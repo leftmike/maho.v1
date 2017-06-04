@@ -20,6 +20,7 @@ const (
 	DATABASES
 	DOUBLE
 	ENGINE
+	IDENTIFIERS
 	INT
 	INTEGER
 	MEDIUMINT
@@ -33,6 +34,7 @@ const (
 
 const (
 	CREATE = -(iota + 1)
+	DEFAULT
 	DELETE
 	EXISTS
 	FROM
@@ -47,15 +49,17 @@ const (
 	TEMPORARY
 	UNIQUE
 	UPDATE
+	VALUES
 	WHERE
 )
 
 var knownIdentifiers = map[string]Identifier{
-	"basic":     BASIC,
-	"columns":   COLUMNS,
-	"databases": DATABASES,
-	"engine":    ENGINE,
-	"tables":    TABLES,
+	"basic":       BASIC,
+	"columns":     COLUMNS,
+	"databases":   DATABASES,
+	"engine":      ENGINE,
+	"identifiers": IDENTIFIERS,
+	"tables":      TABLES,
 }
 
 var knownKeywords = map[string]struct {
@@ -69,6 +73,7 @@ var knownKeywords = map[string]struct {
 	"BOOLEAN":   {BOOLEAN, false},
 	"CHAR":      {CHAR, false},
 	"CREATE":    {CREATE, true},
+	"DEFAULT":   {DEFAULT, true},
 	"DELETE":    {DELETE, true},
 	"DOUBLE":    {DOUBLE, false},
 	"EXISTS":    {EXISTS, true},
@@ -90,16 +95,17 @@ var knownKeywords = map[string]struct {
 	"TINYINT":   {TINYINT, false},
 	"UNIQUE":    {UNIQUE, true},
 	"UPDATE":    {UPDATE, true},
+	"VALUES":    {VALUES, true},
 	"VARBINARY": {VARBINARY, false},
 	"VARCHAR":   {VARCHAR, false},
 	"WHERE":     {WHERE, true},
 }
 
 var (
-	lastIdentifier = Identifier(9999)
+	lastIdentifier = Identifier(999)
 	identifiers    = make(map[string]Identifier)
 	keywords       = make(map[string]Identifier)
-	names          = make(map[Identifier]string)
+	Names          = make(map[Identifier]string)
 )
 
 func Id(s string) Identifier {
@@ -117,7 +123,7 @@ func Id(s string) Identifier {
 	}
 	lastIdentifier += 1
 	identifiers[s] = lastIdentifier
-	names[lastIdentifier] = s
+	Names[lastIdentifier] = s
 	return lastIdentifier
 }
 
@@ -131,12 +137,12 @@ func QuotedId(s string) Identifier {
 	}
 	lastIdentifier += 1
 	identifiers[s] = lastIdentifier
-	names[lastIdentifier] = s
+	Names[lastIdentifier] = s
 	return lastIdentifier
 }
 
 func (id Identifier) String() string {
-	return names[id]
+	return Names[id]
 }
 
 func (id Identifier) IsReserved() bool {
@@ -149,10 +155,10 @@ func (id Identifier) IsReserved() bool {
 func init() {
 	for s, id := range knownIdentifiers {
 		identifiers[strings.ToLower(s)] = id
-		names[id] = s
+		Names[id] = s
 	}
 	for s, n := range knownKeywords {
 		keywords[s] = n.id
-		names[n.id] = s
+		Names[n.id] = s
 	}
 }

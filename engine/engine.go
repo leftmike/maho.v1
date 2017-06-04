@@ -64,6 +64,11 @@ var (
 		{Name: sql.QuotedId("fixed"), Type: sql.BooleanType},
 		{Name: sql.QuotedId("binary"), Type: sql.BooleanType},
 	}
+	identifiersColumns = []sql.Column{
+		{Name: sql.QuotedId("name"), Type: sql.CharacterType, Size: sql.MaxIdentifier},
+		{Name: sql.QuotedId("identifier"), Type: sql.IntegerType, Size: 4},
+		{Name: sql.QuotedId("reserved"), Type: sql.BooleanType},
+	}
 )
 
 type engineRows struct {
@@ -86,14 +91,16 @@ func (es *engineStore) Table(name sql.Identifier) (store.Table, error) {
 		return &engineTable{sql.TABLES, tablesColumns}, nil
 	} else if name == sql.COLUMNS {
 		return &engineTable{sql.COLUMNS, columnsColumns}, nil
+	} else if name == sql.IDENTIFIERS {
+		return &engineTable{sql.IDENTIFIERS, identifiersColumns}, nil
 	}
 
 	return nil, fmt.Errorf("engine: table \"%s\" not found in database \"%s\"", name, sql.ENGINE)
 }
 
 func (es *engineStore) Tables() ([]sql.Identifier, [][]sql.Column) {
-	return []sql.Identifier{sql.DATABASES, sql.TABLES, sql.COLUMNS},
-		[][]sql.Column{databasesColumns, tablesColumns, columnsColumns}
+	return []sql.Identifier{sql.DATABASES, sql.TABLES, sql.COLUMNS, sql.IDENTIFIERS},
+		[][]sql.Column{databasesColumns, tablesColumns, columnsColumns, identifiersColumns}
 }
 
 func (et *engineTable) Name() sql.Identifier {
@@ -129,6 +136,10 @@ func (et *engineTable) Rows() (store.Rows, error) {
 							col.Width, col.Fraction, col.Fixed, col.Binary})
 				}
 			}
+		}
+	case sql.IDENTIFIERS:
+		for id, n := range sql.Names {
+			rows = append(rows, []store.Value{n, int(id), id.IsReserved()})
 		}
 	}
 
