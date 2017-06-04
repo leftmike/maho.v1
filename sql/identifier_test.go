@@ -33,6 +33,15 @@ func TestId(t *testing.T) {
 			t.Errorf("id: \"%s\" == \"%s\"", c.s1, c.s2)
 		}
 	}
+
+	if Id(strings.Repeat("x", MaxIdentifier+1)).String() != strings.Repeat("x", MaxIdentifier) {
+		t.Errorf("id: max identifier")
+	}
+
+	if QuotedId(strings.Repeat("y", MaxIdentifier+2)).String() !=
+		strings.Repeat("y", MaxIdentifier) {
+		t.Errorf("id: max identifier")
+	}
 }
 
 func TestQuotedId(t *testing.T) {

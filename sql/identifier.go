@@ -103,6 +103,10 @@ var (
 )
 
 func Id(s string) Identifier {
+	if len(s) > MaxIdentifier {
+		s = s[:MaxIdentifier]
+	}
+
 	if id, found := keywords[strings.ToUpper(s)]; found {
 		return id
 	}
@@ -118,6 +122,10 @@ func Id(s string) Identifier {
 }
 
 func QuotedId(s string) Identifier {
+	if len(s) > MaxIdentifier {
+		s = s[:MaxIdentifier]
+	}
+
 	if id, found := identifiers[s]; found {
 		return id
 	}

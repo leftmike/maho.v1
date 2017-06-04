@@ -1,7 +1,3 @@
-/*
-identifier.go: use MaxIdentifier
-make a git project
-*/
 package main
 
 import (
