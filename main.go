@@ -7,7 +7,6 @@ import (
 	"maho/engine"
 	"maho/sql"
 	"maho/sql/parser"
-	"maho/store"
 	"os"
 	"strings"
 	"text/tabwriter"
@@ -49,7 +48,7 @@ func parse(rr io.RuneReader, fn string) {
 			}
 			fmt.Fprintln(w)
 
-			dest := make([]store.Value, len(cols))
+			dest := make([]sql.Value, len(cols))
 			for i := 1; rows.Next(dest) == nil; i += 1 {
 				fmt.Fprintf(w, "%d\t", i)
 				for _, v := range dest {

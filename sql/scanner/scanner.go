@@ -15,7 +15,8 @@ const (
 	Identifier
 	Reserved
 	String
-	Number
+	Integer
+	Double
 )
 
 type Position struct {
@@ -34,7 +35,8 @@ type Scanner struct {
 	Error      error
 	Identifier sql.Identifier // Identifier and Reserved
 	String     string
-	Number     int
+	Integer    int64
+	Double     float64
 	Position
 }
 
@@ -204,7 +206,7 @@ func (s *Scanner) scanIdentifier(r rune) rune {
 	return Identifier
 }
 
-func (s *Scanner) scanNumber(r rune, sign int) rune {
+func (s *Scanner) scanNumber(r rune, sign int64) rune {
 	for {
 		s.buffer.WriteRune(r)
 		r = s.readRune()
@@ -220,13 +222,13 @@ func (s *Scanner) scanNumber(r rune, sign int) rune {
 	}
 
 	var err error
-	s.Number, err = strconv.Atoi(s.buffer.String())
+	s.Integer, err = strconv.ParseInt(s.buffer.String(), 10, 64)
 	if err != nil {
 		s.Error = err
 		return Error
 	}
-	s.Number *= sign
-	return Number
+	s.Integer *= sign
+	return Integer
 }
 
 func (s *Scanner) scanQuotedIdentifier(delim rune) rune {

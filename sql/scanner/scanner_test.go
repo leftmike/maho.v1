@@ -21,7 +21,7 @@ func TestScan(t *testing.T) {
 		{"[create]", Identifier},
 		{"\"create\"", Identifier},
 		{"'isn\\'t go fun?'", String},
-		{"12345", Number},
+		{"12345", Integer},
 	}
 
 	for i, c := range cases {
@@ -34,7 +34,7 @@ func TestScan(t *testing.T) {
 
 	numbers := []struct {
 		s string
-		n int
+		n int64
 	}{
 		{"12345", 12345},
 		{"999", 999},
@@ -47,11 +47,11 @@ func TestScan(t *testing.T) {
 	for i, n := range numbers {
 		var s Scanner
 		s.Init(strings.NewReader(n.s), fmt.Sprintf("numbers[%d]", i))
-		if s.Scan() != Number {
+		if s.Scan() != Integer {
 			t.Errorf("scan: \"%s\": not a number", n.s)
 		}
-		if s.Number != n.n {
-			t.Errorf("scan: \"%s\": %d != %d", n.s, s.Number, n.n)
+		if s.Integer != n.n {
+			t.Errorf("scan: \"%s\": %d != %d", n.s, s.Integer, n.n)
 		}
 	}
 

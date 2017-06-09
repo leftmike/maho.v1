@@ -153,12 +153,12 @@ func (p *Parser) maybeRune(mr rune) bool {
 	return false
 }
 
-func (p *Parser) expectNumber(min, max int) int {
-	if p.scan() != scanner.Number || p.scanner.Number < min || p.scanner.Number > max {
+func (p *Parser) expectInteger(min, max int64) int64 {
+	if p.scan() != scanner.Integer || p.scanner.Integer < min || p.scanner.Integer > max {
 		p.error(fmt.Sprintf("expected a number between %d and %d inclusive", min, max))
 	}
 
-	return p.scanner.Number
+	return p.scanner.Integer
 }
 
 func (p *Parser) parseStmt() stmt.Stmt {
@@ -238,7 +238,7 @@ func (p *Parser) parseCreateTable(tmp bool, not bool) stmt.Stmt {
 		p.error("IF NOT EXISTS not implemented")
 	}
 
-	// CREATE TABLE [database .] table ([<column>,] ... )
+	// CREATE TABLE [database .] table ([<column>,] ...)
 	var stmt stmt.CreateTable
 	id := p.expectIdentifier("expected database-name or table-name")
 	if p.maybeRune('.') {
@@ -277,7 +277,7 @@ var types = map[sql.Identifier]sql.Column{
 
 func (p *Parser) parseCreateColumns(stmt *stmt.CreateTable) {
 	/*
-		CREATE TABLE [database .] table ([<column>,] ... )
+		CREATE TABLE [database .] table ([<column>,] ...)
 		<column> = name <data_type>
 		<data_type> =
 			| BINARY [(length)]
@@ -294,6 +294,7 @@ func (p *Parser) parseCreateColumns(stmt *stmt.CreateTable) {
 			| INTEGER [(length)]
 			| BIGINT [(length)]
 	*/
+
 	for {
 		nam := p.expectIdentifier("expected a column name")
 		typ := p.expectIdentifier("expected a data type")
@@ -307,7 +308,7 @@ func (p *Parser) parseCreateColumns(stmt *stmt.CreateTable) {
 
 		if typ == sql.VARCHAR || typ == sql.VARBINARY {
 			p.expectRunes('(')
-			col.Size = uint32(p.expectNumber(0, math.MaxUint32-1))
+			col.Size = uint32(p.expectInteger(0, math.MaxUint32-1))
 			p.expectRunes(')')
 		} else {
 			switch col.Type {
@@ -315,21 +316,21 @@ func (p *Parser) parseCreateColumns(stmt *stmt.CreateTable) {
 				if !p.maybeRune('(') {
 					break
 				}
-				col.Size = uint32(p.expectNumber(0, math.MaxUint32-1))
+				col.Size = uint32(p.expectInteger(0, math.MaxUint32-1))
 				p.expectRunes(')')
 			case sql.DoubleType:
 				if !p.maybeRune('(') {
 					break
 				}
-				col.Width = uint8(p.expectNumber(1, 255))
+				col.Width = uint8(p.expectInteger(1, 255))
 				p.expectRunes(',')
-				col.Fraction = uint8(p.expectNumber(0, 30))
+				col.Fraction = uint8(p.expectInteger(0, 30))
 				p.expectRunes(')')
 			case sql.IntegerType:
 				if !p.maybeRune('(') {
 					break
 				}
-				col.Width = uint8(p.expectNumber(1, 255))
+				col.Width = uint8(p.expectInteger(1, 255))
 				p.expectRunes(')')
 			}
 		}
@@ -355,8 +356,70 @@ func (p *Parser) parseDelete() stmt.Stmt {
 }
 
 func (p *Parser) parseInsert() stmt.Stmt {
-	p.error("INSERT not implemented")
-	return nil
+	/*
+		INSERT INTO [database .] table [(column, ...)] VALUES (<expr> | DEFAULT, ...), ...
+	*/
+
+	var stmt stmt.InsertValues
+	id := p.expectIdentifier("expected database-name or table-name")
+	if p.maybeRune('.') {
+		stmt.Database = id
+		stmt.Table = p.expectIdentifier("expected table-name")
+	} else {
+		stmt.Table = id
+	}
+
+	if p.maybeRune('(') {
+		for {
+			nam := p.expectIdentifier("expected a column name")
+			stmt.Columns = append(stmt.Columns, nam)
+			r := p.expectRunes(',', ')')
+			if r == ')' {
+				break
+			}
+		}
+	}
+
+	p.expectReserved(sql.VALUES)
+
+	for {
+		var row []sql.Value
+
+		p.expectRunes('(')
+		for {
+			r := p.scan()
+			if r == scanner.Reserved {
+				if p.scanner.Identifier == sql.DEFAULT {
+					row = append(row, sql.Default{})
+				} else if p.scanner.Identifier == sql.TRUE {
+					row = append(row, true)
+				} else if p.scanner.Identifier == sql.FALSE {
+					row = append(row, false)
+				} else {
+					p.error(fmt.Sprintf("unexpected identifier: %s", p.scanner.Identifier))
+				}
+			} else if r == scanner.String {
+				row = append(row, p.scanner.String)
+			} else if r == scanner.Integer {
+				row = append(row, p.scanner.Integer)
+			} else {
+				p.error("expected a string, a number, TRUE, FALSE, or DEFAULT for each value")
+			}
+
+			r = p.expectRunes(',', ')')
+			if r == ')' {
+				break
+			}
+		}
+
+		stmt.Rows = append(stmt.Rows, row)
+
+		if !p.maybeRune(',') {
+			break
+		}
+	}
+
+	return &stmt
 }
 
 func (p *Parser) parseSelect() stmt.Stmt {

@@ -37,6 +37,7 @@ const (
 	DEFAULT
 	DELETE
 	EXISTS
+	FALSE
 	FROM
 	IF
 	INDEX
@@ -47,6 +48,7 @@ const (
 	TABLE
 	TEMP
 	TEMPORARY
+	TRUE
 	UNIQUE
 	UPDATE
 	VALUES
@@ -77,6 +79,7 @@ var knownKeywords = map[string]struct {
 	"DELETE":    {DELETE, true},
 	"DOUBLE":    {DOUBLE, false},
 	"EXISTS":    {EXISTS, true},
+	"FALSE":     {FALSE, true},
 	"FROM":      {FROM, true},
 	"IF":        {IF, true},
 	"INDEX":     {INDEX, true},
@@ -93,6 +96,7 @@ var knownKeywords = map[string]struct {
 	"TEMPORARY": {TEMPORARY, true},
 	"TEXT":      {TEXT, false},
 	"TINYINT":   {TINYINT, false},
+	"TRUE":      {TRUE, true},
 	"UNIQUE":    {UNIQUE, true},
 	"UPDATE":    {UPDATE, true},
 	"VALUES":    {VALUES, true},

@@ -73,7 +73,7 @@ var (
 
 type engineRows struct {
 	columns []sql.Column
-	rows    [][]store.Value
+	rows    [][]sql.Value
 	index   int
 }
 
@@ -112,18 +112,18 @@ func (et *engineTable) Columns() []sql.Column {
 }
 
 func (et *engineTable) Rows() (store.Rows, error) {
-	var rows [][]store.Value
+	var rows [][]sql.Value
 
 	switch et.name {
 	case sql.DATABASES:
 		for _, db := range databases {
-			rows = append(rows, []store.Value{db.name, db.store.Type()})
+			rows = append(rows, []sql.Value{db.name, db.store.Type()})
 		}
 	case sql.TABLES:
 		for _, db := range databases {
 			names, cols := db.store.Tables()
 			for i := range names {
-				rows = append(rows, []store.Value{db.name, names[i], len(cols[i])})
+				rows = append(rows, []sql.Value{db.name, names[i], len(cols[i])})
 			}
 		}
 	case sql.COLUMNS:
@@ -132,14 +132,14 @@ func (et *engineTable) Rows() (store.Rows, error) {
 			for i := range names {
 				for _, col := range cols[i] {
 					rows = append(rows,
-						[]store.Value{db.name, names[i], col.Name, col.Type.String(), col.Size,
+						[]sql.Value{db.name, names[i], col.Name, col.Type.String(), col.Size,
 							col.Width, col.Fraction, col.Fixed, col.Binary})
 				}
 			}
 		}
 	case sql.IDENTIFIERS:
 		for id, n := range sql.Names {
-			rows = append(rows, []store.Value{n, int(id), id.IsReserved()})
+			rows = append(rows, []sql.Value{n, int(id), id.IsReserved()})
 		}
 	}
 
@@ -155,7 +155,7 @@ func (er *engineRows) Close() error {
 	return nil
 }
 
-func (er *engineRows) Next(dest []store.Value) error {
+func (er *engineRows) Next(dest []sql.Value) error {
 	if er.index == len(er.rows) {
 		return io.EOF
 	}

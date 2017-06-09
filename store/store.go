@@ -20,7 +20,5 @@ type Table interface {
 type Rows interface {
 	Columns() []sql.Column
 	Close() error
-	Next(dest []Value) error
+	Next(dest []sql.Value) error
 }
-
-type Value interface{}

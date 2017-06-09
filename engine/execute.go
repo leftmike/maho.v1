@@ -21,6 +21,10 @@ func Execute(s stmt.Stmt) error {
 			return fmt.Errorf("engine: database \"%s\" not found", id)
 		}
 		return db.store.CreateTable(stmt.Table, stmt.Columns)
+	case *stmt.InsertValues:
+		fmt.Println(stmt)
+
+		return nil
 	}
 
 	return CanNotBeExecuted
