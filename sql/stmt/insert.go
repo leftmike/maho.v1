@@ -60,3 +60,7 @@ func (stmt *InsertValues) String() string {
 
 	return s
 }
+
+func (stmt *InsertValues) Dispatch(e Executer) (interface{}, error) {
+	return e.InsertValues(stmt)
+}

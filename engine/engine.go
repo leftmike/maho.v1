@@ -13,32 +13,32 @@ type database struct {
 	store store.Store
 }
 
-var (
-	databases       = make(map[sql.Identifier]*database)
+type Engine struct {
+	databases       map[sql.Identifier]*database
 	defaultDatabase sql.Identifier
-)
+}
 
-func Start(id sql.Identifier, name string) error {
+func Start(id sql.Identifier, name string) (*Engine, error) {
 	if id == sql.ENGINE {
-		return fmt.Errorf("engine: \"%s\" not allowed as database name", id)
+		return nil, fmt.Errorf("engine: \"%s\" not allowed as database name", id)
 	}
 	s, err := basic.Make(name)
 	if err != nil {
-		return err
+		return nil, err
 	}
 
-	databases[id] = &database{id, s}
-	defaultDatabase = id
-	return nil
+	e := &Engine{make(map[sql.Identifier]*database), id}
+	e.databases[id] = &database{id, s}
+	e.databases[sql.ENGINE] = &database{sql.ENGINE, &engineStore{e}}
+	return e, nil
 }
 
-func init() {
-	databases[sql.ENGINE] = &database{sql.ENGINE, &engineStore{}}
+type engineStore struct {
+	engine *Engine
 }
-
-type engineStore struct{}
 
 type engineTable struct {
+	engine  *Engine
 	name    sql.Identifier
 	columns []sql.Column
 }
@@ -88,13 +88,13 @@ func (es *engineStore) CreateTable(name sql.Identifier, cols []sql.Column) error
 
 func (es *engineStore) Table(name sql.Identifier) (store.Table, error) {
 	if name == sql.DATABASES {
-		return &engineTable{sql.DATABASES, databasesColumns}, nil
+		return &engineTable{es.engine, sql.DATABASES, databasesColumns}, nil
 	} else if name == sql.TABLES {
-		return &engineTable{sql.TABLES, tablesColumns}, nil
+		return &engineTable{es.engine, sql.TABLES, tablesColumns}, nil
 	} else if name == sql.COLUMNS {
-		return &engineTable{sql.COLUMNS, columnsColumns}, nil
+		return &engineTable{es.engine, sql.COLUMNS, columnsColumns}, nil
 	} else if name == sql.IDENTIFIERS {
-		return &engineTable{sql.IDENTIFIERS, identifiersColumns}, nil
+		return &engineTable{es.engine, sql.IDENTIFIERS, identifiersColumns}, nil
 	}
 
 	return nil, fmt.Errorf("engine: table \"%s\" not found in database \"%s\"", name, sql.ENGINE)
@@ -118,18 +118,18 @@ func (et *engineTable) Rows() (store.Rows, error) {
 
 	switch et.name {
 	case sql.DATABASES:
-		for _, db := range databases {
+		for _, db := range et.engine.databases {
 			rows = append(rows, []sql.Value{db.name, db.store.Type()})
 		}
 	case sql.TABLES:
-		for _, db := range databases {
+		for _, db := range et.engine.databases {
 			names, cols := db.store.Tables()
 			for i := range names {
 				rows = append(rows, []sql.Value{db.name, names[i], len(cols[i])})
 			}
 		}
 	case sql.COLUMNS:
-		for _, db := range databases {
+		for _, db := range et.engine.databases {
 			names, cols := db.store.Tables()
 			for i := range names {
 				for _, col := range cols[i] {

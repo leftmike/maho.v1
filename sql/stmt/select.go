@@ -13,3 +13,7 @@ type Select struct {
 func (stmt *Select) String() string {
 	return fmt.Sprintf("SELECT * FROM %s.%s", stmt.Database, stmt.Table)
 }
+
+func (stmt *Select) Dispatch(e Executer) (interface{}, error) {
+	return e.Select(stmt)
+}

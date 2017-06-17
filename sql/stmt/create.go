@@ -39,3 +39,7 @@ func (stmt *CreateTable) String() string {
 	s += ")"
 	return s
 }
+
+func (stmt *CreateTable) Dispatch(e Executer) (interface{}, error) {
+	return e.CreateTable(stmt)
+}
