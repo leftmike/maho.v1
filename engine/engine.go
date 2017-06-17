@@ -8,14 +8,9 @@ import (
 	"maho/store/basic"
 )
 
-type database struct {
-	name  sql.Identifier
-	store store.Store
-}
-
 type Engine struct {
-	databases       map[sql.Identifier]*database
-	defaultDatabase sql.Identifier
+	stores       map[sql.Identifier]store.Store
+	defaultStore sql.Identifier
 }
 
 func Start(id sql.Identifier, name string) (*Engine, error) {
@@ -27,9 +22,9 @@ func Start(id sql.Identifier, name string) (*Engine, error) {
 		return nil, err
 	}
 
-	e := &Engine{make(map[sql.Identifier]*database), id}
-	e.databases[id] = &database{id, s}
-	e.databases[sql.ENGINE] = &database{sql.ENGINE, &engineStore{e}}
+	e := &Engine{make(map[sql.Identifier]store.Store), id}
+	e.stores[s.Name()] = s
+	e.stores[sql.ENGINE] = &engineStore{e}
 	return e, nil
 }
 
@@ -136,19 +131,19 @@ func (et *engineTable) Rows() (store.Rows, error) {
 
 	switch et.name {
 	case sql.DATABASES:
-		for _, db := range et.engine.databases {
-			rows = append(rows, []sql.Value{db.name, db.store.Type()})
+		for _, s := range et.engine.stores {
+			rows = append(rows, []sql.Value{s.Name(), s.Type()})
 		}
 	case sql.TABLES:
-		for _, db := range et.engine.databases {
-			names, cols := db.store.Tables()
+		for _, s := range et.engine.stores {
+			names, cols := s.Tables()
 			for i := range names {
-				rows = append(rows, []sql.Value{db.name, names[i], len(cols[i])})
+				rows = append(rows, []sql.Value{s.Name(), names[i], len(cols[i])})
 			}
 		}
 	case sql.COLUMNS:
-		for _, db := range et.engine.databases {
-			names, cols := db.store.Tables()
+		for _, s := range et.engine.stores {
+			names, cols := s.Tables()
 			for i := range names {
 				for _, col := range cols[i] {
 					def := col.Default
@@ -156,7 +151,7 @@ func (et *engineTable) Rows() (store.Rows, error) {
 						def = sql.Null{}
 					}
 					rows = append(rows,
-						[]sql.Value{db.name, names[i], col.Name, col.Type.String(), col.Size,
+						[]sql.Value{s.Name(), names[i], col.Name, col.Type.String(), col.Size,
 							col.Width, col.Fraction, col.Fixed, col.Binary, col.NotNull, def})
 				}
 			}

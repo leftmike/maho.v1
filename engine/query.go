@@ -9,13 +9,13 @@ import (
 
 func (e *Engine) lookupTable(db, tbl sql.Identifier) (store.Table, error) {
 	if db == 0 {
-		db = e.defaultDatabase
+		db = e.defaultStore
 	}
-	database, ok := e.databases[db]
+	s, ok := e.stores[db]
 	if !ok {
 		return nil, fmt.Errorf("engine: database \"%s\" not found", db)
 	}
-	return database.store.Table(tbl)
+	return s.Table(tbl)
 }
 
 func (e *Engine) Select(stmt *stmt.Select) (store.Rows, error) {

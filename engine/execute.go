@@ -10,13 +10,13 @@ func (e *Engine) CreateTable(stmt *stmt.CreateTable) (interface{}, error) {
 	fmt.Println(stmt)
 	id := stmt.Database
 	if id == 0 {
-		id = e.defaultDatabase
+		id = e.defaultStore
 	}
-	db, ok := e.databases[id]
+	s, ok := e.stores[id]
 	if !ok {
 		return nil, fmt.Errorf("engine: database \"%s\" not found", id)
 	}
-	return db.store.CreateTable(stmt.Table, stmt.Columns), nil
+	return s.CreateTable(stmt.Table, stmt.Columns), nil
 }
 
 func (e *Engine) InsertValues(stmt *stmt.InsertValues) (interface{}, error) {
