@@ -305,6 +305,12 @@ func (p *Parser) parseCreateColumns(stmt *stmt.CreateTable) {
 
 	for {
 		nam := p.expectIdentifier("expected a column name")
+		for _, c := range stmt.Columns {
+			if c.Name == nam {
+				p.error(fmt.Sprintf("duplicate column name: %s", nam))
+			}
+		}
+
 		typ := p.expectIdentifier("expected a data type")
 		def, found := types[typ]
 		if !found {
@@ -420,6 +426,11 @@ func (p *Parser) parseInsert() stmt.Stmt {
 	if p.maybeRune('(') {
 		for {
 			nam := p.expectIdentifier("expected a column name")
+			for _, c := range stmt.Columns {
+				if c == nam {
+					p.error(fmt.Sprintf("duplicate column name: %s", nam))
+				}
+			}
 			stmt.Columns = append(stmt.Columns, nam)
 			r := p.expectRunes(',', ')')
 			if r == ')' {

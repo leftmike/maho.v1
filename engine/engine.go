@@ -38,9 +38,10 @@ type engineStore struct {
 }
 
 type engineTable struct {
-	engine  *Engine
-	name    sql.Identifier
-	columns []sql.Column
+	engine    *Engine
+	name      sql.Identifier
+	columns   []sql.Column
+	columnMap store.ColumnMap
 }
 
 var (
@@ -87,17 +88,26 @@ func (es *engineStore) CreateTable(name sql.Identifier, cols []sql.Column) error
 }
 
 func (es *engineStore) Table(name sql.Identifier) (store.Table, error) {
+	var cols []sql.Column
+
 	if name == sql.DATABASES {
-		return &engineTable{es.engine, sql.DATABASES, databasesColumns}, nil
+		cols = databasesColumns
 	} else if name == sql.TABLES {
-		return &engineTable{es.engine, sql.TABLES, tablesColumns}, nil
+		cols = tablesColumns
 	} else if name == sql.COLUMNS {
-		return &engineTable{es.engine, sql.COLUMNS, columnsColumns}, nil
+		cols = columnsColumns
 	} else if name == sql.IDENTIFIERS {
-		return &engineTable{es.engine, sql.IDENTIFIERS, identifiersColumns}, nil
+		cols = identifiersColumns
+	} else {
+		return nil, fmt.Errorf("engine: table \"%s\" not found in database \"%s\"", name,
+			sql.ENGINE)
 	}
 
-	return nil, fmt.Errorf("engine: table \"%s\" not found in database \"%s\"", name, sql.ENGINE)
+	cmap := make(store.ColumnMap)
+	for i, c := range cols {
+		cmap[c.Name] = i
+	}
+	return &engineTable{es.engine, name, cols, cmap}, nil
 }
 
 func (es *engineStore) Tables() ([]sql.Identifier, [][]sql.Column) {
@@ -111,6 +121,10 @@ func (et *engineTable) Name() sql.Identifier {
 
 func (et *engineTable) Columns() []sql.Column {
 	return et.columns
+}
+
+func (et *engineTable) ColumnMap() store.ColumnMap {
+	return et.columnMap
 }
 
 func (et *engineTable) Rows() (store.Rows, error) {
@@ -155,6 +169,7 @@ func (et *engineTable) Rows() (store.Rows, error) {
 func (et *engineTable) Insert(row []sql.Value) error {
 	return fmt.Errorf("engine: \"%s.%s\" table can't be modified", sql.ENGINE, et.name)
 }
+
 func (er *engineRows) Columns() []sql.Column {
 	return er.columns
 }

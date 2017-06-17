@@ -11,9 +11,12 @@ type Store interface {
 	Tables() ([]sql.Identifier, [][]sql.Column)
 }
 
+type ColumnMap map[sql.Identifier]int
+
 type Table interface {
 	Name() sql.Identifier
 	Columns() []sql.Column
+	ColumnMap() ColumnMap
 	Rows() (Rows, error)
 	Insert(row []sql.Value) error
 }

@@ -45,6 +45,8 @@ func TestCreateTable(t *testing.T) {
 		{sql: "create table test ()", fail: true},
 		{sql: "create table test (c)", fail: true},
 		{sql: "create table (c int)", fail: true},
+		{sql: "create table t (c int, c bool)", fail: true},
+		{sql: "create table t (c int, d bool, c char(1))", fail: true},
 		{sql: "create table t (c int) default", fail: true},
 		{sql: "create table . (c int)", fail: true},
 		{sql: "create table .t (c int)", fail: true},
@@ -333,6 +335,11 @@ func TestInsertValues(t *testing.T) {
 		{sql: "insert into t values (1, )", fail: true},
 		{sql: "insert into t values (1, 2),", fail: true},
 		{sql: "insert into t values (1, 2) (3)", fail: true},
+		{sql: "insert into t () values (1, 2)", fail: true},
+		{sql: "insert into t (a values (1, 2)", fail: true},
+		{sql: "insert into t (a, ) values (1, 2)", fail: true},
+		{sql: "insert into t (a, a) values (1, 2)", fail: true},
+		{sql: "insert into t (a, b, a) values (1, 2)", fail: true},
 		{
 			sql: "insert into t values (1, 'abc', true)",
 			stmt: stmt.InsertValues{

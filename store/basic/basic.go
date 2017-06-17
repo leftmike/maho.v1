@@ -2,6 +2,7 @@ package basic
 
 import (
 	"fmt"
+	"io"
 	"maho/sql"
 	"maho/store"
 )
@@ -12,8 +13,16 @@ type basicStore struct {
 }
 
 type basicTable struct {
-	name    sql.Identifier
+	name      sql.Identifier
+	columns   []sql.Column
+	columnMap store.ColumnMap
+	rows      [][]sql.Value
+}
+
+type basicRows struct {
 	columns []sql.Column
+	rows    [][]sql.Value
+	index   int
 }
 
 func Make(name string) (store.Store, error) {
@@ -31,7 +40,11 @@ func (bs *basicStore) CreateTable(name sql.Identifier, cols []sql.Column) error 
 	if _, ok := bs.tables[name]; ok {
 		return fmt.Errorf("basic: table \"%s\" already exists in database \"%s\"", name, bs.name)
 	}
-	tbl := basicTable{name, cols}
+	cmap := make(store.ColumnMap)
+	for i, c := range cols {
+		cmap[c.Name] = i
+	}
+	tbl := basicTable{name, cols, cmap, nil}
 	bs.tables[name] = &tbl
 	return nil
 }
@@ -65,10 +78,33 @@ func (bt *basicTable) Columns() []sql.Column {
 	return bt.columns
 }
 
+func (bt *basicTable) ColumnMap() store.ColumnMap {
+	return bt.columnMap
+}
+
 func (bt *basicTable) Rows() (store.Rows, error) {
-	return nil, fmt.Errorf("basic: not implemented")
+	return &basicRows{columns: bt.columns, rows: bt.rows}, nil
 }
 
 func (bt *basicTable) Insert(row []sql.Value) error {
-	return fmt.Errorf("basic: not implemented")
+	bt.rows = append(bt.rows, row)
+	return nil
+}
+
+func (bt *basicRows) Columns() []sql.Column {
+	return bt.columns
+}
+
+func (bt *basicRows) Close() error {
+	bt.index = len(bt.rows)
+	return nil
+}
+
+func (bt *basicRows) Next(dest []sql.Value) error {
+	if bt.index == len(bt.rows) {
+		return io.EOF
+	}
+	copy(dest, bt.rows[bt.index])
+	bt.index += 1
+	return nil
 }
