@@ -5,6 +5,7 @@ import (
 )
 
 type Store interface {
+	Name() sql.Identifier
 	Type() sql.Identifier
 	CreateTable(name sql.Identifier, cols []sql.Column) error
 	Table(name sql.Identifier) (Table, error)

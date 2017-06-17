@@ -22,7 +22,7 @@ func Start(id sql.Identifier, name string) (*Engine, error) {
 	if id == sql.ENGINE {
 		return nil, fmt.Errorf("engine: \"%s\" not allowed as database name", id)
 	}
-	s, err := basic.Make(name)
+	s, err := basic.Make(id, name)
 	if err != nil {
 		return nil, err
 	}
@@ -78,6 +78,10 @@ type engineRows struct {
 	columns []sql.Column
 	rows    [][]sql.Value
 	index   int
+}
+
+func (es *engineStore) Name() sql.Identifier {
+	return sql.ENGINE
 }
 
 func (es *engineStore) Type() sql.Identifier {

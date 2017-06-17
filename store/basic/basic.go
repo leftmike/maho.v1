@@ -8,7 +8,7 @@ import (
 )
 
 type basicStore struct {
-	name   string
+	name   sql.Identifier
 	tables map[sql.Identifier]*basicTable
 }
 
@@ -25,11 +25,15 @@ type basicRows struct {
 	index   int
 }
 
-func Make(name string) (store.Store, error) {
+func Make(id sql.Identifier, name string) (store.Store, error) {
 	var bs basicStore
-	bs.name = name
+	bs.name = id
 	bs.tables = make(map[sql.Identifier]*basicTable)
 	return &bs, nil
+}
+
+func (bs *basicStore) Name() sql.Identifier {
+	return bs.name
 }
 
 func (bs *basicStore) Type() sql.Identifier {
