@@ -36,7 +36,9 @@ func (p *Parser) Parse() (stmt stmt.Stmt, err error) {
 		}
 	}()
 
-	return p.parseStmt(), nil
+	stmt = p.parseStmt()
+	p.expectEOF()
+	return
 }
 
 func (p *Parser) error(msg string) {
@@ -161,6 +163,12 @@ func (p *Parser) expectInteger(min, max int64) int64 {
 	return p.scanner.Integer
 }
 
+func (p *Parser) expectEOF() {
+	if p.scan() != scanner.EOF {
+		p.error(fmt.Sprintf("expected the end of the statement"))
+	}
+}
+
 func (p *Parser) parseStmt() stmt.Stmt {
 	switch p.expectReserved(sql.CREATE, sql.DELETE, sql.INSERT, sql.SELECT, sql.UPDATE) {
 	case sql.CREATE:
@@ -278,7 +286,7 @@ var types = map[sql.Identifier]sql.Column{
 func (p *Parser) parseCreateColumns(stmt *stmt.CreateTable) {
 	/*
 		CREATE TABLE [database .] table ([<column>,] ...)
-		<column> = name <data_type>
+		<column> = name <data_type> [DEFAULT <expr>] | [NOT NULL]
 		<data_type> =
 			| BINARY [(length)]
 			| VARBINARY [(length)]
@@ -339,7 +347,22 @@ func (p *Parser) parseCreateColumns(stmt *stmt.CreateTable) {
 			col.Binary = true
 		}
 
-		// other optional stuff here
+		for {
+			if p.optionalReserved(sql.DEFAULT) {
+				if col.Default != nil {
+					p.error("DEFAULT specified more than once per column")
+				}
+				col.Default = p.parseExpression(false)
+			} else if p.optionalReserved(sql.NOT) {
+				p.expectReserved(sql.NULL)
+				if col.NotNull {
+					p.error("NOT NULL specified more than once per column")
+				}
+				col.NotNull = true
+			} else {
+				break
+			}
+		}
 
 		stmt.Columns = append(stmt.Columns, col)
 
@@ -352,6 +375,31 @@ func (p *Parser) parseCreateColumns(stmt *stmt.CreateTable) {
 
 func (p *Parser) parseDelete() stmt.Stmt {
 	p.error("DELETE not implemented")
+	return nil
+}
+
+func (p *Parser) parseExpression(df bool) sql.Value {
+	r := p.scan()
+	if r == scanner.Reserved {
+		if df && p.scanner.Identifier == sql.DEFAULT {
+			return sql.Default{}
+		} else if p.scanner.Identifier == sql.TRUE {
+			return true
+		} else if p.scanner.Identifier == sql.FALSE {
+			return false
+		} else {
+			p.error(fmt.Sprintf("unexpected identifier: %s", p.scanner.Identifier))
+		}
+	} else if r == scanner.String {
+		return p.scanner.String
+	} else if r == scanner.Integer {
+		return p.scanner.Integer
+	}
+
+	if df {
+		p.error("expected a string, a number, TRUE, FALSE or DEFAULT for each value")
+	}
+	p.error("expected a string, a number, TRUE or FALSE for each value")
 	return nil
 }
 
@@ -387,26 +435,8 @@ func (p *Parser) parseInsert() stmt.Stmt {
 
 		p.expectRunes('(')
 		for {
-			r := p.scan()
-			if r == scanner.Reserved {
-				if p.scanner.Identifier == sql.DEFAULT {
-					row = append(row, sql.Default{})
-				} else if p.scanner.Identifier == sql.TRUE {
-					row = append(row, true)
-				} else if p.scanner.Identifier == sql.FALSE {
-					row = append(row, false)
-				} else {
-					p.error(fmt.Sprintf("unexpected identifier: %s", p.scanner.Identifier))
-				}
-			} else if r == scanner.String {
-				row = append(row, p.scanner.String)
-			} else if r == scanner.Integer {
-				row = append(row, p.scanner.Integer)
-			} else {
-				p.error("expected a string, a number, TRUE, FALSE, or DEFAULT for each value")
-			}
-
-			r = p.expectRunes(',', ')')
+			row = append(row, p.parseExpression(true))
+			r := p.expectRunes(',', ')')
 			if r == ')' {
 				break
 			}

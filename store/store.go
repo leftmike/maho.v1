@@ -15,6 +15,7 @@ type Table interface {
 	Name() sql.Identifier
 	Columns() []sql.Column
 	Rows() (Rows, error)
+	Insert(row []sql.Value) error
 }
 
 type Rows interface {

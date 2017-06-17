@@ -29,6 +29,12 @@ func (stmt *CreateTable) String() string {
 		} else if col.Type == sql.DoubleType && (col.Width < 255 || col.Fraction < 30) {
 			s += fmt.Sprintf("(%d, %d)", col.Width, col.Fraction)
 		}
+		if col.NotNull {
+			s += " NOT NULL"
+		}
+		if col.Default != nil {
+			s += fmt.Sprintf(" DEFAULT %s", sql.FormatValue(col.Default))
+		}
 	}
 	s += ")"
 	return s

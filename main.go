@@ -1,5 +1,40 @@
 package main
 
+/*
+To Do:
+
+maho/sql/stmt:
+
+type Executer { // implemented by Engine
+    CreateTable(stmt stmt.CreateTable) (interface{}, error)
+    InsertValues(stmt stmt.InsertValues) (Result, error)
+    SelectAll(stmt stmt.SelectAll) (store.Rows, error)
+}
+
+type Dispatcher { // implemented by Statements
+    Dispatch(e Executer) (interface{}, error)
+}
+
+func (stmt *CreateTable) Dispatch(e Executer) {
+    return e.CreateTable(stmt)
+}
+
+maho/main:
+
+    stmt,err := p.Parse()
+    ret, err := stmt.Dispatch(eng)
+    if rows, ok := ret.(store.Rows); ok {
+        // display rows
+    } else if res, ok := ret.(store.Result); ok {
+        // display result
+    }
+
+maho/engine:
+
+func (e *Engine) CreateTable(stmt stmt.CreateTable) (interface{}, error)
+
+*/
+
 import (
 	"bufio"
 	"fmt"
@@ -52,7 +87,7 @@ func parse(rr io.RuneReader, fn string) {
 			for i := 1; rows.Next(dest) == nil; i += 1 {
 				fmt.Fprintf(w, "%d\t", i)
 				for _, v := range dest {
-					fmt.Fprintf(w, "%v\t", v)
+					fmt.Fprintf(w, "%s\t", sql.FormatValue(v))
 				}
 				fmt.Fprintln(w)
 			}

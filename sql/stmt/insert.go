@@ -52,7 +52,7 @@ func (stmt *InsertValues) String() string {
 			if j > 0 {
 				s += ", "
 			}
-			s += fmt.Sprintf("%v", v)
+			s += sql.FormatValue(v)
 		}
 
 		s += ")"

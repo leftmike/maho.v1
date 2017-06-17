@@ -63,6 +63,8 @@ var (
 		{Name: sql.QuotedId("fraction"), Type: sql.IntegerType, Size: 1},
 		{Name: sql.QuotedId("fixed"), Type: sql.BooleanType},
 		{Name: sql.QuotedId("binary"), Type: sql.BooleanType},
+		{Name: sql.QuotedId("not_null"), Type: sql.BooleanType},
+		{Name: sql.QuotedId("default"), Type: sql.CharacterType, Size: sql.MaxIdentifier},
 	}
 	identifiersColumns = []sql.Column{
 		{Name: sql.QuotedId("name"), Type: sql.CharacterType, Size: sql.MaxIdentifier},
@@ -131,9 +133,13 @@ func (et *engineTable) Rows() (store.Rows, error) {
 			names, cols := db.store.Tables()
 			for i := range names {
 				for _, col := range cols[i] {
+					def := col.Default
+					if def == nil {
+						def = sql.Null{}
+					}
 					rows = append(rows,
 						[]sql.Value{db.name, names[i], col.Name, col.Type.String(), col.Size,
-							col.Width, col.Fraction, col.Fixed, col.Binary})
+							col.Width, col.Fraction, col.Fixed, col.Binary, col.NotNull, def})
 				}
 			}
 		}
@@ -146,6 +152,9 @@ func (et *engineTable) Rows() (store.Rows, error) {
 	return &engineRows{columns: et.columns, rows: rows}, nil
 }
 
+func (et *engineTable) Insert(row []sql.Value) error {
+	return fmt.Errorf("engine: \"%s.%s\" table can't be modified", sql.ENGINE, et.name)
+}
 func (er *engineRows) Columns() []sql.Column {
 	return er.columns
 }

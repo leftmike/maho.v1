@@ -68,3 +68,7 @@ func (bt *basicTable) Columns() []sql.Column {
 func (bt *basicTable) Rows() (store.Rows, error) {
 	return nil, fmt.Errorf("basic: not implemented")
 }
+
+func (bt *basicTable) Insert(row []sql.Value) error {
+	return fmt.Errorf("basic: not implemented")
+}

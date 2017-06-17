@@ -10,11 +10,15 @@ type Column struct {
 	Type DataType
 
 	// Size of the column in bytes for integers and in characters for character columns
-	Size     uint32
+	Size uint32
+
 	Width    uint8 // display width of integers and doubles
 	Fraction uint8 // display width of fractional part of doubles
 	Fixed    bool  // fixed sized character column
 	Binary   bool  // binary character column
+
+	NotNull bool
+	Default Value
 }
 
 func (col Column) DataType() string {

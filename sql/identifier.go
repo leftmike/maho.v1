@@ -1,6 +1,7 @@
 package sql
 
 import (
+	"fmt"
 	"strings"
 )
 
@@ -44,6 +45,7 @@ const (
 	INSERT
 	INTO
 	NOT
+	NULL
 	SELECT
 	TABLE
 	TEMP
@@ -89,6 +91,7 @@ var knownKeywords = map[string]struct {
 	"INTO":      {INTO, true},
 	"MEDIUMINT": {MEDIUMINT, false},
 	"NOT":       {NOT, true},
+	"NULL":      {NULL, true},
 	"SELECT":    {SELECT, true},
 	"SMALLINT":  {SMALLINT, false},
 	"TABLE":     {TABLE, true},
@@ -147,6 +150,10 @@ func QuotedId(s string) Identifier {
 
 func (id Identifier) String() string {
 	return Names[id]
+}
+
+func (id Identifier) Format() string {
+	return fmt.Sprintf("'%s'", Names[id])
 }
 
 func (id Identifier) IsReserved() bool {
