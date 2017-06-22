@@ -6,19 +6,6 @@ import (
 	"maho/sql/stmt"
 )
 
-func (e *Engine) CreateTable(stmt *stmt.CreateTable) (interface{}, error) {
-	fmt.Println(stmt)
-	id := stmt.Database
-	if id == 0 {
-		id = e.defaultStore
-	}
-	s, ok := e.stores[id]
-	if !ok {
-		return nil, fmt.Errorf("engine: database \"%s\" not found", id)
-	}
-	return s.CreateTable(stmt.Table, stmt.Columns), nil
-}
-
 func (e *Engine) InsertValues(stmt *stmt.InsertValues) (interface{}, error) {
 	fmt.Println(stmt)
 
@@ -59,21 +46,14 @@ func (e *Engine) InsertValues(stmt *stmt.InsertValues) (interface{}, error) {
 			var v sql.Value
 			if c2v[i] < len(r) {
 				v = r[c2v[i]]
-				if _, ok := v.(sql.Default); ok {
-					v = nil
-				}
+			} else {
+				v = sql.Default{}
 			}
-			if v == nil {
-				if c.NotNull && c.Default == nil {
-					return nil, fmt.Errorf("engine: %s: value must be specified for column: %s",
-						tbl.Name(), c.Name)
-				} else if c.Default == nil {
-					v = sql.Null{}
-				} else {
-					v = c.Default
-				}
+
+			row[i], err = c.ConvertValue(v)
+			if err != nil {
+				return nil, fmt.Errorf("%s: %s", tbl.Name(), err.Error())
 			}
-			row[i] = v
 		}
 
 		err := tbl.Insert(row)

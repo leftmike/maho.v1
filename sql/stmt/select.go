@@ -11,7 +11,13 @@ type Select struct {
 }
 
 func (stmt *Select) String() string {
-	return fmt.Sprintf("SELECT * FROM %s.%s", stmt.Database, stmt.Table)
+	s := "SELECT * FROM "
+	if stmt.Database == 0 {
+		s += fmt.Sprintf("%s ", stmt.Table)
+	} else {
+		s += fmt.Sprintf("%s.%s ", stmt.Database, stmt.Table)
+	}
+	return s
 }
 
 func (stmt *Select) Dispatch(e Executer) (interface{}, error) {

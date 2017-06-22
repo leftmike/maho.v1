@@ -95,20 +95,20 @@ func (bt *basicTable) Insert(row []sql.Value) error {
 	return nil
 }
 
-func (bt *basicRows) Columns() []sql.Column {
-	return bt.columns
+func (br *basicRows) Columns() []sql.Column {
+	return br.columns
 }
 
-func (bt *basicRows) Close() error {
-	bt.index = len(bt.rows)
+func (br *basicRows) Close() error {
+	br.index = len(br.rows)
 	return nil
 }
 
-func (bt *basicRows) Next(dest []sql.Value) error {
-	if bt.index == len(bt.rows) {
+func (br *basicRows) Next(dest []sql.Value) error {
+	if br.index == len(br.rows) {
 		return io.EOF
 	}
-	copy(dest, bt.rows[bt.index])
-	bt.index += 1
+	copy(dest, br.rows[br.index])
+	br.index += 1
 	return nil
 }

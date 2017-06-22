@@ -5,29 +5,20 @@ import (
 	"maho/sql"
 )
 
-type InsertInto struct {
+type InsertValues struct {
 	Database sql.Identifier
 	Table    sql.Identifier
+	Columns  []sql.Identifier
+	Rows     [][]sql.Value
 }
 
-type InsertValues struct {
-	InsertInto
-	Columns []sql.Identifier
-	Rows    [][]sql.Value
-}
-
-func (stmt *InsertInto) String() string {
+func (stmt *InsertValues) String() string {
 	s := "INSERT INTO "
 	if stmt.Database == 0 {
 		s += fmt.Sprintf("%s ", stmt.Table)
 	} else {
 		s += fmt.Sprintf("%s.%s ", stmt.Database, stmt.Table)
 	}
-	return s
-}
-
-func (stmt *InsertValues) String() string {
-	s := stmt.InsertInto.String()
 	if stmt.Columns != nil {
 		s += "("
 		for i, col := range stmt.Columns {

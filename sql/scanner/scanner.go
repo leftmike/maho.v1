@@ -207,6 +207,7 @@ func (s *Scanner) scanIdentifier(r rune) rune {
 }
 
 func (s *Scanner) scanNumber(r rune, sign int64) rune {
+	dbl := false
 	for {
 		s.buffer.WriteRune(r)
 		r = s.readRune()
@@ -215,20 +216,31 @@ func (s *Scanner) scanNumber(r rune, sign int64) rune {
 		} else if r == Error {
 			return Error
 		}
-		if !unicode.IsDigit(r) {
+		if !dbl && r == '.' {
+			dbl = true
+		} else if !unicode.IsDigit(r) {
 			s.unreadRune()
 			break
 		}
 	}
 
 	var err error
-	s.Integer, err = strconv.ParseInt(s.buffer.String(), 10, 64)
+	if dbl {
+		s.Double, err = strconv.ParseFloat(s.buffer.String(), 64)
+	} else {
+		s.Integer, err = strconv.ParseInt(s.buffer.String(), 10, 64)
+	}
 	if err != nil {
 		s.Error = err
 		return Error
 	}
-	s.Integer *= sign
-	return Integer
+	if dbl {
+		s.Double *= float64(sign)
+		return Double
+	} else {
+		s.Integer *= sign
+		return Integer
+	}
 }
 
 func (s *Scanner) scanQuotedIdentifier(delim rune) rune {

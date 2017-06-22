@@ -13,15 +13,15 @@ type Formatter interface {
 
 func FormatValue(v Value) string {
 	if v == nil {
-		return ""
+		return "NULL"
 	}
 
 	switch reflect.TypeOf(v).Kind() {
 	case reflect.Bool:
 		if reflect.ValueOf(v).Bool() {
-			return "TRUE"
+			return "t"
 		}
-		return "FALSE"
+		return "f"
 	case reflect.String:
 		return fmt.Sprintf("'%v'", v)
 	}

@@ -343,19 +343,22 @@ func TestInsertValues(t *testing.T) {
 		{
 			sql: "insert into t values (1, 'abc', true)",
 			stmt: stmt.InsertValues{
-				InsertInto: stmt.InsertInto{
-					Table: sql.Id("t"),
-				},
-				Rows: [][]sql.Value{{int64(1), "abc", true}},
+				Table: sql.Id("t"),
+				Rows:  [][]sql.Value{{int64(1), "abc", true}},
 			},
 		},
 		{
 			sql: "insert into t values (1, 'abc', true), (2, 'def', false)",
 			stmt: stmt.InsertValues{
-				InsertInto: stmt.InsertInto{
-					Table: sql.Id("t"),
-				},
-				Rows: [][]sql.Value{{int64(1), "abc", true}, {int64(2), "def", false}},
+				Table: sql.Id("t"),
+				Rows:  [][]sql.Value{{int64(1), "abc", true}, {int64(2), "def", false}},
+			},
+		},
+		{
+			sql: "insert into t values (NULL, 'abc', NULL)",
+			stmt: stmt.InsertValues{
+				Table: sql.Id("t"),
+				Rows:  [][]sql.Value{{nil, "abc", nil}},
 			},
 		},
 	}

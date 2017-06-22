@@ -22,6 +22,7 @@ func TestScan(t *testing.T) {
 		{"\"create\"", Identifier},
 		{"'isn\\'t go fun?'", String},
 		{"12345", Integer},
+		{"1234.5678", Double},
 	}
 
 	for i, c := range cases {
@@ -32,7 +33,7 @@ func TestScan(t *testing.T) {
 		}
 	}
 
-	numbers := []struct {
+	integers := []struct {
 		s string
 		n int64
 	}{
@@ -44,14 +45,37 @@ func TestScan(t *testing.T) {
 		{"+123", 123},
 	}
 
-	for i, n := range numbers {
+	for i, n := range integers {
 		var s Scanner
-		s.Init(strings.NewReader(n.s), fmt.Sprintf("numbers[%d]", i))
+		s.Init(strings.NewReader(n.s), fmt.Sprintf("integers[%d]", i))
 		if s.Scan() != Integer {
-			t.Errorf("scan: \"%s\": not a number", n.s)
+			t.Errorf("scan: \"%s\": not an integer", n.s)
 		}
 		if s.Integer != n.n {
 			t.Errorf("scan: \"%s\": %d != %d", n.s, s.Integer, n.n)
+		}
+	}
+
+	doubles := []struct {
+		s string
+		n float64
+	}{
+		{"123.456", 123.456},
+		{"999.", 999.0},
+		{"99.9 ", 99.9},
+		{"9.99zzz", 9.99},
+		{"-12.3", -12.3},
+		{"+1.23", 1.23},
+	}
+
+	for i, n := range doubles {
+		var s Scanner
+		s.Init(strings.NewReader(n.s), fmt.Sprintf("doubles[%d]", i))
+		if s.Scan() != Double {
+			t.Errorf("scan: \"%s\": not an double", n.s)
+		}
+		if s.Double != n.n {
+			t.Errorf("scan: \"%s\": %d != %d", n.s, s.Double, n.n)
 		}
 	}
 

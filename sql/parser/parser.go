@@ -393,6 +393,8 @@ func (p *Parser) parseExpression(df bool) sql.Value {
 			return true
 		} else if p.scanner.Identifier == sql.FALSE {
 			return false
+		} else if p.scanner.Identifier == sql.NULL {
+			return nil
 		} else {
 			p.error(fmt.Sprintf("unexpected identifier: %s", p.scanner.Identifier))
 		}
@@ -400,12 +402,14 @@ func (p *Parser) parseExpression(df bool) sql.Value {
 		return p.scanner.String
 	} else if r == scanner.Integer {
 		return p.scanner.Integer
+	} else if r == scanner.Double {
+		return p.scanner.Double
 	}
 
 	if df {
-		p.error("expected a string, a number, TRUE, FALSE or DEFAULT for each value")
+		p.error("expected a string, a number, TRUE, FALSE, NULL or DEFAULT for each value")
 	}
-	p.error("expected a string, a number, TRUE or FALSE for each value")
+	p.error("expected a string, a number, TRUE, FALSE or NULL for each value")
 	return nil
 }
 
