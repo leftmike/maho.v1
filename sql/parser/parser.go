@@ -11,12 +11,18 @@ import (
 )
 
 type Parser struct {
-	scanner   scanner.Scanner
-	unscanned bool
-	scanned   rune
+	initialized bool
+	scanner     scanner.Scanner
+	unscanned   bool
+	scanned     rune
 }
 
 func (p *Parser) Init(rr io.RuneReader, fn string) {
+	if p.initialized {
+		panic("parser already initialized")
+	}
+	p.initialized = true
+
 	p.scanner.Init(rr, fn)
 }
 

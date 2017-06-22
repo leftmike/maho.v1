@@ -9,9 +9,9 @@ func (e *Engine) CreateTable(stmt *stmt.CreateTable) (interface{}, error) {
 	fmt.Println(stmt)
 	id := stmt.Database
 	if id == 0 {
-		id = e.defaultStore
+		id = e.defaultDatabase
 	}
-	s, ok := e.stores[id]
+	s, ok := e.databases[id]
 	if !ok {
 		return nil, fmt.Errorf("engine: database \"%s\" not found", id)
 	}

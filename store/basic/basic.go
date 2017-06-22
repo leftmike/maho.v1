@@ -7,7 +7,9 @@ import (
 	"maho/store"
 )
 
-type basicStore struct {
+type basicStore struct{}
+
+type basicDatabase struct {
 	name   sql.Identifier
 	tables map[sql.Identifier]*basicTable
 }
@@ -25,47 +27,51 @@ type basicRows struct {
 	index   int
 }
 
-func Make(id sql.Identifier, name string) (store.Store, error) {
-	var bs basicStore
-	bs.name = id
-	bs.tables = make(map[sql.Identifier]*basicTable)
-	return &bs, nil
+func (bs basicStore) Open(name string) (store.Database, error) {
+	var bdb basicDatabase
+	bdb.name = sql.Id(name)
+	bdb.tables = make(map[sql.Identifier]*basicTable)
+	return &bdb, nil
 }
 
-func (bs *basicStore) Name() sql.Identifier {
-	return bs.name
+func init() {
+	store.Register("basic", basicStore{})
 }
 
-func (bs *basicStore) Type() sql.Identifier {
+func (bdb *basicDatabase) Name() sql.Identifier {
+	return bdb.name
+}
+
+func (bdb *basicDatabase) Type() sql.Identifier {
 	return sql.BASIC
 }
 
-func (bs *basicStore) CreateTable(name sql.Identifier, cols []sql.Column) error {
-	if _, ok := bs.tables[name]; ok {
-		return fmt.Errorf("basic: table \"%s\" already exists in database \"%s\"", name, bs.name)
+func (bdb *basicDatabase) CreateTable(name sql.Identifier, cols []sql.Column) error {
+	if _, ok := bdb.tables[name]; ok {
+		return fmt.Errorf("basic: table \"%s\" already exists in database \"%s\"", name, bdb.name)
 	}
 	cmap := make(store.ColumnMap)
 	for i, c := range cols {
 		cmap[c.Name] = i
 	}
 	tbl := basicTable{name, cols, cmap, nil}
-	bs.tables[name] = &tbl
+	bdb.tables[name] = &tbl
 	return nil
 }
 
-func (bs *basicStore) Table(name sql.Identifier) (store.Table, error) {
-	tbl, ok := bs.tables[name]
+func (bdb *basicDatabase) Table(name sql.Identifier) (store.Table, error) {
+	tbl, ok := bdb.tables[name]
 	if !ok {
-		return nil, fmt.Errorf("basic: table \"%s\" not found in database \"%s\"", name, bs.name)
+		return nil, fmt.Errorf("basic: table \"%s\" not found in database \"%s\"", name, bdb.name)
 	}
 	return tbl, nil
 }
 
-func (bs *basicStore) Tables() ([]sql.Identifier, [][]sql.Column) {
-	names := make([]sql.Identifier, len(bs.tables))
-	cols := make([][]sql.Column, len(bs.tables))
+func (bdb *basicDatabase) Tables() ([]sql.Identifier, [][]sql.Column) {
+	names := make([]sql.Identifier, len(bdb.tables))
+	cols := make([][]sql.Column, len(bdb.tables))
 	i := 0
-	for _, tbl := range bs.tables {
+	for _, tbl := range bdb.tables {
 		names[i] = tbl.name
 		cols[i] = make([]sql.Column, len(tbl.columns))
 		copy(cols[i], tbl.columns)

@@ -26,17 +26,18 @@ type Position struct {
 }
 
 type Scanner struct {
-	rr         io.RuneReader
-	unread     bool
-	read       rune
-	line       int
-	column     int
-	buffer     bytes.Buffer
-	Error      error
-	Identifier sql.Identifier // Identifier and Reserved
-	String     string
-	Integer    int64
-	Double     float64
+	initialized bool
+	rr          io.RuneReader
+	unread      bool
+	read        rune
+	line        int
+	column      int
+	buffer      bytes.Buffer
+	Error       error
+	Identifier  sql.Identifier // Identifier and Reserved
+	String      string
+	Integer     int64
+	Double      float64
 	Position
 }
 
@@ -49,6 +50,11 @@ func (pos Position) String() string {
 }
 
 func (s *Scanner) Init(rr io.RuneReader, fn string) *Scanner {
+	if s.initialized {
+		panic("scanner already initialized")
+	}
+	s.initialized = true
+
 	s.rr = rr
 	s.Filename = fn
 	s.line = 1

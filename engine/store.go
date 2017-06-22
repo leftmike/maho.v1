@@ -7,7 +7,7 @@ import (
 	"maho/store"
 )
 
-type engineStore struct {
+type engineDatabase struct {
 	engine *Engine
 }
 
@@ -54,18 +54,18 @@ type engineRows struct {
 	index   int
 }
 
-func (es *engineStore) Name() sql.Identifier {
+func (edb *engineDatabase) Name() sql.Identifier {
 	return sql.ENGINE
 }
 
-func (es *engineStore) Type() sql.Identifier {
+func (edb *engineDatabase) Type() sql.Identifier {
 	return sql.ENGINE
 }
-func (es *engineStore) CreateTable(name sql.Identifier, cols []sql.Column) error {
+func (edb *engineDatabase) CreateTable(name sql.Identifier, cols []sql.Column) error {
 	return fmt.Errorf("engine: \"%s\" database can't be modified", sql.ENGINE)
 }
 
-func (es *engineStore) Table(name sql.Identifier) (store.Table, error) {
+func (edb *engineDatabase) Table(name sql.Identifier) (store.Table, error) {
 	var cols []sql.Column
 
 	if name == sql.DATABASES {
@@ -85,10 +85,10 @@ func (es *engineStore) Table(name sql.Identifier) (store.Table, error) {
 	for i, c := range cols {
 		cmap[c.Name] = i
 	}
-	return &engineTable{es.engine, name, cols, cmap}, nil
+	return &engineTable{edb.engine, name, cols, cmap}, nil
 }
 
-func (es *engineStore) Tables() ([]sql.Identifier, [][]sql.Column) {
+func (edb *engineDatabase) Tables() ([]sql.Identifier, [][]sql.Column) {
 	return []sql.Identifier{sql.DATABASES, sql.TABLES, sql.COLUMNS, sql.IDENTIFIERS},
 		[][]sql.Column{databasesColumns, tablesColumns, columnsColumns, identifiersColumns}
 }
@@ -110,18 +110,18 @@ func (et *engineTable) Rows() (store.Rows, error) {
 
 	switch et.name {
 	case sql.DATABASES:
-		for _, s := range et.engine.stores {
+		for _, s := range et.engine.databases {
 			rows = append(rows, []sql.Value{s.Name(), s.Type()})
 		}
 	case sql.TABLES:
-		for _, s := range et.engine.stores {
+		for _, s := range et.engine.databases {
 			names, cols := s.Tables()
 			for i := range names {
 				rows = append(rows, []sql.Value{s.Name(), names[i], len(cols[i])})
 			}
 		}
 	case sql.COLUMNS:
-		for _, s := range et.engine.stores {
+		for _, s := range et.engine.databases {
 			names, cols := s.Tables()
 			for i := range names {
 				for _, col := range cols[i] {

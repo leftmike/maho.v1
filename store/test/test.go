@@ -7,7 +7,9 @@ import (
 	"maho/store"
 )
 
-type testStore struct {
+type testStore struct{}
+
+type testDatabase struct {
 	name   sql.Identifier
 	tables map[sql.Identifier]*testTable
 }
@@ -25,47 +27,51 @@ type testRows struct {
 	index   int
 }
 
-func Make(id sql.Identifier) (store.Store, error) {
-	var ts testStore
-	ts.name = id
-	ts.tables = make(map[sql.Identifier]*testTable)
-	return &ts, nil
+func (ts testStore) Open(name string) (store.Database, error) {
+	var tdb testDatabase
+	tdb.name = sql.Id(name)
+	tdb.tables = make(map[sql.Identifier]*testTable)
+	return &tdb, nil
 }
 
-func (ts *testStore) Name() sql.Identifier {
-	return ts.name
+func init() {
+	store.Register("test", testStore{})
 }
 
-func (ts *testStore) Type() sql.Identifier {
+func (tdb *testDatabase) Name() sql.Identifier {
+	return tdb.name
+}
+
+func (tdb *testDatabase) Type() sql.Identifier {
 	return sql.Id("test")
 }
 
-func (ts *testStore) CreateTable(name sql.Identifier, cols []sql.Column) error {
-	if _, ok := ts.tables[name]; ok {
-		return fmt.Errorf("test: table \"%s\" already exists in database \"%s\"", name, ts.name)
+func (tdb *testDatabase) CreateTable(name sql.Identifier, cols []sql.Column) error {
+	if _, ok := tdb.tables[name]; ok {
+		return fmt.Errorf("test: table \"%s\" already exists in database \"%s\"", name, tdb.name)
 	}
 	cmap := make(store.ColumnMap)
 	for i, c := range cols {
 		cmap[c.Name] = i
 	}
 	tbl := testTable{name, cols, cmap, nil}
-	ts.tables[name] = &tbl
+	tdb.tables[name] = &tbl
 	return nil
 }
 
-func (ts *testStore) Table(name sql.Identifier) (store.Table, error) {
-	tbl, ok := ts.tables[name]
+func (tdb *testDatabase) Table(name sql.Identifier) (store.Table, error) {
+	tbl, ok := tdb.tables[name]
 	if !ok {
-		return nil, fmt.Errorf("test: table \"%s\" not found in database \"%s\"", name, ts.name)
+		return nil, fmt.Errorf("test: table \"%s\" not found in database \"%s\"", name, tdb.name)
 	}
 	return tbl, nil
 }
 
-func (ts *testStore) Tables() ([]sql.Identifier, [][]sql.Column) {
-	names := make([]sql.Identifier, len(ts.tables))
-	cols := make([][]sql.Column, len(ts.tables))
+func (tdb *testDatabase) Tables() ([]sql.Identifier, [][]sql.Column) {
+	names := make([]sql.Identifier, len(tdb.tables))
+	cols := make([][]sql.Column, len(tdb.tables))
 	i := 0
-	for _, tbl := range ts.tables {
+	for _, tbl := range tdb.tables {
 		names[i] = tbl.name
 		cols[i] = make([]sql.Column, len(tbl.columns))
 		copy(cols[i], tbl.columns)

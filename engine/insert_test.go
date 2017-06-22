@@ -6,7 +6,7 @@ import (
 	"maho/sql/parser"
 	"maho/sql/stmt"
 	"maho/store"
-	"maho/store/test"
+	_ "maho/store/test"
 	"strings"
 	"testing"
 )
@@ -18,8 +18,8 @@ type insertCase struct {
 }
 
 var (
-	insertCreate1 string       = "create table t (c1 bool, c2 varchar(128), c3 double, c4 int)"
-	insertCases1  []insertCase = []insertCase{
+	insertCreate1 = "create table t (c1 bool, c2 varchar(128), c3 double, c4 int)"
+	insertCases1  = []insertCase{
 		{
 			stmt: "insert into t values (DEFAULT)",
 			rows: [][]sql.Value{{nil, nil, nil, nil}},
@@ -114,9 +114,9 @@ var (
 		},
 	}
 
-	insertCreate2 string = `create table t2 (b1 bool, b2 bool, b3 bool, b4 bool, b5 bool,
+	insertCreate2 = `create table t2 (b1 bool, b2 bool, b3 bool, b4 bool, b5 bool,
 b6 bool)`
-	insertCases2 []insertCase = []insertCase{
+	insertCases2 = []insertCase{
 		{
 			stmt: "insert into t2 values ('t', 'true', 'y', 'yes', 'on', '1')",
 			rows: [][]sql.Value{{true, true, true, true, true, true}},
@@ -127,9 +127,9 @@ b6 bool)`
 		},
 	}
 
-	insertCreate3 string = `create table t3 (c1 int default 1, c2 int not null,
+	insertCreate3 = `create table t3 (c1 int default 1, c2 int not null,
 c3 int default 3 not null)`
-	insertCases3 []insertCase = []insertCase{
+	insertCases3 = []insertCase{
 		{
 			stmt: "insert into t3 values (DEFAULT)",
 			fail: true,
@@ -150,11 +150,11 @@ c3 int default 3 not null)`
 )
 
 func TestInsert(t *testing.T) {
-	s, err := test.Make(sql.Id("test_insert"))
+	db, err := store.Open("test", "test_insert")
 	if err != nil {
 		t.Error(err)
 	}
-	e, err := engine.Start(s)
+	e, err := engine.Start(db)
 	if err != nil {
 		t.Error(err)
 	}

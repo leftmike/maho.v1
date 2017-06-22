@@ -3,8 +3,6 @@ package main
 /*
 To Do:
 - databases should be standalone ==> identifiers should be converted back to strings on storage
-- initialize store types like db drivers are initialized
-- scanner and parser should check that they are initialized only once
 */
 
 import (
@@ -15,7 +13,7 @@ import (
 	"maho/sql"
 	"maho/sql/parser"
 	"maho/store"
-	"maho/store/basic"
+	_ "maho/store/basic"
 	"os"
 	"strings"
 	"text/tabwriter"
@@ -70,13 +68,13 @@ func parse(e *engine.Engine, rr io.RuneReader, fn string) {
 }
 
 func main() {
-	s, err := basic.Make(sql.QuotedId("maho"), "maho")
+	db, err := store.Open("basic", "maho")
 	if err != nil {
 		fmt.Println(err)
 		return
 	}
 
-	e, err := engine.Start(s)
+	e, err := engine.Start(db)
 	if err != nil {
 		fmt.Println(err)
 		return
