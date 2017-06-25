@@ -17,7 +17,7 @@ func TestId(t *testing.T) {
 
 	for _, c := range equal {
 		if Id(c.s1) != Id(c.s2) {
-			t.Errorf("id: \"%s\" != \"%s\"", c.s1, c.s2)
+			t.Errorf("Id(%q) != Id(%q)", c.s1, c.s2)
 		}
 	}
 
@@ -30,17 +30,19 @@ func TestId(t *testing.T) {
 
 	for _, c := range notEqual {
 		if Id(c.s1) == Id(c.s2) {
-			t.Errorf("id: \"%s\" == \"%s\"", c.s1, c.s2)
+			t.Errorf("Id(%q) == Id(%q)", c.s1, c.s2)
 		}
 	}
 
 	if Id(strings.Repeat("x", MaxIdentifier+1)).String() != strings.Repeat("x", MaxIdentifier) {
-		t.Errorf("id: max identifier")
+		t.Errorf(`Id(strings.Repeat("x", MaxIdentifier+1)).String() !=
+strings.Repeat("x", MaxIdentifier)`)
 	}
 
 	if QuotedId(strings.Repeat("y", MaxIdentifier+2)).String() !=
 		strings.Repeat("y", MaxIdentifier) {
-		t.Errorf("id: max identifier")
+		t.Errorf(`QuotedId(strings.Repeat("y", MaxIdentifier+2)).String() !=
+strings.Repeat("y", MaxIdentifier)`)
 	}
 }
 
@@ -54,7 +56,7 @@ func TestQuotedId(t *testing.T) {
 
 	for _, c := range equal {
 		if Id(c.s1) != QuotedId(c.s2) {
-			t.Errorf("id: \"%s\" != \"%s\"", c.s1, c.s2)
+			t.Errorf("Id(%q) != QuotedId(%q)", c.s1, c.s2)
 		}
 	}
 
@@ -72,7 +74,7 @@ func TestQuotedId(t *testing.T) {
 
 	for _, c := range notEqual {
 		if Id(c.s1) == QuotedId(c.s2) {
-			t.Errorf("id: \"%s\" == \"%s\"", c.s1, c.s2)
+			t.Errorf("Id(%q) == QuotedId(%q)", c.s1, c.s2)
 		}
 	}
 }
@@ -84,7 +86,7 @@ func TestString(t *testing.T) {
 		Id(s)
 	}
 	if id.String() != Id("abc").String() {
-		t.Errorf("identifier.String: \"%s\" != \"%s\"", id.String(), Id("abc").String())
+		t.Errorf("Id(%q).String() != Id(\"abc\").String()", id.String())
 	}
 }
 
@@ -92,14 +94,14 @@ func TestIsReserved(t *testing.T) {
 	ids := []string{"abc", "defg", "hijk", "lmnop", "qrstuv", "int", "INT"}
 	for _, s := range ids {
 		if Id(s).IsReserved() {
-			t.Errorf("is reserved: \"%s\"", s)
+			t.Errorf("Id(%q).IsReserved() got true want false", s)
 		}
 	}
 
 	kws := []string{"create", "CREATE", "update", "select", "SELECT"}
 	for _, s := range kws {
 		if !Id(s).IsReserved() {
-			t.Errorf("is reserved: \"%s\"", s)
+			t.Errorf("Id(%q).IsReserved() got false want true", s)
 		}
 	}
 }
@@ -107,14 +109,14 @@ func TestIsReserved(t *testing.T) {
 func TestKeywords(t *testing.T) {
 	for s, n := range knownKeywords {
 		if s != strings.ToUpper(s) {
-			t.Errorf("keywords: \"%s\" must be upper-case", s)
+			t.Errorf("%q != strings.ToUpper(%q)", s, s)
 		}
 
 		if Id(s) != n.id {
-			t.Errorf("keywords: \"%s\": %d %d\n", s, n.id, Id(s))
+			t.Errorf("Id(%q) != knownKeywords[%q].id", s, s)
 		}
 		if n.id.IsReserved() != n.reserved {
-			t.Errorf("keywords: \"%s\" is not a reserved", s)
+			t.Errorf("knownKeywords[%q].id.IsReserved() != knownKeywords[%q].reserved", s, s)
 		}
 	}
 }
@@ -122,10 +124,10 @@ func TestKeywords(t *testing.T) {
 func TestKnownIdentifiers(t *testing.T) {
 	for s, id := range knownIdentifiers {
 		if Id(s) != id {
-			t.Errorf("known identifiers: \"%s\": %d\n", s, id)
+			t.Errorf("Id(%q) != knownIdentifiers[%q]", s, s)
 		}
 		if id.IsReserved() {
-			t.Errorf("known identifiers: \"%s\" is a reserved", s)
+			t.Errorf("knownIdentifiers[%q].IsReserved() got true want false", s)
 		}
 	}
 }

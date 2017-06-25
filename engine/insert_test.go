@@ -4,9 +4,8 @@ import (
 	"maho/engine"
 	"maho/sql"
 	"maho/sql/parser"
-	"maho/sql/stmt"
 	"maho/store"
-	_ "maho/store/test"
+	"maho/store/test"
 	"strings"
 	"testing"
 )
@@ -18,8 +17,13 @@ type insertCase struct {
 }
 
 var (
-	insertCreate1 = "create table t (c1 bool, c2 varchar(128), c3 double, c4 int)"
-	insertCases1  = []insertCase{
+	insertColumns1 = []sql.Column{
+		{Name: sql.Id("c1"), Type: sql.BooleanType, Size: 1},
+		{Name: sql.Id("c2"), Type: sql.CharacterType, Size: 128},
+		{Name: sql.Id("c3"), Type: sql.DoubleType, Size: 8, Width: 255, Fraction: 30},
+		{Name: sql.Id("c4"), Type: sql.IntegerType, Size: 4, Width: 255},
+	}
+	insertCases1 = []insertCase{
 		{
 			stmt: "insert into t values (DEFAULT)",
 			rows: [][]sql.Value{{nil, nil, nil, nil}},
@@ -114,8 +118,14 @@ var (
 		},
 	}
 
-	insertCreate2 = `create table t2 (b1 bool, b2 bool, b3 bool, b4 bool, b5 bool,
-b6 bool)`
+	insertColumns2 = []sql.Column{
+		{Name: sql.Id("b1"), Type: sql.BooleanType, Size: 1},
+		{Name: sql.Id("b2"), Type: sql.BooleanType, Size: 1},
+		{Name: sql.Id("b3"), Type: sql.BooleanType, Size: 1},
+		{Name: sql.Id("b4"), Type: sql.BooleanType, Size: 1},
+		{Name: sql.Id("b5"), Type: sql.BooleanType, Size: 1},
+		{Name: sql.Id("b6"), Type: sql.BooleanType, Size: 1},
+	}
 	insertCases2 = []insertCase{
 		{
 			stmt: "insert into t2 values ('t', 'true', 'y', 'yes', 'on', '1')",
@@ -127,8 +137,12 @@ b6 bool)`
 		},
 	}
 
-	insertCreate3 = `create table t3 (c1 int default 1, c2 int not null,
-c3 int default 3 not null)`
+	insertColumns3 = []sql.Column{
+		{Name: sql.Id("c1"), Type: sql.IntegerType, Size: 4, Width: 255, Default: int64(1)},
+		{Name: sql.Id("c2"), Type: sql.IntegerType, Size: 4, Width: 255, NotNull: true},
+		{Name: sql.Id("c3"), Type: sql.IntegerType, Size: 4, Width: 255, Default: int64(3),
+			NotNull: true},
+	}
 	insertCases3 = []insertCase{
 		{
 			stmt: "insert into t3 values (DEFAULT)",
@@ -159,9 +173,9 @@ func TestInsert(t *testing.T) {
 		t.Error(err)
 	}
 
-	testInsert(t, e, sql.Id("t"), insertCreate1, insertCases1)
-	testInsert(t, e, sql.Id("t2"), insertCreate2, insertCases2)
-	testInsert(t, e, sql.Id("t3"), insertCreate3, insertCases3)
+	testInsert(t, e, db, sql.Id("t"), insertColumns1, insertCases1)
+	testInsert(t, e, db, sql.Id("t2"), insertColumns2, insertCases2)
+	testInsert(t, e, db, sql.Id("t3"), insertColumns3, insertCases3)
 }
 
 func statement(e *engine.Engine, s string) error {
@@ -175,54 +189,53 @@ func statement(e *engine.Engine, s string) error {
 	return err
 }
 
-func testInsert(t *testing.T, e *engine.Engine, tbl sql.Identifier, ctbl string,
-	cases []insertCase) {
-	err := statement(e, ctbl)
-	if err != nil {
-		t.Error(err)
-		return
-	}
+func testInsert(t *testing.T, e *engine.Engine, db store.Database, nam sql.Identifier,
+	cols []sql.Column, cases []insertCase) {
 
 	for _, c := range cases {
+		err := db.CreateTable(nam, cols)
+		if err != nil {
+			t.Error(err)
+			return
+		}
+
 		err = statement(e, c.stmt)
 		if c.fail {
 			if err == nil {
-				t.Errorf("engine: \"%s\": did not fail", c.stmt)
+				t.Errorf("Parse(\"%s\").Dispatch() did not fail", c.stmt)
 			}
 		} else if err != nil {
-			t.Errorf("%s: \"%s\"", err.Error(), c.stmt)
-		}
-	}
-
-	rows, err := (&stmt.Select{Table: tbl}).Dispatch(e)
-	if err != nil {
-		t.Error(err)
-	} else if rows, ok := rows.(store.Rows); ok {
-		dest := make([]sql.Value, len(rows.Columns()))
-		for _, c := range cases {
-			if c.fail {
-				continue
+			t.Errorf("Parse(\"%s\").Dispatch() failed with %s", c.stmt, err.Error())
+		} else {
+			tbl, err := db.Table(nam)
+			if err != nil {
+				t.Error(err)
+				return
 			}
-			for _, r := range c.rows {
-				if rows.Next(dest) != nil {
-					t.Error("engine: expected more rows")
-					break
-				}
-				if len(r) != len(dest) {
-					t.Errorf("engine: len(r) != len(dest): %d != %d", len(r), len(dest))
-					break
-				}
-				for i, v := range r {
-					if v != dest[i] {
-						t.Errorf("engine: \"%s\": row[%d]: %v != %v", c.stmt, i, v, dest[i])
+
+			all := tbl.(test.AllRows).AllRows()
+			if len(all) != len(c.rows) {
+				t.Errorf("len(%s.Rows()) got %d want %d", nam, len(all), len(c.rows))
+			} else {
+				for i, r := range c.rows {
+					if len(all[i]) != len(r) {
+						t.Errorf("len(%s.Rows()[%d]) got %d want %d", nam, i, len(all[i]), len(r))
+					} else {
+						for j, v := range r {
+							if all[i][j] != v {
+								t.Errorf("%s.Rows()[%d][%d] got %v want %v", nam, i, j, all[i][j],
+									v)
+							}
+						}
 					}
 				}
 			}
 		}
-		if rows.Next(dest) == nil {
-			t.Errorf("engine: too many rows")
+
+		err = db.DropTable(nam)
+		if err != nil {
+			t.Error(err)
+			return
 		}
-	} else {
-		t.Errorf("engine: unable to convert select result to rows")
 	}
 }

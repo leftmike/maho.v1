@@ -14,6 +14,7 @@ type Database interface {
 	Name() sql.Identifier
 	Type() sql.Identifier
 	CreateTable(name sql.Identifier, cols []sql.Column) error
+	DropTable(name sql.Identifier) error
 	Table(name sql.Identifier) (Table, error)
 	Tables() ([]sql.Identifier, [][]sql.Column)
 }

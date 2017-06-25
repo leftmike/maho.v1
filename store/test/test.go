@@ -21,6 +21,10 @@ type testTable struct {
 	rows      [][]sql.Value
 }
 
+type AllRows interface {
+	AllRows() [][]sql.Value
+}
+
 type testRows struct {
 	columns []sql.Column
 	rows    [][]sql.Value
@@ -56,6 +60,14 @@ func (tdb *testDatabase) CreateTable(name sql.Identifier, cols []sql.Column) err
 	}
 	tbl := testTable{name, cols, cmap, nil}
 	tdb.tables[name] = &tbl
+	return nil
+}
+
+func (tdb *testDatabase) DropTable(name sql.Identifier) error {
+	if _, ok := tdb.tables[name]; !ok {
+		return fmt.Errorf("test: table \"%s\" does not exist in database \"%s\"", name, tdb.name)
+	}
+	delete(tdb.tables, name)
 	return nil
 }
 
@@ -99,6 +111,10 @@ func (tt *testTable) Rows() (store.Rows, error) {
 func (tt *testTable) Insert(row []sql.Value) error {
 	tt.rows = append(tt.rows, row)
 	return nil
+}
+
+func (tt *testTable) AllRows() [][]sql.Value {
+	return tt.rows
 }
 
 func (tr *testRows) Columns() []sql.Column {

@@ -34,9 +34,11 @@ const (
 )
 
 const (
-	CREATE = -(iota + 1)
+	AS Identifier = -(iota + 1)
+	CREATE
 	DEFAULT
 	DELETE
+	DROP
 	EXISTS
 	FALSE
 	FROM
@@ -70,6 +72,7 @@ var knownKeywords = map[string]struct {
 	id       Identifier
 	reserved bool
 }{
+	"AS":        {AS, true},
 	"BIGINT":    {BIGINT, false},
 	"BINARY":    {BINARY, false},
 	"BLOB":      {BLOB, false},
@@ -80,6 +83,7 @@ var knownKeywords = map[string]struct {
 	"DEFAULT":   {DEFAULT, true},
 	"DELETE":    {DELETE, true},
 	"DOUBLE":    {DOUBLE, false},
+	"DROP":      {DROP, true},
 	"EXISTS":    {EXISTS, true},
 	"FALSE":     {FALSE, true},
 	"FROM":      {FROM, true},
@@ -109,7 +113,7 @@ var knownKeywords = map[string]struct {
 }
 
 var (
-	lastIdentifier = Identifier(999)
+	lastIdentifier = Identifier(0)
 	identifiers    = make(map[string]Identifier)
 	keywords       = make(map[string]Identifier)
 	Names          = make(map[Identifier]string)
@@ -167,9 +171,15 @@ func init() {
 	for s, id := range knownIdentifiers {
 		identifiers[strings.ToLower(s)] = id
 		Names[id] = s
+		if id > lastIdentifier {
+			lastIdentifier = id
+		}
 	}
 	for s, n := range knownKeywords {
 		keywords[s] = n.id
 		Names[n.id] = s
+		if n.id > lastIdentifier {
+			lastIdentifier = n.id
+		}
 	}
 }

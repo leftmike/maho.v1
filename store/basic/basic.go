@@ -59,6 +59,14 @@ func (bdb *basicDatabase) CreateTable(name sql.Identifier, cols []sql.Column) er
 	return nil
 }
 
+func (bdb *basicDatabase) DropTable(name sql.Identifier) error {
+	if _, ok := bdb.tables[name]; !ok {
+		return fmt.Errorf("basic: table \"%s\" does not exist in database \"%s\"", name, bdb.name)
+	}
+	delete(bdb.tables, name)
+	return nil
+}
+
 func (bdb *basicDatabase) Table(name sql.Identifier) (store.Table, error) {
 	tbl, ok := bdb.tables[name]
 	if !ok {

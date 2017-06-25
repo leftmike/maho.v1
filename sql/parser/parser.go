@@ -176,7 +176,7 @@ func (p *Parser) expectEOF() {
 }
 
 func (p *Parser) parseStmt() stmt.Stmt {
-	switch p.expectReserved(sql.CREATE, sql.DELETE, sql.INSERT, sql.SELECT, sql.UPDATE) {
+	switch p.expectReserved(sql.CREATE, sql.DELETE, sql.DROP, sql.INSERT, sql.SELECT, sql.UPDATE) {
 	case sql.CREATE:
 		/*
 			CREATE [UNIQUE] INDEX [IF NOT EXISTS]
@@ -218,6 +218,12 @@ func (p *Parser) parseStmt() stmt.Stmt {
 		*/
 		p.expectReserved(sql.FROM)
 		return p.parseDelete()
+	case sql.DROP:
+		/*
+			DROP TABLE [database.]table [,...]
+		*/
+		p.expectReserved(sql.TABLE)
+		return p.parseDropTable()
 	case sql.INSERT:
 		/*
 		   INSERT INTO
@@ -253,18 +259,18 @@ func (p *Parser) parseCreateTable(tmp bool, not bool) stmt.Stmt {
 	}
 
 	// CREATE TABLE [database .] table ([<column>,] ...)
-	var stmt stmt.CreateTable
-	id := p.expectIdentifier("expected database-name or table-name")
+	var s stmt.CreateTable
+	id := p.expectIdentifier("expected a database or a table")
 	if p.maybeRune('.') {
-		stmt.Database = id
-		stmt.Table = p.expectIdentifier("expected table-name")
+		s.Database = id
+		s.Table = p.expectIdentifier("expected a table")
 	} else {
-		stmt.Table = id
+		s.Table = id
 	}
 
 	if p.maybeRune('(') {
-		p.parseCreateColumns(&stmt)
-		return &stmt
+		p.parseCreateColumns(&s)
+		return &s
 	}
 
 	p.error("CREATE TABLE ... AS ... not implemented")
@@ -289,9 +295,9 @@ var types = map[sql.Identifier]sql.Column{
 	sql.BIGINT:    {Type: sql.IntegerType, Size: 8, Width: 255},
 }
 
-func (p *Parser) parseCreateColumns(stmt *stmt.CreateTable) {
+func (p *Parser) parseCreateColumns(s *stmt.CreateTable) {
 	/*
-		CREATE TABLE [database .] table ([<column>,] ...)
+		CREATE TABLE [database .] table (<column> [, ...])
 		<column> = name <data_type> [DEFAULT <expr>] | [NOT NULL]
 		<data_type> =
 			| BINARY [(length)]
@@ -311,7 +317,7 @@ func (p *Parser) parseCreateColumns(stmt *stmt.CreateTable) {
 
 	for {
 		nam := p.expectIdentifier("expected a column name")
-		for _, c := range stmt.Columns {
+		for _, c := range s.Columns {
 			if c.Name == nam {
 				p.error(fmt.Sprintf("duplicate column name: %s", nam))
 			}
@@ -376,7 +382,7 @@ func (p *Parser) parseCreateColumns(stmt *stmt.CreateTable) {
 			}
 		}
 
-		stmt.Columns = append(stmt.Columns, col)
+		s.Columns = append(s.Columns, col)
 
 		r := p.expectRunes(',', ')')
 		if r == ')' {
@@ -387,6 +393,11 @@ func (p *Parser) parseCreateColumns(stmt *stmt.CreateTable) {
 
 func (p *Parser) parseDelete() stmt.Stmt {
 	p.error("DELETE not implemented")
+	return nil
+}
+
+func (p *Parser) parseDropTable() stmt.Stmt {
+	p.error("DROP not implemented")
 	return nil
 }
 
@@ -424,24 +435,24 @@ func (p *Parser) parseInsert() stmt.Stmt {
 		INSERT INTO [database .] table [(column, ...)] VALUES (<expr> | DEFAULT, ...), ...
 	*/
 
-	var stmt stmt.InsertValues
-	id := p.expectIdentifier("expected database-name or table-name")
+	var s stmt.InsertValues
+	id := p.expectIdentifier("expected a database or a table")
 	if p.maybeRune('.') {
-		stmt.Database = id
-		stmt.Table = p.expectIdentifier("expected table-name")
+		s.Database = id
+		s.Table = p.expectIdentifier("expected a table")
 	} else {
-		stmt.Table = id
+		s.Table = id
 	}
 
 	if p.maybeRune('(') {
 		for {
 			nam := p.expectIdentifier("expected a column name")
-			for _, c := range stmt.Columns {
+			for _, c := range s.Columns {
 				if c == nam {
 					p.error(fmt.Sprintf("duplicate column name: %s", nam))
 				}
 			}
-			stmt.Columns = append(stmt.Columns, nam)
+			s.Columns = append(s.Columns, nam)
 			r := p.expectRunes(',', ')')
 			if r == ')' {
 				break
@@ -463,31 +474,60 @@ func (p *Parser) parseInsert() stmt.Stmt {
 			}
 		}
 
-		stmt.Rows = append(stmt.Rows, row)
+		s.Rows = append(s.Rows, row)
 
 		if !p.maybeRune(',') {
 			break
 		}
 	}
 
-	return &stmt
+	return &s
 }
 
 func (p *Parser) parseSelect() stmt.Stmt {
-	// SELECT * FROM [database.]table
-	p.expectRunes('*')
-	p.expectReserved(sql.FROM)
+	/*
+		SELECT <select-expr> [, ...] FROM [database.]table [[ AS ]] name] [WHERE <expr>]
+		<select-expr> = * | [table.]name [[ AS ] name] [, ...]
+	*/
 
-	var stmt stmt.Select
-	id := p.expectIdentifier("expected database-name or table-name")
-	if p.maybeRune('.') {
-		stmt.Database = id
-		stmt.Table = p.expectIdentifier("expected table-name")
+	var s stmt.Select
+	if p.maybeRune('*') {
+		p.expectReserved(sql.FROM)
 	} else {
-		stmt.Table = id
+		for done := false; !done; {
+			var sr stmt.SelectResult
+			sr.Column = p.expectIdentifier("expected a table or a column")
+			if p.maybeRune('.') {
+				sr.Table = sr.Column
+				sr.Column = p.expectIdentifier("expected a column")
+			}
+			sr.Alias = sr.Column
+			if p.optionalReserved(sql.AS) {
+				sr.Alias = p.expectIdentifier("expected an alias")
+			}
+			if p.optionalReserved(sql.FROM) {
+				done = true
+			} else if !p.maybeRune(',') {
+				sr.Alias = p.expectIdentifier("expected an alias")
+				p.expectRunes(',')
+			}
+
+			s.Results = append(s.Results, sr)
+		}
+
 	}
 
-	return &stmt
+	s.Table = p.expectIdentifier("expected a database or a table")
+	if p.maybeRune('.') {
+		s.Database = s.Table
+		s.Table = p.expectIdentifier("expected a table")
+	}
+
+	// [[ AS ]] name
+	// maybe have a list of tables
+	// [WHERE <expr>]
+
+	return &s
 }
 
 func (p *Parser) parseUpdate() stmt.Stmt {

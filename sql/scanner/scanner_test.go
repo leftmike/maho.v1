@@ -28,8 +28,9 @@ func TestScan(t *testing.T) {
 	for i, c := range cases {
 		var s Scanner
 		s.Init(strings.NewReader(c.s), fmt.Sprintf("cases[%d]", i))
-		if s.Scan() != c.r {
-			t.Errorf("scan: \"%s\": expected: %d", c.s, c.r)
+		r := s.Scan()
+		if r != c.r {
+			t.Errorf("Scan(%q) got %d want %d", c.s, r, c.r)
 		}
 	}
 
@@ -48,11 +49,12 @@ func TestScan(t *testing.T) {
 	for i, n := range integers {
 		var s Scanner
 		s.Init(strings.NewReader(n.s), fmt.Sprintf("integers[%d]", i))
-		if s.Scan() != Integer {
-			t.Errorf("scan: \"%s\": not an integer", n.s)
+		r := s.Scan()
+		if r != Integer {
+			t.Errorf("Scan(%q) got %d want Integer", n.s, r)
 		}
 		if s.Integer != n.n {
-			t.Errorf("scan: \"%s\": %d != %d", n.s, s.Integer, n.n)
+			t.Errorf("Scan(%q).Integer got %d want %d", n.s, s.Integer, n.n)
 		}
 	}
 
@@ -71,11 +73,12 @@ func TestScan(t *testing.T) {
 	for i, n := range doubles {
 		var s Scanner
 		s.Init(strings.NewReader(n.s), fmt.Sprintf("doubles[%d]", i))
-		if s.Scan() != Double {
-			t.Errorf("scan: \"%s\": not an double", n.s)
+		r := s.Scan()
+		if r != Double {
+			t.Errorf("Scan(%q) got %d want Double", n.s, r)
 		}
 		if s.Double != n.n {
-			t.Errorf("scan: \"%s\": %d != %d", n.s, s.Double, n.n)
+			t.Errorf("Scan(%q).Double got %f want %f", n.s, s.Double, n.n)
 		}
 	}
 
@@ -104,22 +107,22 @@ abcd -- identifier
 		var s Scanner
 		s.Init(strings.NewReader(src), "src")
 		for i, e := range expected {
-			if s.Scan() != e.ret {
-				t.Errorf("scan: \"%s\": expected[%d]: %d", src, i, e.ret)
+			r := s.Scan()
+			if r != e.ret {
+				t.Errorf("Scan(%q)[%d] got %d want %d", src, i, r, e.ret)
 			}
 			switch e.ret {
 			case Identifier:
 				if s.Identifier != sql.QuotedId(e.s) {
-					t.Errorf("scan: \"%s\": wrong identifier: %d != %d", src, s.Identifier,
-						sql.Id(e.s))
+					t.Errorf("%d Scan(%q) != sql.QuotedId(%q)", i, src, e.s)
 				}
 			case Reserved:
 				if s.Identifier != e.id {
-					t.Errorf("scan: \"%s\": wrong keyword: %d != %d", src, s.Identifier, e.id)
+					t.Errorf("%d Scan(%q).Identifier != %d", i, src, e.id)
 				}
 			case String:
 				if s.String != e.s {
-					t.Errorf("scan: \"%s\": wrong string: \"%s\" != \"%s\"", src, s.String, e.s)
+					t.Errorf("%d Scan(%q).String != %q", i, src, e.s)
 				}
 			}
 		}

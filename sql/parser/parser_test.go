@@ -25,10 +25,8 @@ func TestParse(t *testing.T) {
 		var p Parser
 		p.Init(strings.NewReader(f), fmt.Sprintf("failed[%d]", i))
 		stmt, err := p.Parse()
-		if stmt != nil {
-			t.Errorf("parse: \"%s\": stmt != nil: %s", f, stmt)
-		} else if err == nil {
-			t.Errorf("parse: \"%s\": did not fail: ", f)
+		if stmt != nil || err == nil {
+			t.Errorf("Parse(%q) did not fail", f)
 		}
 	}
 }
@@ -285,40 +283,33 @@ c2 boolean not null default true)`,
 		stmt, err := p.Parse()
 		if c.fail {
 			if err == nil {
-				t.Errorf("parse: \"%s\": did not fail", c.sql)
+				t.Errorf("Parse(%q) did not fail", c.sql)
 			}
 		} else {
 			if err != nil {
-				t.Errorf("parse: \"%s\": failed: %s", c.sql, err)
-			} else {
-				checkCreateTableStmts(t, c.sql, stmt, c.stmt)
+				t.Errorf("Parse(%q) failed with %s", c.sql, err)
+			} else if !createTableEqual(c.stmt, stmt) {
+				t.Errorf("Parse(%q) != %s", c.sql, c.stmt.String())
 			}
 		}
 	}
 }
 
-func checkCreateTableStmts(t *testing.T, s string, stmt1 stmt.Stmt, create2 stmt.CreateTable) {
-	create1, ok := stmt1.(*stmt.CreateTable)
+func createTableEqual(stmt1 stmt.CreateTable, s2 stmt.Stmt) bool {
+	stmt2, ok := s2.(*stmt.CreateTable)
 	if !ok {
-		t.Errorf("parse: \"%s\": not a stmt.CreateTable: %s", s, stmt1)
-		return
+		return false
 	}
-	if create1.Database != create2.Database {
-		t.Errorf("parse: \"%s\": database: %s != %s", s, create1.Database, create2.Database)
+	if stmt1.Database != stmt2.Database || stmt1.Table != stmt2.Table ||
+		len(stmt1.Columns) != len(stmt2.Columns) {
+		return false
 	}
-	if create1.Table != create2.Table {
-		t.Errorf("parse: \"%s\": table: %s != %s", s, create1.Table, create2.Table)
-	}
-
-	if len(create1.Columns) != len(create2.Columns) {
-		t.Errorf("parse: \"%s\": len(columns): %d != %d", s, len(create1.Columns),
-			len(create2.Columns))
-	}
-	for i, c1 := range create1.Columns {
-		if c1 != create2.Columns[i] {
-			t.Errorf("parse: \"%s\": column[%d]: %v != %v", s, i, c1, create2.Columns[i])
+	for i, c1 := range stmt1.Columns {
+		if c1 != stmt2.Columns[i] {
+			return false
 		}
 	}
+	return true
 }
 
 func TestInsertValues(t *testing.T) {
@@ -369,54 +360,46 @@ func TestInsertValues(t *testing.T) {
 		stmt, err := p.Parse()
 		if c.fail {
 			if err == nil {
-				t.Errorf("parse: \"%s\": did not fail", c.sql)
+				t.Errorf("Parse(%q) did not fail", c.sql)
 			}
 		} else {
 			if err != nil {
-				t.Errorf("parse: \"%s\": failed: %s", c.sql, err)
-			} else {
-				checkInsertValuesStmts(t, c.sql, stmt, c.stmt)
+				t.Errorf("Parse(%q) failed with %s", c.sql, err)
+			} else if !insertValuesEqual(c.stmt, stmt) {
+				t.Errorf("Parse(%q) != %s", c.sql, c.stmt.String())
 			}
 		}
 	}
 }
 
-func checkInsertValuesStmts(t *testing.T, s string, stmt1 stmt.Stmt, insert2 stmt.InsertValues) {
-	insert1, ok := stmt1.(*stmt.InsertValues)
+func insertValuesEqual(stmt1 stmt.InsertValues, s2 stmt.Stmt) bool {
+	stmt2, ok := s2.(*stmt.InsertValues)
 	if !ok {
-		t.Errorf("parse: \"%s\": not a stmt.InsertValues: %s", s, stmt1)
-		return
+		return false
 	}
-	if insert1.Database != insert2.Database {
-		t.Errorf("parse: \"%s\": database: %s != %s", s, insert1.Database, insert2.Database)
+	if stmt1.Database != stmt2.Database || stmt1.Table != stmt2.Table ||
+		len(stmt1.Columns) != len(stmt2.Columns) {
+		return false
 	}
-	if insert1.Table != insert2.Table {
-		t.Errorf("parse: \"%s\": table: %s != %s", s, insert1.Table, insert2.Table)
-	}
-
-	if len(insert1.Columns) != len(insert2.Columns) {
-		t.Errorf("parse: \"%s\": len(columns): %d != %d", s, len(insert1.Columns),
-			len(insert2.Columns))
-	}
-	for i, c1 := range insert1.Columns {
-		if c1 != insert2.Columns[i] {
-			t.Errorf("parse: \"%s\": column[%d]: %v != %v", s, i, c1, insert2.Columns[i])
+	for i, c1 := range stmt1.Columns {
+		if c1 != stmt2.Columns[i] {
+			return false
 		}
 	}
 
-	if len(insert1.Rows) != len(insert2.Rows) {
-		t.Errorf("parse: \"%s\": len(rows): %d != %d", s, len(insert1.Rows),
-			len(insert2.Rows))
+	if len(stmt1.Rows) != len(stmt2.Rows) {
+		return false
 	}
-	for i, r1 := range insert1.Rows {
-		r2 := insert2.Rows[i]
+	for i, r1 := range stmt1.Rows {
+		r2 := stmt2.Rows[i]
 		if len(r1) != len(r2) {
-			t.Errorf("parse: \"%s\": len(row[%d]): %d != %d", s, i, len(r1), len(r2))
+			return false
 		}
 		for j, v1 := range r1 {
 			if v1 != r2[j] {
-				t.Errorf("parse: \"%s\": row[%d][%d]: %v != %v", s, i, j, v1, r2[j])
+				return false
 			}
 		}
 	}
+	return true
 }
