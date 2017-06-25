@@ -60,3 +60,13 @@ func Open(typ string, name string) (Database, error) {
 	}
 	return nil, fmt.Errorf("store %s not found", typ)
 }
+
+func Stores() []string {
+	storesMutex.RLock()
+	defer storesMutex.RUnlock()
+	var ret []string
+	for name := range stores {
+		ret = append(ret, name)
+	}
+	return ret
+}

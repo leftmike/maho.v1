@@ -26,6 +26,7 @@ const (
 	INTEGER
 	MEDIUMINT
 	SMALLINT
+	STORES
 	TABLES
 	TEXT
 	TINYINT
@@ -65,6 +66,7 @@ var knownIdentifiers = map[string]Identifier{
 	"databases":   DATABASES,
 	"engine":      ENGINE,
 	"identifiers": IDENTIFIERS,
+	"stores":      STORES,
 	"tables":      TABLES,
 }
 

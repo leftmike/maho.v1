@@ -19,9 +19,12 @@ type engineTable struct {
 }
 
 var (
+	storesColumns = []sql.Column{
+		{Name: sql.QuotedId("store"), Type: sql.CharacterType, Size: sql.MaxIdentifier},
+	}
 	databasesColumns = []sql.Column{
 		{Name: sql.QuotedId("database"), Type: sql.CharacterType, Size: sql.MaxIdentifier},
-		{Name: sql.QuotedId("type"), Type: sql.CharacterType, Size: sql.MaxIdentifier},
+		{Name: sql.QuotedId("store"), Type: sql.CharacterType, Size: sql.MaxIdentifier},
 	}
 	tablesColumns = []sql.Column{
 		{Name: sql.QuotedId("database"), Type: sql.CharacterType, Size: sql.MaxIdentifier},
@@ -73,7 +76,9 @@ func (edb *engineDatabase) DropTable(name sql.Identifier) error {
 func (edb *engineDatabase) Table(name sql.Identifier) (store.Table, error) {
 	var cols []sql.Column
 
-	if name == sql.DATABASES {
+	if name == sql.STORES {
+		cols = storesColumns
+	} else if name == sql.DATABASES {
 		cols = databasesColumns
 	} else if name == sql.TABLES {
 		cols = tablesColumns
@@ -94,8 +99,9 @@ func (edb *engineDatabase) Table(name sql.Identifier) (store.Table, error) {
 }
 
 func (edb *engineDatabase) Tables() ([]sql.Identifier, [][]sql.Column) {
-	return []sql.Identifier{sql.DATABASES, sql.TABLES, sql.COLUMNS, sql.IDENTIFIERS},
-		[][]sql.Column{databasesColumns, tablesColumns, columnsColumns, identifiersColumns}
+	return []sql.Identifier{sql.STORES, sql.DATABASES, sql.TABLES, sql.COLUMNS, sql.IDENTIFIERS},
+		[][]sql.Column{storesColumns, databasesColumns, tablesColumns, columnsColumns,
+			identifiersColumns}
 }
 
 func (et *engineTable) Name() sql.Identifier {
@@ -114,6 +120,11 @@ func (et *engineTable) Rows() (store.Rows, error) {
 	var rows [][]sql.Value
 
 	switch et.name {
+	case sql.STORES:
+		rows = append(rows, []sql.Value{sql.ENGINE.String()})
+		for _, s := range store.Stores() {
+			rows = append(rows, []sql.Value{s})
+		}
 	case sql.DATABASES:
 		for _, s := range et.engine.databases {
 			rows = append(rows, []sql.Value{s.Name(), s.Type()})
