@@ -11,6 +11,7 @@ type Stmt interface {
 
 type Executer interface {
 	CreateTable(stmt *CreateTable) (interface{}, error)
+	DropTable(stmt *DropTable) (interface{}, error)
 	InsertValues(stmt *InsertValues) (interface{}, error)
 	Select(stmt *Select) (store.Rows, error)
 }

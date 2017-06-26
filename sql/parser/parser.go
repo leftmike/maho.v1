@@ -262,10 +262,10 @@ func (p *Parser) parseCreateTable(tmp bool, not bool) stmt.Stmt {
 	var s stmt.CreateTable
 	id := p.expectIdentifier("expected a database or a table")
 	if p.maybeRune('.') {
-		s.Database = id
-		s.Table = p.expectIdentifier("expected a table")
+		s.Table.Database = id
+		s.Table.Table = p.expectIdentifier("expected a table")
 	} else {
-		s.Table = id
+		s.Table.Table = id
 	}
 
 	if p.maybeRune('(') {
@@ -438,10 +438,10 @@ func (p *Parser) parseInsert() stmt.Stmt {
 	var s stmt.InsertValues
 	id := p.expectIdentifier("expected a database or a table")
 	if p.maybeRune('.') {
-		s.Database = id
-		s.Table = p.expectIdentifier("expected a table")
+		s.Table.Database = id
+		s.Table.Table = p.expectIdentifier("expected a table")
 	} else {
-		s.Table = id
+		s.Table.Table = id
 	}
 
 	if p.maybeRune('(') {
@@ -517,10 +517,10 @@ func (p *Parser) parseSelect() stmt.Stmt {
 
 	}
 
-	s.Table = p.expectIdentifier("expected a database or a table")
+	s.Table.Table = p.expectIdentifier("expected a database or a table")
 	if p.maybeRune('.') {
-		s.Database = s.Table
-		s.Table = p.expectIdentifier("expected a table")
+		s.Table.Database = s.Table.Table
+		s.Table.Table = p.expectIdentifier("expected a table")
 	}
 
 	// [[ AS ]] name

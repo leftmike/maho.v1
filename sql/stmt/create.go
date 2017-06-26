@@ -6,18 +6,12 @@ import (
 )
 
 type CreateTable struct {
-	Database sql.Identifier
-	Table    sql.Identifier
-	Columns  []sql.Column
+	Table   TableName
+	Columns []sql.Column
 }
 
 func (stmt *CreateTable) String() string {
-	s := "CREATE TABLE "
-	if stmt.Database == 0 {
-		s += fmt.Sprintf("%s (", stmt.Table)
-	} else {
-		s += fmt.Sprintf("%s.%s (", stmt.Database, stmt.Table)
-	}
+	s := fmt.Sprintf("CREATE TABLE %s (", stmt.Table)
 
 	for i, col := range stmt.Columns {
 		if i > 0 {
