@@ -6,7 +6,6 @@ To Do:
 - finish parse and execute of select
 - update t.Errorf to be "Operation(args) got %s want %s" and use %q for args
 - or "Operation(args) failed with %s" or "Operation(args) did not fail"
-- parseTableName and use
 */
 
 import (

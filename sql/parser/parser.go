@@ -250,6 +250,16 @@ func (p *Parser) parseCreateIndex(unq bool, not bool) stmt.Stmt {
 	return nil
 }
 
+func (p *Parser) parseTableName(tbl *stmt.TableName) {
+	id := p.expectIdentifier("expected a database or a table")
+	if p.maybeRune('.') {
+		tbl.Database = id
+		tbl.Table = p.expectIdentifier("expected a table")
+	} else {
+		tbl.Table = id
+	}
+}
+
 func (p *Parser) parseCreateTable(tmp bool, not bool) stmt.Stmt {
 	if tmp {
 		p.error("temporary tables not implemented")
@@ -260,13 +270,7 @@ func (p *Parser) parseCreateTable(tmp bool, not bool) stmt.Stmt {
 
 	// CREATE TABLE [database .] table ([<column>,] ...)
 	var s stmt.CreateTable
-	id := p.expectIdentifier("expected a database or a table")
-	if p.maybeRune('.') {
-		s.Table.Database = id
-		s.Table.Table = p.expectIdentifier("expected a table")
-	} else {
-		s.Table.Table = id
-	}
+	p.parseTableName(&s.Table)
 
 	if p.maybeRune('(') {
 		p.parseCreateColumns(&s)
@@ -436,13 +440,7 @@ func (p *Parser) parseInsert() stmt.Stmt {
 	*/
 
 	var s stmt.InsertValues
-	id := p.expectIdentifier("expected a database or a table")
-	if p.maybeRune('.') {
-		s.Table.Database = id
-		s.Table.Table = p.expectIdentifier("expected a table")
-	} else {
-		s.Table.Table = id
-	}
+	p.parseTableName(&s.Table)
 
 	if p.maybeRune('(') {
 		for {
@@ -517,11 +515,7 @@ func (p *Parser) parseSelect() stmt.Stmt {
 
 	}
 
-	s.Table.Table = p.expectIdentifier("expected a database or a table")
-	if p.maybeRune('.') {
-		s.Table.Database = s.Table.Table
-		s.Table.Table = p.expectIdentifier("expected a table")
-	}
+	p.parseTableName(&s.Table)
 
 	// [[ AS ]] name
 	// maybe have a list of tables
