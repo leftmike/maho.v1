@@ -1,6 +1,7 @@
 package stmt
 
 import (
+	"fmt"
 	"maho/sql"
 )
 
@@ -11,7 +12,7 @@ type InsertValues struct {
 }
 
 func (stmt *InsertValues) String() string {
-	s := "INSERT INTO " + stmt.Table.String()
+	s := fmt.Sprintf("INSERT INTO %s ", stmt.Table)
 	if stmt.Columns != nil {
 		s += "("
 		for i, col := range stmt.Columns {

@@ -11,10 +11,22 @@ type SelectResult struct {
 	Alias  sql.Identifier
 }
 
+type AliasTableName struct {
+	TableName
+	Alias sql.Identifier
+}
+
 type Select struct {
-	Table   TableName
-	Alias   sql.Identifier
+	Table   AliasTableName
 	Results []SelectResult
+}
+
+func (atn AliasTableName) String() string {
+	s := atn.TableName.String()
+	if atn.Table != atn.Alias {
+		s += fmt.Sprintf(" AS %s", atn.Alias)
+	}
+	return s
 }
 
 func (stmt *Select) String() string {
@@ -37,9 +49,6 @@ func (stmt *Select) String() string {
 		}
 	}
 	s += fmt.Sprintf(" FROM %s", stmt.Table)
-	if stmt.Alias != 0 {
-		s += fmt.Sprintf(" AS %s", stmt.Alias)
-	}
 	return s
 }
 

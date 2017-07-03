@@ -68,6 +68,27 @@ func (p *Parser) unscan() {
 	p.unscanned = true
 }
 
+func (p *Parser) got() string {
+	switch p.scanned {
+	case scanner.EOF:
+		return fmt.Sprintf("end of file")
+	case scanner.Error:
+		return fmt.Sprintf("error %s", p.scanner.Error.Error())
+	case scanner.Identifier:
+		return fmt.Sprintf("identifier %s", p.scanner.Identifier)
+	case scanner.Reserved:
+		return fmt.Sprintf("reserved identifier %s", p.scanner.Identifier)
+	case scanner.String:
+		return fmt.Sprintf("string %q", p.scanner.String)
+	case scanner.Integer:
+		return fmt.Sprintf("integer %d", p.scanner.Integer)
+	case scanner.Double:
+		return fmt.Sprintf("double %f", p.scanner.Double)
+	}
+
+	return fmt.Sprintf("rune %c", p.scanned)
+}
+
 func (p *Parser) expectReserved(ids ...sql.Identifier) sql.Identifier {
 	t := p.scan()
 	if t == scanner.Reserved {
@@ -92,7 +113,7 @@ func (p *Parser) expectReserved(ids ...sql.Identifier) sql.Identifier {
 		}
 	}
 
-	p.error(fmt.Sprintf("expected keyword: %s", msg))
+	p.error(fmt.Sprintf("expected keyword %s got %s", msg, p.got()))
 	return 0
 }
 
@@ -113,7 +134,7 @@ func (p *Parser) optionalReserved(ids ...sql.Identifier) bool {
 func (p *Parser) expectIdentifier(msg string) sql.Identifier {
 	t := p.scan()
 	if t != scanner.Identifier {
-		p.error(msg)
+		p.error(fmt.Sprintf("%s got %s", msg, p.got()))
 	}
 	return p.scanner.Identifier
 }
@@ -149,7 +170,7 @@ func (p *Parser) expectRunes(runes ...rune) rune {
 		}
 	}
 
-	p.error(fmt.Sprintf("expected: %s", msg))
+	p.error(fmt.Sprintf("expected %s got %s", msg, p.got()))
 	return 0
 }
 
@@ -163,7 +184,8 @@ func (p *Parser) maybeRune(mr rune) bool {
 
 func (p *Parser) expectInteger(min, max int64) int64 {
 	if p.scan() != scanner.Integer || p.scanner.Integer < min || p.scanner.Integer > max {
-		p.error(fmt.Sprintf("expected a number between %d and %d inclusive", min, max))
+		p.error(fmt.Sprintf("expected a number between %d and %d inclusive got %s", min, max,
+			p.got()))
 	}
 
 	return p.scanner.Integer
@@ -171,7 +193,7 @@ func (p *Parser) expectInteger(min, max int64) int64 {
 
 func (p *Parser) expectEOF() {
 	if p.scan() != scanner.EOF {
-		p.error(fmt.Sprintf("expected the end of the statement"))
+		p.error(fmt.Sprintf("expected the end of the statement got %s", p.got()))
 	}
 }
 
@@ -260,6 +282,21 @@ func (p *Parser) parseTableName(tbl *stmt.TableName) {
 	}
 }
 
+func (p *Parser) parseAliasTableName(atbl *stmt.AliasTableName) {
+	p.parseTableName(&atbl.TableName)
+	if p.optionalReserved(sql.AS) {
+		atbl.Alias = p.expectIdentifier("expected an alias")
+	} else {
+		r := p.scan()
+		if r == scanner.Identifier {
+			atbl.Alias = p.scanner.Identifier
+		} else {
+			p.unscan()
+			atbl.Alias = atbl.Table
+		}
+	}
+}
+
 func (p *Parser) parseCreateTable(tmp bool, not bool) stmt.Stmt {
 	if tmp {
 		p.error("temporary tables not implemented")
@@ -330,7 +367,7 @@ func (p *Parser) parseCreateColumns(s *stmt.CreateTable) {
 		typ := p.expectIdentifier("expected a data type")
 		def, found := types[typ]
 		if !found {
-			p.error("expected a data type")
+			p.error(fmt.Sprintf("expected a data type got %s", typ))
 		}
 
 		col := def
@@ -417,7 +454,7 @@ func (p *Parser) parseExpression(df bool) sql.Value {
 		} else if p.scanner.Identifier == sql.NULL {
 			return nil
 		} else {
-			p.error(fmt.Sprintf("unexpected identifier: %s", p.scanner.Identifier))
+			p.error(fmt.Sprintf("unexpected identifier %s", p.scanner.Identifier))
 		}
 	} else if r == scanner.String {
 		return p.scanner.String
@@ -428,9 +465,12 @@ func (p *Parser) parseExpression(df bool) sql.Value {
 	}
 
 	if df {
-		p.error("expected a string, a number, TRUE, FALSE, NULL or DEFAULT for each value")
+		p.error(fmt.Sprintf(
+			"expected a string, a number, TRUE, FALSE, NULL or DEFAULT for each value got %s",
+			p.got()))
 	}
-	p.error("expected a string, a number, TRUE, FALSE or NULL for each value")
+	p.error(fmt.Sprintf(
+		"expected a string, a number, TRUE, FALSE or NULL for each value got %s", p.got()))
 	return nil
 }
 
@@ -447,7 +487,7 @@ func (p *Parser) parseInsert() stmt.Stmt {
 			nam := p.expectIdentifier("expected a column name")
 			for _, c := range s.Columns {
 				if c == nam {
-					p.error(fmt.Sprintf("duplicate column name: %s", nam))
+					p.error(fmt.Sprintf("duplicate column name %s", nam))
 				}
 			}
 			s.Columns = append(s.Columns, nam)
@@ -484,7 +524,7 @@ func (p *Parser) parseInsert() stmt.Stmt {
 
 func (p *Parser) parseSelect() stmt.Stmt {
 	/*
-		SELECT <select-expr> [, ...] FROM [database.]table [[ AS ]] name] [WHERE <expr>]
+		SELECT <select-expr> [, ...] FROM [database.]table [[ AS ] name] [WHERE <expr>]
 		<select-expr> = * | [table.]name [[ AS ] name] [, ...]
 	*/
 
@@ -499,10 +539,12 @@ func (p *Parser) parseSelect() stmt.Stmt {
 				sr.Table = sr.Column
 				sr.Column = p.expectIdentifier("expected a column")
 			}
+
 			sr.Alias = sr.Column
 			if p.optionalReserved(sql.AS) {
 				sr.Alias = p.expectIdentifier("expected an alias")
 			}
+
 			if p.optionalReserved(sql.FROM) {
 				done = true
 			} else if !p.maybeRune(',') {
@@ -515,11 +557,11 @@ func (p *Parser) parseSelect() stmt.Stmt {
 
 	}
 
-	p.parseTableName(&s.Table)
+	p.parseAliasTableName(&s.Table)
 
-	// [[ AS ]] name
-	// maybe have a list of tables
-	// [WHERE <expr>]
+	if p.optionalReserved(sql.WHERE) {
+
+	}
 
 	return &s
 }
