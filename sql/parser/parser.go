@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"io"
 	"maho/sql"
+	"maho/sql/expr"
 	"maho/sql/scanner"
 	"maho/sql/stmt"
 	"math"
@@ -411,7 +412,7 @@ func (p *Parser) parseCreateColumns(s *stmt.CreateTable) {
 				if col.Default != nil {
 					p.error("DEFAULT specified more than once per column")
 				}
-				col.Default = p.parseExpression(false)
+				col.Default = p.parseExpression()
 			} else if p.optionalReserved(sql.NOT) {
 				p.expectReserved(sql.NULL)
 				if col.NotNull {
@@ -442,12 +443,10 @@ func (p *Parser) parseDropTable() stmt.Stmt {
 	return nil
 }
 
-func (p *Parser) parseExpression(df bool) sql.Value {
+func (p *Parser) parseExpression() sql.Value {
 	r := p.scan()
 	if r == scanner.Reserved {
-		if df && p.scanner.Identifier == sql.DEFAULT {
-			return sql.Default{}
-		} else if p.scanner.Identifier == sql.TRUE {
+		if p.scanner.Identifier == sql.TRUE {
 			return true
 		} else if p.scanner.Identifier == sql.FALSE {
 			return false
@@ -464,14 +463,192 @@ func (p *Parser) parseExpression(df bool) sql.Value {
 		return p.scanner.Double
 	}
 
-	if df {
-		p.error(fmt.Sprintf(
-			"expected a string, a number, TRUE, FALSE, NULL or DEFAULT for each value got %s",
-			p.got()))
-	}
+	// XXX: need a better error message
 	p.error(fmt.Sprintf(
 		"expected a string, a number, TRUE, FALSE or NULL for each value got %s", p.got()))
 	return nil
+}
+
+/*
+expr:
+    expr OR expr
+  | expr || expr
+  | expr XOR expr
+  | expr AND expr
+  | expr && expr
+  | NOT expr
+  | ! expr
+  | boolean_primary IS [NOT] {TRUE | FALSE | UNKNOWN}
+  | boolean_primary
+
+boolean_primary:
+    boolean_primary IS [NOT] NULL
+  | boolean_primary <=> predicate
+  | boolean_primary comparison_operator predicate
+  | boolean_primary comparison_operator {ALL | ANY} (subquery)
+  | predicate
+
+comparison_operator: = | >= | > | <= | < | <> | !=
+
+predicate:
+    bit_expr [NOT] IN (subquery)
+  | bit_expr [NOT] IN (expr [, expr] ...)
+  | bit_expr [NOT] BETWEEN bit_expr AND predicate
+  | bit_expr SOUNDS LIKE bit_expr
+  | bit_expr [NOT] LIKE simple_expr [ESCAPE simple_expr]
+  | bit_expr [NOT] REGEXP bit_expr
+  | bit_expr
+
+bit_expr:
+    bit_expr | bit_expr
+  | bit_expr & bit_expr
+  | bit_expr << bit_expr
+  | bit_expr >> bit_expr
+  | bit_expr + bit_expr
+  | bit_expr - bit_expr
+  | bit_expr * bit_expr
+  | bit_expr / bit_expr
+  | bit_expr DIV bit_expr
+  | bit_expr MOD bit_expr
+  | bit_expr % bit_expr
+  | bit_expr ^ bit_expr
+  | bit_expr + interval_expr
+  | bit_expr - interval_expr
+  | simple_expr
+
+simple_expr:
+    literal
+  | identifier
+  | function_call
+  | simple_expr COLLATE collation_name
+  | param_marker
+  | variable
+  | simple_expr || simple_expr
+  | + simple_expr
+  | - simple_expr
+  | ~ simple_expr
+  | ! simple_expr
+  | BINARY simple_expr
+  | (expr [, expr] ...)
+  | ROW (expr, expr [, expr] ...)
+  | (subquery)
+  | EXISTS (subquery)
+  | {identifier expr}
+  | match_expr
+  | case_expr
+  | interval_expr
+*/
+
+/*
+(highest to lowest precedence)
+
+INTERVAL
+BINARY, COLLATE
+!
+- (unary minus), ~ (unary bit inversion)
+13: ^
+12: *, /, DIV, %, MOD
+11: -, +
+10: <<, >>
+9: &
+8: |
+7: = (comparison), <=>, >=, >, <=, <, <>, !=, IS, LIKE, REGEXP, IN
+6: BETWEEN, CASE, WHEN, THEN, ELSE
+5: NOT
+4: AND, &&
+3: XOR
+2: OR, ||
+1: = (assignment), :=
+*/
+
+/*
+<expr>:
+      <literal>
+    | - <expr>
+    | ( <expr> )
+    | <expr> + <expr>
+    | <expr> - <expr>
+    | <expr> * <expr>
+    | <expr> / <expr>
+    | <expr> . <variable>
+    | <variable>
+    | <function> ( [<expr> [,...]] )
+*/
+
+func (p *Parser) parseExpr() expr.Expr {
+	var e expr.Expr
+	r := p.scan()
+	if r == scanner.Reserved {
+		if p.scanner.Identifier == sql.TRUE {
+			e = &expr.Literal{true}
+		} else if p.scanner.Identifier == sql.FALSE {
+			e = &expr.Literal{false}
+		} else if p.scanner.Identifier == sql.NULL {
+			e = &expr.Literal{nil}
+		} else {
+			p.error(fmt.Sprintf("unexpected identifier %s", p.scanner.Identifier))
+		}
+	} else if r == scanner.String {
+		e = &expr.Literal{p.scanner.String}
+	} else if r == scanner.Integer {
+		e = &expr.Literal{p.scanner.Integer}
+	} else if r == scanner.Double {
+		e = &expr.Literal{p.scanner.Double}
+	} else if r == scanner.Identifier {
+		// <variable>
+		// <function> ( <expr> [,...] )
+
+		p.error("<variable> | <function> ( [<expr> [,...]]) not implemented")
+	} else if r == '-' {
+		// - <expr>
+		e = &expr.Unary{expr.NegateOp, p.parseExpr()}
+	} else if r == '(' {
+		// ( <expr> )
+		e = &expr.Unary{expr.NoOp, p.parseExpr()}
+		r = p.scan()
+		if r != ')' {
+			p.error(fmt.Sprintf("expected closing parenthesis got %s", p.got()))
+		}
+	} else {
+		// XXX: need a better error message
+		p.error(fmt.Sprintf(
+			"expected a string, a number, TRUE, FALSE or NULL for each value got %s", p.got()))
+	}
+
+	var op expr.Op
+	r = p.scan()
+	if r == '+' {
+		// <expr> + <expr>
+		op = expr.AddOp
+	} else if r == '-' {
+		// <expr> - <expr>
+		op = expr.SubtractOp
+	} else if r == '*' {
+		// <expr> * <expr>
+		op = expr.MultiplyOp
+	} else if r == '/' {
+		// <expr> / <expr>
+		op = expr.DivideOp
+	} else if r == '=' {
+		// <expr> = <expr>
+		// <expr> == <expr> XXX
+		op = expr.EqualOp
+	} else if r == '.' {
+		// <expr> . <variable>
+		p.error("<expr> . <variable> not implemented")
+	} else {
+		p.unscan()
+		return e
+	}
+
+	e2 := p.parseExpr()
+	if b2, ok := e2.(*expr.Binary); ok && b2.Op.Precedence() < op.Precedence() {
+		b2.Left = &expr.Binary{op, e, b2.Left}
+		e = b2
+	} else {
+		e = &expr.Binary{op, e, e2}
+	}
+	return e
 }
 
 func (p *Parser) parseInsert() stmt.Stmt {
@@ -505,8 +682,14 @@ func (p *Parser) parseInsert() stmt.Stmt {
 
 		p.expectRunes('(')
 		for {
-			row = append(row, p.parseExpression(true))
-			r := p.expectRunes(',', ')')
+			r := p.scan()
+			if r == scanner.Reserved && p.scanner.Identifier == sql.DEFAULT {
+				row = append(row, sql.Default{})
+			} else {
+				p.unscan()
+				row = append(row, p.parseExpression())
+			}
+			r = p.expectRunes(',', ')')
 			if r == ')' {
 				break
 			}
@@ -560,7 +743,7 @@ func (p *Parser) parseSelect() stmt.Stmt {
 	p.parseAliasTableName(&s.Table)
 
 	if p.optionalReserved(sql.WHERE) {
-
+		s.Where = p.parseExpr()
 	}
 
 	return &s

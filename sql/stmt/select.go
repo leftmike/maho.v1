@@ -3,6 +3,7 @@ package stmt
 import (
 	"fmt"
 	"maho/sql"
+	"maho/sql/expr"
 )
 
 type SelectResult struct {
@@ -19,6 +20,7 @@ type AliasTableName struct {
 type Select struct {
 	Table   AliasTableName
 	Results []SelectResult
+	Where   expr.Expr
 }
 
 func (atn AliasTableName) String() string {
@@ -32,7 +34,7 @@ func (atn AliasTableName) String() string {
 func (stmt *Select) String() string {
 	s := "SELECT "
 	if stmt.Results == nil {
-		s += "* "
+		s += "*"
 	} else {
 		for i, sr := range stmt.Results {
 			if i > 0 {
@@ -49,6 +51,9 @@ func (stmt *Select) String() string {
 		}
 	}
 	s += fmt.Sprintf(" FROM %s", stmt.Table)
+	if stmt.Where != nil {
+		s += fmt.Sprintf(" WHERE %s", stmt.Where)
+	}
 	return s
 }
 

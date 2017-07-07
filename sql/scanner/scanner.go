@@ -153,7 +153,7 @@ SkipWhitespace:
 		return s.scanQuotedIdentifier(']')
 	} else if r == '\'' {
 		return s.scanString()
-	} else if r == '.' || r == ',' || r == '(' || r == ')' || r == '*' {
+	} else if r == '.' || r == ',' || r == '(' || r == ')' || r == '*' || r == '/' || r == '=' {
 		return r
 	}
 

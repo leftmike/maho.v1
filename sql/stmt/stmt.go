@@ -1,11 +1,12 @@
 package stmt
 
 import (
+	"fmt"
 	"maho/store"
 )
 
 type Stmt interface {
-	String() string
+	fmt.Stringer
 	Dispatch(e Executer) (interface{}, error)
 }
 
