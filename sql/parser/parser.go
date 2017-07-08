@@ -160,7 +160,7 @@ func (p *Parser) expectTokens(tokens ...rune) rune {
 
 	var msg string
 	if len(tokens) == 1 {
-		msg = fmt.Sprintf("'%c'", tokens[0])
+		msg = fmt.Sprintf("%s", token.Format(tokens[0]))
 	} else {
 		for i, r := range tokens {
 			if i == len(tokens)-1 {
@@ -168,7 +168,7 @@ func (p *Parser) expectTokens(tokens ...rune) rune {
 			} else if i > 0 {
 				msg += ", "
 			}
-			msg += fmt.Sprintf("'%c'", r)
+			msg += fmt.Sprintf("%s", token.Format(r))
 		}
 	}
 

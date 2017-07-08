@@ -92,7 +92,7 @@ SkipWhitespace:
 			s.unreadRune()
 		}
 	} else if r == '/' {
-		if r = s.readRune(); r == '*' {
+		if r := s.readRune(); r == '*' {
 			var p rune
 
 			for {
@@ -144,11 +144,28 @@ SkipWhitespace:
 		return s.scanQuotedIdentifier(']')
 	} else if r == '\'' {
 		return s.scanString()
-	} else if r == '.' || r == ',' || r == '(' || r == ')' || r == '*' || r == '/' || r == '=' {
+	} else if token.IsOpRune(r) {
+		s.buffer.WriteRune(r)
+		r2 := s.readRune()
+		if r2 == '-' || r2 == '+' {
+			s.unreadRune()
+			return r
+		} else if token.IsOpRune(r2) {
+			s.buffer.WriteRune(r2)
+			if r, ok := token.Operators[s.buffer.String()]; ok {
+				return r
+			}
+			s.Error = fmt.Errorf("unexpected operator %s", s.buffer.String())
+			return token.Error
+		} else {
+			s.unreadRune()
+			return r
+		}
+	} else if r == '.' || r == ',' || r == '(' || r == ')' {
 		return r
 	}
 
-	s.Error = fmt.Errorf("unexpected character: %c", r)
+	s.Error = fmt.Errorf("unexpected character '%c'", r)
 	return token.Error
 }
 
