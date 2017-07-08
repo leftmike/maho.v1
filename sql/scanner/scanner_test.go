@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"maho/sql"
 	. "maho/sql/scanner"
+	"maho/sql/token"
 	"strings"
 	"testing"
 )
@@ -13,16 +14,16 @@ func TestScan(t *testing.T) {
 		s string
 		r rune
 	}{
-		{"", EOF},
-		{"abc", Identifier},
-		{"create", Reserved},
-		{"'create'", String},
-		{"`create`", Identifier},
-		{"[create]", Identifier},
-		{"\"create\"", Identifier},
-		{"'isn\\'t go fun?'", String},
-		{"12345", Integer},
-		{"1234.5678", Double},
+		{"", token.EOF},
+		{"abc", token.Identifier},
+		{"create", token.Reserved},
+		{"'create'", token.String},
+		{"`create`", token.Identifier},
+		{"[create]", token.Identifier},
+		{"\"create\"", token.Identifier},
+		{"'isn\\'t go fun?'", token.String},
+		{"12345", token.Integer},
+		{"1234.5678", token.Double},
 	}
 
 	for i, c := range cases {
@@ -50,7 +51,7 @@ func TestScan(t *testing.T) {
 		var s Scanner
 		s.Init(strings.NewReader(n.s), fmt.Sprintf("integers[%d]", i))
 		r := s.Scan()
-		if r != Integer {
+		if r != token.Integer {
 			t.Errorf("Scan(%q) got %d want Integer", n.s, r)
 		}
 		if s.Integer != n.n {
@@ -74,7 +75,7 @@ func TestScan(t *testing.T) {
 		var s Scanner
 		s.Init(strings.NewReader(n.s), fmt.Sprintf("doubles[%d]", i))
 		r := s.Scan()
-		if r != Double {
+		if r != token.Double {
 			t.Errorf("Scan(%q) got %d want Double", n.s, r)
 		}
 		if s.Double != n.n {
@@ -97,11 +98,11 @@ abcd -- identifier
 			id  sql.Identifier
 			s   string
 		}{
-			{ret: Reserved, id: sql.CREATE},
-			{ret: Identifier, s: "create"},
-			{ret: String, s: "create"},
-			{ret: Identifier, s: "abcd"},
-			{ret: EOF},
+			{ret: token.Reserved, id: sql.CREATE},
+			{ret: token.Identifier, s: "create"},
+			{ret: token.String, s: "create"},
+			{ret: token.Identifier, s: "abcd"},
+			{ret: token.EOF},
 		}
 
 		var s Scanner
@@ -112,15 +113,15 @@ abcd -- identifier
 				t.Errorf("Scan(%q)[%d] got %d want %d", src, i, r, e.ret)
 			}
 			switch e.ret {
-			case Identifier:
+			case token.Identifier:
 				if s.Identifier != sql.QuotedId(e.s) {
 					t.Errorf("%d Scan(%q) != sql.QuotedId(%q)", i, src, e.s)
 				}
-			case Reserved:
+			case token.Reserved:
 				if s.Identifier != e.id {
 					t.Errorf("%d Scan(%q).Identifier != %d", i, src, e.id)
 				}
-			case String:
+			case token.String:
 				if s.String != e.s {
 					t.Errorf("%d Scan(%q).String != %q", i, src, e.s)
 				}

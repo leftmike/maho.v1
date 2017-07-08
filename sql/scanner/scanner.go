@@ -5,18 +5,9 @@ import (
 	"fmt"
 	"io"
 	"maho/sql"
+	"maho/sql/token"
 	"strconv"
 	"unicode"
-)
-
-const (
-	EOF = -(iota + 1)
-	Error
-	Identifier
-	Reserved
-	String
-	Integer
-	Double
 )
 
 type Position struct {
@@ -94,7 +85,7 @@ SkipWhitespace:
 
 			goto SkipWhitespace
 		} else if r < 0 {
-			if r != EOF {
+			if r != token.EOF {
 				return r
 			}
 		} else {
@@ -118,7 +109,7 @@ SkipWhitespace:
 
 			goto SkipWhitespace
 		} else if r < 0 {
-			if r != EOF {
+			if r != token.EOF {
 				return r
 			}
 		} else {
@@ -158,7 +149,7 @@ SkipWhitespace:
 	}
 
 	s.Error = fmt.Errorf("unexpected character: %c", r)
-	return Error
+	return token.Error
 }
 
 func (s *Scanner) readRune() rune {
@@ -170,10 +161,10 @@ func (s *Scanner) readRune() rune {
 	var err error
 	s.read, _, err = s.rr.ReadRune()
 	if err == io.EOF {
-		return EOF
+		return token.EOF
 	} else if err != nil {
 		s.Error = err
-		return Error
+		return token.Error
 	}
 
 	if s.read == '\n' {
@@ -194,10 +185,10 @@ func (s *Scanner) scanIdentifier(r rune) rune {
 	for {
 		s.buffer.WriteRune(r)
 		r = s.readRune()
-		if r == EOF {
+		if r == token.EOF {
 			break
-		} else if r == Error {
-			return Error
+		} else if r == token.Error {
+			return token.Error
 		}
 		if !unicode.IsLetter(r) && !unicode.IsDigit(r) && r != '_' && r != '$' {
 			s.unreadRune()
@@ -207,9 +198,9 @@ func (s *Scanner) scanIdentifier(r rune) rune {
 
 	s.Identifier = sql.Id(s.buffer.String())
 	if s.Identifier.IsReserved() {
-		return Reserved
+		return token.Reserved
 	}
-	return Identifier
+	return token.Identifier
 }
 
 func (s *Scanner) scanNumber(r rune, sign int64) rune {
@@ -217,10 +208,10 @@ func (s *Scanner) scanNumber(r rune, sign int64) rune {
 	for {
 		s.buffer.WriteRune(r)
 		r = s.readRune()
-		if r == EOF {
+		if r == token.EOF {
 			break
-		} else if r == Error {
-			return Error
+		} else if r == token.Error {
+			return token.Error
 		}
 		if !dbl && r == '.' {
 			dbl = true
@@ -238,26 +229,26 @@ func (s *Scanner) scanNumber(r rune, sign int64) rune {
 	}
 	if err != nil {
 		s.Error = err
-		return Error
+		return token.Error
 	}
 	if dbl {
 		s.Double *= float64(sign)
-		return Double
+		return token.Double
 	} else {
 		s.Integer *= sign
-		return Integer
+		return token.Integer
 	}
 }
 
 func (s *Scanner) scanQuotedIdentifier(delim rune) rune {
 	for {
 		r := s.readRune()
-		if r == EOF {
+		if r == token.EOF {
 			s.Error = fmt.Errorf("quoted identifier missing terminating '%c'", delim)
-			return Error
+			return token.Error
 		}
-		if r == Error {
-			return Error
+		if r == token.Error {
+			return token.Error
 		}
 		if r == delim {
 			break
@@ -266,35 +257,35 @@ func (s *Scanner) scanQuotedIdentifier(delim rune) rune {
 	}
 
 	s.Identifier = sql.QuotedId(s.buffer.String())
-	return Identifier
+	return token.Identifier
 }
 
 func (s *Scanner) scanString() rune {
 	for {
 		r := s.readRune()
-		if r == EOF {
+		if r == token.EOF {
 			s.Error = fmt.Errorf("string missing terminating \"'\"")
-			return Error
+			return token.Error
 		}
-		if r == Error {
-			return Error
+		if r == token.Error {
+			return token.Error
 		}
 		if r == '\'' {
 			break
 		}
 		if r == '\\' {
 			r = s.readRune()
-			if r == EOF {
+			if r == token.EOF {
 				s.Error = fmt.Errorf("incomplete string escape")
-				return Error
+				return token.Error
 			}
-			if r == Error {
-				return Error
+			if r == token.Error {
+				return token.Error
 			}
 		}
 		s.buffer.WriteRune(r)
 	}
 
 	s.String = s.buffer.String()
-	return String
+	return token.String
 }

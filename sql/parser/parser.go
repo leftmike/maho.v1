@@ -7,6 +7,7 @@ import (
 	"maho/sql/expr"
 	"maho/sql/scanner"
 	"maho/sql/stmt"
+	"maho/sql/token"
 	"math"
 	"runtime"
 )
@@ -28,7 +29,7 @@ func (p *Parser) Init(rr io.RuneReader, fn string) {
 }
 
 func (p *Parser) Parse() (stmt stmt.Stmt, err error) {
-	if p.scan() == scanner.EOF {
+	if p.scan() == token.EOF {
 		return nil, io.EOF
 	}
 	p.unscan()
@@ -59,7 +60,7 @@ func (p *Parser) scan() rune {
 	}
 
 	p.scanned = p.scanner.Scan()
-	if p.scanned == scanner.Error {
+	if p.scanned == token.Error {
 		p.error(p.scanner.Error.Error())
 	}
 	return p.scanned
@@ -71,19 +72,19 @@ func (p *Parser) unscan() {
 
 func (p *Parser) got() string {
 	switch p.scanned {
-	case scanner.EOF:
+	case token.EOF:
 		return fmt.Sprintf("end of file")
-	case scanner.Error:
+	case token.Error:
 		return fmt.Sprintf("error %s", p.scanner.Error.Error())
-	case scanner.Identifier:
+	case token.Identifier:
 		return fmt.Sprintf("identifier %s", p.scanner.Identifier)
-	case scanner.Reserved:
+	case token.Reserved:
 		return fmt.Sprintf("reserved identifier %s", p.scanner.Identifier)
-	case scanner.String:
+	case token.String:
 		return fmt.Sprintf("string %q", p.scanner.String)
-	case scanner.Integer:
+	case token.Integer:
 		return fmt.Sprintf("integer %d", p.scanner.Integer)
-	case scanner.Double:
+	case token.Double:
 		return fmt.Sprintf("double %f", p.scanner.Double)
 	}
 
@@ -92,7 +93,7 @@ func (p *Parser) got() string {
 
 func (p *Parser) expectReserved(ids ...sql.Identifier) sql.Identifier {
 	t := p.scan()
-	if t == scanner.Reserved {
+	if t == token.Reserved {
 		for _, kw := range ids {
 			if kw == p.scanner.Identifier {
 				return kw
@@ -120,7 +121,7 @@ func (p *Parser) expectReserved(ids ...sql.Identifier) sql.Identifier {
 
 func (p *Parser) optionalReserved(ids ...sql.Identifier) bool {
 	t := p.scan()
-	if t == scanner.Reserved {
+	if t == token.Reserved {
 		for _, kw := range ids {
 			if kw == p.scanner.Identifier {
 				return true
@@ -134,14 +135,14 @@ func (p *Parser) optionalReserved(ids ...sql.Identifier) bool {
 
 func (p *Parser) expectIdentifier(msg string) sql.Identifier {
 	t := p.scan()
-	if t != scanner.Identifier {
+	if t != token.Identifier {
 		p.error(fmt.Sprintf("%s got %s", msg, p.got()))
 	}
 	return p.scanner.Identifier
 }
 
 func (p *Parser) maybeIdentifier(id sql.Identifier) bool {
-	if p.scan() == scanner.Identifier && p.scanner.Identifier == id {
+	if p.scan() == token.Identifier && p.scanner.Identifier == id {
 		return true
 	}
 
@@ -149,20 +150,20 @@ func (p *Parser) maybeIdentifier(id sql.Identifier) bool {
 	return false
 }
 
-func (p *Parser) expectRunes(runes ...rune) rune {
+func (p *Parser) expectTokens(tokens ...rune) rune {
 	t := p.scan()
-	for _, r := range runes {
+	for _, r := range tokens {
 		if t == r {
 			return r
 		}
 	}
 
 	var msg string
-	if len(runes) == 1 {
-		msg = fmt.Sprintf("'%c'", runes[0])
+	if len(tokens) == 1 {
+		msg = fmt.Sprintf("'%c'", tokens[0])
 	} else {
-		for i, r := range runes {
-			if i == len(runes)-1 {
+		for i, r := range tokens {
+			if i == len(tokens)-1 {
 				msg += ", or "
 			} else if i > 0 {
 				msg += ", "
@@ -175,7 +176,7 @@ func (p *Parser) expectRunes(runes ...rune) rune {
 	return 0
 }
 
-func (p *Parser) maybeRune(mr rune) bool {
+func (p *Parser) maybeToken(mr rune) bool {
 	if p.scan() == mr {
 		return true
 	}
@@ -184,7 +185,7 @@ func (p *Parser) maybeRune(mr rune) bool {
 }
 
 func (p *Parser) expectInteger(min, max int64) int64 {
-	if p.scan() != scanner.Integer || p.scanner.Integer < min || p.scanner.Integer > max {
+	if p.scan() != token.Integer || p.scanner.Integer < min || p.scanner.Integer > max {
 		p.error(fmt.Sprintf("expected a number between %d and %d inclusive got %s", min, max,
 			p.got()))
 	}
@@ -193,7 +194,7 @@ func (p *Parser) expectInteger(min, max int64) int64 {
 }
 
 func (p *Parser) expectEOF() {
-	if p.scan() != scanner.EOF {
+	if p.scan() != token.EOF {
 		p.error(fmt.Sprintf("expected the end of the statement got %s", p.got()))
 	}
 }
@@ -275,7 +276,7 @@ func (p *Parser) parseCreateIndex(unq bool, not bool) stmt.Stmt {
 
 func (p *Parser) parseTableName(tbl *stmt.TableName) {
 	id := p.expectIdentifier("expected a database or a table")
-	if p.maybeRune('.') {
+	if p.maybeToken(token.Dot) {
 		tbl.Database = id
 		tbl.Table = p.expectIdentifier("expected a table")
 	} else {
@@ -289,7 +290,7 @@ func (p *Parser) parseAliasTableName(atbl *stmt.AliasTableName) {
 		atbl.Alias = p.expectIdentifier("expected an alias")
 	} else {
 		r := p.scan()
-		if r == scanner.Identifier {
+		if r == token.Identifier {
 			atbl.Alias = p.scanner.Identifier
 		} else {
 			p.unscan()
@@ -310,7 +311,7 @@ func (p *Parser) parseCreateTable(tmp bool, not bool) stmt.Stmt {
 	var s stmt.CreateTable
 	p.parseTableName(&s.Table)
 
-	if p.maybeRune('(') {
+	if p.maybeToken(token.LParen) {
 		p.parseCreateColumns(&s)
 		return &s
 	}
@@ -375,31 +376,31 @@ func (p *Parser) parseCreateColumns(s *stmt.CreateTable) {
 		col.Name = nam
 
 		if typ == sql.VARCHAR || typ == sql.VARBINARY {
-			p.expectRunes('(')
+			p.expectTokens(token.LParen)
 			col.Size = uint32(p.expectInteger(0, math.MaxUint32-1))
-			p.expectRunes(')')
+			p.expectTokens(token.RParen)
 		} else {
 			switch col.Type {
 			case sql.CharacterType:
-				if !p.maybeRune('(') {
+				if !p.maybeToken(token.LParen) {
 					break
 				}
 				col.Size = uint32(p.expectInteger(0, math.MaxUint32-1))
-				p.expectRunes(')')
+				p.expectTokens(token.RParen)
 			case sql.DoubleType:
-				if !p.maybeRune('(') {
+				if !p.maybeToken(token.LParen) {
 					break
 				}
 				col.Width = uint8(p.expectInteger(1, 255))
-				p.expectRunes(',')
+				p.expectTokens(token.Comma)
 				col.Fraction = uint8(p.expectInteger(0, 30))
-				p.expectRunes(')')
+				p.expectTokens(token.RParen)
 			case sql.IntegerType:
-				if !p.maybeRune('(') {
+				if !p.maybeToken(token.LParen) {
 					break
 				}
 				col.Width = uint8(p.expectInteger(1, 255))
-				p.expectRunes(')')
+				p.expectTokens(token.RParen)
 			}
 		}
 
@@ -426,8 +427,8 @@ func (p *Parser) parseCreateColumns(s *stmt.CreateTable) {
 
 		s.Columns = append(s.Columns, col)
 
-		r := p.expectRunes(',', ')')
-		if r == ')' {
+		r := p.expectTokens(token.Comma, token.RParen)
+		if r == token.RParen {
 			break
 		}
 	}
@@ -445,7 +446,7 @@ func (p *Parser) parseDropTable() stmt.Stmt {
 
 func (p *Parser) parseExpression() sql.Value {
 	r := p.scan()
-	if r == scanner.Reserved {
+	if r == token.Reserved {
 		if p.scanner.Identifier == sql.TRUE {
 			return true
 		} else if p.scanner.Identifier == sql.FALSE {
@@ -455,11 +456,11 @@ func (p *Parser) parseExpression() sql.Value {
 		} else {
 			p.error(fmt.Sprintf("unexpected identifier %s", p.scanner.Identifier))
 		}
-	} else if r == scanner.String {
+	} else if r == token.String {
 		return p.scanner.String
-	} else if r == scanner.Integer {
+	} else if r == token.Integer {
 		return p.scanner.Integer
-	} else if r == scanner.Double {
+	} else if r == token.Double {
 		return p.scanner.Double
 	}
 
@@ -578,7 +579,7 @@ BINARY, COLLATE
 func (p *Parser) parseExpr() expr.Expr {
 	var e expr.Expr
 	r := p.scan()
-	if r == scanner.Reserved {
+	if r == token.Reserved {
 		if p.scanner.Identifier == sql.TRUE {
 			e = &expr.Literal{true}
 		} else if p.scanner.Identifier == sql.FALSE {
@@ -588,25 +589,24 @@ func (p *Parser) parseExpr() expr.Expr {
 		} else {
 			p.error(fmt.Sprintf("unexpected identifier %s", p.scanner.Identifier))
 		}
-	} else if r == scanner.String {
+	} else if r == token.String {
 		e = &expr.Literal{p.scanner.String}
-	} else if r == scanner.Integer {
+	} else if r == token.Integer {
 		e = &expr.Literal{p.scanner.Integer}
-	} else if r == scanner.Double {
+	} else if r == token.Double {
 		e = &expr.Literal{p.scanner.Double}
-	} else if r == scanner.Identifier {
+	} else if r == token.Identifier {
 		// <variable>
 		// <function> ( <expr> [,...] )
 
 		p.error("<variable> | <function> ( [<expr> [,...]]) not implemented")
-	} else if r == '-' {
+	} else if r == token.Minus {
 		// - <expr>
 		e = &expr.Unary{expr.NegateOp, p.parseExpr()}
-	} else if r == '(' {
+	} else if r == token.LParen {
 		// ( <expr> )
 		e = &expr.Unary{expr.NoOp, p.parseExpr()}
-		r = p.scan()
-		if r != ')' {
+		if p.scan() != token.RParen {
 			p.error(fmt.Sprintf("expected closing parenthesis got %s", p.got()))
 		}
 	} else {
@@ -617,23 +617,23 @@ func (p *Parser) parseExpr() expr.Expr {
 
 	var op expr.Op
 	r = p.scan()
-	if r == '+' {
+	if r == token.Plus {
 		// <expr> + <expr>
 		op = expr.AddOp
-	} else if r == '-' {
+	} else if r == token.Minus {
 		// <expr> - <expr>
 		op = expr.SubtractOp
-	} else if r == '*' {
+	} else if r == token.Star {
 		// <expr> * <expr>
 		op = expr.MultiplyOp
-	} else if r == '/' {
+	} else if r == token.Slash {
 		// <expr> / <expr>
 		op = expr.DivideOp
-	} else if r == '=' {
+	} else if r == token.Equal {
 		// <expr> = <expr>
 		// <expr> == <expr> XXX
 		op = expr.EqualOp
-	} else if r == '.' {
+	} else if r == token.Dot {
 		// <expr> . <variable>
 		p.error("<expr> . <variable> not implemented")
 	} else {
@@ -659,7 +659,7 @@ func (p *Parser) parseInsert() stmt.Stmt {
 	var s stmt.InsertValues
 	p.parseTableName(&s.Table)
 
-	if p.maybeRune('(') {
+	if p.maybeToken(token.LParen) {
 		for {
 			nam := p.expectIdentifier("expected a column name")
 			for _, c := range s.Columns {
@@ -668,8 +668,8 @@ func (p *Parser) parseInsert() stmt.Stmt {
 				}
 			}
 			s.Columns = append(s.Columns, nam)
-			r := p.expectRunes(',', ')')
-			if r == ')' {
+			r := p.expectTokens(token.Comma, token.RParen)
+			if r == token.RParen {
 				break
 			}
 		}
@@ -680,24 +680,24 @@ func (p *Parser) parseInsert() stmt.Stmt {
 	for {
 		var row []sql.Value
 
-		p.expectRunes('(')
+		p.expectTokens(token.LParen)
 		for {
 			r := p.scan()
-			if r == scanner.Reserved && p.scanner.Identifier == sql.DEFAULT {
+			if r == token.Reserved && p.scanner.Identifier == sql.DEFAULT {
 				row = append(row, sql.Default{})
 			} else {
 				p.unscan()
 				row = append(row, p.parseExpression())
 			}
-			r = p.expectRunes(',', ')')
-			if r == ')' {
+			r = p.expectTokens(token.Comma, token.RParen)
+			if r == token.RParen {
 				break
 			}
 		}
 
 		s.Rows = append(s.Rows, row)
 
-		if !p.maybeRune(',') {
+		if !p.maybeToken(token.Comma) {
 			break
 		}
 	}
@@ -712,13 +712,13 @@ func (p *Parser) parseSelect() stmt.Stmt {
 	*/
 
 	var s stmt.Select
-	if p.maybeRune('*') {
+	if p.maybeToken(token.Star) {
 		p.expectReserved(sql.FROM)
 	} else {
 		for done := false; !done; {
 			var sr stmt.SelectResult
 			sr.Column = p.expectIdentifier("expected a table or a column")
-			if p.maybeRune('.') {
+			if p.maybeToken(token.Dot) {
 				sr.Table = sr.Column
 				sr.Column = p.expectIdentifier("expected a column")
 			}
@@ -730,9 +730,9 @@ func (p *Parser) parseSelect() stmt.Stmt {
 
 			if p.optionalReserved(sql.FROM) {
 				done = true
-			} else if !p.maybeRune(',') {
+			} else if !p.maybeToken(token.Comma) {
 				sr.Alias = p.expectIdentifier("expected an alias")
-				p.expectRunes(',')
+				p.expectTokens(token.Comma)
 			}
 
 			s.Results = append(s.Results, sr)
