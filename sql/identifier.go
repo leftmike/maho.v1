@@ -35,7 +35,8 @@ const (
 )
 
 const (
-	AS Identifier = -(iota + 1)
+	AND Identifier = -(iota + 1)
+	AS
 	CREATE
 	DEFAULT
 	DELETE
@@ -49,6 +50,7 @@ const (
 	INTO
 	NOT
 	NULL
+	OR
 	SELECT
 	TABLE
 	TEMP
@@ -74,6 +76,7 @@ var knownKeywords = map[string]struct {
 	id       Identifier
 	reserved bool
 }{
+	"AND":       {AND, true},
 	"AS":        {AS, true},
 	"BIGINT":    {BIGINT, false},
 	"BINARY":    {BINARY, false},
@@ -98,6 +101,7 @@ var knownKeywords = map[string]struct {
 	"MEDIUMINT": {MEDIUMINT, false},
 	"NOT":       {NOT, true},
 	"NULL":      {NULL, true},
+	"OR":        {OR, true},
 	"SELECT":    {SELECT, true},
 	"SMALLINT":  {SMALLINT, false},
 	"TABLE":     {TABLE, true},

@@ -471,110 +471,42 @@ func (p *Parser) parseExpression() sql.Value {
 }
 
 /*
-expr:
-    expr OR expr
-  | expr || expr
-  | expr XOR expr
-  | expr AND expr
-  | expr && expr
-  | NOT expr
-  | ! expr
-  | boolean_primary IS [NOT] {TRUE | FALSE | UNKNOWN}
-  | boolean_primary
-
-boolean_primary:
-    boolean_primary IS [NOT] NULL
-  | boolean_primary <=> predicate
-  | boolean_primary comparison_operator predicate
-  | boolean_primary comparison_operator {ALL | ANY} (subquery)
-  | predicate
-
-comparison_operator: = | >= | > | <= | < | <> | !=
-
-predicate:
-    bit_expr [NOT] IN (subquery)
-  | bit_expr [NOT] IN (expr [, expr] ...)
-  | bit_expr [NOT] BETWEEN bit_expr AND predicate
-  | bit_expr SOUNDS LIKE bit_expr
-  | bit_expr [NOT] LIKE simple_expr [ESCAPE simple_expr]
-  | bit_expr [NOT] REGEXP bit_expr
-  | bit_expr
-
-bit_expr:
-    bit_expr | bit_expr
-  | bit_expr & bit_expr
-  | bit_expr << bit_expr
-  | bit_expr >> bit_expr
-  | bit_expr + bit_expr
-  | bit_expr - bit_expr
-  | bit_expr * bit_expr
-  | bit_expr / bit_expr
-  | bit_expr DIV bit_expr
-  | bit_expr MOD bit_expr
-  | bit_expr % bit_expr
-  | bit_expr ^ bit_expr
-  | bit_expr + interval_expr
-  | bit_expr - interval_expr
-  | simple_expr
-
-simple_expr:
-    literal
-  | identifier
-  | function_call
-  | simple_expr COLLATE collation_name
-  | param_marker
-  | variable
-  | simple_expr || simple_expr
-  | + simple_expr
-  | - simple_expr
-  | ~ simple_expr
-  | ! simple_expr
-  | BINARY simple_expr
-  | (expr [, expr] ...)
-  | ROW (expr, expr [, expr] ...)
-  | (subquery)
-  | EXISTS (subquery)
-  | {identifier expr}
-  | match_expr
-  | case_expr
-  | interval_expr
-*/
-
-/*
-(highest to lowest precedence)
-
-INTERVAL
-BINARY, COLLATE
-!
-- (unary minus), ~ (unary bit inversion)
-13: ^
-12: *, /, DIV, %, MOD
-11: -, +
-10: <<, >>
-9: &
-8: |
-7: = (comparison), <=>, >=, >, <=, <, <>, !=, IS, LIKE, REGEXP, IN
-6: BETWEEN, CASE, WHEN, THEN, ELSE
-5: NOT
-4: AND, &&
-3: XOR
-2: OR, ||
-1: = (assignment), :=
-*/
-
-/*
 <expr>:
       <literal>
     | - <expr>
+    | NOT <expr>
     | ( <expr> )
-    | <expr> + <expr>
-    | <expr> - <expr>
-    | <expr> * <expr>
-    | <expr> / <expr>
+    | <expr> <op> <expr>
     | <expr> . <variable>
     | <variable>
     | <function> ( [<expr> [,...]] )
+<op>:
+      + - * / %
+    | = == != <> < <= > >=
+    | << >> & |
+    | AND | OR
 */
+
+var binaryOps = map[rune]expr.Op{
+	token.Ampersand:      expr.BinaryAndOp,
+	token.Bar:            expr.BinaryOrOp,
+	token.BarBar:         expr.ConcatOp,
+	token.Equal:          expr.EqualOp,
+	token.EqualEqual:     expr.EqualOp,
+	token.BangEqual:      expr.NotEqualOp,
+	token.Greater:        expr.GreaterThanOp,
+	token.GreaterEqual:   expr.GreaterEqualOp,
+	token.GreaterGreater: expr.RShiftOp,
+	token.Less:           expr.LessThanOp,
+	token.LessEqual:      expr.LessEqualOp,
+	token.LessGreater:    expr.NotEqualOp,
+	token.LessLess:       expr.LShiftOp,
+	token.Minus:          expr.SubtractOp,
+	token.Percent:        expr.ModuloOp,
+	token.Plus:           expr.AddOp,
+	token.Slash:          expr.DivideOp,
+	token.Star:           expr.MultiplyOp,
+}
 
 func (p *Parser) parseExpr() expr.Expr {
 	var e expr.Expr
@@ -586,6 +518,8 @@ func (p *Parser) parseExpr() expr.Expr {
 			e = &expr.Literal{false}
 		} else if p.scanner.Identifier == sql.NULL {
 			e = &expr.Literal{nil}
+		} else if p.scanner.Identifier == sql.NOT {
+			e = &expr.Unary{expr.NotOp, p.parseExpr()}
 		} else {
 			p.error(fmt.Sprintf("unexpected identifier %s", p.scanner.Identifier))
 		}
@@ -617,28 +551,19 @@ func (p *Parser) parseExpr() expr.Expr {
 
 	var op expr.Op
 	r = p.scan()
-	if r == token.Plus {
-		// <expr> + <expr>
-		op = expr.AddOp
-	} else if r == token.Minus {
-		// <expr> - <expr>
-		op = expr.SubtractOp
-	} else if r == token.Star {
-		// <expr> * <expr>
-		op = expr.MultiplyOp
-	} else if r == token.Slash {
-		// <expr> / <expr>
-		op = expr.DivideOp
-	} else if r == token.Equal {
-		// <expr> = <expr>
-		// <expr> == <expr> XXX
-		op = expr.EqualOp
-	} else if r == token.Dot {
-		// <expr> . <variable>
-		p.error("<expr> . <variable> not implemented")
-	} else {
-		p.unscan()
-		return e
+	op, ok := binaryOps[r]
+	if !ok {
+		if r == token.Reserved && p.scanner.Identifier == sql.AND {
+			op = expr.AndOp
+		} else if r == token.Reserved && p.scanner.Identifier == sql.OR {
+			op = expr.OrOp
+		} else if r == token.Dot {
+			// <expr> . <variable>
+			p.error("<expr> . <variable> not implemented")
+		} else {
+			p.unscan()
+			return e
+		}
 	}
 
 	e2 := p.parseExpr()

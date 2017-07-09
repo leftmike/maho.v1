@@ -4,6 +4,11 @@ package main
 To Do:
 - databases should be standalone ==> identifiers should be converted back to strings on storage
 - finish parse and execute of select
+- fix unary precidence of - and NOT
+- test parsing expressions
+- test expr.go
+- test stmt(?)
+- test token
 - DEFAULT for column can be an expression in CREATE TABLE
 - INSERT VALUES can be expressions
 - update t.Errorf to be "Operation(args) got %s want %s" and use %q for args
