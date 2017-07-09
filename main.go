@@ -4,8 +4,7 @@ package main
 To Do:
 - databases should be standalone ==> identifiers should be converted back to strings on storage
 - finish parse and execute of select
-- fix unary precidence of - and NOT
-- test parsing expressions
+- finish (testing) parsing expressions
 - test expr.go
 - test stmt(?)
 - test token

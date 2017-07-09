@@ -50,7 +50,7 @@ var ops = [...]struct {
 	ModuloOp:       {"%", 8},
 	MultiplyOp:     {"*", 8},
 	NegateOp:       {"-", 9},
-	NoOp:           {"", 9},
+	NoOp:           {"", 11},
 	NotEqualOp:     {"!=", 4},
 	NotOp:          {"NOT", 3},
 	OrOp:           {"OR", 1},
@@ -91,7 +91,7 @@ func (u *Unary) String() string {
 	if ops[u.Op].name == "" {
 		return u.Expr.String()
 	}
-	return fmt.Sprintf("%s %s", ops[u.Op].name, u.Expr)
+	return fmt.Sprintf("(%s %s)", ops[u.Op].name, u.Expr)
 }
 
 func (u *Unary) Eval(ctx EvalCtx) (interface{}, error) {

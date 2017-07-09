@@ -477,9 +477,8 @@ func (p *Parser) parseExpression() sql.Value {
     | NOT <expr>
     | ( <expr> )
     | <expr> <op> <expr>
-    | <expr> . <variable>
-    | <variable>
-    | <function> ( [<expr> [,...]] )
+    | <ref> [. <ref> ...]
+    | <func> ( [<expr> [,...]] )
 <op>:
       + - * / %
     | = == != <> < <= > >=
@@ -519,7 +518,7 @@ func (p *Parser) parseExpr() expr.Expr {
 		} else if p.scanner.Identifier == sql.NULL {
 			e = &expr.Literal{nil}
 		} else if p.scanner.Identifier == sql.NOT {
-			e = &expr.Unary{expr.NotOp, p.parseExpr()}
+			e = p.parseUnaryExpr(expr.NotOp)
 		} else {
 			p.error(fmt.Sprintf("unexpected identifier %s", p.scanner.Identifier))
 		}
@@ -530,13 +529,13 @@ func (p *Parser) parseExpr() expr.Expr {
 	} else if r == token.Double {
 		e = &expr.Literal{p.scanner.Double}
 	} else if r == token.Identifier {
-		// <variable>
-		// <function> ( <expr> [,...] )
+		// <ref> [. <ref> ...]
+		// <func> ( <expr> [,...] )
 
-		p.error("<variable> | <function> ( [<expr> [,...]]) not implemented")
+		p.error("<ref> [. <ref> ...] | <func> ( [<expr> [,...]]) not implemented")
 	} else if r == token.Minus {
 		// - <expr>
-		e = &expr.Unary{expr.NegateOp, p.parseExpr()}
+		e = p.parseUnaryExpr(expr.NegateOp)
 	} else if r == token.LParen {
 		// ( <expr> )
 		e = &expr.Unary{expr.NoOp, p.parseExpr()}
@@ -557,9 +556,6 @@ func (p *Parser) parseExpr() expr.Expr {
 			op = expr.AndOp
 		} else if r == token.Reserved && p.scanner.Identifier == sql.OR {
 			op = expr.OrOp
-		} else if r == token.Dot {
-			// <expr> . <variable>
-			p.error("<expr> . <variable> not implemented")
 		} else {
 			p.unscan()
 			return e
@@ -574,6 +570,24 @@ func (p *Parser) parseExpr() expr.Expr {
 		e = &expr.Binary{op, e, e2}
 	}
 	return e
+}
+
+func (p *Parser) parseUnaryExpr(op expr.Op) expr.Expr {
+	e := p.parseExpr()
+	if b, ok := e.(*expr.Binary); ok && b.Op.Precedence() < op.Precedence() {
+		for {
+			if bl, ok := b.Left.(*expr.Binary); ok && bl.Op.Precedence() < op.Precedence() {
+				b = bl
+			} else {
+				break
+			}
+		}
+
+		b.Left = &expr.Unary{op, b.Left}
+		return e
+	}
+
+	return &expr.Unary{op, e}
 }
 
 func (p *Parser) parseInsert() stmt.Stmt {

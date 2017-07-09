@@ -1,11 +1,12 @@
-package parser_test
+package parser
 
 import (
 	"fmt"
 	"maho/sql"
-	. "maho/sql/parser"
+	"maho/sql/expr"
 	"maho/sql/stmt"
 	"math"
+	"runtime"
 	"strings"
 	"testing"
 )
@@ -289,7 +290,7 @@ c2 boolean not null default true)`,
 			if err != nil {
 				t.Errorf("Parse(%q) failed with %s", c.sql, err)
 			} else if !createTableEqual(c.stmt, stmt) {
-				t.Errorf("Parse(%q) != %s", c.sql, c.stmt.String())
+				t.Errorf("Parse(%q) got %s want %s", c.sql, stmt.String(), c.stmt.String())
 			}
 		}
 	}
@@ -366,7 +367,7 @@ func TestInsertValues(t *testing.T) {
 			if err != nil {
 				t.Errorf("Parse(%q) failed with %s", c.sql, err)
 			} else if !insertValuesEqual(c.stmt, stmt) {
-				t.Errorf("Parse(%q) != %s", c.sql, c.stmt.String())
+				t.Errorf("Parse(%q) got %s want %s", c.sql, stmt.String(), c.stmt.String())
 			}
 		}
 	}
@@ -402,4 +403,54 @@ func insertValuesEqual(stmt1 stmt.InsertValues, s2 stmt.Stmt) bool {
 		}
 	}
 	return true
+}
+
+func parseExpr(p *Parser) (e expr.Expr, err error) {
+	defer func() {
+		if r := recover(); r != nil {
+			if _, ok := r.(runtime.Error); ok {
+				panic(r)
+			}
+			err = r.(error)
+			e = nil
+		}
+	}()
+
+	e = p.parseExpr()
+	return
+}
+
+func TestParseExpr(t *testing.T) {
+	cases := []struct {
+		sql  string
+		expr string
+	}{
+		{"1 * 2 - 3 = 4", "((1 * (2 - 3)) == 4)"},
+		{"1 * 2 * 3 - 5", "((1 * (2 * 3)) - 5)"},
+		{"1 - 2 * (3 + 4) + 5", "(1 - ((2 * (3 + 4)) + 5))"},
+		{"1 + 2 = 3 * 4 - 5 * 6", "((1 + 2) == ((3 * 4) - (5 * 6)))"},
+		{"NOT 12 AND 1 OR 3", "(((NOT 12) AND 1) OR 3)"},
+		{"- 1 * 2 + 3", "(((- 1) * 2) + 3)"},
+		{"- 1 * 2", "((- 1) * 2)"},
+		{"12 % 34 + 56", "((12 % 34) + 56)"},
+		{"12 == 34 OR 56 != 78", "((12 == 34) OR (56 != 78))"},
+		{"12 + 34 << 56 + 78", "((12 + 34) << (56 + 78))"},
+		{"abc", "abc"},
+		{"abc.def", "abc.def"},
+		{"abc. def . ghi .jkl", "abc.def.ghi.jkl"},
+		{"abc(1 + 2)", "abc((1 + 2))"},
+		{"abc()", "abc()"},
+		{"abc(1 + 2, def() * 3)", "abc((1 + 2), (def() * 3))"},
+	}
+
+	for i, c := range cases {
+		var p Parser
+		p.Init(strings.NewReader(c.sql), fmt.Sprintf("tests[%d]", i))
+		e, err := parseExpr(&p)
+		if err != nil {
+			t.Errorf("parseExpr(%q) failed with %s", c.sql, err)
+		} else if c.expr != e.String() {
+			t.Errorf("parseExpr(%q) got %s want %s", c.sql, e.String(), c.expr)
+		}
+	}
 }
