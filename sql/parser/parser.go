@@ -529,10 +529,28 @@ func (p *Parser) parseExpr() expr.Expr {
 	} else if r == token.Double {
 		e = &expr.Literal{p.scanner.Double}
 	} else if r == token.Identifier {
-		// <ref> [. <ref> ...]
-		// <func> ( <expr> [,...] )
+		if p.maybeToken(token.LParen) {
+			// <func> ( <expr> [,...] )
+			c := &expr.Call{Name: p.scanner.Identifier}
+			if !p.maybeToken(token.RParen) {
+				for {
+					c.Args = append(c.Args, p.parseExpr())
+					if p.maybeToken(token.RParen) {
+						break
+					}
+					p.expectTokens(token.Comma)
+				}
+			}
+			e = c
+		} else {
+			// <ref> [. <ref> ...]
+			ref := expr.Ref{p.scanner.Identifier}
+			for p.maybeToken(token.Dot) {
+				ref = append(ref, p.expectIdentifier("expected a reference"))
+			}
 
-		p.error("<ref> [. <ref> ...] | <func> ( [<expr> [,...]]) not implemented")
+			e = ref
+		}
 	} else if r == token.Minus {
 		// - <expr>
 		e = p.parseUnaryExpr(expr.NegateOp)

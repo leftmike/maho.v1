@@ -445,12 +445,30 @@ func TestParseExpr(t *testing.T) {
 
 	for i, c := range cases {
 		var p Parser
-		p.Init(strings.NewReader(c.sql), fmt.Sprintf("tests[%d]", i))
+		p.Init(strings.NewReader(c.sql), fmt.Sprintf("cases[%d]", i))
 		e, err := parseExpr(&p)
 		if err != nil {
 			t.Errorf("parseExpr(%q) failed with %s", c.sql, err)
 		} else if c.expr != e.String() {
-			t.Errorf("parseExpr(%q) got %s want %s", c.sql, e.String(), c.expr)
+			t.Errorf("parseExpr(%q) got %s want %s", c.sql, e, c.expr)
+		}
+	}
+
+	fails := []string {
+		"1 *",
+		"1 * 2)",
+		"(*)",
+		"abc.123",
+		"((1 + 2) * 3",
+		"abc(123,",
+	}
+
+	for i, f := range fails {
+		var p Parser
+		p.Init(strings.NewReader(f), fmt.Sprintf("fails[%d]", i))
+		e, err := parseExpr(&p)
+		if err == nil {
+			t.Errorf("parseExpr(%q) did not fail, got %s", f, e)
 		}
 	}
 }

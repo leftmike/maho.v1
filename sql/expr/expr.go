@@ -105,7 +105,6 @@ type Binary struct {
 }
 
 func (b *Binary) String() string {
-	// XXX: () not always necessary
 	return fmt.Sprintf("(%s %s %s)", b.Left, ops[b.Op].name, b.Right)
 }
 
@@ -113,13 +112,37 @@ func (b *Binary) Eval(ctx EvalCtx) (interface{}, error) {
 	return b.Left.Eval(ctx) // XXX: fix this
 }
 
-type Variable struct {
-	name     sql.Identifier
-	table    sql.Identifier
-	database sql.Identifier
+type Ref []sql.Identifier
+
+func (r Ref) String() string {
+	s := r[0].String()
+	for i := 1; i < len(r); i++ {
+		s += fmt.Sprintf(".%s", r[i])
+	}
+	return s
+}
+
+func (r Ref) Eval(ctx EvalCtx) (interface{}, error) {
+	return nil, nil
 }
 
 type Call struct {
-	name sql.Identifier
-	args []Expr
+	Name sql.Identifier
+	Args []Expr
+}
+
+func (c *Call) String() string {
+	s := fmt.Sprintf("%s(", c.Name)
+	for i, a := range c.Args {
+		if i > 0 {
+			s += ", "
+		}
+		s += a.String()
+	}
+	s += ")"
+	return s
+}
+
+func (c *Call) Eval(ctx EvalCtx) (interface{}, error) {
+	return nil, nil
 }
