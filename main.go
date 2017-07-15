@@ -7,7 +7,6 @@ To Do:
 - evaluating expressions
 - test expr.go
 - test stmt(?)
-- test token
 - DEFAULT for column can be an expression in CREATE TABLE
 - INSERT VALUES can be expressions
 - update t.Errorf to be "Operation(args) got %s want %s" and use %q for args
