@@ -1,7 +1,6 @@
 package sql
 
 import (
-	"fmt"
 	"strings"
 )
 
@@ -160,10 +159,6 @@ func QuotedId(s string) Identifier {
 
 func (id Identifier) String() string {
 	return Names[id]
-}
-
-func (id Identifier) Format() string {
-	return fmt.Sprintf("'%s'", Names[id])
 }
 
 func (id Identifier) IsReserved() bool {

@@ -470,6 +470,21 @@ func (p *Parser) parseExpression() sql.Value {
 	return nil
 }
 
+func (p *Parser) ParseExpr() (e expr.Expr, err error) {
+	defer func() {
+		if r := recover(); r != nil {
+			if _, ok := r.(runtime.Error); ok {
+				panic(r)
+			}
+			err = r.(error)
+			e = nil
+		}
+	}()
+
+	e = p.parseExpr()
+	return
+}
+
 /*
 <expr>:
       <literal>

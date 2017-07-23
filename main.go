@@ -5,12 +5,14 @@ To Do:
 - databases should be standalone ==> identifiers should be converted back to strings on storage
 - finish parse and execute of select
 - evaluating expressions
-- test expr.go
-- test stmt(?)
 - DEFAULT for column can be an expression in CREATE TABLE
 - INSERT VALUES can be expressions
 - update t.Errorf to be "Operation(args) got %s want %s" and use %q for args
 - or "Operation(args) failed with %s" or "Operation(args) did not fail"
+- handle DEFAULT specially in INSERT VALUES; it should not be part of value.Format
+- value.Format should not use reflect
+- column.ConvertValue should not use reflect
+- is eval.value really necessary
 */
 
 import (
@@ -66,7 +68,7 @@ func parse(e *engine.Engine, rr io.RuneReader, fn string) {
 			for i := 1; rows.Next(dest) == nil; i += 1 {
 				fmt.Fprintf(w, "%d\t", i)
 				for _, v := range dest {
-					fmt.Fprintf(w, "%s\t", sql.FormatValue(v))
+					fmt.Fprintf(w, "%s\t", sql.Format(v))
 				}
 				fmt.Fprintln(w)
 			}

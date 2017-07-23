@@ -7,11 +7,7 @@ import (
 
 type Value interface{}
 
-type Formatter interface {
-	Format() string
-}
-
-func FormatValue(v Value) string {
+func Format(v Value) string {
 	if v == nil {
 		return "NULL"
 	}
@@ -26,8 +22,8 @@ func FormatValue(v Value) string {
 		return fmt.Sprintf("'%v'", v)
 	}
 
-	if f, ok := v.(Formatter); ok {
-		return f.Format()
+	if _, ok := v.(Default); ok {
+		return "DEFAULT"
 	}
 
 	return fmt.Sprintf("%v", v)

@@ -7,7 +7,7 @@ import (
 func TestIsOpRune(t *testing.T) {
 	for r := rune(0); r < 2000; r++ {
 		switch r {
-		case Minus,	Plus, Star, Slash, Percent, Equal, Less, Greater,
+		case Minus, Plus, Star, Slash, Percent, Equal, Less, Greater,
 			Ampersand, Bar, Bang:
 			if IsOpRune(r) != true {
 				t.Errorf("IsOpRune('%c') got false want true", r)

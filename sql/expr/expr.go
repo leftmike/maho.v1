@@ -62,12 +62,12 @@ func (op Op) Precedence() int {
 	return ops[op].precedence
 }
 
-type EvalCtx interface {
+func (op Op) String() string {
+	return ops[op].name
 }
 
 type Expr interface {
 	fmt.Stringer
-	Eval(ctx EvalCtx) (interface{}, error)
 }
 
 type Literal struct {
@@ -75,11 +75,7 @@ type Literal struct {
 }
 
 func (l *Literal) String() string {
-	return sql.FormatValue(l.Value)
-}
-
-func (l *Literal) Eval(ctx EvalCtx) (interface{}, error) {
-	return l.Value, nil
+	return sql.Format(l.Value)
 }
 
 type Unary struct {
@@ -94,10 +90,6 @@ func (u *Unary) String() string {
 	return fmt.Sprintf("(%s %s)", ops[u.Op].name, u.Expr)
 }
 
-func (u *Unary) Eval(ctx EvalCtx) (interface{}, error) {
-	return u.Expr.Eval(ctx) // XXX: fix this
-}
-
 type Binary struct {
 	Op    Op
 	Left  Expr
@@ -108,10 +100,6 @@ func (b *Binary) String() string {
 	return fmt.Sprintf("(%s %s %s)", b.Left, ops[b.Op].name, b.Right)
 }
 
-func (b *Binary) Eval(ctx EvalCtx) (interface{}, error) {
-	return b.Left.Eval(ctx) // XXX: fix this
-}
-
 type Ref []sql.Identifier
 
 func (r Ref) String() string {
@@ -120,10 +108,6 @@ func (r Ref) String() string {
 		s += fmt.Sprintf(".%s", r[i])
 	}
 	return s
-}
-
-func (r Ref) Eval(ctx EvalCtx) (interface{}, error) {
-	return nil, nil
 }
 
 type Call struct {
@@ -141,8 +125,4 @@ func (c *Call) String() string {
 	}
 	s += ")"
 	return s
-}
-
-func (c *Call) Eval(ctx EvalCtx) (interface{}, error) {
-	return nil, nil
 }

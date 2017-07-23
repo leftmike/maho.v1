@@ -1,12 +1,11 @@
-package parser
+package parser_test
 
 import (
 	"fmt"
 	"maho/sql"
-	"maho/sql/expr"
+	"maho/sql/parser"
 	"maho/sql/stmt"
 	"math"
-	"runtime"
 	"strings"
 	"testing"
 )
@@ -23,7 +22,7 @@ func TestParse(t *testing.T) {
 	}
 
 	for i, f := range failed {
-		var p Parser
+		var p parser.Parser
 		p.Init(strings.NewReader(f), fmt.Sprintf("failed[%d]", i))
 		stmt, err := p.Parse()
 		if stmt != nil || err == nil {
@@ -279,7 +278,7 @@ c2 boolean not null default true)`,
 	}
 
 	for i, c := range cases {
-		var p Parser
+		var p parser.Parser
 		p.Init(strings.NewReader(c.sql), fmt.Sprintf("tests[%d]", i))
 		stmt, err := p.Parse()
 		if c.fail {
@@ -356,7 +355,7 @@ func TestInsertValues(t *testing.T) {
 	}
 
 	for i, c := range cases {
-		var p Parser
+		var p parser.Parser
 		p.Init(strings.NewReader(c.sql), fmt.Sprintf("tests[%d]", i))
 		stmt, err := p.Parse()
 		if c.fail {
@@ -405,21 +404,6 @@ func insertValuesEqual(stmt1 stmt.InsertValues, s2 stmt.Stmt) bool {
 	return true
 }
 
-func parseExpr(p *Parser) (e expr.Expr, err error) {
-	defer func() {
-		if r := recover(); r != nil {
-			if _, ok := r.(runtime.Error); ok {
-				panic(r)
-			}
-			err = r.(error)
-			e = nil
-		}
-	}()
-
-	e = p.parseExpr()
-	return
-}
-
 func TestParseExpr(t *testing.T) {
 	cases := []struct {
 		sql  string
@@ -444,19 +428,19 @@ func TestParseExpr(t *testing.T) {
 	}
 
 	for i, c := range cases {
-		var p Parser
+		var p parser.Parser
 		p.Init(strings.NewReader(c.sql), fmt.Sprintf("cases[%d]", i))
-		e, err := parseExpr(&p)
+		e, err := p.ParseExpr()
 		if err != nil {
-			t.Errorf("parseExpr(%q) failed with %s", c.sql, err)
+			t.Errorf("ParseExpr(%q) failed with %s", c.sql, err)
 		} else if c.expr != e.String() {
-			t.Errorf("parseExpr(%q) got %s want %s", c.sql, e, c.expr)
+			t.Errorf("ParseExpr(%q) got %s want %s", c.sql, e, c.expr)
 		}
 	}
 
-	fails := []string {
+	fails := []string{
 		"1 *",
-		"1 * 2)",
+		"(1 * 2",
 		"(*)",
 		"abc.123",
 		"((1 + 2) * 3",
@@ -464,11 +448,11 @@ func TestParseExpr(t *testing.T) {
 	}
 
 	for i, f := range fails {
-		var p Parser
+		var p parser.Parser
 		p.Init(strings.NewReader(f), fmt.Sprintf("fails[%d]", i))
-		e, err := parseExpr(&p)
+		e, err := p.ParseExpr()
 		if err == nil {
-			t.Errorf("parseExpr(%q) did not fail, got %s", f, e)
+			t.Errorf("ParseExpr(%q) did not fail, got %s", f, e)
 		}
 	}
 }
