@@ -2,7 +2,6 @@ package sql
 
 import (
 	"fmt"
-	"reflect"
 )
 
 type Value interface{}
@@ -12,14 +11,13 @@ func Format(v Value) string {
 		return "NULL"
 	}
 
-	switch reflect.TypeOf(v).Kind() {
-	case reflect.Bool:
-		if reflect.ValueOf(v).Bool() {
+	if b, ok := v.(bool); ok {
+		if b {
 			return "true"
 		}
 		return "false"
-	case reflect.String:
-		return fmt.Sprintf("'%v'", v)
+	} else if s, ok := v.(string); ok {
+		return fmt.Sprintf("'%s'", s)
 	}
 
 	if _, ok := v.(Default); ok {

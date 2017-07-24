@@ -10,8 +10,6 @@ To Do:
 - update t.Errorf to be "Operation(args) got %s want %s" and use %q for args
 - or "Operation(args) failed with %s" or "Operation(args) did not fail"
 - handle DEFAULT specially in INSERT VALUES; it should not be part of value.Format
-- value.Format should not use reflect
-- column.ConvertValue should not use reflect
 - is eval.value really necessary?
 - add tests to maho and maho/sql/stmt even if just stubs
 - eval failure tests

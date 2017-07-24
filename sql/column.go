@@ -3,6 +3,8 @@ package sql
 import (
 	"fmt"
 	"math"
+	"strconv"
+	"strings"
 )
 
 type Column struct {
@@ -78,9 +80,55 @@ func (c Column) ConvertValue(v Value) (Value, error) {
 		}
 	}
 
-	v, err := c.Type.ConvertTo(v)
-	if err != nil {
-		return nil, fmt.Errorf("column: %s: %s", c.Name, err)
+	switch c.Type {
+	case BooleanType:
+		if s, ok := v.(string); ok {
+			s = strings.Trim(s, " \t\n")
+			if s == "t" || s == "true" || s == "y" || s == "yes" || s == "on" || s == "1" {
+				return true, nil
+			} else if s == "f" || s == "false" || s == "n" || s == "no" || s == "off" || s == "0" {
+				return false, nil
+			} else {
+				return nil, fmt.Errorf("column: %s: expected a boolean value: %v", c.Name, v)
+			}
+		} else if _, ok := v.(bool); !ok {
+			return nil, fmt.Errorf("column: %s: expected a boolean value: %v", c.Name, v)
+		}
+	case CharacterType:
+		if i, ok := v.(int64); ok {
+			return strconv.FormatInt(i, 10), nil
+		} else if f, ok := v.(float64); ok {
+			return strconv.FormatFloat(f, 'g', -1, 64), nil
+		} else if _, ok := v.(string); !ok {
+			return nil, fmt.Errorf("column: %s: expected a string value: %v", c.Name, v)
+		}
+	case DoubleType:
+		if i, ok := v.(int64); ok {
+			return float64(i), nil
+		} else if s, ok := v.(string); ok {
+			d, err := strconv.ParseFloat(strings.Trim(s, " \t\n"), 64)
+			if err != nil {
+				return nil, fmt.Errorf("column: %s: expected a float: %v: %s", c.Name, v,
+					err.Error())
+			}
+			return d, nil
+		} else if _, ok := v.(float64); !ok {
+			return nil, fmt.Errorf("column: %s: expected a float value: %v", c.Name, v)
+		}
+	case IntegerType:
+		if f, ok := v.(float64); ok {
+			return int64(f), nil
+		} else if s, ok := v.(string); ok {
+			i, err := strconv.ParseInt(strings.Trim(s, " \t\n"), 10, 64)
+			if err != nil {
+				return nil, fmt.Errorf("column: %s: expected an integer: %v: %s", c.Name, v,
+					err.Error())
+			}
+			return i, nil
+		} else if _, ok := v.(int64); !ok {
+			return nil, fmt.Errorf("column: %s: expected an integer value: %v", c.Name, v)
+		}
 	}
+
 	return v, nil
 }
