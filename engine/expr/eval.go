@@ -145,8 +145,29 @@ func binaryOrCall(ctx EvalContext, args []sql.Value) (sql.Value, error) {
 }
 
 func concatCall(ctx EvalContext, args []sql.Value) (sql.Value, error) {
-	// XXX
-	return nil, nil
+	s := ""
+	for _, a := range args {
+		if a == nil {
+			continue
+		}
+		switch v := a.(type) {
+		case bool:
+			if v {
+				s += "t"
+			} else {
+				s += "f"
+			}
+		case string:
+			s += v
+		case float64:
+			s += fmt.Sprintf("%v", v)
+		case int64:
+			s += fmt.Sprintf("%v", v)
+		default:
+			panic("unexpected sql.Value")
+		}
+	}
+	return s, nil
 }
 
 func divideCall(ctx EvalContext, args []sql.Value) (sql.Value, error) {

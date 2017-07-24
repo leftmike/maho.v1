@@ -97,6 +97,17 @@ func TestEval(t *testing.T) {
 		{"abs(-123)", "123"},
 		{"abs(12.3)", "12.3"},
 		{"abs(-1.23)", "1.23"},
+
+		{"null || null", "''"},
+		{"'abc' || null", "'abc'"},
+		{"null || 'def'", "'def'"},
+		{"123 || 'abc'", "'123abc'"},
+		{"'abc' || 123", "'abc123'"},
+		{"true || 'abc'", "'tabc'"},
+		{"'abc' || false", "'abcf'"},
+		{"123.456 || 'abc'", "'123.456abc'"},
+		{"'abc' || 123.456 || 'abc'", "'abc123.456abc'"},
+		{"concat(12, 3.4, null, '56', true)", "'123.456t'"},
 	}
 
 	for i, c := range cases {
