@@ -76,21 +76,21 @@ func TestEval(t *testing.T) {
 
 		{"null AND true", "NULL"},
 		{"false AND null", "NULL"},
-		{"false AND true", "f"},
-		{"true AND false", "f"},
-		{"true AND true", "t"},
-		{"false AND false", "f"},
+		{"false AND true", "false"},
+		{"true AND false", "false"},
+		{"true AND true", "true"},
+		{"false AND false", "false"},
 
 		{"null OR true", "NULL"},
 		{"false OR null", "NULL"},
-		{"false OR true", "t"},
-		{"true OR false", "t"},
-		{"true OR true", "t"},
-		{"false OR false", "f"},
+		{"false OR true", "true"},
+		{"true OR false", "true"},
+		{"true OR true", "true"},
+		{"false OR false", "false"},
 
 		{"NOT null", "NULL"},
-		{"NOT false", "t"},
-		{"NOT true", "f"},
+		{"NOT false", "true"},
+		{"NOT true", "false"},
 
 		{"abs(null)", "NULL"},
 		{"abs(123)", "123"},
@@ -103,11 +103,11 @@ func TestEval(t *testing.T) {
 		{"null || 'def'", "'def'"},
 		{"123 || 'abc'", "'123abc'"},
 		{"'abc' || 123", "'abc123'"},
-		{"true || 'abc'", "'tabc'"},
-		{"'abc' || false", "'abcf'"},
+		{"true || 'abc'", "'trueabc'"},
+		{"'abc' || false", "'abcfalse'"},
 		{"123.456 || 'abc'", "'123.456abc'"},
 		{"'abc' || 123.456 || 'abc'", "'abc123.456abc'"},
-		{"concat(12, 3.4, null, '56', true)", "'123.456t'"},
+		{"concat(12, 3.4, null, '56', true)", "'123.456true'"},
 	}
 
 	for i, c := range cases {

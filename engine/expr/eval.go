@@ -153,9 +153,9 @@ func concatCall(ctx EvalContext, args []sql.Value) (sql.Value, error) {
 		switch v := a.(type) {
 		case bool:
 			if v {
-				s += "t"
+				s += "true"
 			} else {
-				s += "f"
+				s += "false"
 			}
 		case string:
 			s += v

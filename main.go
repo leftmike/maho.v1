@@ -13,7 +13,6 @@ To Do:
 - value.Format should not use reflect
 - column.ConvertValue should not use reflect
 - is eval.value really necessary?
-- change boolean output to be true and false rather than t and f (so that they can be read in the same way)
 - add tests to maho and maho/sql/stmt even if just stubs
 - eval failure tests
 */

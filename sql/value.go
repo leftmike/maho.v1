@@ -15,9 +15,9 @@ func Format(v Value) string {
 	switch reflect.TypeOf(v).Kind() {
 	case reflect.Bool:
 		if reflect.ValueOf(v).Bool() {
-			return "t"
+			return "true"
 		}
-		return "f"
+		return "false"
 	case reflect.String:
 		return fmt.Sprintf("'%v'", v)
 	}
