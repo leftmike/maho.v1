@@ -108,6 +108,45 @@ func TestEval(t *testing.T) {
 		{"123.456 || 'abc'", "'123.456abc'"},
 		{"'abc' || 123.456 || 'abc'", "'abc123.456abc'"},
 		{"concat(12, 3.4, null, '56', true)", "'123.456true'"},
+
+		{"true == false", "false"},
+		{"true == true", "true"},
+		{"false == false", "true"},
+		{"true == null", "NULL"},
+		{"null == false", "NULL"},
+		{"null == null", "NULL"},
+		{"true != false", "true"},
+		{"true != true", "false"},
+		{"false != false", "false"},
+		{"true != null", "NULL"},
+		{"null != false", "NULL"},
+		{"null != null", "NULL"},
+
+		{"null == 123", "NULL"},
+		{"12.3 == null", "NULL"},
+		{"null >= 123", "NULL"},
+		{"12.3 >= null", "NULL"},
+		{"null > 123", "NULL"},
+		{"12.3 > null", "NULL"},
+		{"null <= 123", "NULL"},
+		{"12.3 <= null", "NULL"},
+		{"null < 123", "NULL"},
+		{"12.3 < null", "NULL"},
+		{"null != 123", "NULL"},
+		{"12.3 != null", "NULL"},
+
+		{"null == 'abc'", "NULL"},
+		{"'abcd' == null", "NULL"},
+		{"null >= 'abc'", "NULL"},
+		{"'abcd' >= null", "NULL"},
+		{"null > 'abc'", "NULL"},
+		{"'abcd' > null", "NULL"},
+		{"null <= 'abc'", "NULL"},
+		{"'abcd' <= null", "NULL"},
+		{"null < 'abc'", "NULL"},
+		{"'abcd' < null", "NULL"},
+		{"null != 'abc'", "NULL"},
+		{"'abcd' != null", "NULL"},
 	}
 
 	for i, c := range cases {
@@ -116,35 +155,191 @@ func TestEval(t *testing.T) {
 		e, err := p.ParseExpr()
 		if err != nil {
 			t.Errorf("ParseExpr(%q) failed with %s", c.s, err)
+			continue
 		}
 		r, err := Compile(nil, e)
 		if err != nil {
 			t.Errorf("Compile(%q) failed with %s", c.s, err)
+			continue
 		}
 		v, err := r.Eval(nil)
 		if err != nil {
 			t.Errorf("Eval(%q) failed with %s", c.s, err)
+			continue
 		}
 		if sql.Format(v) != c.r {
 			t.Errorf("Eval(%q) got %s want %s", c.s, sql.Format(v), c.r)
 		}
 	}
-	/*
-		fail := []string{
-			"abc()",
-		}
 
-		for i, f := range fail {
-			var p parser.Parser
-			p.Init(strings.NewReader(f), fmt.Sprintf("fail[%d]", i))
-			e, err := p.ParseExpr()
-			if err != nil {
-				t.Errorf("ParseExpr(%q) failed with %s", f, err)
-			}
-			r, err := Compile(nil, e)
-			if err == nil {
-				t.Errorf("Compile(%q) did not fail, got %s", f, r)
-			}
+	numberCases := []string{
+		"-123.4",
+		"-123",
+		"123",
+		"123.4",
+		"124",
+		"456",
+		"456.7",
+	}
+
+	for i, m := range numberCases {
+		for j, n := range numberCases {
+			numberTest(t, m, "==", n, i == j)
+			numberTest(t, m, ">=", n, i >= j)
+			numberTest(t, m, ">", n, i > j)
+			numberTest(t, m, "<=", n, i <= j)
+			numberTest(t, m, "<", n, i < j)
+			numberTest(t, m, "!=", n, i != j)
 		}
-	*/
+	}
+
+	stringCases := []string{
+		"'ABC'",
+		"'abc'",
+		"'abcA'",
+		"'abca'",
+		"'abcd'",
+		"'abcde'",
+		"'bcde'",
+	}
+
+	for i, m := range stringCases {
+		for j, n := range stringCases {
+			compareTest(t, m, "==", n, i == j)
+			compareTest(t, m, ">=", n, i >= j)
+			compareTest(t, m, ">", n, i > j)
+			compareTest(t, m, "<=", n, i <= j)
+			compareTest(t, m, "<", n, i < j)
+			compareTest(t, m, "!=", n, i != j)
+		}
+	}
+
+	fail := []string{
+		"123 + 'abc'",
+		"'abc' + 12.34",
+		"true + 123",
+		"123 / 'abc'",
+		"'abc' / 12.34",
+		"true / 123",
+		"123 % 'abc'",
+		"'abc' % 12.34",
+		"true % 123",
+		"123 * 'abc'",
+		"'abc' * 12.34",
+		"true * 123",
+		"123 - 'abc'",
+		"'abc' - 12.34",
+		"true - 123",
+
+		"123 AND true",
+		"'abc' AND false",
+		"true AND 12.34",
+		"123 OR true",
+		"'abc' OR false",
+		"true OR 12.34",
+
+		"123 & true",
+		"123 & 'abc'",
+		"12.34 & 567",
+		"true | 123",
+		"'abc' | 123",
+		"123 | 45.67",
+
+		"123 == 'abc'",
+		"'abc' == true",
+		"12.34 == false",
+		"123 <= 'abc'",
+		"'abc' <= true",
+		"12.34 <= false",
+		"123 < 'abc'",
+		"'abc' < true",
+		"12.34 < false",
+		"123 >= 'abc'",
+		"'abc' >= true",
+		"12.34 >= false",
+		"123 > 'abc'",
+		"'abc' > true",
+		"12.34 > false",
+		"123 != 'abc'",
+		"'abc' != true",
+		"12.34 != false",
+
+		"'abc' << 12",
+		"12 << true",
+		"12 << -34",
+		"12 << 3.4",
+		"'abc' >> 12",
+		"12 >> true",
+		"12 >> -34",
+		"12 >> 3.4",
+
+		"- true",
+		"- 'abc'",
+
+		"not 'abc'",
+		"not 123",
+		"not 12.34",
+
+		"abs(true)",
+		"abs('xyz')",
+	}
+
+	for i, f := range fail {
+		var p parser.Parser
+		p.Init(strings.NewReader(f), fmt.Sprintf("fail[%d]", i))
+		e, err := p.ParseExpr()
+		if err != nil {
+			t.Errorf("ParseExpr(%q) failed with %s", f, err)
+			continue
+		}
+		r, err := Compile(nil, e)
+		if err != nil {
+			t.Errorf("Compile(%q) failed with %s", f, err)
+			continue
+		}
+		v, err := r.Eval(nil)
+		if err == nil {
+			t.Errorf("Eval(%q) did not fail, got %s", f, sql.Format(v))
+		}
+	}
+}
+
+func numberTest(t *testing.T, m, op, n string, b bool) {
+	compareTest(t, m, op, n, b)
+	if !strings.ContainsRune(m, '.') {
+		compareTest(t, m+".0", op, n, b)
+	}
+	if !strings.ContainsRune(n, '.') {
+		compareTest(t, m, op, n+".0", b)
+	}
+}
+
+func compareTest(t *testing.T, m, op, n string, b bool) {
+	s := m + op + n
+	var p parser.Parser
+	p.Init(strings.NewReader(s), s)
+	e, err := p.ParseExpr()
+	if err != nil {
+		t.Errorf("ParseExpr(%q) failed with %s", s, err)
+		return
+	}
+	r, err := Compile(nil, e)
+	if err != nil {
+		t.Errorf("Compile(%q) failed with %s", s, err)
+		return
+	}
+	v, err := r.Eval(nil)
+	if err != nil {
+		t.Errorf("Eval(%q) failed with %s", s, err)
+		return
+	}
+	var ret string
+	if b {
+		ret = "true"
+	} else {
+		ret = "false"
+	}
+	if sql.Format(v) != ret {
+		t.Errorf("Eval(%q) got %s want %s", s, sql.Format(v), ret)
+	}
 }

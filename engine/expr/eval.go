@@ -53,6 +53,46 @@ func (c *call) Eval(ctx EvalContext) (sql.Value, error) {
 	return c.call.fn(ctx, args)
 }
 
+func anyFunc(a0 sql.Value, a1 sql.Value, bfn func(b0, b1 bool) sql.Value,
+	ifn func(i0, i1 int64) sql.Value, ffn func(f0, f1 float64) sql.Value,
+	sfn func(s0, s1 string) sql.Value) (sql.Value, error) {
+	if a0 == nil || a1 == nil {
+		return nil, nil
+	}
+	switch a0 := a0.(type) {
+	case bool:
+		if bfn == nil {
+			return nil, fmt.Errorf("engine: want number or string got %v", a0)
+		}
+		if a1, ok := a1.(bool); ok {
+			return bfn(a0, a1), nil
+		}
+		return nil, fmt.Errorf("engine: want boolean got %v", a1)
+	case float64:
+		switch a1 := a1.(type) {
+		case float64:
+			return ffn(a0, a1), nil
+		case int64:
+			return ffn(a0, float64(a1)), nil
+		}
+		return nil, fmt.Errorf("engine: want number got %v", a1)
+	case int64:
+		switch a1 := a1.(type) {
+		case float64:
+			return ffn(float64(a0), a1), nil
+		case int64:
+			return ifn(a0, a1), nil
+		}
+		return nil, fmt.Errorf("engine: want number got %v", a1)
+	case string:
+		if a1, ok := a1.(string); ok {
+			return sfn(a0, a1), nil
+		}
+		return nil, fmt.Errorf("engine: want string got %v", a1)
+	}
+	panic(fmt.Sprintf("unexpected type for sql.Value: %T: %v", a0, a0))
+}
+
 func numFunc(a0 sql.Value, a1 sql.Value, ifn func(i0, i1 int64) sql.Value,
 	ffn func(f0, f1 float64) sql.Value) (sql.Value, error) {
 	if a0 == nil || a1 == nil {
@@ -73,10 +113,10 @@ func numFunc(a0 sql.Value, a1 sql.Value, ifn func(i0, i1 int64) sql.Value,
 		case int64:
 			return ifn(a0, a1), nil
 		}
+	default:
+		return nil, fmt.Errorf("engine: want number got %v", a0)
 	}
-
-	// XXX: better error message and panic if not expected type in sql.Value
-	return nil, fmt.Errorf("engine: want number")
+	return nil, fmt.Errorf("engine: want number got %v", a1)
 }
 
 func intFunc(a0 sql.Value, a1 sql.Value, ifn func(i0, i1 int64) sql.Value) (sql.Value, error) {
@@ -87,8 +127,9 @@ func intFunc(a0 sql.Value, a1 sql.Value, ifn func(i0, i1 int64) sql.Value) (sql.
 		if a1, ok := a1.(int64); ok {
 			return ifn(a0, a1), nil
 		}
+		return nil, fmt.Errorf("engine: want integer got %v", a1)
 	}
-	return nil, fmt.Errorf("engine: want integer")
+	return nil, fmt.Errorf("engine: want integer got %v", a0)
 }
 
 func shiftFunc(a0 sql.Value, a1 sql.Value, ifn func(i0 int64, i1 uint64) sql.Value) (sql.Value,
@@ -99,12 +140,13 @@ func shiftFunc(a0 sql.Value, a1 sql.Value, ifn func(i0 int64, i1 uint64) sql.Val
 	if a0, ok := a0.(int64); ok {
 		if a1, ok := a1.(int64); ok {
 			if a1 < 0 {
-				return nil, fmt.Errorf("engine: want non-negative integer")
+				return nil, fmt.Errorf("engine: want non-negative integer got %v", a1)
 			}
 			return ifn(a0, uint64(a1)), nil
 		}
+		return nil, fmt.Errorf("engine: want integer got %v", a1)
 	}
-	return nil, fmt.Errorf("engine: want integer")
+	return nil, fmt.Errorf("engine: want integer got %v", a0)
 }
 
 func addCall(ctx EvalContext, args []sql.Value) (sql.Value, error) {
@@ -126,8 +168,9 @@ func andCall(ctx EvalContext, args []sql.Value) (sql.Value, error) {
 		if a1, ok := args[1].(bool); ok {
 			return a0 && a1, nil
 		}
+		return nil, fmt.Errorf("engine: want boolean got %v", args[1])
 	}
-	return nil, fmt.Errorf("engine: want boolean")
+	return nil, fmt.Errorf("engine: want boolean got %v", args[0])
 }
 
 func binaryAndCall(ctx EvalContext, args []sql.Value) (sql.Value, error) {
@@ -181,28 +224,75 @@ func divideCall(ctx EvalContext, args []sql.Value) (sql.Value, error) {
 }
 
 func equalCall(ctx EvalContext, args []sql.Value) (sql.Value, error) {
-	// XXX
-	return nil, nil
+	return anyFunc(args[0], args[1],
+		func(b0, b1 bool) sql.Value {
+			return b0 == b1
+		},
+		func(i0, i1 int64) sql.Value {
+			return i0 == i1
+		},
+		func(f0, f1 float64) sql.Value {
+			return f0 == f1
+		},
+		func(s0, s1 string) sql.Value {
+			return s0 == s1
+		})
 }
 
 func greaterEqualCall(ctx EvalContext, args []sql.Value) (sql.Value, error) {
-	// XXX
-	return nil, nil
+	return anyFunc(args[0], args[1],
+		nil,
+		func(i0, i1 int64) sql.Value {
+			return i0 >= i1
+		},
+		func(f0, f1 float64) sql.Value {
+			return f0 >= f1
+		},
+		func(s0, s1 string) sql.Value {
+			return s0 >= s1
+		})
 }
 
 func greaterThanCall(ctx EvalContext, args []sql.Value) (sql.Value, error) {
-	// XXX
-	return nil, nil
+	return anyFunc(args[0], args[1],
+		nil,
+		func(i0, i1 int64) sql.Value {
+			return i0 > i1
+		},
+		func(f0, f1 float64) sql.Value {
+			return f0 > f1
+		},
+		func(s0, s1 string) sql.Value {
+			return s0 > s1
+		})
 }
 
 func lessEqualCall(ctx EvalContext, args []sql.Value) (sql.Value, error) {
-	// XXX
-	return nil, nil
+	return anyFunc(args[0], args[1],
+		nil,
+		func(i0, i1 int64) sql.Value {
+			return i0 <= i1
+		},
+		func(f0, f1 float64) sql.Value {
+			return f0 <= f1
+		},
+		func(s0, s1 string) sql.Value {
+			return s0 <= s1
+		})
 }
 
 func lessThanCall(ctx EvalContext, args []sql.Value) (sql.Value, error) {
-	// XXX
-	return nil, nil
+	return anyFunc(args[0], args[1],
+		nil,
+		func(i0, i1 int64) sql.Value {
+			return i0 < i1
+		},
+		func(f0, f1 float64) sql.Value {
+			return f0 < f1
+		},
+		func(s0, s1 string) sql.Value {
+			return s0 < s1
+		})
 }
 
 func lShiftCall(ctx EvalContext, args []sql.Value) (sql.Value, error) {
@@ -239,12 +329,23 @@ func negateCall(ctx EvalContext, args []sql.Value) (sql.Value, error) {
 	case int64:
 		return -a0, nil
 	}
-	return nil, fmt.Errorf("engine: want number")
+	return nil, fmt.Errorf("engine: want number got %v", args[0])
 }
 
 func notEqualCall(ctx EvalContext, args []sql.Value) (sql.Value, error) {
-	// XXX
-	return nil, nil
+	return anyFunc(args[0], args[1],
+		func(b0, b1 bool) sql.Value {
+			return b0 != b1
+		},
+		func(i0, i1 int64) sql.Value {
+			return i0 != i1
+		},
+		func(f0, f1 float64) sql.Value {
+			return f0 != f1
+		},
+		func(s0, s1 string) sql.Value {
+			return s0 != s1
+		})
 }
 
 func notCall(ctx EvalContext, args []sql.Value) (sql.Value, error) {
@@ -254,7 +355,7 @@ func notCall(ctx EvalContext, args []sql.Value) (sql.Value, error) {
 	if a0, ok := args[0].(bool); ok {
 		return a0 == false, nil
 	}
-	return nil, fmt.Errorf("engine: want boolean")
+	return nil, fmt.Errorf("engine: want boolean got %v", args[0])
 }
 
 func orCall(ctx EvalContext, args []sql.Value) (sql.Value, error) {
@@ -267,7 +368,7 @@ func orCall(ctx EvalContext, args []sql.Value) (sql.Value, error) {
 			return a0 || a1, nil
 		}
 	}
-	return nil, fmt.Errorf("engine: want boolean")
+	return nil, fmt.Errorf("engine: want boolean got %v", args[0])
 }
 
 func rShiftCall(ctx EvalContext, args []sql.Value) (sql.Value, error) {
@@ -303,5 +404,5 @@ func absCall(ctx EvalContext, args []sql.Value) (sql.Value, error) {
 		}
 		return a0, nil
 	}
-	return nil, fmt.Errorf("engine: want number")
+	return nil, fmt.Errorf("engine: want number got %v", args[0])
 }
