@@ -4,18 +4,24 @@ import (
 	"fmt"
 )
 
+const (
+	NullString  = "NULL"
+	TrueString  = "true"
+	FalseString = "false"
+)
+
 type Value interface{}
 
 func Format(v Value) string {
 	if v == nil {
-		return "NULL"
+		return NullString
 	}
 
 	if b, ok := v.(bool); ok {
 		if b {
-			return "true"
+			return TrueString
 		}
-		return "false"
+		return FalseString
 	} else if s, ok := v.(string); ok {
 		return fmt.Sprintf("'%s'", s)
 	}

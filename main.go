@@ -11,7 +11,6 @@ To Do:
 - or "Operation(args) failed with %s" or "Operation(args) did not fail"
 - handle DEFAULT specially in INSERT VALUES; it should not be part of value.Format
 - add tests to maho and maho/sql/stmt even if just stubs
-- make string representation of null, true, and false be constants and use in eval_test.go
 */
 
 import (

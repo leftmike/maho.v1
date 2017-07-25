@@ -2,6 +2,7 @@ package expr
 
 import (
 	"fmt"
+	"maho/sql"
 	"maho/sql/expr"
 	"maho/sql/parser"
 	"strings"
@@ -15,7 +16,8 @@ func TestCompile(t *testing.T) {
 	}{
 		{"1 + 2", `"+"(1, 2)`},
 		{"abs(1 * 2 + 3 / - 4)", `abs("+"("*"(1, 2), "/"(3, "-"(4))))`},
-		{"concat('abc', 123, 45.6, true, null)", "concat('abc', 123, 45.6, true, NULL)"},
+		{"concat('abc', 123, 45.6, true, null)",
+			"concat('abc', 123, 45.6, " + sql.TrueString + ", " + sql.NullString + ")"},
 	}
 
 	for i, c := range cases {
