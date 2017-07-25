@@ -10,7 +10,7 @@ To Do:
 - update t.Errorf to be "Operation(args) got %s want %s" and use %q for args
 - or "Operation(args) failed with %s" or "Operation(args) did not fail"
 - handle DEFAULT specially in INSERT VALUES; it should not be part of value.Format
-- add tests to maho and maho/sql/stmt even if just stubs
+- add tests maho/sql/stmt even if just stubs
 */
 
 import (
@@ -27,7 +27,7 @@ import (
 	"text/tabwriter"
 )
 
-func parse(e *engine.Engine, rr io.RuneReader, fn string) {
+func parse(e *engine.Engine, rr io.RuneReader, fn string, w io.Writer) {
 	var p parser.Parser
 	p.Init(rr, fn)
 
@@ -48,7 +48,7 @@ func parse(e *engine.Engine, rr io.RuneReader, fn string) {
 		}
 
 		if rows, ok := ret.(store.Rows); ok {
-			w := tabwriter.NewWriter(os.Stdout, 0, 0, 1, ' ', tabwriter.AlignRight)
+			w := tabwriter.NewWriter(w, 0, 0, 1, ' ', tabwriter.AlignRight)
 
 			cols := rows.Columns()
 			fmt.Fprint(w, "\t")
@@ -75,21 +75,24 @@ func parse(e *engine.Engine, rr io.RuneReader, fn string) {
 	}
 }
 
-func main() {
+func start() (*engine.Engine, error) {
 	db, err := store.Open("basic", "maho")
 	if err != nil {
-		fmt.Println(err)
-		return
+		return nil, err
 	}
 
-	e, err := engine.Start(db)
+	return engine.Start(db)
+}
+
+func main() {
+	e, err := start()
 	if err != nil {
 		fmt.Println(err)
 		return
 	}
 
 	if len(os.Args) == 1 {
-		parse(e, bufio.NewReader(os.Stdin), "[Stdin]")
+		parse(e, bufio.NewReader(os.Stdin), "[Stdin]", os.Stdout)
 	} else {
 		for idx := 1; idx < len(os.Args); idx++ {
 			/*			f, err := os.Open(os.Args[idx])
@@ -97,7 +100,7 @@ func main() {
 							log.Fatal(err)
 						}
 						parse(e, bufio.NewReader(f), os.Args[idx])*/
-			parse(e, strings.NewReader(os.Args[idx]), fmt.Sprintf("os.Args[%d]", idx))
+			parse(e, strings.NewReader(os.Args[idx]), fmt.Sprintf("os.Args[%d]", idx), os.Stdout)
 		}
 	}
 }
