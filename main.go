@@ -4,13 +4,12 @@ package main
 To Do:
 - databases should be standalone ==> identifiers should be converted back to strings on storage
 - finish parse and execute of select
-- evaluating expressions
+- references in expressions
 - DEFAULT for column can be an expression in CREATE TABLE
 - INSERT VALUES can be expressions
+- handle DEFAULT specially in INSERT VALUES; it should not be part of value.Format
 - update t.Errorf to be "Operation(args) got %s want %s" and use %q for args
 - or "Operation(args) failed with %s" or "Operation(args) did not fail"
-- handle DEFAULT specially in INSERT VALUES; it should not be part of value.Format
-- add tests maho/sql/stmt even if just stubs
 */
 
 import (
