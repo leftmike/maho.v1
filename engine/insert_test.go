@@ -18,10 +18,10 @@ type insertCase struct {
 
 var (
 	insertColumns1 = []sql.Column{
-		{Name: sql.Id("c1"), Type: sql.BooleanType, Size: 1},
-		{Name: sql.Id("c2"), Type: sql.CharacterType, Size: 128},
-		{Name: sql.Id("c3"), Type: sql.DoubleType, Size: 8, Width: 255, Fraction: 30},
-		{Name: sql.Id("c4"), Type: sql.IntegerType, Size: 4, Width: 255},
+		{Name: sql.ID("c1"), Type: sql.BooleanType, Size: 1},
+		{Name: sql.ID("c2"), Type: sql.CharacterType, Size: 128},
+		{Name: sql.ID("c3"), Type: sql.DoubleType, Size: 8, Width: 255, Fraction: 30},
+		{Name: sql.ID("c4"), Type: sql.IntegerType, Size: 4, Width: 255},
 	}
 	insertCases1 = []insertCase{
 		{
@@ -119,12 +119,12 @@ var (
 	}
 
 	insertColumns2 = []sql.Column{
-		{Name: sql.Id("b1"), Type: sql.BooleanType, Size: 1},
-		{Name: sql.Id("b2"), Type: sql.BooleanType, Size: 1},
-		{Name: sql.Id("b3"), Type: sql.BooleanType, Size: 1},
-		{Name: sql.Id("b4"), Type: sql.BooleanType, Size: 1},
-		{Name: sql.Id("b5"), Type: sql.BooleanType, Size: 1},
-		{Name: sql.Id("b6"), Type: sql.BooleanType, Size: 1},
+		{Name: sql.ID("b1"), Type: sql.BooleanType, Size: 1},
+		{Name: sql.ID("b2"), Type: sql.BooleanType, Size: 1},
+		{Name: sql.ID("b3"), Type: sql.BooleanType, Size: 1},
+		{Name: sql.ID("b4"), Type: sql.BooleanType, Size: 1},
+		{Name: sql.ID("b5"), Type: sql.BooleanType, Size: 1},
+		{Name: sql.ID("b6"), Type: sql.BooleanType, Size: 1},
 	}
 	insertCases2 = []insertCase{
 		{
@@ -138,9 +138,9 @@ var (
 	}
 
 	insertColumns3 = []sql.Column{
-		{Name: sql.Id("c1"), Type: sql.IntegerType, Size: 4, Width: 255, Default: int64(1)},
-		{Name: sql.Id("c2"), Type: sql.IntegerType, Size: 4, Width: 255, NotNull: true},
-		{Name: sql.Id("c3"), Type: sql.IntegerType, Size: 4, Width: 255, Default: int64(3),
+		{Name: sql.ID("c1"), Type: sql.IntegerType, Size: 4, Width: 255, Default: int64(1)},
+		{Name: sql.ID("c2"), Type: sql.IntegerType, Size: 4, Width: 255, NotNull: true},
+		{Name: sql.ID("c3"), Type: sql.IntegerType, Size: 4, Width: 255, Default: int64(3),
 			NotNull: true},
 	}
 	insertCases3 = []insertCase{
@@ -173,9 +173,9 @@ func TestInsert(t *testing.T) {
 		t.Error(err)
 	}
 
-	testInsert(t, e, db, sql.Id("t"), insertColumns1, insertCases1)
-	testInsert(t, e, db, sql.Id("t2"), insertColumns2, insertCases2)
-	testInsert(t, e, db, sql.Id("t3"), insertColumns3, insertCases3)
+	testInsert(t, e, db, sql.ID("t"), insertColumns1, insertCases1)
+	testInsert(t, e, db, sql.ID("t2"), insertColumns2, insertCases2)
+	testInsert(t, e, db, sql.ID("t3"), insertColumns3, insertCases3)
 }
 
 func statement(e *engine.Engine, s string) error {

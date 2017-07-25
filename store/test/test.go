@@ -33,7 +33,7 @@ type testRows struct {
 
 func (ts testStore) Open(name string) (store.Database, error) {
 	var tdb testDatabase
-	tdb.name = sql.Id(name)
+	tdb.name = sql.ID(name)
 	tdb.tables = make(map[sql.Identifier]*testTable)
 	return &tdb, nil
 }
@@ -47,7 +47,7 @@ func (tdb *testDatabase) Name() sql.Identifier {
 }
 
 func (tdb *testDatabase) Type() sql.Identifier {
-	return sql.Id("test")
+	return sql.ID("test")
 }
 
 func (tdb *testDatabase) CreateTable(name sql.Identifier, cols []sql.Column) error {

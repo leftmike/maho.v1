@@ -5,7 +5,7 @@ import (
 	"testing"
 )
 
-func TestId(t *testing.T) {
+func TestID(t *testing.T) {
 	equal := []struct{ s1, s2 string }{
 		{"abc", "abc"},
 		{"Abc", "abc"},
@@ -16,8 +16,8 @@ func TestId(t *testing.T) {
 	}
 
 	for _, c := range equal {
-		if Id(c.s1) != Id(c.s2) {
-			t.Errorf("Id(%q) != Id(%q)", c.s1, c.s2)
+		if ID(c.s1) != ID(c.s2) {
+			t.Errorf("ID(%q) != ID(%q)", c.s1, c.s2)
 		}
 	}
 
@@ -29,24 +29,24 @@ func TestId(t *testing.T) {
 	}
 
 	for _, c := range notEqual {
-		if Id(c.s1) == Id(c.s2) {
-			t.Errorf("Id(%q) == Id(%q)", c.s1, c.s2)
+		if ID(c.s1) == ID(c.s2) {
+			t.Errorf("ID(%q) == ID(%q)", c.s1, c.s2)
 		}
 	}
 
-	if Id(strings.Repeat("x", MaxIdentifier+1)).String() != strings.Repeat("x", MaxIdentifier) {
-		t.Errorf(`Id(strings.Repeat("x", MaxIdentifier+1)).String() !=
+	if ID(strings.Repeat("x", MaxIdentifier+1)).String() != strings.Repeat("x", MaxIdentifier) {
+		t.Errorf(`ID(strings.Repeat("x", MaxIdentifier+1)).String() !=
 strings.Repeat("x", MaxIdentifier)`)
 	}
 
-	if QuotedId(strings.Repeat("y", MaxIdentifier+2)).String() !=
+	if QuotedID(strings.Repeat("y", MaxIdentifier+2)).String() !=
 		strings.Repeat("y", MaxIdentifier) {
-		t.Errorf(`QuotedId(strings.Repeat("y", MaxIdentifier+2)).String() !=
+		t.Errorf(`QuotedID(strings.Repeat("y", MaxIdentifier+2)).String() !=
 strings.Repeat("y", MaxIdentifier)`)
 	}
 }
 
-func TestQuotedId(t *testing.T) {
+func TestQuotedID(t *testing.T) {
 	equal := []struct{ s1, s2 string }{
 		{"abc", "abc"},
 		{"Abc", "abc"},
@@ -55,8 +55,8 @@ func TestQuotedId(t *testing.T) {
 	}
 
 	for _, c := range equal {
-		if Id(c.s1) != QuotedId(c.s2) {
-			t.Errorf("Id(%q) != QuotedId(%q)", c.s1, c.s2)
+		if ID(c.s1) != QuotedID(c.s2) {
+			t.Errorf("ID(%q) != QuotedID(%q)", c.s1, c.s2)
 		}
 	}
 
@@ -73,35 +73,35 @@ func TestQuotedId(t *testing.T) {
 	}
 
 	for _, c := range notEqual {
-		if Id(c.s1) == QuotedId(c.s2) {
-			t.Errorf("Id(%q) == QuotedId(%q)", c.s1, c.s2)
+		if ID(c.s1) == QuotedID(c.s2) {
+			t.Errorf("ID(%q) == QuotedID(%q)", c.s1, c.s2)
 		}
 	}
 }
 
 func TestString(t *testing.T) {
-	id := Id("abc")
+	id := ID("abc")
 	ids := []string{"abc", "defg", "hijk", "lmnop", "qrstuv"}
 	for _, s := range ids {
-		Id(s)
+		ID(s)
 	}
-	if id.String() != Id("abc").String() {
-		t.Errorf("Id(%q).String() != Id(\"abc\").String()", id.String())
+	if id.String() != ID("abc").String() {
+		t.Errorf("ID(%q).String() != ID(\"abc\").String()", id.String())
 	}
 }
 
 func TestIsReserved(t *testing.T) {
 	ids := []string{"abc", "defg", "hijk", "lmnop", "qrstuv", "int", "INT"}
 	for _, s := range ids {
-		if Id(s).IsReserved() {
-			t.Errorf("Id(%q).IsReserved() got true want false", s)
+		if ID(s).IsReserved() {
+			t.Errorf("ID(%q).IsReserved() got true want false", s)
 		}
 	}
 
 	kws := []string{"create", "CREATE", "update", "select", "SELECT"}
 	for _, s := range kws {
-		if !Id(s).IsReserved() {
-			t.Errorf("Id(%q).IsReserved() got false want true", s)
+		if !ID(s).IsReserved() {
+			t.Errorf("ID(%q).IsReserved() got false want true", s)
 		}
 	}
 }
@@ -112,8 +112,8 @@ func TestKeywords(t *testing.T) {
 			t.Errorf("%q != strings.ToUpper(%q)", s, s)
 		}
 
-		if Id(s) != n.id {
-			t.Errorf("Id(%q) != knownKeywords[%q].id", s, s)
+		if ID(s) != n.id {
+			t.Errorf("ID(%q) != knownKeywords[%q].id", s, s)
 		}
 		if n.id.IsReserved() != n.reserved {
 			t.Errorf("knownKeywords[%q].id.IsReserved() != knownKeywords[%q].reserved", s, s)
@@ -123,8 +123,8 @@ func TestKeywords(t *testing.T) {
 
 func TestKnownIdentifiers(t *testing.T) {
 	for s, id := range knownIdentifiers {
-		if Id(s) != id {
-			t.Errorf("Id(%q) != knownIdentifiers[%q]", s, s)
+		if ID(s) != id {
+			t.Errorf("ID(%q) != knownIdentifiers[%q]", s, s)
 		}
 		if id.IsReserved() {
 			t.Errorf("knownIdentifiers[%q].IsReserved() got true want false", s)

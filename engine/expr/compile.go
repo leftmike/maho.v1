@@ -97,8 +97,8 @@ var opFuncs = map[expr.Op]*callFunc{
 }
 
 var idFuncs = map[sql.Identifier]*callFunc{
-	sql.Id("abs"):    {absCall, 1, 1, ""},
-	sql.Id("concat"): {concatCall, 2, math.MaxInt16, ""},
+	sql.ID("abs"):    {absCall, 1, 1, ""},
+	sql.ID("concat"): {concatCall, 2, math.MaxInt16, ""},
 }
 
 func init() {

@@ -124,7 +124,7 @@ var (
 	Names          = make(map[Identifier]string)
 )
 
-func Id(s string) Identifier {
+func ID(s string) Identifier {
 	if len(s) > MaxIdentifier {
 		s = s[:MaxIdentifier]
 	}
@@ -143,7 +143,7 @@ func Id(s string) Identifier {
 	return lastIdentifier
 }
 
-func QuotedId(s string) Identifier {
+func QuotedID(s string) Identifier {
 	if len(s) > MaxIdentifier {
 		s = s[:MaxIdentifier]
 	}

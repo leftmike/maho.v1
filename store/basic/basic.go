@@ -29,7 +29,7 @@ type basicRows struct {
 
 func (bs basicStore) Open(name string) (store.Database, error) {
 	var bdb basicDatabase
-	bdb.name = sql.Id(name)
+	bdb.name = sql.ID(name)
 	bdb.tables = make(map[sql.Identifier]*basicTable)
 	return &bdb, nil
 }

@@ -17,11 +17,11 @@ func TestExpr(t *testing.T) {
 				&Literal{456}},
 			s: "((- 123) / 456)"},
 		{
-			e: &Call{sql.Id("abc"), []Expr{
+			e: &Call{sql.ID("abc"), []Expr{
 				&Unary{NegateOp, &Literal{123}},
 				&Literal{456},
 				&Binary{AddOp,
-					Ref{sql.Id("def"), sql.Id("ghi")},
+					Ref{sql.ID("def"), sql.ID("ghi")},
 					&Literal{789}}}},
 			s: "abc((- 123), 456, (def.ghi + 789))",
 		},

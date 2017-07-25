@@ -141,8 +141,8 @@ abcd -- identifier
 			}
 			switch e.ret {
 			case token.Identifier:
-				if s.Identifier != sql.QuotedId(e.s) {
-					t.Errorf("%d Scan(%q) != sql.QuotedId(%q)", i, src, e.s)
+				if s.Identifier != sql.QuotedID(e.s) {
+					t.Errorf("%d Scan(%q) != sql.QuotedID(%q)", i, src, e.s)
 				}
 			case token.Reserved:
 				if s.Identifier != e.id {

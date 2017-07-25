@@ -213,7 +213,7 @@ func (s *Scanner) scanIdentifier(r rune) rune {
 		}
 	}
 
-	s.Identifier = sql.Id(s.buffer.String())
+	s.Identifier = sql.ID(s.buffer.String())
 	if s.Identifier.IsReserved() {
 		return token.Reserved
 	}
@@ -273,7 +273,7 @@ func (s *Scanner) scanQuotedIdentifier(delim rune) rune {
 		s.buffer.WriteRune(r)
 	}
 
-	s.Identifier = sql.QuotedId(s.buffer.String())
+	s.Identifier = sql.QuotedID(s.buffer.String())
 	return token.Identifier
 }
 
