@@ -3,7 +3,6 @@ package expr
 import (
 	"fmt"
 	"maho/sql"
-	"maho/sql/expr"
 	"maho/sql/parser"
 	"strings"
 	"testing"
@@ -60,7 +59,7 @@ func TestCompile(t *testing.T) {
 
 func TestFuncs(t *testing.T) {
 	for op, cf := range opFuncs {
-		if op == expr.NegateOp || op == expr.NotOp {
+		if op == sql.NegateOp || op == sql.NotOp {
 			if cf.minArgs != 1 {
 				t.Errorf("opFuncs[%s].minArgs got %d want 1", op, cf.minArgs)
 			}

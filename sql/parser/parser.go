@@ -4,7 +4,6 @@ import (
 	"fmt"
 	"io"
 	"maho/sql"
-	"maho/sql/expr"
 	"maho/sql/scanner"
 	"maho/sql/stmt"
 	"maho/sql/token"
@@ -470,7 +469,7 @@ func (p *Parser) parseExpression() sql.Value {
 	return nil
 }
 
-func (p *Parser) ParseExpr() (e expr.Expr, err error) {
+func (p *Parser) ParseExpr() (e sql.Expr, err error) {
 	defer func() {
 		if r := recover(); r != nil {
 			if _, ok := r.(runtime.Error); ok {
@@ -501,52 +500,52 @@ func (p *Parser) ParseExpr() (e expr.Expr, err error) {
     | AND | OR
 */
 
-var binaryOps = map[rune]expr.Op{
-	token.Ampersand:      expr.BinaryAndOp,
-	token.Bar:            expr.BinaryOrOp,
-	token.BarBar:         expr.ConcatOp,
-	token.Equal:          expr.EqualOp,
-	token.EqualEqual:     expr.EqualOp,
-	token.BangEqual:      expr.NotEqualOp,
-	token.Greater:        expr.GreaterThanOp,
-	token.GreaterEqual:   expr.GreaterEqualOp,
-	token.GreaterGreater: expr.RShiftOp,
-	token.Less:           expr.LessThanOp,
-	token.LessEqual:      expr.LessEqualOp,
-	token.LessGreater:    expr.NotEqualOp,
-	token.LessLess:       expr.LShiftOp,
-	token.Minus:          expr.SubtractOp,
-	token.Percent:        expr.ModuloOp,
-	token.Plus:           expr.AddOp,
-	token.Slash:          expr.DivideOp,
-	token.Star:           expr.MultiplyOp,
+var binaryOps = map[rune]sql.Op{
+	token.Ampersand:      sql.BinaryAndOp,
+	token.Bar:            sql.BinaryOrOp,
+	token.BarBar:         sql.ConcatOp,
+	token.Equal:          sql.EqualOp,
+	token.EqualEqual:     sql.EqualOp,
+	token.BangEqual:      sql.NotEqualOp,
+	token.Greater:        sql.GreaterThanOp,
+	token.GreaterEqual:   sql.GreaterEqualOp,
+	token.GreaterGreater: sql.RShiftOp,
+	token.Less:           sql.LessThanOp,
+	token.LessEqual:      sql.LessEqualOp,
+	token.LessGreater:    sql.NotEqualOp,
+	token.LessLess:       sql.LShiftOp,
+	token.Minus:          sql.SubtractOp,
+	token.Percent:        sql.ModuloOp,
+	token.Plus:           sql.AddOp,
+	token.Slash:          sql.DivideOp,
+	token.Star:           sql.MultiplyOp,
 }
 
-func (p *Parser) parseExpr() expr.Expr {
-	var e expr.Expr
+func (p *Parser) parseExpr() sql.Expr {
+	var e sql.Expr
 	r := p.scan()
 	if r == token.Reserved {
 		if p.scanner.Identifier == sql.TRUE {
-			e = &expr.Literal{true}
+			e = &sql.Literal{true}
 		} else if p.scanner.Identifier == sql.FALSE {
-			e = &expr.Literal{false}
+			e = &sql.Literal{false}
 		} else if p.scanner.Identifier == sql.NULL {
-			e = &expr.Literal{nil}
+			e = &sql.Literal{nil}
 		} else if p.scanner.Identifier == sql.NOT {
-			e = p.parseUnaryExpr(expr.NotOp)
+			e = p.parseUnaryExpr(sql.NotOp)
 		} else {
 			p.error(fmt.Sprintf("unexpected identifier %s", p.scanner.Identifier))
 		}
 	} else if r == token.String {
-		e = &expr.Literal{p.scanner.String}
+		e = &sql.Literal{p.scanner.String}
 	} else if r == token.Integer {
-		e = &expr.Literal{p.scanner.Integer}
+		e = &sql.Literal{p.scanner.Integer}
 	} else if r == token.Double {
-		e = &expr.Literal{p.scanner.Double}
+		e = &sql.Literal{p.scanner.Double}
 	} else if r == token.Identifier {
 		if p.maybeToken(token.LParen) {
 			// <func> ( <expr> [,...] )
-			c := &expr.Call{Name: p.scanner.Identifier}
+			c := &sql.Call{Name: p.scanner.Identifier}
 			if !p.maybeToken(token.RParen) {
 				for {
 					c.Args = append(c.Args, p.parseExpr())
@@ -559,7 +558,7 @@ func (p *Parser) parseExpr() expr.Expr {
 			e = c
 		} else {
 			// <ref> [. <ref> ...]
-			ref := expr.Ref{p.scanner.Identifier}
+			ref := sql.Ref{p.scanner.Identifier}
 			for p.maybeToken(token.Dot) {
 				ref = append(ref, p.expectIdentifier("expected a reference"))
 			}
@@ -568,10 +567,10 @@ func (p *Parser) parseExpr() expr.Expr {
 		}
 	} else if r == token.Minus {
 		// - <expr>
-		e = p.parseUnaryExpr(expr.NegateOp)
+		e = p.parseUnaryExpr(sql.NegateOp)
 	} else if r == token.LParen {
 		// ( <expr> )
-		e = &expr.Unary{expr.NoOp, p.parseExpr()}
+		e = &sql.Unary{sql.NoOp, p.parseExpr()}
 		if p.scan() != token.RParen {
 			p.error(fmt.Sprintf("expected closing parenthesis got %s", p.got()))
 		}
@@ -581,14 +580,14 @@ func (p *Parser) parseExpr() expr.Expr {
 			"expected a string, a number, TRUE, FALSE or NULL for each value got %s", p.got()))
 	}
 
-	var op expr.Op
+	var op sql.Op
 	r = p.scan()
 	op, ok := binaryOps[r]
 	if !ok {
 		if r == token.Reserved && p.scanner.Identifier == sql.AND {
-			op = expr.AndOp
+			op = sql.AndOp
 		} else if r == token.Reserved && p.scanner.Identifier == sql.OR {
-			op = expr.OrOp
+			op = sql.OrOp
 		} else {
 			p.unscan()
 			return e
@@ -596,31 +595,31 @@ func (p *Parser) parseExpr() expr.Expr {
 	}
 
 	e2 := p.parseExpr()
-	if b2, ok := e2.(*expr.Binary); ok && b2.Op.Precedence() < op.Precedence() {
-		b2.Left = &expr.Binary{op, e, b2.Left}
+	if b2, ok := e2.(*sql.Binary); ok && b2.Op.Precedence() < op.Precedence() {
+		b2.Left = &sql.Binary{op, e, b2.Left}
 		e = b2
 	} else {
-		e = &expr.Binary{op, e, e2}
+		e = &sql.Binary{op, e, e2}
 	}
 	return e
 }
 
-func (p *Parser) parseUnaryExpr(op expr.Op) expr.Expr {
+func (p *Parser) parseUnaryExpr(op sql.Op) sql.Expr {
 	e := p.parseExpr()
-	if b, ok := e.(*expr.Binary); ok && b.Op.Precedence() < op.Precedence() {
+	if b, ok := e.(*sql.Binary); ok && b.Op.Precedence() < op.Precedence() {
 		for {
-			if bl, ok := b.Left.(*expr.Binary); ok && bl.Op.Precedence() < op.Precedence() {
+			if bl, ok := b.Left.(*sql.Binary); ok && bl.Op.Precedence() < op.Precedence() {
 				b = bl
 			} else {
 				break
 			}
 		}
 
-		b.Left = &expr.Unary{op, b.Left}
+		b.Left = &sql.Unary{op, b.Left}
 		return e
 	}
 
-	return &expr.Unary{op, e}
+	return &sql.Unary{op, e}
 }
 
 func (p *Parser) parseInsert() stmt.Stmt {

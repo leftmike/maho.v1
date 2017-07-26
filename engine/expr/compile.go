@@ -3,7 +3,6 @@ package expr
 import (
 	"fmt"
 	"maho/sql"
-	"maho/sql/expr"
 	"math"
 )
 
@@ -11,12 +10,12 @@ type CompileContext interface {
 	Simplify() bool
 }
 
-func Compile(ctx CompileContext, e expr.Expr) (Expr, error) {
+func Compile(ctx CompileContext, e sql.Expr) (Expr, error) {
 	switch e := e.(type) {
-	case *expr.Literal:
+	case *sql.Literal:
 		return &literal{e.Value}, nil
-	case *expr.Unary:
-		if e.Op == expr.NoOp {
+	case *sql.Unary:
+		if e.Op == sql.NoOp {
 			return Compile(ctx, e.Expr)
 		}
 		cf := opFuncs[e.Op]
@@ -25,7 +24,7 @@ func Compile(ctx CompileContext, e expr.Expr) (Expr, error) {
 			return nil, err
 		}
 		return &call{cf, []Expr{a1}}, nil
-	case *expr.Binary:
+	case *sql.Binary:
 		cf := opFuncs[e.Op]
 		a1, err := Compile(ctx, e.Left)
 		if err != nil {
@@ -36,9 +35,9 @@ func Compile(ctx CompileContext, e expr.Expr) (Expr, error) {
 			return nil, err
 		}
 		return &call{cf, []Expr{a1, a2}}, nil
-	case expr.Ref:
+	case sql.Ref:
 		panic("ref not handled yet")
-	case *expr.Call:
+	case *sql.Call:
 		cf, ok := idFuncs[e.Name]
 		if !ok {
 			return nil, fmt.Errorf("engine: function \"%s\" not found", e.Name)
@@ -73,27 +72,27 @@ type callFunc struct {
 	name    string
 }
 
-var opFuncs = map[expr.Op]*callFunc{
-	expr.AddOp:          {addCall, 2, 2, ""},
-	expr.AndOp:          {andCall, 2, 2, ""},
-	expr.BinaryAndOp:    {binaryAndCall, 2, 2, ""},
-	expr.BinaryOrOp:     {binaryOrCall, 2, 2, ""},
-	expr.ConcatOp:       {concatCall, 2, 2, ""},
-	expr.DivideOp:       {divideCall, 2, 2, ""},
-	expr.EqualOp:        {equalCall, 2, 2, ""},
-	expr.GreaterEqualOp: {greaterEqualCall, 2, 2, ""},
-	expr.GreaterThanOp:  {greaterThanCall, 2, 2, ""},
-	expr.LessEqualOp:    {lessEqualCall, 2, 2, ""},
-	expr.LessThanOp:     {lessThanCall, 2, 2, ""},
-	expr.LShiftOp:       {lShiftCall, 2, 2, ""},
-	expr.ModuloOp:       {moduloCall, 2, 2, ""},
-	expr.MultiplyOp:     {multiplyCall, 2, 2, ""},
-	expr.NegateOp:       {negateCall, 1, 1, ""},
-	expr.NotEqualOp:     {notEqualCall, 2, 2, ""},
-	expr.NotOp:          {notCall, 1, 1, ""},
-	expr.OrOp:           {orCall, 2, 2, ""},
-	expr.RShiftOp:       {rShiftCall, 2, 2, ""},
-	expr.SubtractOp:     {subtractCall, 2, 2, ""},
+var opFuncs = map[sql.Op]*callFunc{
+	sql.AddOp:          {addCall, 2, 2, ""},
+	sql.AndOp:          {andCall, 2, 2, ""},
+	sql.BinaryAndOp:    {binaryAndCall, 2, 2, ""},
+	sql.BinaryOrOp:     {binaryOrCall, 2, 2, ""},
+	sql.ConcatOp:       {concatCall, 2, 2, ""},
+	sql.DivideOp:       {divideCall, 2, 2, ""},
+	sql.EqualOp:        {equalCall, 2, 2, ""},
+	sql.GreaterEqualOp: {greaterEqualCall, 2, 2, ""},
+	sql.GreaterThanOp:  {greaterThanCall, 2, 2, ""},
+	sql.LessEqualOp:    {lessEqualCall, 2, 2, ""},
+	sql.LessThanOp:     {lessThanCall, 2, 2, ""},
+	sql.LShiftOp:       {lShiftCall, 2, 2, ""},
+	sql.ModuloOp:       {moduloCall, 2, 2, ""},
+	sql.MultiplyOp:     {multiplyCall, 2, 2, ""},
+	sql.NegateOp:       {negateCall, 1, 1, ""},
+	sql.NotEqualOp:     {notEqualCall, 2, 2, ""},
+	sql.NotOp:          {notCall, 1, 1, ""},
+	sql.OrOp:           {orCall, 2, 2, ""},
+	sql.RShiftOp:       {rShiftCall, 2, 2, ""},
+	sql.SubtractOp:     {subtractCall, 2, 2, ""},
 }
 
 var idFuncs = map[sql.Identifier]*callFunc{

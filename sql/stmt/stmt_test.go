@@ -9,9 +9,9 @@ import (
 
 func TestTableName(t *testing.T) {
 	cases := []struct {
-		db sql.Identifier
+		db  sql.Identifier
 		tbl sql.Identifier
-		r string
+		r   string
 	}{
 		{tbl: sql.QuotedID("abc"), r: "abc"},
 		{sql.QuotedID("abcd"), sql.QuotedID("efghijk"), "abcd.efghijk"},
@@ -26,12 +26,12 @@ func TestTableName(t *testing.T) {
 }
 
 type mockExecuter struct {
-	createTable bool
-	dropTable bool
+	createTable  bool
+	dropTable    bool
 	insertValues bool
-	selectStmt bool
-	ret interface{}
-	err error
+	selectStmt   bool
+	ret          interface{}
+	err          error
 }
 
 func (me *mockExecuter) CreateTable(stmt *stmt.CreateTable) (interface{}, error) {

@@ -10,6 +10,7 @@ To Do:
 - handle DEFAULT specially in INSERT VALUES; it should not be part of value.Format
 - update t.Errorf to be "Operation(args) got %s want %s" and use %q for args
 - or "Operation(args) failed with %s" or "Operation(args) did not fail"
+- move engine/expr to engine?
 */
 
 import (

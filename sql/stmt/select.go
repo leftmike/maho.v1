@@ -3,7 +3,6 @@ package stmt
 import (
 	"fmt"
 	"maho/sql"
-	"maho/sql/expr"
 )
 
 type SelectResult struct {
@@ -20,7 +19,7 @@ type AliasTableName struct {
 type Select struct {
 	Table   AliasTableName
 	Results []SelectResult
-	Where   expr.Expr
+	Where   sql.Expr
 }
 
 func (atn AliasTableName) String() string {

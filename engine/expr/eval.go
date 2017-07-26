@@ -3,7 +3,6 @@ package expr
 import (
 	"fmt"
 	"maho/sql"
-	"maho/sql/expr"
 )
 
 type EvalContext interface {
@@ -14,7 +13,7 @@ type Expr interface {
 	Eval(ctx EvalContext) (sql.Value, error)
 }
 
-type literal expr.Literal
+type literal sql.Literal
 
 func (l *literal) String() string {
 	return sql.Format(l.Value)
