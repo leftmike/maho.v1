@@ -1,8 +1,8 @@
-package expr_test
+package engine_test
 
 import (
 	"fmt"
-	. "maho/engine/expr"
+	. "maho/engine"
 	"maho/sql"
 	"maho/sql/parser"
 	"strings"
