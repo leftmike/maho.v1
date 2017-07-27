@@ -412,7 +412,7 @@ func (p *Parser) parseCreateColumns(s *stmt.CreateTable) {
 				if col.Default != nil {
 					p.error("DEFAULT specified more than once per column")
 				}
-				col.Default = p.parseExpression()
+				col.Default = p.parseExpr()
 			} else if p.optionalReserved(sql.NOT) {
 				p.expectReserved(sql.NULL)
 				if col.NotNull {
@@ -440,32 +440,6 @@ func (p *Parser) parseDelete() stmt.Stmt {
 
 func (p *Parser) parseDropTable() stmt.Stmt {
 	p.error("DROP not implemented")
-	return nil
-}
-
-func (p *Parser) parseExpression() sql.Value {
-	r := p.scan()
-	if r == token.Reserved {
-		if p.scanner.Identifier == sql.TRUE {
-			return true
-		} else if p.scanner.Identifier == sql.FALSE {
-			return false
-		} else if p.scanner.Identifier == sql.NULL {
-			return nil
-		} else {
-			p.error(fmt.Sprintf("unexpected identifier %s", p.scanner.Identifier))
-		}
-	} else if r == token.String {
-		return p.scanner.String
-	} else if r == token.Integer {
-		return p.scanner.Integer
-	} else if r == token.Double {
-		return p.scanner.Double
-	}
-
-	// XXX: need a better error message
-	p.error(fmt.Sprintf(
-		"expected a string, a number, TRUE, FALSE or NULL for each value got %s", p.got()))
 	return nil
 }
 
@@ -649,16 +623,16 @@ func (p *Parser) parseInsert() stmt.Stmt {
 	p.expectReserved(sql.VALUES)
 
 	for {
-		var row []sql.Value
+		var row []sql.Expr
 
 		p.expectTokens(token.LParen)
 		for {
 			r := p.scan()
 			if r == token.Reserved && p.scanner.Identifier == sql.DEFAULT {
-				row = append(row, sql.Default{})
+				row = append(row, nil)
 			} else {
 				p.unscan()
-				row = append(row, p.parseExpression())
+				row = append(row, p.parseExpr())
 			}
 			r = p.expectTokens(token.Comma, token.RParen)
 			if r == token.RParen {

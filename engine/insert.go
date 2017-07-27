@@ -43,11 +43,23 @@ func (e *Engine) InsertValues(stmt *stmt.InsertValues) (interface{}, error) {
 		}
 		row := make([]sql.Value, len(cols))
 		for i, c := range cols {
-			var v sql.Value
+			e := c.Default
 			if c2v[i] < len(r) {
-				v = r[c2v[i]]
-			} else {
-				v = sql.Default{}
+				e = r[c2v[i]]
+				if e == nil {
+					e = c.Default
+				}
+			}
+			var v sql.Value
+			if e != nil {
+				ce, err := Compile(nil, e)
+				if err != nil {
+					return nil, err
+				}
+				v, err = ce.Eval(nil)
+				if err != nil {
+					return nil, err
+				}
 			}
 
 			row[i], err = c.ConvertValue(v)

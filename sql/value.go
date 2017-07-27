@@ -26,10 +26,6 @@ func Format(v Value) string {
 		return fmt.Sprintf("'%s'", s)
 	}
 
-	if _, ok := v.(Default); ok {
-		return "DEFAULT"
-	}
-
 	return fmt.Sprintf("%v", v)
 }
 

@@ -8,7 +8,7 @@ import (
 type InsertValues struct {
 	Table   TableName
 	Columns []sql.Identifier
-	Rows    [][]sql.Value
+	Rows    [][]sql.Expr
 }
 
 func (stmt *InsertValues) String() string {

@@ -20,7 +20,7 @@ type Column struct {
 	Binary   bool  // binary character column
 
 	NotNull bool
-	Default Value
+	Default Expr
 }
 
 func (c Column) DataType() string {
@@ -70,14 +70,6 @@ func (c Column) ConvertValue(v Value) (Value, error) {
 			return nil, fmt.Errorf("column may not be NULL: %s", c.Name)
 		}
 		return nil, nil
-	} else if _, ok := v.(Default); ok {
-		if c.NotNull && c.Default == nil {
-			return nil, fmt.Errorf("value must be specified for column: %s", c.Name)
-		} else if c.Default == nil {
-			return nil, nil
-		} else {
-			v = c.Default
-		}
 	}
 
 	switch c.Type {

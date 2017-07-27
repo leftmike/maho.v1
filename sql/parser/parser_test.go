@@ -6,6 +6,7 @@ import (
 	"maho/sql/parser"
 	"maho/sql/stmt"
 	"math"
+	"reflect"
 	"strings"
 	"testing"
 )
@@ -246,9 +247,9 @@ func TestCreateTable(t *testing.T) {
 				Table: stmt.TableName{Table: sql.ID("t")},
 				Columns: []sql.Column{
 					{Name: sql.ID("c1"), Type: sql.CharacterType, Fixed: false, Size: 64,
-						Default: sql.Value("abcd")},
+						Default: &sql.Literal{"abcd"}},
 					{Name: sql.ID("c2"), Type: sql.IntegerType, Size: 4, Width: 255,
-						Default: sql.Value(int64(123))},
+						Default: &sql.Literal{int64(123)}},
 				},
 			},
 		},
@@ -257,7 +258,8 @@ func TestCreateTable(t *testing.T) {
 			stmt: stmt.CreateTable{
 				Table: stmt.TableName{Table: sql.ID("t")},
 				Columns: []sql.Column{
-					{Name: sql.ID("c1"), Type: sql.BooleanType, Size: 1, Default: sql.Value(true)},
+					{Name: sql.ID("c1"), Type: sql.BooleanType, Size: 1,
+						Default: &sql.Literal{true}},
 					{Name: sql.ID("c2"), Type: sql.BooleanType, Size: 1, NotNull: true},
 				},
 			},
@@ -268,10 +270,10 @@ c2 boolean not null default true)`,
 			stmt: stmt.CreateTable{
 				Table: stmt.TableName{Table: sql.ID("t")},
 				Columns: []sql.Column{
-					{Name: sql.ID("c1"), Type: sql.BooleanType, Size: 1, Default: sql.Value(true),
-						NotNull: true},
-					{Name: sql.ID("c2"), Type: sql.BooleanType, Size: 1, Default: sql.Value(true),
-						NotNull: true},
+					{Name: sql.ID("c1"), Type: sql.BooleanType, Size: 1,
+						Default: &sql.Literal{true}, NotNull: true},
+					{Name: sql.ID("c2"), Type: sql.BooleanType, Size: 1,
+						Default: &sql.Literal{true}, NotNull: true},
 				},
 			},
 		},
@@ -305,7 +307,7 @@ func createTableEqual(stmt1 stmt.CreateTable, s2 stmt.Stmt) bool {
 		return false
 	}
 	for i, c1 := range stmt1.Columns {
-		if c1 != stmt2.Columns[i] {
+		if !reflect.DeepEqual(c1, stmt2.Columns[i]) {
 			return false
 		}
 	}
@@ -335,21 +337,28 @@ func TestInsertValues(t *testing.T) {
 			sql: "insert into t values (1, 'abc', true)",
 			stmt: stmt.InsertValues{
 				Table: stmt.TableName{Table: sql.ID("t")},
-				Rows:  [][]sql.Value{{int64(1), "abc", true}},
+				Rows: [][]sql.Expr{
+					{&sql.Literal{int64(1)}, &sql.Literal{"abc"}, &sql.Literal{true}},
+				},
 			},
 		},
 		{
 			sql: "insert into t values (1, 'abc', true), (2, 'def', false)",
 			stmt: stmt.InsertValues{
 				Table: stmt.TableName{Table: sql.ID("t")},
-				Rows:  [][]sql.Value{{int64(1), "abc", true}, {int64(2), "def", false}},
+				Rows: [][]sql.Expr{
+					{&sql.Literal{int64(1)}, &sql.Literal{"abc"}, &sql.Literal{true}},
+					{&sql.Literal{int64(2)}, &sql.Literal{"def"}, &sql.Literal{false}},
+				},
 			},
 		},
 		{
 			sql: "insert into t values (NULL, 'abc', NULL)",
 			stmt: stmt.InsertValues{
 				Table: stmt.TableName{Table: sql.ID("t")},
-				Rows:  [][]sql.Value{{nil, "abc", nil}},
+				Rows: [][]sql.Expr{
+					{&sql.Literal{nil}, &sql.Literal{"abc"}, &sql.Literal{nil}},
+				},
 			},
 		},
 	}
@@ -396,7 +405,7 @@ func insertValuesEqual(stmt1 stmt.InsertValues, s2 stmt.Stmt) bool {
 			return false
 		}
 		for j, v1 := range r1 {
-			if v1 != r2[j] {
+			if !reflect.DeepEqual(v1, r2[j]) {
 				return false
 			}
 		}

@@ -138,10 +138,11 @@ var (
 	}
 
 	insertColumns3 = []sql.Column{
-		{Name: sql.ID("c1"), Type: sql.IntegerType, Size: 4, Width: 255, Default: int64(1)},
+		{Name: sql.ID("c1"), Type: sql.IntegerType, Size: 4, Width: 255,
+			Default: &sql.Literal{int64(1)}},
 		{Name: sql.ID("c2"), Type: sql.IntegerType, Size: 4, Width: 255, NotNull: true},
-		{Name: sql.ID("c3"), Type: sql.IntegerType, Size: 4, Width: 255, Default: int64(3),
-			NotNull: true},
+		{Name: sql.ID("c3"), Type: sql.IntegerType, Size: 4, Width: 255,
+			Default: &sql.Literal{int64(3)}, NotNull: true},
 	}
 	insertCases3 = []insertCase{
 		{
