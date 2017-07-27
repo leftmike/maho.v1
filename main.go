@@ -7,7 +7,6 @@ To Do:
 - references in expressions
 - update t.Errorf to be "Operation(args) got %s want %s" and use %q for args
 - or "Operation(args) failed with %s" or "Operation(args) did not fail"
-- engine tables should have not_null columns
 */
 
 import (

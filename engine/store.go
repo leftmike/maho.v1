@@ -20,34 +20,44 @@ type engineTable struct {
 
 var (
 	storesColumns = []sql.Column{
-		{Name: sql.QuotedID("store"), Type: sql.CharacterType, Size: sql.MaxIdentifier},
+		{Name: sql.QuotedID("store"), Type: sql.CharacterType, Size: sql.MaxIdentifier,
+			NotNull: true},
 	}
 	databasesColumns = []sql.Column{
-		{Name: sql.QuotedID("database"), Type: sql.CharacterType, Size: sql.MaxIdentifier},
-		{Name: sql.QuotedID("store"), Type: sql.CharacterType, Size: sql.MaxIdentifier},
+		{Name: sql.QuotedID("database"), Type: sql.CharacterType, Size: sql.MaxIdentifier,
+			NotNull: true},
+		{Name: sql.QuotedID("store"), Type: sql.CharacterType, Size: sql.MaxIdentifier,
+			NotNull: true},
 	}
 	tablesColumns = []sql.Column{
-		{Name: sql.QuotedID("database"), Type: sql.CharacterType, Size: sql.MaxIdentifier},
-		{Name: sql.QuotedID("table"), Type: sql.CharacterType, Size: sql.MaxIdentifier},
-		{Name: sql.QuotedID("num_columns"), Type: sql.IntegerType, Size: 4},
+		{Name: sql.QuotedID("database"), Type: sql.CharacterType, Size: sql.MaxIdentifier,
+			NotNull: true},
+		{Name: sql.QuotedID("table"), Type: sql.CharacterType, Size: sql.MaxIdentifier,
+			NotNull: true},
+		{Name: sql.QuotedID("num_columns"), Type: sql.IntegerType, Size: 4, NotNull: true},
 	}
 	columnsColumns = []sql.Column{
-		{Name: sql.QuotedID("database"), Type: sql.CharacterType, Size: sql.MaxIdentifier},
-		{Name: sql.QuotedID("table"), Type: sql.CharacterType, Size: sql.MaxIdentifier},
-		{Name: sql.QuotedID("column"), Type: sql.CharacterType, Size: sql.MaxIdentifier},
-		{Name: sql.QuotedID("type"), Type: sql.CharacterType, Size: sql.MaxIdentifier},
-		{Name: sql.QuotedID("size"), Type: sql.IntegerType, Size: 4},
-		{Name: sql.QuotedID("width"), Type: sql.IntegerType, Size: 1},
-		{Name: sql.QuotedID("fraction"), Type: sql.IntegerType, Size: 1},
-		{Name: sql.QuotedID("fixed"), Type: sql.BooleanType},
-		{Name: sql.QuotedID("binary"), Type: sql.BooleanType},
-		{Name: sql.QuotedID("not_null"), Type: sql.BooleanType},
+		{Name: sql.QuotedID("database"), Type: sql.CharacterType, Size: sql.MaxIdentifier,
+			NotNull: true},
+		{Name: sql.QuotedID("table"), Type: sql.CharacterType, Size: sql.MaxIdentifier,
+			NotNull: true},
+		{Name: sql.QuotedID("column"), Type: sql.CharacterType, Size: sql.MaxIdentifier,
+			NotNull: true},
+		{Name: sql.QuotedID("type"), Type: sql.CharacterType, Size: sql.MaxIdentifier,
+			NotNull: true},
+		{Name: sql.QuotedID("size"), Type: sql.IntegerType, Size: 4, NotNull: true},
+		{Name: sql.QuotedID("width"), Type: sql.IntegerType, Size: 1, NotNull: true},
+		{Name: sql.QuotedID("fraction"), Type: sql.IntegerType, Size: 1, NotNull: true},
+		{Name: sql.QuotedID("fixed"), Type: sql.BooleanType, NotNull: true},
+		{Name: sql.QuotedID("binary"), Type: sql.BooleanType, NotNull: true},
+		{Name: sql.QuotedID("not_null"), Type: sql.BooleanType, NotNull: true},
 		{Name: sql.QuotedID("default"), Type: sql.CharacterType, Size: sql.MaxIdentifier},
 	}
 	identifiersColumns = []sql.Column{
-		{Name: sql.QuotedID("name"), Type: sql.CharacterType, Size: sql.MaxIdentifier},
-		{Name: sql.QuotedID("identifier"), Type: sql.IntegerType, Size: 4},
-		{Name: sql.QuotedID("reserved"), Type: sql.BooleanType},
+		{Name: sql.QuotedID("name"), Type: sql.CharacterType, Size: sql.MaxIdentifier,
+			NotNull: true},
+		{Name: sql.QuotedID("identifier"), Type: sql.IntegerType, Size: 4, NotNull: true},
+		{Name: sql.QuotedID("reserved"), Type: sql.BooleanType, NotNull: true},
 	}
 )
 
