@@ -1,4 +1,4 @@
-package scanner
+package parser
 
 import (
 	"bytes"
@@ -10,13 +10,13 @@ import (
 	"unicode"
 )
 
-type Position struct {
-	Filename string
-	Line     int
-	Column   int
+type position struct {
+	filename string
+	line     int
+	column   int
 }
 
-type Scanner struct {
+type scanner struct {
 	initialized bool
 	rr          io.RuneReader
 	unread      bool
@@ -24,36 +24,36 @@ type Scanner struct {
 	line        int
 	column      int
 	buffer      bytes.Buffer
-	Error       error
-	Identifier  sql.Identifier // Identifier and Reserved
-	String      string
-	Integer     int64
-	Double      float64
-	Position
+	error       error
+	identifier  sql.Identifier // Identifier and Reserved
+	string      string
+	integer     int64
+	double      float64
+	pos         position
 }
 
-func (pos Position) String() string {
-	s := pos.Filename
-	if pos.Line > 0 {
-		s += fmt.Sprintf(":%d:%d", pos.Line, pos.Column)
+func (pos position) String() string {
+	s := pos.filename
+	if pos.line > 0 {
+		s += fmt.Sprintf(":%d:%d", pos.line, pos.column)
 	}
 	return s
 }
 
-func (s *Scanner) Init(rr io.RuneReader, fn string) *Scanner {
+func (s *scanner) Init(rr io.RuneReader, fn string) *scanner {
 	if s.initialized {
 		panic("scanner already initialized")
 	}
 	s.initialized = true
 
 	s.rr = rr
-	s.Filename = fn
-	s.line = 1
-	s.column = 0
+	s.pos.filename = fn
+	s.pos.line = 1
+	s.pos.column = 0
 	return s
 }
 
-func (s *Scanner) Scan() rune {
+func (s *scanner) Scan() rune {
 	s.buffer.Reset()
 
 SkipWhitespace:
@@ -117,8 +117,8 @@ SkipWhitespace:
 		}
 	}
 
-	s.Column = s.column
-	s.Line = s.line
+	s.pos.column = s.column
+	s.pos.line = s.line
 
 	if unicode.IsLetter(r) || r == '_' {
 		return s.scanIdentifier(r)
@@ -155,7 +155,7 @@ SkipWhitespace:
 			if r, ok := token.Operators[s.buffer.String()]; ok {
 				return r
 			}
-			s.Error = fmt.Errorf("unexpected operator %s", s.buffer.String())
+			s.error = fmt.Errorf("unexpected operator %s", s.buffer.String())
 			return token.Error
 		} else {
 			s.unreadRune()
@@ -165,11 +165,11 @@ SkipWhitespace:
 		return r
 	}
 
-	s.Error = fmt.Errorf("unexpected character '%c'", r)
+	s.error = fmt.Errorf("unexpected character '%c'", r)
 	return token.Error
 }
 
-func (s *Scanner) readRune() rune {
+func (s *scanner) readRune() rune {
 	if s.unread {
 		s.unread = false
 		return s.read
@@ -180,7 +180,7 @@ func (s *Scanner) readRune() rune {
 	if err == io.EOF {
 		return token.EOF
 	} else if err != nil {
-		s.Error = err
+		s.error = err
 		return token.Error
 	}
 
@@ -194,11 +194,11 @@ func (s *Scanner) readRune() rune {
 	return s.read
 }
 
-func (s *Scanner) unreadRune() {
+func (s *scanner) unreadRune() {
 	s.unread = true
 }
 
-func (s *Scanner) scanIdentifier(r rune) rune {
+func (s *scanner) scanIdentifier(r rune) rune {
 	for {
 		s.buffer.WriteRune(r)
 		r = s.readRune()
@@ -213,14 +213,14 @@ func (s *Scanner) scanIdentifier(r rune) rune {
 		}
 	}
 
-	s.Identifier = sql.ID(s.buffer.String())
-	if s.Identifier.IsReserved() {
+	s.identifier = sql.ID(s.buffer.String())
+	if s.identifier.IsReserved() {
 		return token.Reserved
 	}
 	return token.Identifier
 }
 
-func (s *Scanner) scanNumber(r rune, sign int64) rune {
+func (s *scanner) scanNumber(r rune, sign int64) rune {
 	dbl := false
 	for {
 		s.buffer.WriteRune(r)
@@ -240,28 +240,28 @@ func (s *Scanner) scanNumber(r rune, sign int64) rune {
 
 	var err error
 	if dbl {
-		s.Double, err = strconv.ParseFloat(s.buffer.String(), 64)
+		s.double, err = strconv.ParseFloat(s.buffer.String(), 64)
 	} else {
-		s.Integer, err = strconv.ParseInt(s.buffer.String(), 10, 64)
+		s.integer, err = strconv.ParseInt(s.buffer.String(), 10, 64)
 	}
 	if err != nil {
-		s.Error = err
+		s.error = err
 		return token.Error
 	}
 	if dbl {
-		s.Double *= float64(sign)
+		s.double *= float64(sign)
 		return token.Double
 	} else {
-		s.Integer *= sign
+		s.integer *= sign
 		return token.Integer
 	}
 }
 
-func (s *Scanner) scanQuotedIdentifier(delim rune) rune {
+func (s *scanner) scanQuotedIdentifier(delim rune) rune {
 	for {
 		r := s.readRune()
 		if r == token.EOF {
-			s.Error = fmt.Errorf("quoted identifier missing terminating '%c'", delim)
+			s.error = fmt.Errorf("quoted identifier missing terminating '%c'", delim)
 			return token.Error
 		}
 		if r == token.Error {
@@ -273,15 +273,15 @@ func (s *Scanner) scanQuotedIdentifier(delim rune) rune {
 		s.buffer.WriteRune(r)
 	}
 
-	s.Identifier = sql.QuotedID(s.buffer.String())
+	s.identifier = sql.QuotedID(s.buffer.String())
 	return token.Identifier
 }
 
-func (s *Scanner) scanString() rune {
+func (s *scanner) scanString() rune {
 	for {
 		r := s.readRune()
 		if r == token.EOF {
-			s.Error = fmt.Errorf("string missing terminating \"'\"")
+			s.error = fmt.Errorf("string missing terminating \"'\"")
 			return token.Error
 		}
 		if r == token.Error {
@@ -293,7 +293,7 @@ func (s *Scanner) scanString() rune {
 		if r == '\\' {
 			r = s.readRune()
 			if r == token.EOF {
-				s.Error = fmt.Errorf("incomplete string escape")
+				s.error = fmt.Errorf("incomplete string escape")
 				return token.Error
 			}
 			if r == token.Error {
@@ -303,6 +303,6 @@ func (s *Scanner) scanString() rune {
 		s.buffer.WriteRune(r)
 	}
 
-	s.String = s.buffer.String()
+	s.string = s.buffer.String()
 	return token.String
 }
