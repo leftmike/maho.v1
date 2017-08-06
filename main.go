@@ -3,10 +3,28 @@ package main
 /*
 To Do:
 - databases should be standalone ==> identifiers should be converted back to strings on storage
+- row: row.Set is columns in the set and maybe Count of rows; row.Scanner is an interface to
+  scan a set of rows; row.Slice is an interface to return the rows as a slice; utility routines
+  to convert between the two -- if necessary
 - finish parse and execute of select
 - references in expressions
 - update t.Errorf to be "Operation(args) got %s want %s" and use %q for args
 - or "Operation(args) failed with %s" or "Operation(args) did not fail"
+- change AliasTableName to TableAlias (and the same for Columns)
+- should stmt be objects which parser builds and know how to execute themselves using engine?
+
+p := parser.NewParser(rr io.RuneReader, fn string)
+stmt, err := p.Parse()
+
+maho/parser --> expr, sql, stmt
+maho/parser/token
+maho/parser/scanner
+maho/engine
+maho/expr --> sql
+maho/row
+maho/sql
+maho/stmt --> sql, expr
+maho/store
 */
 
 import (

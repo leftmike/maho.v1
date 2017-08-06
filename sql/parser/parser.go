@@ -649,6 +649,26 @@ func (p *Parser) parseInsert() stmt.Stmt {
 	return &s
 }
 
+/*
+<select> = SELECT <select-list>
+    [FROM <from-item> [',' ...]]
+    [WHERE <expr>]
+<values> = VALUES '(' <expr> [',' ...] ')' [',' ...]
+<select-list> = '*'
+    | <result-column> [',' ...]
+<result-column> = <expr> [[ AS ] column-alias
+    | table-name '.' '*'
+<from-item> = [ database-name '.' ] table-name [[ AS ] table-alias]
+    | '(' <select> | <values> ')' [[ AS ] table-alias]
+    | '(' <from-item> [',' ...] ')'
+    | <from-item> [ NATURAL ] <join-type> <from-item> [ ON <expr> | USING '(' join-column ',' ...]
+<join-type> = [ INNER ] JOIN
+    | LEFT [ OUTER ] JOIN
+    | RIGHT [ OUTER ] JOIN
+    | FULL [ OUTER ] JOIN
+    | CROSS JOIN
+*/
+
 func (p *Parser) parseSelect() stmt.Stmt {
 	/*
 		SELECT <select-expr> [, ...] FROM [database.]table [[ AS ] name] [WHERE <expr>]

@@ -5,6 +5,80 @@ import (
 	"maho/sql"
 )
 
+/*
+type ResultColumn struct {
+	ID   sql.Identifier // Table or ColumnAlias
+	Expr sql.Expr
+}
+
+func (rc ResultColumn) Table() sql.Identifier {
+	return rc.ID
+}
+
+func (rc ResultColumn) ColumnAlias() sql.Identifier {
+	return rc.ID
+}
+
+func (rc ResultColumn) IsExpr() bool {
+	return rc.Expr != nil
+}
+
+func (rc ResultColumn) IsTable() bool {
+	return rc.Expr == nil
+}
+
+type Subquery interface {
+	subquery() bool
+}
+
+type TableAlias struct {
+	TableName
+	Alias sql.Identifier
+}
+
+func (ta *TableAlias) subquery() bool {
+	return true
+}
+
+type FromItem struct {
+	Alias    sql.Identifier
+	Subquery interface{} // Select, Values, TableName, or Join
+}
+
+type JoinType int
+
+const (
+	PlainJoin = iota // JOIN
+	InnerJoin
+	CrossJoin
+	LeftJoin
+)
+
+type Join struct {
+	Left    interface{}
+	Right   interface{}
+	Natural bool
+	Outer   bool
+	Type    JoinType
+	On      sql.Expr
+	Using   []sql.Identifier
+}
+
+type NewSelect struct {
+	Results []ResultColumn
+	From    FromItem
+	Where   sql.Expr
+}
+
+func (s *NewSelect) subquery() bool {
+	return true
+}
+
+func (s *NewSelect) AllResults() bool { // SELECT * ...
+	return s.Results == nil
+}
+*/
+
 type SelectResult struct {
 	Table  sql.Identifier
 	Column sql.Identifier
