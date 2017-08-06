@@ -2,6 +2,8 @@ package stmt
 
 import (
 	"fmt"
+
+	"maho/engine"
 	"maho/sql"
 )
 
@@ -34,6 +36,12 @@ func (stmt *CreateTable) String() string {
 	return s
 }
 
-func (stmt *CreateTable) Dispatch(e Executer) (interface{}, error) {
-	return e.CreateTable(stmt)
+func (stmt *CreateTable) Execute(e *engine.Engine) (interface{}, error) {
+	fmt.Println(stmt)
+
+	db, err := e.LookupDatabase(stmt.Table.Database)
+	if err != nil {
+		return nil, err
+	}
+	return nil, db.CreateTable(stmt.Table.Table, stmt.Columns)
 }

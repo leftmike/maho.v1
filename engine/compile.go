@@ -103,9 +103,21 @@ var idFuncs = map[sql.Identifier]*callFunc{
 func init() {
 	for op, cf := range opFuncs {
 		cf.name = fmt.Sprintf("\"%s\"", op)
+		if op == sql.NegateOp || op == sql.NotOp {
+			if cf.minArgs != 1 || cf.maxArgs != 1 {
+				panic(fmt.Sprintf("opFuncs[%s]: minArgs != 1 || maxArgs != 1", op))
+			}
+		} else {
+			if cf.minArgs != 2 || cf.maxArgs != 2 {
+				panic(fmt.Sprintf("opFuncs[%s]: minArgs != 2 || maxArgs != 2", op))
+			}
+		}
 	}
 
 	for id, cf := range idFuncs {
 		cf.name = id.String()
+		if cf.minArgs < 0 || cf.maxArgs < cf.minArgs {
+			panic(fmt.Sprintf("opFuncs[%s]: minArgs < 0 || maxArgs < minArgs", id))
+		}
 	}
 }

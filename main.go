@@ -11,7 +11,6 @@ To Do:
 - update t.Errorf to be "Operation(args) got %s want %s" and use %q for args
 - or "Operation(args) failed with %s" or "Operation(args) did not fail"
 - change AliasTableName to TableAlias (and the same for Columns)
-- should stmt be objects which parser builds and know how to execute themselves using engine?
 
 maho/parser --> expr, sql, stmt
 maho/parser/token
@@ -19,9 +18,9 @@ maho/parser/scanner
 maho/engine
 - maho/expr --> sql
 - maho/row
-- maho/sql
-- maho/stmt --> sql, expr
-- maho/store
+maho/sql
+maho/stmt --> sql, expr
+maho/store
 */
 
 import (
@@ -50,7 +49,7 @@ func parse(e *engine.Engine, p parser.Parser, w io.Writer) {
 			break
 		}
 
-		ret, err := stmt.Dispatch(e)
+		ret, err := stmt.Execute(e)
 		if err != nil {
 			fmt.Println(err)
 			break

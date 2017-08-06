@@ -1,10 +1,11 @@
-package engine
+package engine_test
 
 import (
 	"fmt"
 	"strings"
 	"testing"
 
+	"maho/engine"
 	"maho/parser"
 	"maho/sql"
 )
@@ -26,12 +27,12 @@ func TestCompile(t *testing.T) {
 		if err != nil {
 			t.Errorf("ParseExpr(%q) failed with %s", c.s, err)
 		}
-		r, err := Compile(nil, e)
+		r, err := engine.Compile(nil, e)
 		if err != nil {
-			t.Errorf("Compile(%q) failed with %s", c.s, err)
+			t.Errorf("engine.Compile(%q) failed with %s", c.s, err)
 		}
 		if r.String() != c.r {
-			t.Errorf("Compile(%q) got %s want %s", c.s, r, c.r)
+			t.Errorf("engine.Compile(%q) got %s want %s", c.s, r, c.r)
 		}
 	}
 
@@ -49,46 +50,9 @@ func TestCompile(t *testing.T) {
 		if err != nil {
 			t.Errorf("ParseExpr(%q) failed with %s", f, err)
 		}
-		r, err := Compile(nil, e)
+		r, err := engine.Compile(nil, e)
 		if err == nil {
-			t.Errorf("Compile(%q) did not fail, got %s", f, r)
-		}
-	}
-}
-
-func TestFuncs(t *testing.T) {
-	for op, cf := range opFuncs {
-		if op == sql.NegateOp || op == sql.NotOp {
-			if cf.minArgs != 1 {
-				t.Errorf("opFuncs[%s].minArgs got %d want 1", op, cf.minArgs)
-			}
-			if cf.maxArgs != 1 {
-				t.Errorf("opFuncs[%s].maxArgs got %d want 1", op, cf.maxArgs)
-			}
-		} else {
-			if cf.minArgs != 2 {
-				t.Errorf("opFuncs[%s].minArgs got %d want 2", op, cf.minArgs)
-			}
-			if cf.maxArgs != 2 {
-				t.Errorf("opFuncs[%s].maxArgs got %d want 2", op, cf.maxArgs)
-			}
-		}
-
-		n := fmt.Sprintf(`"%s"`, op)
-		if cf.name != n {
-			t.Errorf("opFuncs[%s].name got %s want %s", op, cf.name, n)
-		}
-	}
-
-	for id, cf := range idFuncs {
-		if cf.minArgs < 0 {
-			t.Errorf("idFuncs[%s].minArgs < 0; got %d", id, cf.minArgs)
-		}
-		if cf.maxArgs < cf.minArgs {
-			t.Errorf("idFuncs[%s].maxArgs < minArgs; got %d < %d", id, cf.maxArgs, cf.minArgs)
-		}
-		if cf.name != id.String() {
-			t.Errorf("idFuncs[%s].name got %s want %s", id, cf.name, id)
+			t.Errorf("engine.Compile(%q) did not fail, got %s", f, r)
 		}
 	}
 }

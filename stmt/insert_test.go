@@ -1,4 +1,4 @@
-package engine_test
+package stmt_test
 
 import (
 	"strings"
@@ -186,7 +186,7 @@ func statement(e *engine.Engine, s string) error {
 	if err != nil {
 		return err
 	}
-	_, err = stmt.Dispatch(e)
+	_, err = stmt.Execute(e)
 	return err
 }
 
@@ -203,10 +203,10 @@ func testInsert(t *testing.T, e *engine.Engine, db store.Database, nam sql.Ident
 		err = statement(e, c.stmt)
 		if c.fail {
 			if err == nil {
-				t.Errorf("Parse(\"%s\").Dispatch() did not fail", c.stmt)
+				t.Errorf("Parse(\"%s\").Execute() did not fail", c.stmt)
 			}
 		} else if err != nil {
-			t.Errorf("Parse(\"%s\").Dispatch() failed with %s", c.stmt, err.Error())
+			t.Errorf("Parse(\"%s\").Execute() failed with %s", c.stmt, err.Error())
 		} else {
 			tbl, err := db.Table(nam)
 			if err != nil {

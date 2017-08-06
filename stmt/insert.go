@@ -1,15 +1,61 @@
-package engine
+package stmt
 
 import (
 	"fmt"
+
+	"maho/engine"
 	"maho/sql"
-	"maho/sql/stmt"
 )
 
-func (e *Engine) InsertValues(stmt *stmt.InsertValues) (interface{}, error) {
+type InsertValues struct {
+	Table   TableName
+	Columns []sql.Identifier
+	Rows    [][]sql.Expr
+}
+
+func (stmt *InsertValues) String() string {
+	s := fmt.Sprintf("INSERT INTO %s ", stmt.Table)
+	if stmt.Columns != nil {
+		s += "("
+		for i, col := range stmt.Columns {
+			if i > 0 {
+				s += ", "
+			}
+			s += col.String()
+		}
+		s += ") "
+	}
+
+	s += "VALUES"
+
+	for i, r := range stmt.Rows {
+		if i > 0 {
+			s += ", ("
+		} else {
+			s += " ("
+		}
+
+		for j, v := range r {
+			if j > 0 {
+				s += ", "
+			}
+			s += sql.Format(v)
+		}
+
+		s += ")"
+	}
+
+	return s
+}
+
+func (stmt *InsertValues) Execute(e *engine.Engine) (interface{}, error) {
 	fmt.Println(stmt)
 
-	tbl, err := e.lookupTable(stmt.Table.Database, stmt.Table.Table)
+	db, err := e.LookupDatabase(stmt.Table.Database)
+	if err != nil {
+		return nil, err
+	}
+	tbl, err := db.Table(stmt.Table.Table)
 	if err != nil {
 		return nil, err
 	}
@@ -52,7 +98,7 @@ func (e *Engine) InsertValues(stmt *stmt.InsertValues) (interface{}, error) {
 			}
 			var v sql.Value
 			if e != nil {
-				ce, err := Compile(nil, e)
+				ce, err := engine.Compile(nil, e)
 				if err != nil {
 					return nil, err
 				}

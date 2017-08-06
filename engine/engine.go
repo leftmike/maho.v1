@@ -2,6 +2,7 @@ package engine
 
 import (
 	"fmt"
+
 	"maho/sql"
 	"maho/store"
 )
@@ -22,7 +23,7 @@ func Start(db store.Database) (*Engine, error) {
 	return e, nil
 }
 
-func (e *Engine) lookupTable(db, tbl sql.Identifier) (store.Table, error) {
+func (e *Engine) LookupDatabase(db sql.Identifier) (store.Database, error) {
 	if db == 0 {
 		db = e.defaultDatabase
 	}
@@ -30,5 +31,5 @@ func (e *Engine) lookupTable(db, tbl sql.Identifier) (store.Table, error) {
 	if !ok {
 		return nil, fmt.Errorf("engine: database \"%s\" not found", db)
 	}
-	return s.Table(tbl)
+	return s, nil
 }

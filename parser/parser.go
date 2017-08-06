@@ -9,7 +9,7 @@ import (
 	"maho/parser/scanner"
 	"maho/parser/token"
 	"maho/sql"
-	"maho/sql/stmt"
+	"maho/stmt"
 )
 
 type Parser interface {

@@ -9,7 +9,7 @@ import (
 
 	"maho/parser"
 	"maho/sql"
-	"maho/sql/stmt"
+	"maho/stmt"
 )
 
 func TestParse(t *testing.T) {
