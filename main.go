@@ -13,38 +13,33 @@ To Do:
 - change AliasTableName to TableAlias (and the same for Columns)
 - should stmt be objects which parser builds and know how to execute themselves using engine?
 
-p := parser.NewParser(rr io.RuneReader, fn string)
-stmt, err := p.Parse()
-
 maho/parser --> expr, sql, stmt
 maho/parser/token
 maho/parser/scanner
 maho/engine
-maho/expr --> sql
-maho/row
-maho/sql
-maho/stmt --> sql, expr
-maho/store
+- maho/expr --> sql
+- maho/row
+- maho/sql
+- maho/stmt --> sql, expr
+- maho/store
 */
 
 import (
 	"bufio"
 	"fmt"
 	"io"
-	"maho/engine"
-	"maho/sql"
-	"maho/sql/parser"
-	"maho/store"
-	_ "maho/store/basic"
 	"os"
 	"strings"
 	"text/tabwriter"
+
+	"maho/engine"
+	"maho/parser"
+	"maho/sql"
+	"maho/store"
+	_ "maho/store/basic"
 )
 
-func parse(e *engine.Engine, rr io.RuneReader, fn string, w io.Writer) {
-	var p parser.Parser
-	p.Init(rr, fn)
-
+func parse(e *engine.Engine, p parser.Parser, w io.Writer) {
 	for {
 		stmt, err := p.Parse()
 		if err == io.EOF {
@@ -106,7 +101,7 @@ func main() {
 	}
 
 	if len(os.Args) == 1 {
-		parse(e, bufio.NewReader(os.Stdin), "[Stdin]", os.Stdout)
+		parse(e, parser.NewParser(bufio.NewReader(os.Stdin), "[Stdin]"), os.Stdout)
 	} else {
 		for idx := 1; idx < len(os.Args); idx++ {
 			/*			f, err := os.Open(os.Args[idx])
@@ -114,7 +109,8 @@ func main() {
 							log.Fatal(err)
 						}
 						parse(e, bufio.NewReader(f), os.Args[idx])*/
-			parse(e, strings.NewReader(os.Args[idx]), fmt.Sprintf("os.Args[%d]", idx), os.Stdout)
+			parse(e, parser.NewParser(strings.NewReader(os.Args[idx]), fmt.Sprintf("os.Args[%d]",
+				idx)), os.Stdout)
 		}
 	}
 }

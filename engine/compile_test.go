@@ -2,10 +2,11 @@ package engine
 
 import (
 	"fmt"
-	"maho/sql"
-	"maho/sql/parser"
 	"strings"
 	"testing"
+
+	"maho/parser"
+	"maho/sql"
 )
 
 func TestCompile(t *testing.T) {
@@ -20,8 +21,7 @@ func TestCompile(t *testing.T) {
 	}
 
 	for i, c := range cases {
-		var p parser.Parser
-		p.Init(strings.NewReader(c.s), fmt.Sprintf("cases[%d]", i))
+		p := parser.NewParser(strings.NewReader(c.s), fmt.Sprintf("cases[%d]", i))
 		e, err := p.ParseExpr()
 		if err != nil {
 			t.Errorf("ParseExpr(%q) failed with %s", c.s, err)
@@ -44,8 +44,7 @@ func TestCompile(t *testing.T) {
 	}
 
 	for i, f := range fail {
-		var p parser.Parser
-		p.Init(strings.NewReader(f), fmt.Sprintf("fail[%d]", i))
+		p := parser.NewParser(strings.NewReader(f), fmt.Sprintf("fail[%d]", i))
 		e, err := p.ParseExpr()
 		if err != nil {
 			t.Errorf("ParseExpr(%q) failed with %s", f, err)

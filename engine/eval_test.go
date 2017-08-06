@@ -2,11 +2,12 @@ package engine_test
 
 import (
 	"fmt"
-	. "maho/engine"
-	"maho/sql"
-	"maho/sql/parser"
 	"strings"
 	"testing"
+
+	. "maho/engine"
+	"maho/parser"
+	"maho/sql"
 )
 
 func TestEval(t *testing.T) {
@@ -150,8 +151,7 @@ func TestEval(t *testing.T) {
 	}
 
 	for i, c := range cases {
-		var p parser.Parser
-		p.Init(strings.NewReader(c.s), fmt.Sprintf("cases[%d]", i))
+		p := parser.NewParser(strings.NewReader(c.s), fmt.Sprintf("cases[%d]", i))
 		e, err := p.ParseExpr()
 		if err != nil {
 			t.Errorf("ParseExpr(%q) failed with %s", c.s, err)
@@ -285,8 +285,7 @@ func TestEval(t *testing.T) {
 	}
 
 	for i, f := range fail {
-		var p parser.Parser
-		p.Init(strings.NewReader(f), fmt.Sprintf("fail[%d]", i))
+		p := parser.NewParser(strings.NewReader(f), fmt.Sprintf("fail[%d]", i))
 		e, err := p.ParseExpr()
 		if err != nil {
 			t.Errorf("ParseExpr(%q) failed with %s", f, err)
@@ -316,8 +315,7 @@ func numberTest(t *testing.T, m, op, n string, b bool) {
 
 func compareTest(t *testing.T, m, op, n string, b bool) {
 	s := m + op + n
-	var p parser.Parser
-	p.Init(strings.NewReader(s), s)
+	p := parser.NewParser(strings.NewReader(s), s)
 	e, err := p.ParseExpr()
 	if err != nil {
 		t.Errorf("ParseExpr(%q) failed with %s", s, err)

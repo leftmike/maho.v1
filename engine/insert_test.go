@@ -1,13 +1,14 @@
 package engine_test
 
 import (
-	"maho/engine"
-	"maho/sql"
-	"maho/sql/parser"
-	"maho/store"
-	"maho/store/test"
 	"strings"
 	"testing"
+
+	"maho/engine"
+	"maho/parser"
+	"maho/sql"
+	"maho/store"
+	"maho/store/test"
 )
 
 type insertCase struct {
@@ -180,8 +181,7 @@ func TestInsert(t *testing.T) {
 }
 
 func statement(e *engine.Engine, s string) error {
-	var p parser.Parser
-	p.Init(strings.NewReader(s), "statement")
+	p := parser.NewParser(strings.NewReader(s), "statement")
 	stmt, err := p.Parse()
 	if err != nil {
 		return err

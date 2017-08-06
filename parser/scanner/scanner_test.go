@@ -1,11 +1,13 @@
-package parser
+package scanner_test
 
 import (
 	"fmt"
-	"maho/sql"
-	"maho/sql/token"
 	"strings"
 	"testing"
+
+	. "maho/parser/scanner"
+	"maho/parser/token"
+	"maho/sql"
 )
 
 func TestScan(t *testing.T) {
@@ -53,7 +55,7 @@ func TestScan(t *testing.T) {
 	}
 
 	for i, c := range cases {
-		var s scanner
+		var s Scanner
 		s.Init(strings.NewReader(c.s), fmt.Sprintf("cases[%d]", i))
 		r := s.Scan()
 		if r != c.r {
@@ -74,14 +76,14 @@ func TestScan(t *testing.T) {
 	}
 
 	for i, n := range integers {
-		var s scanner
+		var s Scanner
 		s.Init(strings.NewReader(n.s), fmt.Sprintf("integers[%d]", i))
 		r := s.Scan()
 		if r != token.Integer {
 			t.Errorf("Scan(%q) got %d want Integer", n.s, r)
 		}
-		if s.integer != n.n {
-			t.Errorf("Scan(%q).Integer got %d want %d", n.s, s.integer, n.n)
+		if s.Integer != n.n {
+			t.Errorf("Scan(%q).Integer got %d want %d", n.s, s.Integer, n.n)
 		}
 	}
 
@@ -98,14 +100,14 @@ func TestScan(t *testing.T) {
 	}
 
 	for i, n := range doubles {
-		var s scanner
+		var s Scanner
 		s.Init(strings.NewReader(n.s), fmt.Sprintf("doubles[%d]", i))
 		r := s.Scan()
 		if r != token.Double {
 			t.Errorf("Scan(%q) got %d want Double", n.s, r)
 		}
-		if s.double != n.n {
-			t.Errorf("Scan(%q).Double got %f want %f", n.s, s.double, n.n)
+		if s.Double != n.n {
+			t.Errorf("Scan(%q).Double got %f want %f", n.s, s.Double, n.n)
 		}
 	}
 
@@ -131,7 +133,7 @@ abcd -- identifier
 			{ret: token.EOF},
 		}
 
-		var s scanner
+		var s Scanner
 		s.Init(strings.NewReader(src), "src")
 		for i, e := range expected {
 			r := s.Scan()
@@ -140,15 +142,15 @@ abcd -- identifier
 			}
 			switch e.ret {
 			case token.Identifier:
-				if s.identifier != sql.QuotedID(e.s) {
+				if s.Identifier != sql.QuotedID(e.s) {
 					t.Errorf("%d Scan(%q) != sql.QuotedID(%q)", i, src, e.s)
 				}
 			case token.Reserved:
-				if s.identifier != e.id {
+				if s.Identifier != e.id {
 					t.Errorf("%d Scan(%q).Identifier != %d", i, src, e.id)
 				}
 			case token.String:
-				if s.string != e.s {
+				if s.String != e.s {
 					t.Errorf("%d Scan(%q).String != %q", i, src, e.s)
 				}
 			}

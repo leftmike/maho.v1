@@ -2,13 +2,14 @@ package parser_test
 
 import (
 	"fmt"
-	"maho/sql"
-	"maho/sql/parser"
-	"maho/sql/stmt"
 	"math"
 	"reflect"
 	"strings"
 	"testing"
+
+	"maho/parser"
+	"maho/sql"
+	"maho/sql/stmt"
 )
 
 func TestParse(t *testing.T) {
@@ -23,8 +24,7 @@ func TestParse(t *testing.T) {
 	}
 
 	for i, f := range failed {
-		var p parser.Parser
-		p.Init(strings.NewReader(f), fmt.Sprintf("failed[%d]", i))
+		p := parser.NewParser(strings.NewReader(f), fmt.Sprintf("failed[%d]", i))
 		stmt, err := p.Parse()
 		if stmt != nil || err == nil {
 			t.Errorf("Parse(%q) did not fail", f)
@@ -280,8 +280,7 @@ c2 boolean not null default true)`,
 	}
 
 	for i, c := range cases {
-		var p parser.Parser
-		p.Init(strings.NewReader(c.sql), fmt.Sprintf("tests[%d]", i))
+		p := parser.NewParser(strings.NewReader(c.sql), fmt.Sprintf("tests[%d]", i))
 		stmt, err := p.Parse()
 		if c.fail {
 			if err == nil {
@@ -364,8 +363,7 @@ func TestInsertValues(t *testing.T) {
 	}
 
 	for i, c := range cases {
-		var p parser.Parser
-		p.Init(strings.NewReader(c.sql), fmt.Sprintf("tests[%d]", i))
+		p := parser.NewParser(strings.NewReader(c.sql), fmt.Sprintf("tests[%d]", i))
 		stmt, err := p.Parse()
 		if c.fail {
 			if err == nil {
@@ -437,8 +435,7 @@ func TestParseExpr(t *testing.T) {
 	}
 
 	for i, c := range cases {
-		var p parser.Parser
-		p.Init(strings.NewReader(c.sql), fmt.Sprintf("cases[%d]", i))
+		p := parser.NewParser(strings.NewReader(c.sql), fmt.Sprintf("cases[%d]", i))
 		e, err := p.ParseExpr()
 		if err != nil {
 			t.Errorf("ParseExpr(%q) failed with %s", c.sql, err)
@@ -457,8 +454,7 @@ func TestParseExpr(t *testing.T) {
 	}
 
 	for i, f := range fails {
-		var p parser.Parser
-		p.Init(strings.NewReader(f), fmt.Sprintf("fails[%d]", i))
+		p := parser.NewParser(strings.NewReader(f), fmt.Sprintf("fails[%d]", i))
 		e, err := p.ParseExpr()
 		if err == nil {
 			t.Errorf("ParseExpr(%q) did not fail, got %s", f, e)
