@@ -1,4 +1,4 @@
-package engine
+package expr
 
 import (
 	"fmt"
@@ -10,12 +10,12 @@ type CompileContext interface {
 	Simplify() bool
 }
 
-func Compile(ctx CompileContext, e sql.Expr) (Expr, error) {
+func Compile(ctx CompileContext, e Expr) (CExpr, error) {
 	switch e := e.(type) {
-	case *sql.Literal:
-		return &literal{e.Value}, nil
-	case *sql.Unary:
-		if e.Op == sql.NoOp {
+	case *Literal:
+		return e, nil
+	case *Unary:
+		if e.Op == NoOp {
 			return Compile(ctx, e.Expr)
 		}
 		cf := opFuncs[e.Op]
@@ -23,8 +23,8 @@ func Compile(ctx CompileContext, e sql.Expr) (Expr, error) {
 		if err != nil {
 			return nil, err
 		}
-		return &call{cf, []Expr{a1}}, nil
-	case *sql.Binary:
+		return &call{cf, []CExpr{a1}}, nil
+	case *Binary:
 		cf := opFuncs[e.Op]
 		a1, err := Compile(ctx, e.Left)
 		if err != nil {
@@ -34,10 +34,10 @@ func Compile(ctx CompileContext, e sql.Expr) (Expr, error) {
 		if err != nil {
 			return nil, err
 		}
-		return &call{cf, []Expr{a1, a2}}, nil
-	case sql.Ref:
+		return &call{cf, []CExpr{a1, a2}}, nil
+	case Ref:
 		panic("ref not handled yet")
-	case *sql.Call:
+	case *Call:
 		cf, ok := idFuncs[e.Name]
 		if !ok {
 			return nil, fmt.Errorf("engine: function \"%s\" not found", e.Name)
@@ -51,7 +51,7 @@ func Compile(ctx CompileContext, e sql.Expr) (Expr, error) {
 				e.Name, cf.maxArgs, len(e.Args))
 		}
 
-		args := make([]Expr, len(e.Args))
+		args := make([]CExpr, len(e.Args))
 		for i, a := range e.Args {
 			var err error
 			args[i], err = Compile(ctx, a)
@@ -72,27 +72,27 @@ type callFunc struct {
 	name    string
 }
 
-var opFuncs = map[sql.Op]*callFunc{
-	sql.AddOp:          {addCall, 2, 2, ""},
-	sql.AndOp:          {andCall, 2, 2, ""},
-	sql.BinaryAndOp:    {binaryAndCall, 2, 2, ""},
-	sql.BinaryOrOp:     {binaryOrCall, 2, 2, ""},
-	sql.ConcatOp:       {concatCall, 2, 2, ""},
-	sql.DivideOp:       {divideCall, 2, 2, ""},
-	sql.EqualOp:        {equalCall, 2, 2, ""},
-	sql.GreaterEqualOp: {greaterEqualCall, 2, 2, ""},
-	sql.GreaterThanOp:  {greaterThanCall, 2, 2, ""},
-	sql.LessEqualOp:    {lessEqualCall, 2, 2, ""},
-	sql.LessThanOp:     {lessThanCall, 2, 2, ""},
-	sql.LShiftOp:       {lShiftCall, 2, 2, ""},
-	sql.ModuloOp:       {moduloCall, 2, 2, ""},
-	sql.MultiplyOp:     {multiplyCall, 2, 2, ""},
-	sql.NegateOp:       {negateCall, 1, 1, ""},
-	sql.NotEqualOp:     {notEqualCall, 2, 2, ""},
-	sql.NotOp:          {notCall, 1, 1, ""},
-	sql.OrOp:           {orCall, 2, 2, ""},
-	sql.RShiftOp:       {rShiftCall, 2, 2, ""},
-	sql.SubtractOp:     {subtractCall, 2, 2, ""},
+var opFuncs = map[Op]*callFunc{
+	AddOp:          {addCall, 2, 2, ""},
+	AndOp:          {andCall, 2, 2, ""},
+	BinaryAndOp:    {binaryAndCall, 2, 2, ""},
+	BinaryOrOp:     {binaryOrCall, 2, 2, ""},
+	ConcatOp:       {concatCall, 2, 2, ""},
+	DivideOp:       {divideCall, 2, 2, ""},
+	EqualOp:        {equalCall, 2, 2, ""},
+	GreaterEqualOp: {greaterEqualCall, 2, 2, ""},
+	GreaterThanOp:  {greaterThanCall, 2, 2, ""},
+	LessEqualOp:    {lessEqualCall, 2, 2, ""},
+	LessThanOp:     {lessThanCall, 2, 2, ""},
+	LShiftOp:       {lShiftCall, 2, 2, ""},
+	ModuloOp:       {moduloCall, 2, 2, ""},
+	MultiplyOp:     {multiplyCall, 2, 2, ""},
+	NegateOp:       {negateCall, 1, 1, ""},
+	NotEqualOp:     {notEqualCall, 2, 2, ""},
+	NotOp:          {notCall, 1, 1, ""},
+	OrOp:           {orCall, 2, 2, ""},
+	RShiftOp:       {rShiftCall, 2, 2, ""},
+	SubtractOp:     {subtractCall, 2, 2, ""},
 }
 
 var idFuncs = map[sql.Identifier]*callFunc{
@@ -103,7 +103,7 @@ var idFuncs = map[sql.Identifier]*callFunc{
 func init() {
 	for op, cf := range opFuncs {
 		cf.name = fmt.Sprintf("\"%s\"", op)
-		if op == sql.NegateOp || op == sql.NotOp {
+		if op == NegateOp || op == NotOp {
 			if cf.minArgs != 1 || cf.maxArgs != 1 {
 				panic(fmt.Sprintf("opFuncs[%s]: minArgs != 1 || maxArgs != 1", op))
 			}

@@ -1,11 +1,11 @@
-package engine_test
+package expr_test
 
 import (
 	"fmt"
 	"strings"
 	"testing"
 
-	. "maho/engine"
+	"maho/expr"
 	"maho/parser"
 	"maho/sql"
 )
@@ -157,9 +157,9 @@ func TestEval(t *testing.T) {
 			t.Errorf("ParseExpr(%q) failed with %s", c.s, err)
 			continue
 		}
-		r, err := Compile(nil, e)
+		r, err := expr.Compile(nil, e)
 		if err != nil {
-			t.Errorf("Compile(%q) failed with %s", c.s, err)
+			t.Errorf("expr.Compile(%q) failed with %s", c.s, err)
 			continue
 		}
 		v, err := r.Eval(nil)
@@ -291,9 +291,9 @@ func TestEval(t *testing.T) {
 			t.Errorf("ParseExpr(%q) failed with %s", f, err)
 			continue
 		}
-		r, err := Compile(nil, e)
+		r, err := expr.Compile(nil, e)
 		if err != nil {
-			t.Errorf("Compile(%q) failed with %s", f, err)
+			t.Errorf("expr.Compile(%q) failed with %s", f, err)
 			continue
 		}
 		v, err := r.Eval(nil)
@@ -321,9 +321,9 @@ func compareTest(t *testing.T, m, op, n string, b bool) {
 		t.Errorf("ParseExpr(%q) failed with %s", s, err)
 		return
 	}
-	r, err := Compile(nil, e)
+	r, err := expr.Compile(nil, e)
 	if err != nil {
-		t.Errorf("Compile(%q) failed with %s", s, err)
+		t.Errorf("expr.Compile(%q) failed with %s", s, err)
 		return
 	}
 	v, err := r.Eval(nil)

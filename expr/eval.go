@@ -1,4 +1,4 @@
-package engine
+package expr
 
 import (
 	"fmt"
@@ -8,24 +8,18 @@ import (
 type EvalContext interface {
 }
 
-type Expr interface {
+type CExpr interface {
 	fmt.Stringer
 	Eval(ctx EvalContext) (sql.Value, error)
 }
 
-type literal sql.Literal
-
-func (l *literal) String() string {
-	return sql.Format(l.Value)
-}
-
-func (l *literal) Eval(ctx EvalContext) (sql.Value, error) {
+func (l *Literal) Eval(ctx EvalContext) (sql.Value, error) {
 	return l.Value, nil
 }
 
 type call struct {
 	call *callFunc
-	args []Expr
+	args []CExpr
 }
 
 func (c *call) String() string {

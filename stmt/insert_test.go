@@ -5,7 +5,9 @@ import (
 	"testing"
 
 	"maho/engine"
+	"maho/expr"
 	"maho/parser"
+	"maho/row"
 	"maho/sql"
 	"maho/store"
 	"maho/store/test"
@@ -18,7 +20,7 @@ type insertCase struct {
 }
 
 var (
-	insertColumns1 = []sql.Column{
+	insertColumns1 = []row.Column{
 		{Name: sql.ID("c1"), Type: sql.BooleanType, Size: 1},
 		{Name: sql.ID("c2"), Type: sql.CharacterType, Size: 128},
 		{Name: sql.ID("c3"), Type: sql.DoubleType, Size: 8, Width: 255, Fraction: 30},
@@ -119,7 +121,7 @@ var (
 		},
 	}
 
-	insertColumns2 = []sql.Column{
+	insertColumns2 = []row.Column{
 		{Name: sql.ID("b1"), Type: sql.BooleanType, Size: 1},
 		{Name: sql.ID("b2"), Type: sql.BooleanType, Size: 1},
 		{Name: sql.ID("b3"), Type: sql.BooleanType, Size: 1},
@@ -138,12 +140,12 @@ var (
 		},
 	}
 
-	insertColumns3 = []sql.Column{
+	insertColumns3 = []row.Column{
 		{Name: sql.ID("c1"), Type: sql.IntegerType, Size: 4, Width: 255,
-			Default: &sql.Literal{int64(1)}},
+			Default: &expr.Literal{int64(1)}},
 		{Name: sql.ID("c2"), Type: sql.IntegerType, Size: 4, Width: 255, NotNull: true},
 		{Name: sql.ID("c3"), Type: sql.IntegerType, Size: 4, Width: 255,
-			Default: &sql.Literal{int64(3)}, NotNull: true},
+			Default: &expr.Literal{int64(3)}, NotNull: true},
 	}
 	insertCases3 = []insertCase{
 		{
@@ -191,7 +193,7 @@ func statement(e *engine.Engine, s string) error {
 }
 
 func testInsert(t *testing.T, e *engine.Engine, db store.Database, nam sql.Identifier,
-	cols []sql.Column, cases []insertCase) {
+	cols []row.Column, cases []insertCase) {
 
 	for _, c := range cases {
 		err := db.CreateTable(nam, cols)

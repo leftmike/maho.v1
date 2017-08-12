@@ -3,6 +3,8 @@ package basic
 import (
 	"fmt"
 	"io"
+
+	"maho/row"
 	"maho/sql"
 	"maho/store"
 )
@@ -16,13 +18,13 @@ type basicDatabase struct {
 
 type basicTable struct {
 	name      sql.Identifier
-	columns   []sql.Column
+	columns   []row.Column
 	columnMap store.ColumnMap
 	rows      [][]sql.Value
 }
 
 type basicRows struct {
-	columns []sql.Column
+	columns []row.Column
 	rows    [][]sql.Value
 	index   int
 }
@@ -46,7 +48,7 @@ func (bdb *basicDatabase) Type() sql.Identifier {
 	return sql.BASIC
 }
 
-func (bdb *basicDatabase) CreateTable(name sql.Identifier, cols []sql.Column) error {
+func (bdb *basicDatabase) CreateTable(name sql.Identifier, cols []row.Column) error {
 	if _, ok := bdb.tables[name]; ok {
 		return fmt.Errorf("basic: table \"%s\" already exists in database \"%s\"", name, bdb.name)
 	}
@@ -75,13 +77,13 @@ func (bdb *basicDatabase) Table(name sql.Identifier) (store.Table, error) {
 	return tbl, nil
 }
 
-func (bdb *basicDatabase) Tables() ([]sql.Identifier, [][]sql.Column) {
+func (bdb *basicDatabase) Tables() ([]sql.Identifier, [][]row.Column) {
 	names := make([]sql.Identifier, len(bdb.tables))
-	cols := make([][]sql.Column, len(bdb.tables))
+	cols := make([][]row.Column, len(bdb.tables))
 	i := 0
 	for _, tbl := range bdb.tables {
 		names[i] = tbl.name
-		cols[i] = make([]sql.Column, len(tbl.columns))
+		cols[i] = make([]row.Column, len(tbl.columns))
 		copy(cols[i], tbl.columns)
 		i += 1
 	}
@@ -92,7 +94,7 @@ func (bt *basicTable) Name() sql.Identifier {
 	return bt.name
 }
 
-func (bt *basicTable) Columns() []sql.Column {
+func (bt *basicTable) Columns() []row.Column {
 	return bt.columns
 }
 
@@ -109,7 +111,7 @@ func (bt *basicTable) Insert(row []sql.Value) error {
 	return nil
 }
 
-func (br *basicRows) Columns() []sql.Column {
+func (br *basicRows) Columns() []row.Column {
 	return br.columns
 }
 

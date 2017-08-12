@@ -1,8 +1,10 @@
-package sql_test
+package expr_test
 
 import (
-	. "maho/sql"
 	"testing"
+
+	. "maho/expr"
+	"maho/sql"
 )
 
 func TestExpr(t *testing.T) {
@@ -16,11 +18,11 @@ func TestExpr(t *testing.T) {
 				&Literal{456}},
 			s: "((- 123) / 456)"},
 		{
-			e: &Call{ID("abc"), []Expr{
+			e: &Call{sql.ID("abc"), []Expr{
 				&Unary{NegateOp, &Literal{123}},
 				&Literal{456},
 				&Binary{AddOp,
-					Ref{ID("def"), ID("ghi")},
+					Ref{sql.ID("def"), sql.ID("ghi")},
 					&Literal{789}}}},
 			s: "abc((- 123), 456, (def.ghi + 789))",
 		},

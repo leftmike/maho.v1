@@ -7,7 +7,9 @@ import (
 	"strings"
 	"testing"
 
+	"maho/expr"
 	"maho/parser"
+	"maho/row"
 	"maho/sql"
 	"maho/stmt"
 )
@@ -84,7 +86,7 @@ func TestCreateTable(t *testing.T) {
 			sql: "create table t (c1 tinyint, c2 smallint, c3 mediumint, c4 integer, c5 bigint)",
 			stmt: stmt.CreateTable{
 				Table: stmt.TableName{Table: sql.ID("t")},
-				Columns: []sql.Column{
+				Columns: []row.Column{
 					{Name: sql.ID("c1"), Type: sql.IntegerType, Size: 1, Width: 255},
 					{Name: sql.ID("c2"), Type: sql.IntegerType, Size: 2, Width: 255},
 					{Name: sql.ID("c3"), Type: sql.IntegerType, Size: 3, Width: 255},
@@ -97,7 +99,7 @@ func TestCreateTable(t *testing.T) {
 			sql: "create table t (c1 tinyint(1), c2 smallint(2), c3 mediumint(3), c4 integer(4))",
 			stmt: stmt.CreateTable{
 				Table: stmt.TableName{Table: sql.ID("t")},
-				Columns: []sql.Column{
+				Columns: []row.Column{
 					{Name: sql.ID("c1"), Type: sql.IntegerType, Size: 1, Width: 1},
 					{Name: sql.ID("c2"), Type: sql.IntegerType, Size: 2, Width: 2},
 					{Name: sql.ID("c3"), Type: sql.IntegerType, Size: 3, Width: 3},
@@ -109,7 +111,7 @@ func TestCreateTable(t *testing.T) {
 			sql: "create table t (b1 bool, b2 boolean, d1 double, d2 double)",
 			stmt: stmt.CreateTable{
 				Table: stmt.TableName{Table: sql.ID("t")},
-				Columns: []sql.Column{
+				Columns: []row.Column{
 					{Name: sql.ID("b1"), Type: sql.BooleanType, Size: 1},
 					{Name: sql.ID("b2"), Type: sql.BooleanType, Size: 1},
 					{Name: sql.ID("d1"), Type: sql.DoubleType, Size: 8, Width: 255, Fraction: 30},
@@ -121,7 +123,7 @@ func TestCreateTable(t *testing.T) {
 			sql: "create table t (d1 double(123,4), d2 double(12,3))",
 			stmt: stmt.CreateTable{
 				Table: stmt.TableName{Table: sql.ID("t")},
-				Columns: []sql.Column{
+				Columns: []row.Column{
 					{Name: sql.ID("d1"), Type: sql.DoubleType, Size: 8, Width: 123, Fraction: 4},
 					{Name: sql.ID("d2"), Type: sql.DoubleType, Size: 8, Width: 12, Fraction: 3},
 				},
@@ -131,7 +133,7 @@ func TestCreateTable(t *testing.T) {
 			sql: "create table t (b1 binary, b2 varbinary(123), b3 blob)",
 			stmt: stmt.CreateTable{
 				Table: stmt.TableName{Table: sql.ID("t")},
-				Columns: []sql.Column{
+				Columns: []row.Column{
 					{
 						Name:   sql.ID("b1"),
 						Type:   sql.CharacterType,
@@ -160,7 +162,7 @@ func TestCreateTable(t *testing.T) {
 			sql: "create table t (b1 binary(123), b2 varbinary(456), b3 blob(789))",
 			stmt: stmt.CreateTable{
 				Table: stmt.TableName{Table: sql.ID("t")},
-				Columns: []sql.Column{
+				Columns: []row.Column{
 					{
 						Name:   sql.ID("b1"),
 						Type:   sql.CharacterType,
@@ -189,7 +191,7 @@ func TestCreateTable(t *testing.T) {
 			sql: "create table t (c1 char, c2 varchar(123), c3 text)",
 			stmt: stmt.CreateTable{
 				Table: stmt.TableName{Table: sql.ID("t")},
-				Columns: []sql.Column{
+				Columns: []row.Column{
 					{Name: sql.ID("c1"), Type: sql.CharacterType, Fixed: true, Size: 1},
 					{Name: sql.ID("c2"), Type: sql.CharacterType, Fixed: false, Size: 123},
 					{
@@ -205,7 +207,7 @@ func TestCreateTable(t *testing.T) {
 			sql: "create table t (c1 char(123), c2 varchar(456), c3 text(789))",
 			stmt: stmt.CreateTable{
 				Table: stmt.TableName{Table: sql.ID("t")},
-				Columns: []sql.Column{
+				Columns: []row.Column{
 					{Name: sql.ID("c1"), Type: sql.CharacterType, Fixed: true, Size: 123},
 					{Name: sql.ID("c2"), Type: sql.CharacterType, Fixed: false, Size: 456},
 					{Name: sql.ID("c3"), Type: sql.CharacterType, Fixed: false, Size: 789},
@@ -216,7 +218,7 @@ func TestCreateTable(t *testing.T) {
 			sql: "create table t (b1 char binary, b2 varchar(123) binary, b3 text binary)",
 			stmt: stmt.CreateTable{
 				Table: stmt.TableName{Table: sql.ID("t")},
-				Columns: []sql.Column{
+				Columns: []row.Column{
 					{
 						Name:   sql.ID("b1"),
 						Type:   sql.CharacterType,
@@ -245,11 +247,11 @@ func TestCreateTable(t *testing.T) {
 			sql: "create table t (c1 varchar(64) default 'abcd', c2 int default 123)",
 			stmt: stmt.CreateTable{
 				Table: stmt.TableName{Table: sql.ID("t")},
-				Columns: []sql.Column{
+				Columns: []row.Column{
 					{Name: sql.ID("c1"), Type: sql.CharacterType, Fixed: false, Size: 64,
-						Default: &sql.Literal{"abcd"}},
+						Default: &expr.Literal{"abcd"}},
 					{Name: sql.ID("c2"), Type: sql.IntegerType, Size: 4, Width: 255,
-						Default: &sql.Literal{int64(123)}},
+						Default: &expr.Literal{int64(123)}},
 				},
 			},
 		},
@@ -257,9 +259,9 @@ func TestCreateTable(t *testing.T) {
 			sql: "create table t (c1 boolean default true, c2 boolean not null)",
 			stmt: stmt.CreateTable{
 				Table: stmt.TableName{Table: sql.ID("t")},
-				Columns: []sql.Column{
+				Columns: []row.Column{
 					{Name: sql.ID("c1"), Type: sql.BooleanType, Size: 1,
-						Default: &sql.Literal{true}},
+						Default: &expr.Literal{true}},
 					{Name: sql.ID("c2"), Type: sql.BooleanType, Size: 1, NotNull: true},
 				},
 			},
@@ -269,11 +271,11 @@ func TestCreateTable(t *testing.T) {
 c2 boolean not null default true)`,
 			stmt: stmt.CreateTable{
 				Table: stmt.TableName{Table: sql.ID("t")},
-				Columns: []sql.Column{
+				Columns: []row.Column{
 					{Name: sql.ID("c1"), Type: sql.BooleanType, Size: 1,
-						Default: &sql.Literal{true}, NotNull: true},
+						Default: &expr.Literal{true}, NotNull: true},
 					{Name: sql.ID("c2"), Type: sql.BooleanType, Size: 1,
-						Default: &sql.Literal{true}, NotNull: true},
+						Default: &expr.Literal{true}, NotNull: true},
 				},
 			},
 		},
@@ -336,8 +338,8 @@ func TestInsertValues(t *testing.T) {
 			sql: "insert into t values (1, 'abc', true)",
 			stmt: stmt.InsertValues{
 				Table: stmt.TableName{Table: sql.ID("t")},
-				Rows: [][]sql.Expr{
-					{&sql.Literal{int64(1)}, &sql.Literal{"abc"}, &sql.Literal{true}},
+				Rows: [][]expr.Expr{
+					{&expr.Literal{int64(1)}, &expr.Literal{"abc"}, &expr.Literal{true}},
 				},
 			},
 		},
@@ -345,9 +347,9 @@ func TestInsertValues(t *testing.T) {
 			sql: "insert into t values (1, 'abc', true), (2, 'def', false)",
 			stmt: stmt.InsertValues{
 				Table: stmt.TableName{Table: sql.ID("t")},
-				Rows: [][]sql.Expr{
-					{&sql.Literal{int64(1)}, &sql.Literal{"abc"}, &sql.Literal{true}},
-					{&sql.Literal{int64(2)}, &sql.Literal{"def"}, &sql.Literal{false}},
+				Rows: [][]expr.Expr{
+					{&expr.Literal{int64(1)}, &expr.Literal{"abc"}, &expr.Literal{true}},
+					{&expr.Literal{int64(2)}, &expr.Literal{"def"}, &expr.Literal{false}},
 				},
 			},
 		},
@@ -355,8 +357,8 @@ func TestInsertValues(t *testing.T) {
 			sql: "insert into t values (NULL, 'abc', NULL)",
 			stmt: stmt.InsertValues{
 				Table: stmt.TableName{Table: sql.ID("t")},
-				Rows: [][]sql.Expr{
-					{&sql.Literal{nil}, &sql.Literal{"abc"}, &sql.Literal{nil}},
+				Rows: [][]expr.Expr{
+					{&expr.Literal{nil}, &expr.Literal{"abc"}, &expr.Literal{nil}},
 				},
 			},
 		},

@@ -4,12 +4,13 @@ import (
 	"fmt"
 
 	"maho/engine"
+	"maho/row"
 	"maho/sql"
 )
 
 type CreateTable struct {
 	Table   TableName
-	Columns []sql.Column
+	Columns []row.Column
 }
 
 func (stmt *CreateTable) String() string {

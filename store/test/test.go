@@ -3,6 +3,8 @@ package test
 import (
 	"fmt"
 	"io"
+
+	"maho/row"
 	"maho/sql"
 	"maho/store"
 )
@@ -16,7 +18,7 @@ type testDatabase struct {
 
 type testTable struct {
 	name      sql.Identifier
-	columns   []sql.Column
+	columns   []row.Column
 	columnMap store.ColumnMap
 	rows      [][]sql.Value
 }
@@ -26,7 +28,7 @@ type AllRows interface {
 }
 
 type testRows struct {
-	columns []sql.Column
+	columns []row.Column
 	rows    [][]sql.Value
 	index   int
 }
@@ -50,7 +52,7 @@ func (tdb *testDatabase) Type() sql.Identifier {
 	return sql.ID("test")
 }
 
-func (tdb *testDatabase) CreateTable(name sql.Identifier, cols []sql.Column) error {
+func (tdb *testDatabase) CreateTable(name sql.Identifier, cols []row.Column) error {
 	if _, ok := tdb.tables[name]; ok {
 		return fmt.Errorf("test: table \"%s\" already exists in database \"%s\"", name, tdb.name)
 	}
@@ -79,13 +81,13 @@ func (tdb *testDatabase) Table(name sql.Identifier) (store.Table, error) {
 	return tbl, nil
 }
 
-func (tdb *testDatabase) Tables() ([]sql.Identifier, [][]sql.Column) {
+func (tdb *testDatabase) Tables() ([]sql.Identifier, [][]row.Column) {
 	names := make([]sql.Identifier, len(tdb.tables))
-	cols := make([][]sql.Column, len(tdb.tables))
+	cols := make([][]row.Column, len(tdb.tables))
 	i := 0
 	for _, tbl := range tdb.tables {
 		names[i] = tbl.name
-		cols[i] = make([]sql.Column, len(tbl.columns))
+		cols[i] = make([]row.Column, len(tbl.columns))
 		copy(cols[i], tbl.columns)
 		i += 1
 	}
@@ -96,7 +98,7 @@ func (tt *testTable) Name() sql.Identifier {
 	return tt.name
 }
 
-func (tt *testTable) Columns() []sql.Column {
+func (tt *testTable) Columns() []row.Column {
 	return tt.columns
 }
 
@@ -117,7 +119,7 @@ func (tt *testTable) AllRows() [][]sql.Value {
 	return tt.rows
 }
 
-func (tr *testRows) Columns() []sql.Column {
+func (tr *testRows) Columns() []row.Column {
 	return tr.columns
 }
 

@@ -1,15 +1,18 @@
-package sql
+package row
 
 import (
 	"fmt"
 	"math"
 	"strconv"
 	"strings"
+
+	"maho/expr"
+	"maho/sql"
 )
 
 type Column struct {
-	Name Identifier
-	Type DataType
+	Name sql.Identifier
+	Type sql.DataType
 
 	// Size of the column in bytes for integers and in characters for character columns
 	Size uint32
@@ -20,14 +23,14 @@ type Column struct {
 	Binary   bool  // binary character column
 
 	NotNull bool
-	Default Expr
+	Default expr.Expr
 }
 
 func (c Column) DataType() string {
 	switch c.Type {
-	case BooleanType:
+	case sql.BooleanType:
 		return "BOOL"
-	case CharacterType:
+	case sql.CharacterType:
 		if c.Binary {
 			if c.Fixed {
 				return fmt.Sprintf("BINARY(%d)", c.Size)
@@ -45,9 +48,9 @@ func (c Column) DataType() string {
 				return fmt.Sprintf("VARCHAR(%d)", c.Size)
 			}
 		}
-	case DoubleType:
+	case sql.DoubleType:
 		return "DOUBLE"
-	case IntegerType:
+	case sql.IntegerType:
 		switch c.Size {
 		case 1:
 			return "TINYINT"
@@ -64,7 +67,7 @@ func (c Column) DataType() string {
 	return ""
 }
 
-func (c Column) ConvertValue(v Value) (Value, error) {
+func (c Column) ConvertValue(v sql.Value) (sql.Value, error) {
 	if v == nil {
 		if c.NotNull {
 			return nil, fmt.Errorf("column may not be NULL: %s", c.Name)
@@ -73,7 +76,7 @@ func (c Column) ConvertValue(v Value) (Value, error) {
 	}
 
 	switch c.Type {
-	case BooleanType:
+	case sql.BooleanType:
 		if s, ok := v.(string); ok {
 			s = strings.Trim(s, " \t\n")
 			if s == "t" || s == "true" || s == "y" || s == "yes" || s == "on" || s == "1" {
@@ -86,7 +89,7 @@ func (c Column) ConvertValue(v Value) (Value, error) {
 		} else if _, ok := v.(bool); !ok {
 			return nil, fmt.Errorf("column: %s: expected a boolean value: %v", c.Name, v)
 		}
-	case CharacterType:
+	case sql.CharacterType:
 		if i, ok := v.(int64); ok {
 			return strconv.FormatInt(i, 10), nil
 		} else if f, ok := v.(float64); ok {
@@ -94,7 +97,7 @@ func (c Column) ConvertValue(v Value) (Value, error) {
 		} else if _, ok := v.(string); !ok {
 			return nil, fmt.Errorf("column: %s: expected a string value: %v", c.Name, v)
 		}
-	case DoubleType:
+	case sql.DoubleType:
 		if i, ok := v.(int64); ok {
 			return float64(i), nil
 		} else if s, ok := v.(string); ok {
@@ -107,7 +110,7 @@ func (c Column) ConvertValue(v Value) (Value, error) {
 		} else if _, ok := v.(float64); !ok {
 			return nil, fmt.Errorf("column: %s: expected a float value: %v", c.Name, v)
 		}
-	case IntegerType:
+	case sql.IntegerType:
 		if f, ok := v.(float64); ok {
 			return int64(f), nil
 		} else if s, ok := v.(string); ok {

@@ -1,7 +1,9 @@
-package sql
+package expr
 
 import (
 	"fmt"
+
+	"maho/sql"
 )
 
 type Op int
@@ -70,11 +72,11 @@ type Expr interface {
 }
 
 type Literal struct {
-	Value Value
+	Value sql.Value
 }
 
 func (l *Literal) String() string {
-	return Format(l.Value)
+	return sql.Format(l.Value)
 }
 
 type Unary struct {
@@ -99,7 +101,7 @@ func (b *Binary) String() string {
 	return fmt.Sprintf("(%s %s %s)", b.Left, ops[b.Op].name, b.Right)
 }
 
-type Ref []Identifier
+type Ref []sql.Identifier
 
 func (r Ref) String() string {
 	s := r[0].String()
@@ -110,7 +112,7 @@ func (r Ref) String() string {
 }
 
 type Call struct {
-	Name Identifier
+	Name sql.Identifier
 	Args []Expr
 }
 

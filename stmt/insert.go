@@ -4,13 +4,14 @@ import (
 	"fmt"
 
 	"maho/engine"
+	"maho/expr"
 	"maho/sql"
 )
 
 type InsertValues struct {
 	Table   TableName
 	Columns []sql.Identifier
-	Rows    [][]sql.Expr
+	Rows    [][]expr.Expr
 }
 
 func (stmt *InsertValues) String() string {
@@ -98,7 +99,7 @@ func (stmt *InsertValues) Execute(e *engine.Engine) (interface{}, error) {
 			}
 			var v sql.Value
 			if e != nil {
-				ce, err := engine.Compile(nil, e)
+				ce, err := expr.Compile(nil, e)
 				if err != nil {
 					return nil, err
 				}

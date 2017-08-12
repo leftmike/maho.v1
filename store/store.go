@@ -2,8 +2,10 @@ package store
 
 import (
 	"fmt"
-	"maho/sql"
 	"sync"
+
+	"maho/row"
+	"maho/sql"
 )
 
 type Store interface {
@@ -13,24 +15,24 @@ type Store interface {
 type Database interface {
 	Name() sql.Identifier
 	Type() sql.Identifier
-	CreateTable(name sql.Identifier, cols []sql.Column) error
+	CreateTable(name sql.Identifier, cols []row.Column) error
 	DropTable(name sql.Identifier) error
 	Table(name sql.Identifier) (Table, error)
-	Tables() ([]sql.Identifier, [][]sql.Column)
+	Tables() ([]sql.Identifier, [][]row.Column)
 }
 
 type ColumnMap map[sql.Identifier]int
 
 type Table interface {
 	Name() sql.Identifier
-	Columns() []sql.Column
+	Columns() []row.Column
 	ColumnMap() ColumnMap
 	Rows() (Rows, error)
 	Insert(row []sql.Value) error
 }
 
 type Rows interface {
-	Columns() []sql.Column
+	Columns() []row.Column
 	Close() error
 	Next(dest []sql.Value) error
 }

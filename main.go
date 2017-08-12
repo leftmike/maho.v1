@@ -11,15 +11,16 @@ To Do:
 - update t.Errorf to be "Operation(args) got %s want %s" and use %q for args
 - or "Operation(args) failed with %s" or "Operation(args) did not fail"
 - change AliasTableName to TableAlias (and the same for Columns)
+- does Column belong in row?
 
-maho/parser --> expr, sql, stmt
+maho/parser
 maho/parser/token
 maho/parser/scanner
 maho/engine
-- maho/expr --> sql
+maho/expr
 - maho/row
 maho/sql
-maho/stmt --> sql, expr
+maho/stmt
 maho/store
 */
 

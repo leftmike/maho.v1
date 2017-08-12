@@ -4,6 +4,7 @@ import (
 	"fmt"
 
 	"maho/engine"
+	"maho/expr"
 	"maho/sql"
 )
 
@@ -95,7 +96,7 @@ type AliasTableName struct {
 type Select struct {
 	Table   AliasTableName
 	Results []SelectResult
-	Where   sql.Expr
+	Where   expr.Expr
 }
 
 func (atn AliasTableName) String() string {

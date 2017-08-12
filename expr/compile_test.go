@@ -1,11 +1,11 @@
-package engine_test
+package expr_test
 
 import (
 	"fmt"
 	"strings"
 	"testing"
 
-	"maho/engine"
+	"maho/expr"
 	"maho/parser"
 	"maho/sql"
 )
@@ -27,12 +27,12 @@ func TestCompile(t *testing.T) {
 		if err != nil {
 			t.Errorf("ParseExpr(%q) failed with %s", c.s, err)
 		}
-		r, err := engine.Compile(nil, e)
+		r, err := expr.Compile(nil, e)
 		if err != nil {
-			t.Errorf("engine.Compile(%q) failed with %s", c.s, err)
+			t.Errorf("expr.Compile(%q) failed with %s", c.s, err)
 		}
 		if r.String() != c.r {
-			t.Errorf("engine.Compile(%q) got %s want %s", c.s, r, c.r)
+			t.Errorf("expr.Compile(%q) got %s want %s", c.s, r, c.r)
 		}
 	}
 
@@ -50,9 +50,9 @@ func TestCompile(t *testing.T) {
 		if err != nil {
 			t.Errorf("ParseExpr(%q) failed with %s", f, err)
 		}
-		r, err := engine.Compile(nil, e)
+		r, err := expr.Compile(nil, e)
 		if err == nil {
-			t.Errorf("engine.Compile(%q) did not fail, got %s", f, r)
+			t.Errorf("expr.Compile(%q) did not fail, got %s", f, r)
 		}
 	}
 }
