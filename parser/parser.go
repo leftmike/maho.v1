@@ -362,11 +362,12 @@ func (p *parser) parseCreateColumns(s *stmt.CreateTable) {
 
 	for {
 		nam := p.expectIdentifier("expected a column name")
-		for _, c := range s.Columns {
-			if c.Name == nam {
+		for _, col := range s.Columns {
+			if col == nam {
 				p.error(fmt.Sprintf("duplicate column name: %s", nam))
 			}
 		}
+		s.Columns = append(s.Columns, nam)
 
 		typ := p.expectIdentifier("expected a data type")
 		def, found := types[typ]
@@ -374,60 +375,59 @@ func (p *parser) parseCreateColumns(s *stmt.CreateTable) {
 			p.error(fmt.Sprintf("expected a data type got %s", typ))
 		}
 
-		col := def
-		col.Name = nam
+		ct := def
 
 		if typ == sql.VARCHAR || typ == sql.VARBINARY {
 			p.expectTokens(token.LParen)
-			col.Size = uint32(p.expectInteger(0, db.MaxColumnSize))
+			ct.Size = uint32(p.expectInteger(0, db.MaxColumnSize))
 			p.expectTokens(token.RParen)
 		} else {
-			switch col.Type {
+			switch ct.Type {
 			case sql.CharacterType:
 				if !p.maybeToken(token.LParen) {
 					break
 				}
-				col.Size = uint32(p.expectInteger(0, db.MaxColumnSize))
+				ct.Size = uint32(p.expectInteger(0, db.MaxColumnSize))
 				p.expectTokens(token.RParen)
 			case sql.DoubleType:
 				if !p.maybeToken(token.LParen) {
 					break
 				}
-				col.Width = uint8(p.expectInteger(1, 255))
+				ct.Width = uint8(p.expectInteger(1, 255))
 				p.expectTokens(token.Comma)
-				col.Fraction = uint8(p.expectInteger(0, 30))
+				ct.Fraction = uint8(p.expectInteger(0, 30))
 				p.expectTokens(token.RParen)
 			case sql.IntegerType:
 				if !p.maybeToken(token.LParen) {
 					break
 				}
-				col.Width = uint8(p.expectInteger(1, 255))
+				ct.Width = uint8(p.expectInteger(1, 255))
 				p.expectTokens(token.RParen)
 			}
 		}
 
-		if col.Type == sql.CharacterType && !col.Binary && p.maybeIdentifier(sql.BINARY) {
-			col.Binary = true
+		if ct.Type == sql.CharacterType && !ct.Binary && p.maybeIdentifier(sql.BINARY) {
+			ct.Binary = true
 		}
 
 		for {
 			if p.optionalReserved(sql.DEFAULT) {
-				if col.Default != nil {
+				if ct.Default != nil {
 					p.error("DEFAULT specified more than once per column")
 				}
-				col.Default = p.parseExpr()
+				ct.Default = p.parseExpr()
 			} else if p.optionalReserved(sql.NOT) {
 				p.expectReserved(sql.NULL)
-				if col.NotNull {
+				if ct.NotNull {
 					p.error("NOT NULL specified more than once per column")
 				}
-				col.NotNull = true
+				ct.NotNull = true
 			} else {
 				break
 			}
 		}
 
-		s.Columns = append(s.Columns, col)
+		s.ColumnTypes = append(s.ColumnTypes, ct)
 
 		r := p.expectTokens(token.Comma, token.RParen)
 		if r == token.RParen {

@@ -14,58 +14,65 @@ type engineDatabase struct {
 }
 
 type engineTable struct {
-	engine  *Engine
-	name    sql.Identifier
-	columns []db.ColumnType
+	engine      *Engine
+	name        sql.Identifier
+	columns     []sql.Identifier
+	columnTypes []db.ColumnType
 }
 
 var (
-	storesColumns = []db.ColumnType{
-		{Name: sql.QuotedID("store"), Type: sql.CharacterType, Size: sql.MaxIdentifier,
-			NotNull: true},
+	storesColumns     = []sql.Identifier{sql.QuotedID("store")}
+	storesColumnTypes = []db.ColumnType{
+		{Type: sql.CharacterType, Size: sql.MaxIdentifier, NotNull: true},
 	}
-	databasesColumns = []db.ColumnType{
-		{Name: sql.QuotedID("database"), Type: sql.CharacterType, Size: sql.MaxIdentifier,
-			NotNull: true},
-		{Name: sql.QuotedID("store"), Type: sql.CharacterType, Size: sql.MaxIdentifier,
-			NotNull: true},
+
+	databasesColumns     = []sql.Identifier{sql.QuotedID("database"), sql.QuotedID("store")}
+	databasesColumnTypes = []db.ColumnType{
+		{Type: sql.CharacterType, Size: sql.MaxIdentifier, NotNull: true},
+		{Type: sql.CharacterType, Size: sql.MaxIdentifier, NotNull: true},
 	}
-	tablesColumns = []db.ColumnType{
-		{Name: sql.QuotedID("database"), Type: sql.CharacterType, Size: sql.MaxIdentifier,
-			NotNull: true},
-		{Name: sql.QuotedID("table"), Type: sql.CharacterType, Size: sql.MaxIdentifier,
-			NotNull: true},
-		{Name: sql.QuotedID("num_columns"), Type: sql.IntegerType, Size: 4, NotNull: true},
+
+	tablesColumns = []sql.Identifier{sql.QuotedID("database"), sql.QuotedID("table"),
+		sql.QuotedID("num_columns")}
+	tablesColumnTypes = []db.ColumnType{
+		{Type: sql.CharacterType, Size: sql.MaxIdentifier, NotNull: true},
+		{Type: sql.CharacterType, Size: sql.MaxIdentifier, NotNull: true},
+		{Type: sql.IntegerType, Size: 4, NotNull: true},
 	}
-	columnsColumns = []db.ColumnType{
-		{Name: sql.QuotedID("database"), Type: sql.CharacterType, Size: sql.MaxIdentifier,
-			NotNull: true},
-		{Name: sql.QuotedID("table"), Type: sql.CharacterType, Size: sql.MaxIdentifier,
-			NotNull: true},
-		{Name: sql.QuotedID("column"), Type: sql.CharacterType, Size: sql.MaxIdentifier,
-			NotNull: true},
-		{Name: sql.QuotedID("type"), Type: sql.CharacterType, Size: sql.MaxIdentifier,
-			NotNull: true},
-		{Name: sql.QuotedID("size"), Type: sql.IntegerType, Size: 4, NotNull: true},
-		{Name: sql.QuotedID("width"), Type: sql.IntegerType, Size: 1, NotNull: true},
-		{Name: sql.QuotedID("fraction"), Type: sql.IntegerType, Size: 1, NotNull: true},
-		{Name: sql.QuotedID("fixed"), Type: sql.BooleanType, NotNull: true},
-		{Name: sql.QuotedID("binary"), Type: sql.BooleanType, NotNull: true},
-		{Name: sql.QuotedID("not_null"), Type: sql.BooleanType, NotNull: true},
-		{Name: sql.QuotedID("default"), Type: sql.CharacterType, Size: sql.MaxIdentifier},
+
+	columnsColumns = []sql.Identifier{sql.QuotedID("database"), sql.QuotedID("table"),
+		sql.QuotedID("column"), sql.QuotedID("type"), sql.QuotedID("size"), sql.QuotedID("width"),
+		sql.QuotedID("fraction"), sql.QuotedID("fixed"), sql.QuotedID("binary"),
+		sql.QuotedID("not_null"), sql.QuotedID("default")}
+
+	columnsColumnTypes = []db.ColumnType{
+		{Type: sql.CharacterType, Size: sql.MaxIdentifier, NotNull: true},
+		{Type: sql.CharacterType, Size: sql.MaxIdentifier, NotNull: true},
+		{Type: sql.CharacterType, Size: sql.MaxIdentifier, NotNull: true},
+		{Type: sql.CharacterType, Size: sql.MaxIdentifier, NotNull: true},
+		{Type: sql.IntegerType, Size: 4, NotNull: true},
+		{Type: sql.IntegerType, Size: 1, NotNull: true},
+		{Type: sql.IntegerType, Size: 1, NotNull: true},
+		{Type: sql.BooleanType, NotNull: true},
+		{Type: sql.BooleanType, NotNull: true},
+		{Type: sql.BooleanType, NotNull: true},
+		{Type: sql.CharacterType, Size: sql.MaxIdentifier},
 	}
-	identifiersColumns = []db.ColumnType{
-		{Name: sql.QuotedID("name"), Type: sql.CharacterType, Size: sql.MaxIdentifier,
-			NotNull: true},
-		{Name: sql.QuotedID("identifier"), Type: sql.IntegerType, Size: 4, NotNull: true},
-		{Name: sql.QuotedID("reserved"), Type: sql.BooleanType, NotNull: true},
+
+	identifiersColumns = []sql.Identifier{sql.QuotedID("name"), sql.QuotedID("identifier"),
+		sql.QuotedID("reserved")}
+	identifiersColumnTypes = []db.ColumnType{
+		{Type: sql.CharacterType, Size: sql.MaxIdentifier, NotNull: true},
+		{Type: sql.IntegerType, Size: 4, NotNull: true},
+		{Type: sql.BooleanType, NotNull: true},
 	}
 )
 
 type engineRows struct {
-	columns []db.ColumnType
-	rows    [][]sql.Value
-	index   int
+	columns     []sql.Identifier
+	columnTypes []db.ColumnType
+	rows        [][]sql.Value
+	index       int
 }
 
 func (edb *engineDatabase) Name() sql.Identifier {
@@ -76,7 +83,9 @@ func (edb *engineDatabase) Type() sql.Identifier {
 	return sql.ENGINE
 }
 
-func (edb *engineDatabase) CreateTable(name sql.Identifier, cols []db.ColumnType) error {
+func (edb *engineDatabase) CreateTable(name sql.Identifier, cols []sql.Identifier,
+	colTypes []db.ColumnType) error {
+
 	return fmt.Errorf("engine: \"%s\" database can't be modified", sql.ENGINE)
 }
 
@@ -85,38 +94,46 @@ func (edb *engineDatabase) DropTable(name sql.Identifier) error {
 }
 
 func (edb *engineDatabase) Table(name sql.Identifier) (db.Table, error) {
-	var cols []db.ColumnType
+	var cols []sql.Identifier
+	var colTypes []db.ColumnType
 
 	if name == sql.STORES {
 		cols = storesColumns
+		colTypes = storesColumnTypes
 	} else if name == sql.DATABASES {
 		cols = databasesColumns
+		colTypes = databasesColumnTypes
 	} else if name == sql.TABLES {
 		cols = tablesColumns
+		colTypes = tablesColumnTypes
 	} else if name == sql.COLUMNS {
 		cols = columnsColumns
+		colTypes = columnsColumnTypes
 	} else if name == sql.IDENTIFIERS {
 		cols = identifiersColumns
+		colTypes = identifiersColumnTypes
 	} else {
 		return nil, fmt.Errorf("engine: table \"%s\" not found in database \"%s\"", name,
 			sql.ENGINE)
 	}
 
-	return &engineTable{edb.engine, name, cols}, nil
+	return &engineTable{edb.engine, name, cols, colTypes}, nil
 }
 
-func (edb *engineDatabase) Tables() ([]sql.Identifier, [][]db.ColumnType) {
-	return []sql.Identifier{sql.STORES, sql.DATABASES, sql.TABLES, sql.COLUMNS, sql.IDENTIFIERS},
-		[][]db.ColumnType{storesColumns, databasesColumns, tablesColumns, columnsColumns,
-			identifiersColumns}
+func (edb *engineDatabase) Tables() []sql.Identifier {
+	return []sql.Identifier{sql.STORES, sql.DATABASES, sql.TABLES, sql.COLUMNS, sql.IDENTIFIERS}
 }
 
 func (et *engineTable) Name() sql.Identifier {
 	return et.name
 }
 
-func (et *engineTable) Columns() []db.ColumnType {
+func (et *engineTable) Columns() []sql.Identifier {
 	return et.columns
+}
+
+func (et *engineTable) ColumnTypes() []db.ColumnType {
+	return et.columnTypes
 }
 
 func (et *engineTable) Rows() (db.Rows, error) {
@@ -133,21 +150,29 @@ func (et *engineTable) Rows() (db.Rows, error) {
 			rows = append(rows, []sql.Value{s.Name(), s.Type()})
 		}
 	case sql.TABLES:
-		for _, s := range et.engine.databases {
-			names, cols := s.Tables()
-			for i := range names {
-				rows = append(rows, []sql.Value{s.Name(), names[i], len(cols[i])})
+		for _, dbase := range et.engine.databases {
+			names := dbase.Tables()
+			for _, n := range names {
+				tbl, err := dbase.Table(n)
+				if err != nil {
+					continue
+				}
+				rows = append(rows, []sql.Value{dbase.Name(), n, len(tbl.Columns())})
 			}
 		}
 	case sql.COLUMNS:
-		for _, s := range et.engine.databases {
-			names, cols := s.Tables()
-			for i := range names {
-				for _, col := range cols[i] {
+		for _, dbase := range et.engine.databases {
+			names := dbase.Tables()
+			for _, n := range names {
+				tbl, err := dbase.Table(n)
+				if err != nil {
+					continue
+				}
+				cols := tbl.Columns()
+				for i, ct := range tbl.ColumnTypes() {
 					rows = append(rows,
-						[]sql.Value{s.Name(), names[i], col.Name, col.Type.String(), col.Size,
-							col.Width, col.Fraction, col.Fixed, col.Binary, col.NotNull,
-							col.Default})
+						[]sql.Value{dbase.Name(), n, cols[i], ct.Type.String(), ct.Size, ct.Width,
+							ct.Fraction, ct.Fixed, ct.Binary, ct.NotNull, ct.Default})
 				}
 			}
 		}
@@ -157,15 +182,19 @@ func (et *engineTable) Rows() (db.Rows, error) {
 		}
 	}
 
-	return &engineRows{columns: et.columns, rows: rows}, nil
+	return &engineRows{columns: et.columns, columnTypes: et.columnTypes, rows: rows}, nil
 }
 
 func (et *engineTable) Insert(row []sql.Value) error {
 	return fmt.Errorf("engine: \"%s.%s\" table can't be modified", sql.ENGINE, et.name)
 }
 
-func (er *engineRows) Columns() []db.ColumnType {
+func (er *engineRows) Columns() []sql.Identifier {
 	return er.columns
+}
+
+func (er *engineRows) ColumnTypes() []db.ColumnType {
+	return er.columnTypes
 }
 
 func (er *engineRows) Close() error {

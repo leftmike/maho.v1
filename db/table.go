@@ -6,7 +6,8 @@ import (
 
 type Table interface {
 	Name() sql.Identifier
-	Columns() []ColumnType
+	Columns() []sql.Identifier
+	ColumnTypes() []ColumnType
 	Rows() (Rows, error)
 	Insert(row []sql.Value) error
 }

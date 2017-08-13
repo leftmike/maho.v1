@@ -20,11 +20,12 @@ type insertCase struct {
 }
 
 var (
-	insertColumns1 = []db.ColumnType{
-		{Name: sql.ID("c1"), Type: sql.BooleanType, Size: 1},
-		{Name: sql.ID("c2"), Type: sql.CharacterType, Size: 128},
-		{Name: sql.ID("c3"), Type: sql.DoubleType, Size: 8, Width: 255, Fraction: 30},
-		{Name: sql.ID("c4"), Type: sql.IntegerType, Size: 4, Width: 255},
+	insertColumns1     = []sql.Identifier{sql.ID("c1"), sql.ID("c2"), sql.ID("c3"), sql.ID("c4")}
+	insertColumnTypes1 = []db.ColumnType{
+		{Type: sql.BooleanType, Size: 1},
+		{Type: sql.CharacterType, Size: 128},
+		{Type: sql.DoubleType, Size: 8, Width: 255, Fraction: 30},
+		{Type: sql.IntegerType, Size: 4, Width: 255},
 	}
 	insertCases1 = []insertCase{
 		{
@@ -121,13 +122,15 @@ var (
 		},
 	}
 
-	insertColumns2 = []db.ColumnType{
-		{Name: sql.ID("b1"), Type: sql.BooleanType, Size: 1},
-		{Name: sql.ID("b2"), Type: sql.BooleanType, Size: 1},
-		{Name: sql.ID("b3"), Type: sql.BooleanType, Size: 1},
-		{Name: sql.ID("b4"), Type: sql.BooleanType, Size: 1},
-		{Name: sql.ID("b5"), Type: sql.BooleanType, Size: 1},
-		{Name: sql.ID("b6"), Type: sql.BooleanType, Size: 1},
+	insertColumns2 = []sql.Identifier{sql.ID("b1"), sql.ID("b2"), sql.ID("b3"), sql.ID("b4"),
+		sql.ID("b5"), sql.ID("b6")}
+	insertColumnTypes2 = []db.ColumnType{
+		{Type: sql.BooleanType, Size: 1},
+		{Type: sql.BooleanType, Size: 1},
+		{Type: sql.BooleanType, Size: 1},
+		{Type: sql.BooleanType, Size: 1},
+		{Type: sql.BooleanType, Size: 1},
+		{Type: sql.BooleanType, Size: 1},
 	}
 	insertCases2 = []insertCase{
 		{
@@ -140,12 +143,12 @@ var (
 		},
 	}
 
-	insertColumns3 = []db.ColumnType{
-		{Name: sql.ID("c1"), Type: sql.IntegerType, Size: 4, Width: 255,
-			Default: &expr.Literal{int64(1)}},
-		{Name: sql.ID("c2"), Type: sql.IntegerType, Size: 4, Width: 255, NotNull: true},
-		{Name: sql.ID("c3"), Type: sql.IntegerType, Size: 4, Width: 255,
-			Default: &expr.Literal{int64(3)}, NotNull: true},
+	insertColumns3     = []sql.Identifier{sql.ID("c1"), sql.ID("c2"), sql.ID("c3")}
+	insertColumnTypes3 = []db.ColumnType{
+		{Type: sql.IntegerType, Size: 4, Width: 255, Default: &expr.Literal{int64(1)}},
+		{Type: sql.IntegerType, Size: 4, Width: 255, NotNull: true},
+		{Type: sql.IntegerType, Size: 4, Width: 255, Default: &expr.Literal{int64(3)},
+			NotNull: true},
 	}
 	insertCases3 = []insertCase{
 		{
@@ -177,9 +180,9 @@ func TestInsert(t *testing.T) {
 		t.Error(err)
 	}
 
-	testInsert(t, e, db, sql.ID("t"), insertColumns1, insertCases1)
-	testInsert(t, e, db, sql.ID("t2"), insertColumns2, insertCases2)
-	testInsert(t, e, db, sql.ID("t3"), insertColumns3, insertCases3)
+	testInsert(t, e, db, sql.ID("t"), insertColumns1, insertColumnTypes1, insertCases1)
+	testInsert(t, e, db, sql.ID("t2"), insertColumns2, insertColumnTypes2, insertCases2)
+	testInsert(t, e, db, sql.ID("t3"), insertColumns3, insertColumnTypes3, insertCases3)
 }
 
 func statement(e *engine.Engine, s string) error {
@@ -193,10 +196,10 @@ func statement(e *engine.Engine, s string) error {
 }
 
 func testInsert(t *testing.T, e *engine.Engine, dbase db.Database, nam sql.Identifier,
-	cols []db.ColumnType, cases []insertCase) {
+	cols []sql.Identifier, colTypes []db.ColumnType, cases []insertCase) {
 
 	for _, c := range cases {
-		err := dbase.CreateTable(nam, cols)
+		err := dbase.CreateTable(nam, cols, colTypes)
 		if err != nil {
 			t.Error(err)
 			return

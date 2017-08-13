@@ -5,7 +5,12 @@ import (
 )
 
 type Rows interface {
-	Columns() []ColumnType
+	Columns() []sql.Identifier
 	Close() error
 	Next(dest []sql.Value) error
+}
+
+type RowsColumnType interface {
+	Rows
+	ColumnTypes() []ColumnType
 }

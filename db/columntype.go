@@ -15,7 +15,6 @@ const (
 )
 
 type ColumnType struct {
-	Name sql.Identifier
 	Type sql.DataType
 
 	// Size of the column in bytes for integers and in characters for character columns
@@ -71,10 +70,10 @@ func (ct ColumnType) DataType() string {
 	return ""
 }
 
-func (ct ColumnType) ConvertValue(v sql.Value) (sql.Value, error) {
+func (ct ColumnType) ConvertValue(n sql.Identifier, v sql.Value) (sql.Value, error) {
 	if v == nil {
 		if ct.NotNull {
-			return nil, fmt.Errorf("column may not be NULL: %s", ct.Name)
+			return nil, fmt.Errorf("column may not be NULL: %s", n)
 		}
 		return nil, nil
 	}
@@ -88,10 +87,10 @@ func (ct ColumnType) ConvertValue(v sql.Value) (sql.Value, error) {
 			} else if s == "f" || s == "false" || s == "n" || s == "no" || s == "off" || s == "0" {
 				return false, nil
 			} else {
-				return nil, fmt.Errorf("column: %s: expected a boolean value: %v", ct.Name, v)
+				return nil, fmt.Errorf("column: %s: expected a boolean value: %v", n, v)
 			}
 		} else if _, ok := v.(bool); !ok {
-			return nil, fmt.Errorf("column: %s: expected a boolean value: %v", ct.Name, v)
+			return nil, fmt.Errorf("column: %s: expected a boolean value: %v", n, v)
 		}
 	case sql.CharacterType:
 		if i, ok := v.(int64); ok {
@@ -99,7 +98,7 @@ func (ct ColumnType) ConvertValue(v sql.Value) (sql.Value, error) {
 		} else if f, ok := v.(float64); ok {
 			return strconv.FormatFloat(f, 'g', -1, 64), nil
 		} else if _, ok := v.(string); !ok {
-			return nil, fmt.Errorf("column: %s: expected a string value: %v", ct.Name, v)
+			return nil, fmt.Errorf("column: %s: expected a string value: %v", n, v)
 		}
 	case sql.DoubleType:
 		if i, ok := v.(int64); ok {
@@ -107,12 +106,12 @@ func (ct ColumnType) ConvertValue(v sql.Value) (sql.Value, error) {
 		} else if s, ok := v.(string); ok {
 			d, err := strconv.ParseFloat(strings.Trim(s, " \t\n"), 64)
 			if err != nil {
-				return nil, fmt.Errorf("column: %s: expected a float: %v: %s", ct.Name, v,
+				return nil, fmt.Errorf("column: %s: expected a float: %v: %s", n, v,
 					err.Error())
 			}
 			return d, nil
 		} else if _, ok := v.(float64); !ok {
-			return nil, fmt.Errorf("column: %s: expected a float value: %v", ct.Name, v)
+			return nil, fmt.Errorf("column: %s: expected a float value: %v", n, v)
 		}
 	case sql.IntegerType:
 		if f, ok := v.(float64); ok {
@@ -120,12 +119,12 @@ func (ct ColumnType) ConvertValue(v sql.Value) (sql.Value, error) {
 		} else if s, ok := v.(string); ok {
 			i, err := strconv.ParseInt(strings.Trim(s, " \t\n"), 10, 64)
 			if err != nil {
-				return nil, fmt.Errorf("column: %s: expected an integer: %v: %s", ct.Name, v,
+				return nil, fmt.Errorf("column: %s: expected an integer: %v: %s", n, v,
 					err.Error())
 			}
 			return i, nil
 		} else if _, ok := v.(int64); !ok {
-			return nil, fmt.Errorf("column: %s: expected an integer value: %v", ct.Name, v)
+			return nil, fmt.Errorf("column: %s: expected an integer value: %v", n, v)
 		}
 	}
 

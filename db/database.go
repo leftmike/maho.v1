@@ -7,8 +7,8 @@ import (
 type Database interface {
 	Name() sql.Identifier
 	Type() sql.Identifier
-	CreateTable(name sql.Identifier, cols []ColumnType) error
+	CreateTable(name sql.Identifier, cols []sql.Identifier, colTypes []ColumnType) error
 	DropTable(name sql.Identifier) error
 	Table(name sql.Identifier) (Table, error)
-	Tables() ([]sql.Identifier, [][]ColumnType)
+	Tables() []sql.Identifier
 }

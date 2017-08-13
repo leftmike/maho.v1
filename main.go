@@ -11,11 +11,8 @@ To Do:
 
 - change AliasTableName to TableAlias (and the same for Columns)
 - split out display info from ColumnType
-- ColumnType: remove Name and store separately
 - db.TableInsert
 - db.DatabaseModify
-- db.Rows: Columns() []sql.Identifier, Next, Close
-- db.RowsColumnType: Rows, ColumnType(idx int) (ColumnType, error)
 */
 
 import (
@@ -57,11 +54,11 @@ func parse(e *engine.Engine, p parser.Parser, w io.Writer) {
 			cols := rows.Columns()
 			fmt.Fprint(w, "\t")
 			for _, col := range cols {
-				fmt.Fprintf(w, "%s\t", col.Name)
+				fmt.Fprintf(w, "%s\t", col)
 			}
 			fmt.Fprint(w, "\n\t")
 			for _, col := range cols {
-				fmt.Fprintf(w, "%s\t", strings.Repeat("-", len(col.Name.String())))
+				fmt.Fprintf(w, "%s\t", strings.Repeat("-", len(col.String())))
 
 			}
 			fmt.Fprintln(w)

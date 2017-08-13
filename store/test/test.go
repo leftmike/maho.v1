@@ -17,9 +17,10 @@ type testDatabase struct {
 }
 
 type testTable struct {
-	name    sql.Identifier
-	columns []db.ColumnType
-	rows    [][]sql.Value
+	name        sql.Identifier
+	columns     []sql.Identifier
+	columnTypes []db.ColumnType
+	rows        [][]sql.Value
 }
 
 type AllRows interface {
@@ -27,9 +28,10 @@ type AllRows interface {
 }
 
 type testRows struct {
-	columns []db.ColumnType
-	rows    [][]sql.Value
-	index   int
+	columns     []sql.Identifier
+	columnTypes []db.ColumnType
+	rows        [][]sql.Value
+	index       int
 }
 
 func (ts testStore) Open(name string) (db.Database, error) {
@@ -51,11 +53,14 @@ func (tdb *testDatabase) Type() sql.Identifier {
 	return sql.ID("test")
 }
 
-func (tdb *testDatabase) CreateTable(name sql.Identifier, cols []db.ColumnType) error {
+func (tdb *testDatabase) CreateTable(name sql.Identifier, cols []sql.Identifier,
+	colTypes []db.ColumnType) error {
+
 	if _, ok := tdb.tables[name]; ok {
 		return fmt.Errorf("test: table \"%s\" already exists in database \"%s\"", name, tdb.name)
 	}
-	tbl := testTable{name, cols, nil}
+
+	tbl := testTable{name, cols, colTypes, nil}
 	tdb.tables[name] = &tbl
 	return nil
 }
@@ -76,29 +81,30 @@ func (tdb *testDatabase) Table(name sql.Identifier) (db.Table, error) {
 	return tbl, nil
 }
 
-func (tdb *testDatabase) Tables() ([]sql.Identifier, [][]db.ColumnType) {
+func (tdb *testDatabase) Tables() []sql.Identifier {
 	names := make([]sql.Identifier, len(tdb.tables))
-	cols := make([][]db.ColumnType, len(tdb.tables))
 	i := 0
 	for _, tbl := range tdb.tables {
 		names[i] = tbl.name
-		cols[i] = make([]db.ColumnType, len(tbl.columns))
-		copy(cols[i], tbl.columns)
 		i += 1
 	}
-	return names, cols
+	return names
 }
 
 func (tt *testTable) Name() sql.Identifier {
 	return tt.name
 }
 
-func (tt *testTable) Columns() []db.ColumnType {
+func (tt *testTable) Columns() []sql.Identifier {
 	return tt.columns
 }
 
+func (tt *testTable) ColumnTypes() []db.ColumnType {
+	return tt.columnTypes
+}
+
 func (tt *testTable) Rows() (db.Rows, error) {
-	return &testRows{columns: tt.columns, rows: tt.rows}, nil
+	return &testRows{columns: tt.columns, columnTypes: tt.columnTypes, rows: tt.rows}, nil
 }
 
 func (tt *testTable) Insert(row []sql.Value) error {
@@ -110,8 +116,12 @@ func (tt *testTable) AllRows() [][]sql.Value {
 	return tt.rows
 }
 
-func (tr *testRows) Columns() []db.ColumnType {
+func (tr *testRows) Columns() []sql.Identifier {
 	return tr.columns
+}
+
+func (tr *testRows) ColumnTypes() []db.ColumnType {
+	return tr.columnTypes
 }
 
 func (tr *testRows) Close() error {

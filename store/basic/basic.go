@@ -17,15 +17,17 @@ type basicDatabase struct {
 }
 
 type basicTable struct {
-	name    sql.Identifier
-	columns []db.ColumnType
-	rows    [][]sql.Value
+	name        sql.Identifier
+	columns     []sql.Identifier
+	columnTypes []db.ColumnType
+	rows        [][]sql.Value
 }
 
 type basicRows struct {
-	columns []db.ColumnType
-	rows    [][]sql.Value
-	index   int
+	columns     []sql.Identifier
+	columnTypes []db.ColumnType
+	rows        [][]sql.Value
+	index       int
 }
 
 func (bs basicStore) Open(name string) (db.Database, error) {
@@ -47,11 +49,13 @@ func (bdb *basicDatabase) Type() sql.Identifier {
 	return sql.BASIC
 }
 
-func (bdb *basicDatabase) CreateTable(name sql.Identifier, cols []db.ColumnType) error {
+func (bdb *basicDatabase) CreateTable(name sql.Identifier, cols []sql.Identifier,
+	colTypes []db.ColumnType) error {
+
 	if _, ok := bdb.tables[name]; ok {
 		return fmt.Errorf("basic: table \"%s\" already exists in database \"%s\"", name, bdb.name)
 	}
-	tbl := basicTable{name, cols, nil}
+	tbl := basicTable{name, cols, colTypes, nil}
 	bdb.tables[name] = &tbl
 	return nil
 }
@@ -72,29 +76,30 @@ func (bdb *basicDatabase) Table(name sql.Identifier) (db.Table, error) {
 	return tbl, nil
 }
 
-func (bdb *basicDatabase) Tables() ([]sql.Identifier, [][]db.ColumnType) {
+func (bdb *basicDatabase) Tables() []sql.Identifier {
 	names := make([]sql.Identifier, len(bdb.tables))
-	cols := make([][]db.ColumnType, len(bdb.tables))
 	i := 0
 	for _, tbl := range bdb.tables {
 		names[i] = tbl.name
-		cols[i] = make([]db.ColumnType, len(tbl.columns))
-		copy(cols[i], tbl.columns)
 		i += 1
 	}
-	return names, cols
+	return names
 }
 
 func (bt *basicTable) Name() sql.Identifier {
 	return bt.name
 }
 
-func (bt *basicTable) Columns() []db.ColumnType {
+func (bt *basicTable) Columns() []sql.Identifier {
 	return bt.columns
 }
 
+func (bt *basicTable) ColumnTypes() []db.ColumnType {
+	return bt.columnTypes
+}
+
 func (bt *basicTable) Rows() (db.Rows, error) {
-	return &basicRows{columns: bt.columns, rows: bt.rows}, nil
+	return &basicRows{columns: bt.columns, columnTypes: bt.columnTypes, rows: bt.rows}, nil
 }
 
 func (bt *basicTable) Insert(row []sql.Value) error {
@@ -102,8 +107,12 @@ func (bt *basicTable) Insert(row []sql.Value) error {
 	return nil
 }
 
-func (br *basicRows) Columns() []db.ColumnType {
+func (br *basicRows) Columns() []sql.Identifier {
 	return br.columns
+}
+
+func (br *basicRows) ColumnTypes() []db.ColumnType {
+	return br.columnTypes
 }
 
 func (br *basicRows) Close() error {

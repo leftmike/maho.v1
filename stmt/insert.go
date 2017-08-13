@@ -62,6 +62,7 @@ func (stmt *InsertValues) Execute(e *engine.Engine) (interface{}, error) {
 	}
 
 	cols := tbl.Columns()
+	colTypes := tbl.ColumnTypes()
 	mv := len(cols)
 	c2v := make([]int, mv) // column number to value number
 	if stmt.Columns == nil {
@@ -74,8 +75,8 @@ func (stmt *InsertValues) Execute(e *engine.Engine) (interface{}, error) {
 		}
 
 		var cmap = make(map[sql.Identifier]int)
-		for i, ct := range tbl.Columns() {
-			cmap[ct.Name] = i
+		for i, cn := range cols {
+			cmap[cn] = i
 		}
 
 		mv = len(stmt.Columns)
@@ -93,7 +94,7 @@ func (stmt *InsertValues) Execute(e *engine.Engine) (interface{}, error) {
 			return nil, fmt.Errorf("engine: %s: too many values", tbl.Name())
 		}
 		row := make([]sql.Value, len(cols))
-		for i, c := range cols {
+		for i, c := range colTypes {
 			e := c.Default
 			if c2v[i] < len(r) {
 				e = r[c2v[i]]
@@ -113,7 +114,7 @@ func (stmt *InsertValues) Execute(e *engine.Engine) (interface{}, error) {
 				}
 			}
 
-			row[i], err = c.ConvertValue(v)
+			row[i], err = c.ConvertValue(cols[i], v)
 			if err != nil {
 				return nil, fmt.Errorf("%s: %s", tbl.Name(), err.Error())
 			}
