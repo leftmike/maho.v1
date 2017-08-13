@@ -1,4 +1,4 @@
-package row
+package db
 
 import (
 	"fmt"
@@ -10,7 +10,7 @@ import (
 	"maho/sql"
 )
 
-type Column struct {
+type ColumnType struct {
 	Name sql.Identifier
 	Type sql.DataType
 
@@ -22,36 +22,36 @@ type Column struct {
 	Fixed    bool  // fixed sized character column
 	Binary   bool  // binary character column
 
-	NotNull bool
+	NotNull bool // not allowed to be NULL
 	Default expr.Expr
 }
 
-func (c Column) DataType() string {
-	switch c.Type {
+func (ct ColumnType) DataType() string {
+	switch ct.Type {
 	case sql.BooleanType:
 		return "BOOL"
 	case sql.CharacterType:
-		if c.Binary {
-			if c.Fixed {
-				return fmt.Sprintf("BINARY(%d)", c.Size)
-			} else if c.Size == math.MaxUint32-1 {
+		if ct.Binary {
+			if ct.Fixed {
+				return fmt.Sprintf("BINARY(%d)", ct.Size)
+			} else if ct.Size == math.MaxUint32-1 {
 				return "BLOB"
 			} else {
-				return fmt.Sprintf("VARBINARY(%d)", c.Size)
+				return fmt.Sprintf("VARBINARY(%d)", ct.Size)
 			}
 		} else {
-			if c.Fixed {
-				return fmt.Sprintf("CHAR(%d)", c.Size)
-			} else if c.Size == math.MaxUint32-1 {
+			if ct.Fixed {
+				return fmt.Sprintf("CHAR(%d)", ct.Size)
+			} else if ct.Size == math.MaxUint32-1 {
 				return "TEXT"
 			} else {
-				return fmt.Sprintf("VARCHAR(%d)", c.Size)
+				return fmt.Sprintf("VARCHAR(%d)", ct.Size)
 			}
 		}
 	case sql.DoubleType:
 		return "DOUBLE"
 	case sql.IntegerType:
-		switch c.Size {
+		switch ct.Size {
 		case 1:
 			return "TINYINT"
 		case 2:
@@ -67,15 +67,15 @@ func (c Column) DataType() string {
 	return ""
 }
 
-func (c Column) ConvertValue(v sql.Value) (sql.Value, error) {
+func (ct ColumnType) ConvertValue(v sql.Value) (sql.Value, error) {
 	if v == nil {
-		if c.NotNull {
-			return nil, fmt.Errorf("column may not be NULL: %s", c.Name)
+		if ct.NotNull {
+			return nil, fmt.Errorf("column may not be NULL: %s", ct.Name)
 		}
 		return nil, nil
 	}
 
-	switch c.Type {
+	switch ct.Type {
 	case sql.BooleanType:
 		if s, ok := v.(string); ok {
 			s = strings.Trim(s, " \t\n")
@@ -84,10 +84,10 @@ func (c Column) ConvertValue(v sql.Value) (sql.Value, error) {
 			} else if s == "f" || s == "false" || s == "n" || s == "no" || s == "off" || s == "0" {
 				return false, nil
 			} else {
-				return nil, fmt.Errorf("column: %s: expected a boolean value: %v", c.Name, v)
+				return nil, fmt.Errorf("column: %s: expected a boolean value: %v", ct.Name, v)
 			}
 		} else if _, ok := v.(bool); !ok {
-			return nil, fmt.Errorf("column: %s: expected a boolean value: %v", c.Name, v)
+			return nil, fmt.Errorf("column: %s: expected a boolean value: %v", ct.Name, v)
 		}
 	case sql.CharacterType:
 		if i, ok := v.(int64); ok {
@@ -95,7 +95,7 @@ func (c Column) ConvertValue(v sql.Value) (sql.Value, error) {
 		} else if f, ok := v.(float64); ok {
 			return strconv.FormatFloat(f, 'g', -1, 64), nil
 		} else if _, ok := v.(string); !ok {
-			return nil, fmt.Errorf("column: %s: expected a string value: %v", c.Name, v)
+			return nil, fmt.Errorf("column: %s: expected a string value: %v", ct.Name, v)
 		}
 	case sql.DoubleType:
 		if i, ok := v.(int64); ok {
@@ -103,12 +103,12 @@ func (c Column) ConvertValue(v sql.Value) (sql.Value, error) {
 		} else if s, ok := v.(string); ok {
 			d, err := strconv.ParseFloat(strings.Trim(s, " \t\n"), 64)
 			if err != nil {
-				return nil, fmt.Errorf("column: %s: expected a float: %v: %s", c.Name, v,
+				return nil, fmt.Errorf("column: %s: expected a float: %v: %s", ct.Name, v,
 					err.Error())
 			}
 			return d, nil
 		} else if _, ok := v.(float64); !ok {
-			return nil, fmt.Errorf("column: %s: expected a float value: %v", c.Name, v)
+			return nil, fmt.Errorf("column: %s: expected a float value: %v", ct.Name, v)
 		}
 	case sql.IntegerType:
 		if f, ok := v.(float64); ok {
@@ -116,12 +116,12 @@ func (c Column) ConvertValue(v sql.Value) (sql.Value, error) {
 		} else if s, ok := v.(string); ok {
 			i, err := strconv.ParseInt(strings.Trim(s, " \t\n"), 10, 64)
 			if err != nil {
-				return nil, fmt.Errorf("column: %s: expected an integer: %v: %s", c.Name, v,
+				return nil, fmt.Errorf("column: %s: expected an integer: %v: %s", ct.Name, v,
 					err.Error())
 			}
 			return i, nil
 		} else if _, ok := v.(int64); !ok {
-			return nil, fmt.Errorf("column: %s: expected an integer value: %v", c.Name, v)
+			return nil, fmt.Errorf("column: %s: expected an integer value: %v", ct.Name, v)
 		}
 	}
 

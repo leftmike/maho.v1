@@ -4,7 +4,7 @@ import (
 	"fmt"
 	"io"
 
-	"maho/row"
+	"maho/db"
 	"maho/sql"
 	"maho/store"
 )
@@ -16,29 +16,29 @@ type engineDatabase struct {
 type engineTable struct {
 	engine    *Engine
 	name      sql.Identifier
-	columns   []row.Column
-	columnMap store.ColumnMap
+	columns   []db.ColumnType
+	columnMap db.ColumnMap
 }
 
 var (
-	storesColumns = []row.Column{
+	storesColumns = []db.ColumnType{
 		{Name: sql.QuotedID("store"), Type: sql.CharacterType, Size: sql.MaxIdentifier,
 			NotNull: true},
 	}
-	databasesColumns = []row.Column{
+	databasesColumns = []db.ColumnType{
 		{Name: sql.QuotedID("database"), Type: sql.CharacterType, Size: sql.MaxIdentifier,
 			NotNull: true},
 		{Name: sql.QuotedID("store"), Type: sql.CharacterType, Size: sql.MaxIdentifier,
 			NotNull: true},
 	}
-	tablesColumns = []row.Column{
+	tablesColumns = []db.ColumnType{
 		{Name: sql.QuotedID("database"), Type: sql.CharacterType, Size: sql.MaxIdentifier,
 			NotNull: true},
 		{Name: sql.QuotedID("table"), Type: sql.CharacterType, Size: sql.MaxIdentifier,
 			NotNull: true},
 		{Name: sql.QuotedID("num_columns"), Type: sql.IntegerType, Size: 4, NotNull: true},
 	}
-	columnsColumns = []row.Column{
+	columnsColumns = []db.ColumnType{
 		{Name: sql.QuotedID("database"), Type: sql.CharacterType, Size: sql.MaxIdentifier,
 			NotNull: true},
 		{Name: sql.QuotedID("table"), Type: sql.CharacterType, Size: sql.MaxIdentifier,
@@ -55,7 +55,7 @@ var (
 		{Name: sql.QuotedID("not_null"), Type: sql.BooleanType, NotNull: true},
 		{Name: sql.QuotedID("default"), Type: sql.CharacterType, Size: sql.MaxIdentifier},
 	}
-	identifiersColumns = []row.Column{
+	identifiersColumns = []db.ColumnType{
 		{Name: sql.QuotedID("name"), Type: sql.CharacterType, Size: sql.MaxIdentifier,
 			NotNull: true},
 		{Name: sql.QuotedID("identifier"), Type: sql.IntegerType, Size: 4, NotNull: true},
@@ -64,7 +64,7 @@ var (
 )
 
 type engineRows struct {
-	columns []row.Column
+	columns []db.ColumnType
 	rows    [][]sql.Value
 	index   int
 }
@@ -77,7 +77,7 @@ func (edb *engineDatabase) Type() sql.Identifier {
 	return sql.ENGINE
 }
 
-func (edb *engineDatabase) CreateTable(name sql.Identifier, cols []row.Column) error {
+func (edb *engineDatabase) CreateTable(name sql.Identifier, cols []db.ColumnType) error {
 	return fmt.Errorf("engine: \"%s\" database can't be modified", sql.ENGINE)
 }
 
@@ -85,8 +85,8 @@ func (edb *engineDatabase) DropTable(name sql.Identifier) error {
 	return fmt.Errorf("engine: \"%s\" database can't be modified", sql.ENGINE)
 }
 
-func (edb *engineDatabase) Table(name sql.Identifier) (store.Table, error) {
-	var cols []row.Column
+func (edb *engineDatabase) Table(name sql.Identifier) (db.Table, error) {
+	var cols []db.ColumnType
 
 	if name == sql.STORES {
 		cols = storesColumns
@@ -103,16 +103,16 @@ func (edb *engineDatabase) Table(name sql.Identifier) (store.Table, error) {
 			sql.ENGINE)
 	}
 
-	cmap := make(store.ColumnMap)
+	cmap := make(db.ColumnMap)
 	for i, c := range cols {
 		cmap[c.Name] = i
 	}
 	return &engineTable{edb.engine, name, cols, cmap}, nil
 }
 
-func (edb *engineDatabase) Tables() ([]sql.Identifier, [][]row.Column) {
+func (edb *engineDatabase) Tables() ([]sql.Identifier, [][]db.ColumnType) {
 	return []sql.Identifier{sql.STORES, sql.DATABASES, sql.TABLES, sql.COLUMNS, sql.IDENTIFIERS},
-		[][]row.Column{storesColumns, databasesColumns, tablesColumns, columnsColumns,
+		[][]db.ColumnType{storesColumns, databasesColumns, tablesColumns, columnsColumns,
 			identifiersColumns}
 }
 
@@ -120,15 +120,15 @@ func (et *engineTable) Name() sql.Identifier {
 	return et.name
 }
 
-func (et *engineTable) Columns() []row.Column {
+func (et *engineTable) Columns() []db.ColumnType {
 	return et.columns
 }
 
-func (et *engineTable) ColumnMap() store.ColumnMap {
+func (et *engineTable) ColumnMap() db.ColumnMap {
 	return et.columnMap
 }
 
-func (et *engineTable) Rows() (store.Rows, error) {
+func (et *engineTable) Rows() (db.Rows, error) {
 	var rows [][]sql.Value
 
 	switch et.name {
@@ -173,7 +173,7 @@ func (et *engineTable) Insert(row []sql.Value) error {
 	return fmt.Errorf("engine: \"%s.%s\" table can't be modified", sql.ENGINE, et.name)
 }
 
-func (er *engineRows) Columns() []row.Column {
+func (er *engineRows) Columns() []db.ColumnType {
 	return er.columns
 }
 

@@ -6,10 +6,10 @@ import (
 	"math"
 	"runtime"
 
+	"maho/db"
 	"maho/expr"
 	"maho/parser/scanner"
 	"maho/parser/token"
-	"maho/row"
 	"maho/sql"
 	"maho/stmt"
 )
@@ -323,7 +323,7 @@ func (p *parser) parseCreateTable(tmp bool, not bool) stmt.Stmt {
 	return nil
 }
 
-var types = map[sql.Identifier]row.Column{
+var types = map[sql.Identifier]db.ColumnType{
 	sql.BINARY:    {Type: sql.CharacterType, Fixed: true, Binary: true, Size: 1},
 	sql.VARBINARY: {Type: sql.CharacterType, Fixed: false, Binary: true},
 	sql.BLOB:      {Type: sql.CharacterType, Fixed: false, Binary: true, Size: math.MaxUint32 - 1},

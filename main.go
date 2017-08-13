@@ -3,25 +3,21 @@ package main
 /*
 To Do:
 - databases should be standalone ==> identifiers should be converted back to strings on storage
-- row: row.Set is columns in the set and maybe Count of rows; row.Scanner is an interface to
-  scan a set of rows; row.Slice is an interface to return the rows as a slice; utility routines
-  to convert between the two -- if necessary
-- finish parse and execute of select
-- references in expressions
 - update t.Errorf to be "Operation(args) got %s want %s" and use %q for args
 - or "Operation(args) failed with %s" or "Operation(args) did not fail"
-- change AliasTableName to TableAlias (and the same for Columns)
-- does Column belong in row?
 
-maho/parser
-maho/parser/token
-maho/parser/scanner
-maho/engine
-maho/expr
-- maho/row
-maho/sql
-maho/stmt
-maho/store
+- finish parse and execute of select
+- references in expressions
+
+- change AliasTableName to TableAlias (and the same for Columns)
+- split out display info from ColumnType
+- ColumnType.Size: use a constant instead of math.MaxUint32-1
+- ColumnType: remove Name and store separately
+- get rid of store.ColumnMap
+- db.TableInsert
+- db.DatabaseModify
+- db.Rows: Columns() []sql.Identifier, Next, Close
+- db.RowsColumnType: Rows, ColumnType(idx int) (ColumnType, error)
 */
 
 import (
@@ -32,6 +28,7 @@ import (
 	"strings"
 	"text/tabwriter"
 
+	"maho/db"
 	"maho/engine"
 	"maho/parser"
 	"maho/sql"
@@ -56,7 +53,7 @@ func parse(e *engine.Engine, p parser.Parser, w io.Writer) {
 			break
 		}
 
-		if rows, ok := ret.(store.Rows); ok {
+		if rows, ok := ret.(db.Rows); ok {
 			w := tabwriter.NewWriter(w, 0, 0, 1, ' ', tabwriter.AlignRight)
 
 			cols := rows.Columns()

@@ -4,10 +4,10 @@ import (
 	"strings"
 	"testing"
 
+	"maho/db"
 	"maho/engine"
 	"maho/expr"
 	"maho/parser"
-	"maho/row"
 	"maho/sql"
 	"maho/store"
 	"maho/store/test"
@@ -20,7 +20,7 @@ type insertCase struct {
 }
 
 var (
-	insertColumns1 = []row.Column{
+	insertColumns1 = []db.ColumnType{
 		{Name: sql.ID("c1"), Type: sql.BooleanType, Size: 1},
 		{Name: sql.ID("c2"), Type: sql.CharacterType, Size: 128},
 		{Name: sql.ID("c3"), Type: sql.DoubleType, Size: 8, Width: 255, Fraction: 30},
@@ -121,7 +121,7 @@ var (
 		},
 	}
 
-	insertColumns2 = []row.Column{
+	insertColumns2 = []db.ColumnType{
 		{Name: sql.ID("b1"), Type: sql.BooleanType, Size: 1},
 		{Name: sql.ID("b2"), Type: sql.BooleanType, Size: 1},
 		{Name: sql.ID("b3"), Type: sql.BooleanType, Size: 1},
@@ -140,7 +140,7 @@ var (
 		},
 	}
 
-	insertColumns3 = []row.Column{
+	insertColumns3 = []db.ColumnType{
 		{Name: sql.ID("c1"), Type: sql.IntegerType, Size: 4, Width: 255,
 			Default: &expr.Literal{int64(1)}},
 		{Name: sql.ID("c2"), Type: sql.IntegerType, Size: 4, Width: 255, NotNull: true},
@@ -192,11 +192,11 @@ func statement(e *engine.Engine, s string) error {
 	return err
 }
 
-func testInsert(t *testing.T, e *engine.Engine, db store.Database, nam sql.Identifier,
-	cols []row.Column, cases []insertCase) {
+func testInsert(t *testing.T, e *engine.Engine, dbase db.Database, nam sql.Identifier,
+	cols []db.ColumnType, cases []insertCase) {
 
 	for _, c := range cases {
-		err := db.CreateTable(nam, cols)
+		err := dbase.CreateTable(nam, cols)
 		if err != nil {
 			t.Error(err)
 			return
@@ -210,7 +210,7 @@ func testInsert(t *testing.T, e *engine.Engine, db store.Database, nam sql.Ident
 		} else if err != nil {
 			t.Errorf("Parse(\"%s\").Execute() failed with %s", c.stmt, err.Error())
 		} else {
-			tbl, err := db.Table(nam)
+			tbl, err := dbase.Table(nam)
 			if err != nil {
 				t.Error(err)
 				return
@@ -235,7 +235,7 @@ func testInsert(t *testing.T, e *engine.Engine, db store.Database, nam sql.Ident
 			}
 		}
 
-		err = db.DropTable(nam)
+		err = dbase.DropTable(nam)
 		if err != nil {
 			t.Error(err)
 			return

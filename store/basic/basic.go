@@ -4,7 +4,7 @@ import (
 	"fmt"
 	"io"
 
-	"maho/row"
+	"maho/db"
 	"maho/sql"
 	"maho/store"
 )
@@ -18,18 +18,18 @@ type basicDatabase struct {
 
 type basicTable struct {
 	name      sql.Identifier
-	columns   []row.Column
-	columnMap store.ColumnMap
+	columns   []db.ColumnType
+	columnMap db.ColumnMap
 	rows      [][]sql.Value
 }
 
 type basicRows struct {
-	columns []row.Column
+	columns []db.ColumnType
 	rows    [][]sql.Value
 	index   int
 }
 
-func (bs basicStore) Open(name string) (store.Database, error) {
+func (bs basicStore) Open(name string) (db.Database, error) {
 	var bdb basicDatabase
 	bdb.name = sql.ID(name)
 	bdb.tables = make(map[sql.Identifier]*basicTable)
@@ -48,11 +48,11 @@ func (bdb *basicDatabase) Type() sql.Identifier {
 	return sql.BASIC
 }
 
-func (bdb *basicDatabase) CreateTable(name sql.Identifier, cols []row.Column) error {
+func (bdb *basicDatabase) CreateTable(name sql.Identifier, cols []db.ColumnType) error {
 	if _, ok := bdb.tables[name]; ok {
 		return fmt.Errorf("basic: table \"%s\" already exists in database \"%s\"", name, bdb.name)
 	}
-	cmap := make(store.ColumnMap)
+	cmap := make(db.ColumnMap)
 	for i, c := range cols {
 		cmap[c.Name] = i
 	}
@@ -69,7 +69,7 @@ func (bdb *basicDatabase) DropTable(name sql.Identifier) error {
 	return nil
 }
 
-func (bdb *basicDatabase) Table(name sql.Identifier) (store.Table, error) {
+func (bdb *basicDatabase) Table(name sql.Identifier) (db.Table, error) {
 	tbl, ok := bdb.tables[name]
 	if !ok {
 		return nil, fmt.Errorf("basic: table \"%s\" not found in database \"%s\"", name, bdb.name)
@@ -77,13 +77,13 @@ func (bdb *basicDatabase) Table(name sql.Identifier) (store.Table, error) {
 	return tbl, nil
 }
 
-func (bdb *basicDatabase) Tables() ([]sql.Identifier, [][]row.Column) {
+func (bdb *basicDatabase) Tables() ([]sql.Identifier, [][]db.ColumnType) {
 	names := make([]sql.Identifier, len(bdb.tables))
-	cols := make([][]row.Column, len(bdb.tables))
+	cols := make([][]db.ColumnType, len(bdb.tables))
 	i := 0
 	for _, tbl := range bdb.tables {
 		names[i] = tbl.name
-		cols[i] = make([]row.Column, len(tbl.columns))
+		cols[i] = make([]db.ColumnType, len(tbl.columns))
 		copy(cols[i], tbl.columns)
 		i += 1
 	}
@@ -94,15 +94,15 @@ func (bt *basicTable) Name() sql.Identifier {
 	return bt.name
 }
 
-func (bt *basicTable) Columns() []row.Column {
+func (bt *basicTable) Columns() []db.ColumnType {
 	return bt.columns
 }
 
-func (bt *basicTable) ColumnMap() store.ColumnMap {
+func (bt *basicTable) ColumnMap() db.ColumnMap {
 	return bt.columnMap
 }
 
-func (bt *basicTable) Rows() (store.Rows, error) {
+func (bt *basicTable) Rows() (db.Rows, error) {
 	return &basicRows{columns: bt.columns, rows: bt.rows}, nil
 }
 
@@ -111,7 +111,7 @@ func (bt *basicTable) Insert(row []sql.Value) error {
 	return nil
 }
 
-func (br *basicRows) Columns() []row.Column {
+func (br *basicRows) Columns() []db.ColumnType {
 	return br.columns
 }
 

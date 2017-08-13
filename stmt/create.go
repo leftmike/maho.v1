@@ -3,14 +3,14 @@ package stmt
 import (
 	"fmt"
 
+	"maho/db"
 	"maho/engine"
-	"maho/row"
 	"maho/sql"
 )
 
 type CreateTable struct {
 	Table   TableName
-	Columns []row.Column
+	Columns []db.ColumnType
 }
 
 func (stmt *CreateTable) String() string {

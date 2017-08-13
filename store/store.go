@@ -4,37 +4,11 @@ import (
 	"fmt"
 	"sync"
 
-	"maho/row"
-	"maho/sql"
+	"maho/db"
 )
 
 type Store interface {
-	Open(name string) (Database, error)
-}
-
-type Database interface {
-	Name() sql.Identifier
-	Type() sql.Identifier
-	CreateTable(name sql.Identifier, cols []row.Column) error
-	DropTable(name sql.Identifier) error
-	Table(name sql.Identifier) (Table, error)
-	Tables() ([]sql.Identifier, [][]row.Column)
-}
-
-type ColumnMap map[sql.Identifier]int
-
-type Table interface {
-	Name() sql.Identifier
-	Columns() []row.Column
-	ColumnMap() ColumnMap
-	Rows() (Rows, error)
-	Insert(row []sql.Value) error
-}
-
-type Rows interface {
-	Columns() []row.Column
-	Close() error
-	Next(dest []sql.Value) error
+	Open(name string) (db.Database, error)
 }
 
 var (
@@ -54,7 +28,7 @@ func Register(typ string, store Store) {
 	stores[typ] = store
 }
 
-func Open(typ string, name string) (Database, error) {
+func Open(typ string, name string) (db.Database, error) {
 	storesMutex.RLock()
 	defer storesMutex.RUnlock()
 	if store, ok := stores[typ]; ok {
