@@ -171,18 +171,21 @@ var (
 )
 
 func TestInsert(t *testing.T) {
-	db, err := store.Open("test", "test_insert")
+	dbase, err := store.Open("test", "test_insert")
 	if err != nil {
 		t.Error(err)
 	}
-	e, err := engine.Start(db)
+	e, err := engine.Start(dbase)
 	if err != nil {
 		t.Error(err)
 	}
 
-	testInsert(t, e, db, sql.ID("t"), insertColumns1, insertColumnTypes1, insertCases1)
-	testInsert(t, e, db, sql.ID("t2"), insertColumns2, insertColumnTypes2, insertCases2)
-	testInsert(t, e, db, sql.ID("t3"), insertColumns3, insertColumnTypes3, insertCases3)
+	testInsert(t, e, dbase.(db.DatabaseModify), sql.ID("t"), insertColumns1, insertColumnTypes1,
+		insertCases1)
+	testInsert(t, e, dbase.(db.DatabaseModify), sql.ID("t2"), insertColumns2, insertColumnTypes2,
+		insertCases2)
+	testInsert(t, e, dbase.(db.DatabaseModify), sql.ID("t3"), insertColumns3, insertColumnTypes3,
+		insertCases3)
 }
 
 func statement(e *engine.Engine, s string) error {
@@ -195,7 +198,7 @@ func statement(e *engine.Engine, s string) error {
 	return err
 }
 
-func testInsert(t *testing.T, e *engine.Engine, dbase db.Database, nam sql.Identifier,
+func testInsert(t *testing.T, e *engine.Engine, dbase db.DatabaseModify, nam sql.Identifier,
 	cols []sql.Identifier, colTypes []db.ColumnType, cases []insertCase) {
 
 	for _, c := range cases {

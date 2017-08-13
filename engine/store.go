@@ -83,16 +83,6 @@ func (edb *engineDatabase) Type() sql.Identifier {
 	return sql.ENGINE
 }
 
-func (edb *engineDatabase) CreateTable(name sql.Identifier, cols []sql.Identifier,
-	colTypes []db.ColumnType) error {
-
-	return fmt.Errorf("engine: \"%s\" database can't be modified", sql.ENGINE)
-}
-
-func (edb *engineDatabase) DropTable(name sql.Identifier) error {
-	return fmt.Errorf("engine: \"%s\" database can't be modified", sql.ENGINE)
-}
-
 func (edb *engineDatabase) Table(name sql.Identifier) (db.Table, error) {
 	var cols []sql.Identifier
 	var colTypes []db.ColumnType

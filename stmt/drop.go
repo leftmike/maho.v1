@@ -3,6 +3,7 @@ package stmt
 import (
 	"fmt"
 
+	"maho/db"
 	"maho/engine"
 )
 
@@ -25,11 +26,15 @@ func (stmt *DropTable) Execute(e *engine.Engine) (interface{}, error) {
 	fmt.Println(stmt)
 
 	for _, tbl := range stmt.Tables {
-		db, err := e.LookupDatabase(tbl.Database)
+		d, err := e.LookupDatabase(tbl.Database)
 		if err != nil {
 			return nil, err
 		}
-		err = db.DropTable(tbl.Table)
+		dbase, ok := d.(db.DatabaseModify)
+		if !ok {
+			return nil, fmt.Errorf("\"%s\" database can't be modified", d.Name())
+		}
+		err = dbase.DropTable(tbl.Table)
 		if err != nil {
 			return nil, err
 		}

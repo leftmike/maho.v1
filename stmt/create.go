@@ -41,9 +41,13 @@ func (stmt *CreateTable) String() string {
 func (stmt *CreateTable) Execute(e *engine.Engine) (interface{}, error) {
 	fmt.Println(stmt)
 
-	db, err := e.LookupDatabase(stmt.Table.Database)
+	d, err := e.LookupDatabase(stmt.Table.Database)
 	if err != nil {
 		return nil, err
 	}
-	return nil, db.CreateTable(stmt.Table.Table, stmt.Columns, stmt.ColumnTypes)
+	dbase, ok := d.(db.DatabaseModify)
+	if !ok {
+		return nil, fmt.Errorf("\"%s\" database can't be modified", d.Name())
+	}
+	return nil, dbase.CreateTable(stmt.Table.Table, stmt.Columns, stmt.ColumnTypes)
 }
