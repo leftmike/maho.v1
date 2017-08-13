@@ -3,6 +3,7 @@ package stmt
 import (
 	"fmt"
 
+	"maho/db"
 	"maho/engine"
 	"maho/expr"
 	"maho/sql"
@@ -52,13 +53,17 @@ func (stmt *InsertValues) String() string {
 func (stmt *InsertValues) Execute(e *engine.Engine) (interface{}, error) {
 	fmt.Println(stmt)
 
-	db, err := e.LookupDatabase(stmt.Table.Database)
+	dbase, err := e.LookupDatabase(stmt.Table.Database)
 	if err != nil {
 		return nil, err
 	}
-	tbl, err := db.Table(stmt.Table.Table)
+	t, err := dbase.Table(stmt.Table.Table)
 	if err != nil {
 		return nil, err
+	}
+	tbl, ok := t.(db.TableInsert)
+	if !ok {
+		return nil, fmt.Errorf("\"%s.%s\" table can't be modified", dbase.Name(), t.Name())
 	}
 
 	cols := tbl.Columns()

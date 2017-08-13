@@ -185,10 +185,6 @@ func (et *engineTable) Rows() (db.Rows, error) {
 	return &engineRows{columns: et.columns, columnTypes: et.columnTypes, rows: rows}, nil
 }
 
-func (et *engineTable) Insert(row []sql.Value) error {
-	return fmt.Errorf("engine: \"%s.%s\" table can't be modified", sql.ENGINE, et.name)
-}
-
 func (er *engineRows) Columns() []sql.Identifier {
 	return er.columns
 }

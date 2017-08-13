@@ -9,5 +9,9 @@ type Table interface {
 	Columns() []sql.Identifier
 	ColumnTypes() []ColumnType
 	Rows() (Rows, error)
+}
+
+type TableInsert interface {
+	Table
 	Insert(row []sql.Value) error
 }

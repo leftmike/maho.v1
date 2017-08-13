@@ -11,7 +11,6 @@ To Do:
 
 - change AliasTableName to TableAlias (and the same for Columns)
 - split out display info from ColumnType
-- db.TableInsert
 - db.DatabaseModify
 */
 
