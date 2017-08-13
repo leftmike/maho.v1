@@ -3,7 +3,6 @@ package parser
 import (
 	"fmt"
 	"io"
-	"math"
 	"runtime"
 
 	"maho/db"
@@ -326,10 +325,10 @@ func (p *parser) parseCreateTable(tmp bool, not bool) stmt.Stmt {
 var types = map[sql.Identifier]db.ColumnType{
 	sql.BINARY:    {Type: sql.CharacterType, Fixed: true, Binary: true, Size: 1},
 	sql.VARBINARY: {Type: sql.CharacterType, Fixed: false, Binary: true},
-	sql.BLOB:      {Type: sql.CharacterType, Fixed: false, Binary: true, Size: math.MaxUint32 - 1},
+	sql.BLOB:      {Type: sql.CharacterType, Fixed: false, Binary: true, Size: db.MaxColumnSize},
 	sql.CHAR:      {Type: sql.CharacterType, Fixed: true, Size: 1},
 	sql.VARCHAR:   {Type: sql.CharacterType, Fixed: false},
-	sql.TEXT:      {Type: sql.CharacterType, Fixed: false, Size: math.MaxUint32 - 1},
+	sql.TEXT:      {Type: sql.CharacterType, Fixed: false, Size: db.MaxColumnSize},
 	sql.BOOL:      {Type: sql.BooleanType, Size: 1},
 	sql.BOOLEAN:   {Type: sql.BooleanType, Size: 1},
 	sql.DOUBLE:    {Type: sql.DoubleType, Size: 8, Width: 255, Fraction: 30},
@@ -380,7 +379,7 @@ func (p *parser) parseCreateColumns(s *stmt.CreateTable) {
 
 		if typ == sql.VARCHAR || typ == sql.VARBINARY {
 			p.expectTokens(token.LParen)
-			col.Size = uint32(p.expectInteger(0, math.MaxUint32-1))
+			col.Size = uint32(p.expectInteger(0, db.MaxColumnSize))
 			p.expectTokens(token.RParen)
 		} else {
 			switch col.Type {
@@ -388,7 +387,7 @@ func (p *parser) parseCreateColumns(s *stmt.CreateTable) {
 				if !p.maybeToken(token.LParen) {
 					break
 				}
-				col.Size = uint32(p.expectInteger(0, math.MaxUint32-1))
+				col.Size = uint32(p.expectInteger(0, db.MaxColumnSize))
 				p.expectTokens(token.RParen)
 			case sql.DoubleType:
 				if !p.maybeToken(token.LParen) {

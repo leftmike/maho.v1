@@ -73,8 +73,12 @@ func (stmt *InsertValues) Execute(e *engine.Engine) (interface{}, error) {
 			c2v[c] = len(c2v)
 		}
 
+		var cmap = make(map[sql.Identifier]int)
+		for i, ct := range tbl.Columns() {
+			cmap[ct.Name] = i
+		}
+
 		mv = len(stmt.Columns)
-		cmap := tbl.ColumnMap()
 		for v, nam := range stmt.Columns {
 			c, ok := cmap[nam]
 			if !ok {

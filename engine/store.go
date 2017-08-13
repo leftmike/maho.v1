@@ -14,10 +14,9 @@ type engineDatabase struct {
 }
 
 type engineTable struct {
-	engine    *Engine
-	name      sql.Identifier
-	columns   []db.ColumnType
-	columnMap db.ColumnMap
+	engine  *Engine
+	name    sql.Identifier
+	columns []db.ColumnType
 }
 
 var (
@@ -103,11 +102,7 @@ func (edb *engineDatabase) Table(name sql.Identifier) (db.Table, error) {
 			sql.ENGINE)
 	}
 
-	cmap := make(db.ColumnMap)
-	for i, c := range cols {
-		cmap[c.Name] = i
-	}
-	return &engineTable{edb.engine, name, cols, cmap}, nil
+	return &engineTable{edb.engine, name, cols}, nil
 }
 
 func (edb *engineDatabase) Tables() ([]sql.Identifier, [][]db.ColumnType) {
@@ -122,10 +117,6 @@ func (et *engineTable) Name() sql.Identifier {
 
 func (et *engineTable) Columns() []db.ColumnType {
 	return et.columns
-}
-
-func (et *engineTable) ColumnMap() db.ColumnMap {
-	return et.columnMap
 }
 
 func (et *engineTable) Rows() (db.Rows, error) {

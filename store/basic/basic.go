@@ -17,10 +17,9 @@ type basicDatabase struct {
 }
 
 type basicTable struct {
-	name      sql.Identifier
-	columns   []db.ColumnType
-	columnMap db.ColumnMap
-	rows      [][]sql.Value
+	name    sql.Identifier
+	columns []db.ColumnType
+	rows    [][]sql.Value
 }
 
 type basicRows struct {
@@ -52,11 +51,7 @@ func (bdb *basicDatabase) CreateTable(name sql.Identifier, cols []db.ColumnType)
 	if _, ok := bdb.tables[name]; ok {
 		return fmt.Errorf("basic: table \"%s\" already exists in database \"%s\"", name, bdb.name)
 	}
-	cmap := make(db.ColumnMap)
-	for i, c := range cols {
-		cmap[c.Name] = i
-	}
-	tbl := basicTable{name, cols, cmap, nil}
+	tbl := basicTable{name, cols, nil}
 	bdb.tables[name] = &tbl
 	return nil
 }
@@ -96,10 +91,6 @@ func (bt *basicTable) Name() sql.Identifier {
 
 func (bt *basicTable) Columns() []db.ColumnType {
 	return bt.columns
-}
-
-func (bt *basicTable) ColumnMap() db.ColumnMap {
-	return bt.columnMap
 }
 
 func (bt *basicTable) Rows() (db.Rows, error) {

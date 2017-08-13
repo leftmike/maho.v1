@@ -17,10 +17,9 @@ type testDatabase struct {
 }
 
 type testTable struct {
-	name      sql.Identifier
-	columns   []db.ColumnType
-	columnMap db.ColumnMap
-	rows      [][]sql.Value
+	name    sql.Identifier
+	columns []db.ColumnType
+	rows    [][]sql.Value
 }
 
 type AllRows interface {
@@ -56,11 +55,7 @@ func (tdb *testDatabase) CreateTable(name sql.Identifier, cols []db.ColumnType) 
 	if _, ok := tdb.tables[name]; ok {
 		return fmt.Errorf("test: table \"%s\" already exists in database \"%s\"", name, tdb.name)
 	}
-	cmap := make(db.ColumnMap)
-	for i, c := range cols {
-		cmap[c.Name] = i
-	}
-	tbl := testTable{name, cols, cmap, nil}
+	tbl := testTable{name, cols, nil}
 	tdb.tables[name] = &tbl
 	return nil
 }
@@ -100,10 +95,6 @@ func (tt *testTable) Name() sql.Identifier {
 
 func (tt *testTable) Columns() []db.ColumnType {
 	return tt.columns
-}
-
-func (tt *testTable) ColumnMap() db.ColumnMap {
-	return tt.columnMap
 }
 
 func (tt *testTable) Rows() (db.Rows, error) {

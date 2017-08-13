@@ -10,6 +10,10 @@ import (
 	"maho/sql"
 )
 
+const (
+	MaxColumnSize = math.MaxUint32 - 1
+)
+
 type ColumnType struct {
 	Name sql.Identifier
 	Type sql.DataType
@@ -34,7 +38,7 @@ func (ct ColumnType) DataType() string {
 		if ct.Binary {
 			if ct.Fixed {
 				return fmt.Sprintf("BINARY(%d)", ct.Size)
-			} else if ct.Size == math.MaxUint32-1 {
+			} else if ct.Size == MaxColumnSize {
 				return "BLOB"
 			} else {
 				return fmt.Sprintf("VARBINARY(%d)", ct.Size)
@@ -42,7 +46,7 @@ func (ct ColumnType) DataType() string {
 		} else {
 			if ct.Fixed {
 				return fmt.Sprintf("CHAR(%d)", ct.Size)
-			} else if ct.Size == math.MaxUint32-1 {
+			} else if ct.Size == MaxColumnSize {
 				return "TEXT"
 			} else {
 				return fmt.Sprintf("VARCHAR(%d)", ct.Size)

@@ -11,9 +11,7 @@ To Do:
 
 - change AliasTableName to TableAlias (and the same for Columns)
 - split out display info from ColumnType
-- ColumnType.Size: use a constant instead of math.MaxUint32-1
 - ColumnType: remove Name and store separately
-- get rid of store.ColumnMap
 - db.TableInsert
 - db.DatabaseModify
 - db.Rows: Columns() []sql.Identifier, Next, Close

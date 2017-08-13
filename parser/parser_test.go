@@ -2,7 +2,6 @@ package parser_test
 
 import (
 	"fmt"
-	"math"
 	"reflect"
 	"strings"
 	"testing"
@@ -153,7 +152,7 @@ func TestCreateTable(t *testing.T) {
 						Type:   sql.CharacterType,
 						Fixed:  false,
 						Binary: true,
-						Size:   math.MaxUint32 - 1,
+						Size:   db.MaxColumnSize,
 					},
 				},
 			},
@@ -198,7 +197,7 @@ func TestCreateTable(t *testing.T) {
 						Name:  sql.ID("c3"),
 						Type:  sql.CharacterType,
 						Fixed: false,
-						Size:  math.MaxUint32 - 1,
+						Size:  db.MaxColumnSize,
 					},
 				},
 			},
@@ -238,7 +237,7 @@ func TestCreateTable(t *testing.T) {
 						Type:   sql.CharacterType,
 						Fixed:  false,
 						Binary: true,
-						Size:   math.MaxUint32 - 1,
+						Size:   db.MaxColumnSize,
 					},
 				},
 			},
