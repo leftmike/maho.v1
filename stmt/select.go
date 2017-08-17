@@ -34,15 +34,6 @@ type Subquery interface {
 	subquery() bool
 }
 
-type TableAlias struct {
-	TableName
-	Alias sql.Identifier
-}
-
-func (ta *TableAlias) subquery() bool {
-	return true
-}
-
 type FromItem struct {
 	Alias    sql.Identifier
 	Subquery interface{} // Select, Values, TableName, or Join
@@ -88,21 +79,16 @@ type SelectResult struct {
 	Alias  sql.Identifier
 }
 
-type AliasTableName struct {
-	TableName
-	Alias sql.Identifier
-}
-
 type Select struct {
-	Table   AliasTableName
+	Table   TableAlias
 	Results []SelectResult
 	Where   expr.Expr
 }
 
-func (atn AliasTableName) String() string {
-	s := atn.TableName.String()
-	if atn.Table != atn.Alias {
-		s += fmt.Sprintf(" AS %s", atn.Alias)
+func (ta TableAlias) String() string {
+	s := ta.TableName.String()
+	if ta.Table != ta.Alias {
+		s += fmt.Sprintf(" AS %s", ta.Alias)
 	}
 	return s
 }

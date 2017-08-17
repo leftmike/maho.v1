@@ -9,7 +9,6 @@ To Do:
 - finish parse and execute of select
 - references in expressions
 
-- change AliasTableName to TableAlias (and the same for Columns)
 - split out display info from ColumnType
 */
 

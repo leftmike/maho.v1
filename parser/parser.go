@@ -286,17 +286,17 @@ func (p *parser) parseTableName(tbl *stmt.TableName) {
 	}
 }
 
-func (p *parser) parseAliasTableName(atbl *stmt.AliasTableName) {
-	p.parseTableName(&atbl.TableName)
+func (p *parser) parseTableAlias(ta *stmt.TableAlias) {
+	p.parseTableName(&ta.TableName)
 	if p.optionalReserved(sql.AS) {
-		atbl.Alias = p.expectIdentifier("expected an alias")
+		ta.Alias = p.expectIdentifier("expected an alias")
 	} else {
 		r := p.scan()
 		if r == token.Identifier {
-			atbl.Alias = p.scanner.Identifier
+			ta.Alias = p.scanner.Identifier
 		} else {
 			p.unscan()
-			atbl.Alias = atbl.Table
+			ta.Alias = atbl.Table
 		}
 	}
 }
@@ -708,7 +708,7 @@ func (p *parser) parseSelect() stmt.Stmt {
 
 	}
 
-	p.parseAliasTableName(&s.Table)
+	p.parseTableAlias(&s.Table)
 
 	if p.optionalReserved(sql.WHERE) {
 		s.Where = p.parseExpr()

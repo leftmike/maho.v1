@@ -51,7 +51,7 @@ func TestInsertValues(t *testing.T) {
 
 func TestSelect(t *testing.T) {
 	s := stmt.Select{
-		Table: stmt.AliasTableName{
+		Table: stmt.TableAlias{
 			stmt.TableName{sql.QuotedID("db"), sql.QuotedID("tbl")},
 			sql.QuotedID("alias"),
 		},
