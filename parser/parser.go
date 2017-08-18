@@ -18,15 +18,22 @@ type Parser interface {
 	ParseExpr() (expr.Expr, error)
 }
 
+const lookBackAmount = 3
+
 type parser struct {
 	scanner   scanner.Scanner
 	sctx      *scanner.ScanCtx
-	lookBack  [1]scanner.ScanCtx
-	unscanned bool
+	lookBack  [lookBackAmount]scanner.ScanCtx
+	current   uint
+	unscanned uint
 	scanned   rune
 }
 
 func NewParser(rr io.RuneReader, fn string) Parser {
+	return newParser(rr, fn)
+}
+
+func newParser(rr io.RuneReader, fn string) *parser {
 	var p parser
 	p.scanner.Init(rr, fn)
 	p.sctx = &p.lookBack[0]
@@ -59,24 +66,29 @@ func (p *parser) error(msg string) {
 }
 
 func (p *parser) scan() rune {
-	if p.unscanned {
-		p.unscanned = false
-		return p.scanned
+	if p.unscanned > 0 {
+		p.unscanned -= 1
+		if p.unscanned > p.current {
+			return p.scanned[lookBack-(p.unscanned-p.current)]
+		}
+		return p.scanned[(p.current-p.unscanned)%lookBack]
 	}
 
-	p.scanned = p.scanner.Scan(p.sctx)
-	if p.scanned == token.Error {
+	p.current = (p.current + 1) % lookBack
+	p.sctx = &p.lookBack[p.current]
+	p.sctx.Token = p.scanner.Scan(p.sctx)
+	if p.sctx.Token == token.Error {
 		p.error(p.sctx.Error.Error())
 	}
-	return p.scanned
+	return p.scanned[p.current]
 }
 
 func (p *parser) unscan() {
-	p.unscanned = true
+	p.unscanned += 1
 }
 
 func (p *parser) got() string {
-	switch p.scanned {
+	switch p.scanned[p.current] {
 	case token.EOF:
 		return fmt.Sprintf("end of file")
 	case token.Error:

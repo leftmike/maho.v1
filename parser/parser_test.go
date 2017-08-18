@@ -1,4 +1,4 @@
-package parser_test
+package parser
 
 import (
 	"fmt"
@@ -8,10 +8,44 @@ import (
 
 	"maho/db"
 	"maho/expr"
-	"maho/parser"
+	"maho/parser/token"
 	"maho/sql"
 	"maho/stmt"
 )
+
+func TestScan(t *testing.T) {
+	s := `create foobar * 123 (,) 'string' "identifier" 456.789`
+	tokens := []rune{token.Reserved, token.Identifier, token.Star, token.Integer, token.LParen,
+		token.Comma, token.RParen, token.String, token.Identifier, token.Double, token.EOF}
+	p := newParser(strings.NewReader(s), "scan")
+	for _, e := range tokens {
+		r := p.scan()
+		if e != r {
+			t.Errorf("scan(%q) got %s want %s", s, token.Format(r), token.Format(e))
+		}
+	}
+
+	p = newParser(strings.NewReader(s), "scan")
+	for i := 0; i < len(tokens); i++ {
+		if i >= lookBack {
+			for j := 0; j < lookBack; j++ {
+				p.unscan()
+			}
+			for j := lookBack; j > 0; j-- {
+				r := p.scan()
+				if tokens[i-j] != r {
+					t.Errorf("scan(%q) got %s want %s", s, token.Format(r),
+						token.Format(tokens[i-j]))
+				}
+			}
+		}
+
+		r := p.scan()
+		if tokens[i] != r {
+			t.Errorf("scan(%q) got %s want %s", s, token.Format(r), token.Format(tokens[i]))
+		}
+	}
+}
 
 func TestParse(t *testing.T) {
 	failed := []string{
@@ -25,7 +59,7 @@ func TestParse(t *testing.T) {
 	}
 
 	for i, f := range failed {
-		p := parser.NewParser(strings.NewReader(f), fmt.Sprintf("failed[%d]", i))
+		p := NewParser(strings.NewReader(f), fmt.Sprintf("failed[%d]", i))
 		stmt, err := p.Parse()
 		if stmt != nil || err == nil {
 			t.Errorf("Parse(%q) did not fail", f)
@@ -233,7 +267,7 @@ c2 boolean not null default true)`,
 	}
 
 	for i, c := range cases {
-		p := parser.NewParser(strings.NewReader(c.sql), fmt.Sprintf("tests[%d]", i))
+		p := NewParser(strings.NewReader(c.sql), fmt.Sprintf("tests[%d]", i))
 		stmt, err := p.Parse()
 		if c.fail {
 			if err == nil {
@@ -322,7 +356,7 @@ func TestInsertValues(t *testing.T) {
 	}
 
 	for i, c := range cases {
-		p := parser.NewParser(strings.NewReader(c.sql), fmt.Sprintf("tests[%d]", i))
+		p := NewParser(strings.NewReader(c.sql), fmt.Sprintf("tests[%d]", i))
 		stmt, err := p.Parse()
 		if c.fail {
 			if err == nil {
@@ -394,7 +428,7 @@ func TestParseExpr(t *testing.T) {
 	}
 
 	for i, c := range cases {
-		p := parser.NewParser(strings.NewReader(c.sql), fmt.Sprintf("cases[%d]", i))
+		p := NewParser(strings.NewReader(c.sql), fmt.Sprintf("cases[%d]", i))
 		e, err := p.ParseExpr()
 		if err != nil {
 			t.Errorf("ParseExpr(%q) failed with %s", c.sql, err)
@@ -413,7 +447,7 @@ func TestParseExpr(t *testing.T) {
 	}
 
 	for i, f := range fails {
-		p := parser.NewParser(strings.NewReader(f), fmt.Sprintf("fails[%d]", i))
+		p := NewParser(strings.NewReader(f), fmt.Sprintf("fails[%d]", i))
 		e, err := p.ParseExpr()
 		if err == nil {
 			t.Errorf("ParseExpr(%q) did not fail, got %s", f, e)
