@@ -57,7 +57,8 @@ func TestScan(t *testing.T) {
 	for i, c := range cases {
 		var s Scanner
 		s.Init(strings.NewReader(c.s), fmt.Sprintf("cases[%d]", i))
-		r := s.Scan()
+		var sctx ScanCtx
+		r := s.Scan(&sctx)
 		if r != c.r {
 			t.Errorf("Scan(%q) got %d want %d", c.s, r, c.r)
 		}
@@ -78,12 +79,13 @@ func TestScan(t *testing.T) {
 	for i, n := range integers {
 		var s Scanner
 		s.Init(strings.NewReader(n.s), fmt.Sprintf("integers[%d]", i))
-		r := s.Scan()
+		var sctx ScanCtx
+		r := s.Scan(&sctx)
 		if r != token.Integer {
 			t.Errorf("Scan(%q) got %d want Integer", n.s, r)
 		}
-		if s.Integer != n.n {
-			t.Errorf("Scan(%q).Integer got %d want %d", n.s, s.Integer, n.n)
+		if sctx.Integer != n.n {
+			t.Errorf("Scan(%q).Integer got %d want %d", n.s, sctx.Integer, n.n)
 		}
 	}
 
@@ -102,12 +104,13 @@ func TestScan(t *testing.T) {
 	for i, n := range doubles {
 		var s Scanner
 		s.Init(strings.NewReader(n.s), fmt.Sprintf("doubles[%d]", i))
-		r := s.Scan()
+		var sctx ScanCtx
+		r := s.Scan(&sctx)
 		if r != token.Double {
 			t.Errorf("Scan(%q) got %d want Double", n.s, r)
 		}
-		if s.Double != n.n {
-			t.Errorf("Scan(%q).Double got %f want %f", n.s, s.Double, n.n)
+		if sctx.Double != n.n {
+			t.Errorf("Scan(%q).Double got %f want %f", n.s, sctx.Double, n.n)
 		}
 	}
 
@@ -136,21 +139,22 @@ abcd -- identifier
 		var s Scanner
 		s.Init(strings.NewReader(src), "src")
 		for i, e := range expected {
-			r := s.Scan()
+			var sctx ScanCtx
+			r := s.Scan(&sctx)
 			if r != e.ret {
 				t.Errorf("Scan(%q)[%d] got %d want %d", src, i, r, e.ret)
 			}
 			switch e.ret {
 			case token.Identifier:
-				if s.Identifier != sql.QuotedID(e.s) {
+				if sctx.Identifier != sql.QuotedID(e.s) {
 					t.Errorf("%d Scan(%q) != sql.QuotedID(%q)", i, src, e.s)
 				}
 			case token.Reserved:
-				if s.Identifier != e.id {
+				if sctx.Identifier != e.id {
 					t.Errorf("%d Scan(%q).Identifier != %d", i, src, e.id)
 				}
 			case token.String:
-				if s.String != e.s {
+				if sctx.String != e.s {
 					t.Errorf("%d Scan(%q).String != %q", i, src, e.s)
 				}
 			}

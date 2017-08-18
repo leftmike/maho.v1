@@ -19,7 +19,8 @@ type Parser interface {
 }
 
 type parser struct {
-	scanner   scanner.Scanner
+	scanner scanner.Scanner
+	scanner.ScanCtx
 	unscanned bool
 	scanned   rune
 }
@@ -52,7 +53,7 @@ func (p *parser) Parse() (stmt stmt.Stmt, err error) {
 }
 
 func (p *parser) error(msg string) {
-	panic(fmt.Errorf("%s: %s", p.scanner.Position, msg))
+	panic(fmt.Errorf("%s: %s", p.Position, msg))
 }
 
 func (p *parser) scan() rune {
@@ -61,9 +62,9 @@ func (p *parser) scan() rune {
 		return p.scanned
 	}
 
-	p.scanned = p.scanner.Scan()
+	p.scanned = p.scanner.Scan(&p.ScanCtx)
 	if p.scanned == token.Error {
-		p.error(p.scanner.Error.Error())
+		p.error(p.Error.Error())
 	}
 	return p.scanned
 }
@@ -77,17 +78,17 @@ func (p *parser) got() string {
 	case token.EOF:
 		return fmt.Sprintf("end of file")
 	case token.Error:
-		return fmt.Sprintf("error %s", p.scanner.Error.Error())
+		return fmt.Sprintf("error %s", p.Error.Error())
 	case token.Identifier:
-		return fmt.Sprintf("identifier %s", p.scanner.Identifier)
+		return fmt.Sprintf("identifier %s", p.Identifier)
 	case token.Reserved:
-		return fmt.Sprintf("reserved identifier %s", p.scanner.Identifier)
+		return fmt.Sprintf("reserved identifier %s", p.Identifier)
 	case token.String:
-		return fmt.Sprintf("string %q", p.scanner.String)
+		return fmt.Sprintf("string %q", p.String)
 	case token.Integer:
-		return fmt.Sprintf("integer %d", p.scanner.Integer)
+		return fmt.Sprintf("integer %d", p.Integer)
 	case token.Double:
-		return fmt.Sprintf("double %f", p.scanner.Double)
+		return fmt.Sprintf("double %f", p.Double)
 	}
 
 	return fmt.Sprintf("rune %c", p.scanned)
@@ -97,7 +98,7 @@ func (p *parser) expectReserved(ids ...sql.Identifier) sql.Identifier {
 	t := p.scan()
 	if t == token.Reserved {
 		for _, kw := range ids {
-			if kw == p.scanner.Identifier {
+			if kw == p.Identifier {
 				return kw
 			}
 		}
@@ -125,7 +126,7 @@ func (p *parser) optionalReserved(ids ...sql.Identifier) bool {
 	t := p.scan()
 	if t == token.Reserved {
 		for _, kw := range ids {
-			if kw == p.scanner.Identifier {
+			if kw == p.Identifier {
 				return true
 			}
 		}
@@ -140,11 +141,11 @@ func (p *parser) expectIdentifier(msg string) sql.Identifier {
 	if t != token.Identifier {
 		p.error(fmt.Sprintf("%s got %s", msg, p.got()))
 	}
-	return p.scanner.Identifier
+	return p.Identifier
 }
 
 func (p *parser) maybeIdentifier(id sql.Identifier) bool {
-	if p.scan() == token.Identifier && p.scanner.Identifier == id {
+	if p.scan() == token.Identifier && p.Identifier == id {
 		return true
 	}
 
@@ -187,12 +188,12 @@ func (p *parser) maybeToken(mr rune) bool {
 }
 
 func (p *parser) expectInteger(min, max int64) int64 {
-	if p.scan() != token.Integer || p.scanner.Integer < min || p.scanner.Integer > max {
+	if p.scan() != token.Integer || p.Integer < min || p.Integer > max {
 		p.error(fmt.Sprintf("expected a number between %d and %d inclusive got %s", min, max,
 			p.got()))
 	}
 
-	return p.scanner.Integer
+	return p.Integer
 }
 
 func (p *parser) expectEOF() {
@@ -293,7 +294,7 @@ func (p *parser) parseTableAlias(ta *stmt.TableAlias) {
 	} else {
 		r := p.scan()
 		if r == token.Identifier {
-			ta.Alias = p.scanner.Identifier
+			ta.Alias = p.Identifier
 		} else {
 			p.unscan()
 			ta.Alias = ta.Table
@@ -502,27 +503,27 @@ func (p *parser) parseExpr() expr.Expr {
 	var e expr.Expr
 	r := p.scan()
 	if r == token.Reserved {
-		if p.scanner.Identifier == sql.TRUE {
+		if p.Identifier == sql.TRUE {
 			e = &expr.Literal{true}
-		} else if p.scanner.Identifier == sql.FALSE {
+		} else if p.Identifier == sql.FALSE {
 			e = &expr.Literal{false}
-		} else if p.scanner.Identifier == sql.NULL {
+		} else if p.Identifier == sql.NULL {
 			e = &expr.Literal{nil}
-		} else if p.scanner.Identifier == sql.NOT {
+		} else if p.Identifier == sql.NOT {
 			e = p.parseUnaryExpr(expr.NotOp)
 		} else {
-			p.error(fmt.Sprintf("unexpected identifier %s", p.scanner.Identifier))
+			p.error(fmt.Sprintf("unexpected identifier %s", p.Identifier))
 		}
 	} else if r == token.String {
-		e = &expr.Literal{p.scanner.String}
+		e = &expr.Literal{p.String}
 	} else if r == token.Integer {
-		e = &expr.Literal{p.scanner.Integer}
+		e = &expr.Literal{p.Integer}
 	} else if r == token.Double {
-		e = &expr.Literal{p.scanner.Double}
+		e = &expr.Literal{p.Double}
 	} else if r == token.Identifier {
 		if p.maybeToken(token.LParen) {
 			// <func> ( <expr> [,...] )
-			c := &expr.Call{Name: p.scanner.Identifier}
+			c := &expr.Call{Name: p.Identifier}
 			if !p.maybeToken(token.RParen) {
 				for {
 					c.Args = append(c.Args, p.parseExpr())
@@ -535,7 +536,7 @@ func (p *parser) parseExpr() expr.Expr {
 			e = c
 		} else {
 			// <ref> [. <ref> ...]
-			ref := expr.Ref{p.scanner.Identifier}
+			ref := expr.Ref{p.Identifier}
 			for p.maybeToken(token.Dot) {
 				ref = append(ref, p.expectIdentifier("expected a reference"))
 			}
@@ -561,9 +562,9 @@ func (p *parser) parseExpr() expr.Expr {
 	r = p.scan()
 	op, ok := binaryOps[r]
 	if !ok {
-		if r == token.Reserved && p.scanner.Identifier == sql.AND {
+		if r == token.Reserved && p.Identifier == sql.AND {
 			op = expr.AndOp
-		} else if r == token.Reserved && p.scanner.Identifier == sql.OR {
+		} else if r == token.Reserved && p.Identifier == sql.OR {
 			op = expr.OrOp
 		} else {
 			p.unscan()
@@ -631,7 +632,7 @@ func (p *parser) parseInsert() stmt.Stmt {
 		p.expectTokens(token.LParen)
 		for {
 			r := p.scan()
-			if r == token.Reserved && p.scanner.Identifier == sql.DEFAULT {
+			if r == token.Reserved && p.Identifier == sql.DEFAULT {
 				row = append(row, nil)
 			} else {
 				p.unscan()

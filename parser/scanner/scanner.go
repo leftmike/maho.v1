@@ -17,20 +17,25 @@ type Position struct {
 	Column   int
 }
 
+type ScanCtx struct {
+	Token      rune
+	Error      error
+	Identifier sql.Identifier // Identifier and Reserved
+	String     string
+	Integer    int64
+	Double     float64
+	Position
+}
+
 type Scanner struct {
 	initialized bool
 	rr          io.RuneReader
 	unread      bool
 	read        rune
+	filename    string
 	line        int
 	column      int
 	buffer      bytes.Buffer
-	Error       error
-	Identifier  sql.Identifier // Identifier and Reserved
-	String      string
-	Integer     int64
-	Double      float64
-	Position
 }
 
 func (pos Position) String() string {
@@ -48,16 +53,21 @@ func (s *Scanner) Init(rr io.RuneReader, fn string) {
 	s.initialized = true
 
 	s.rr = rr
-	s.Filename = fn
-	s.Line = 1
-	s.Column = 0
+	s.filename = fn
 }
 
-func (s *Scanner) Scan() rune {
+func (s *Scanner) Scan(sctx *ScanCtx) rune {
 	s.buffer.Reset()
+	sctx.Filename = s.filename
+	sctx.Line = 1
+	sctx.Column = 0
+	sctx.Token = s.scan(sctx)
+	return sctx.Token
+}
 
+func (s *Scanner) scan(sctx *ScanCtx) rune {
 SkipWhitespace:
-	r := s.readRune()
+	r := s.readRune(sctx)
 
 	for {
 		if r < 0 {
@@ -67,13 +77,13 @@ SkipWhitespace:
 			break
 		}
 
-		r = s.readRune()
+		r = s.readRune(sctx)
 	}
 
 	if r == '-' {
-		if r := s.readRune(); r == '-' {
+		if r := s.readRune(sctx); r == '-' {
 			for {
-				r = s.readRune()
+				r = s.readRune(sctx)
 				if r < 0 {
 					return r
 				}
@@ -92,11 +102,11 @@ SkipWhitespace:
 			s.unreadRune()
 		}
 	} else if r == '/' {
-		if r := s.readRune(); r == '*' {
+		if r := s.readRune(sctx); r == '*' {
 			var p rune
 
 			for {
-				r = s.readRune()
+				r = s.readRune(sctx)
 				if r < 0 {
 					return r
 				}
@@ -117,36 +127,36 @@ SkipWhitespace:
 		}
 	}
 
-	s.Column = s.column
-	s.Line = s.line
+	sctx.Column = s.column
+	sctx.Line = s.line
 
 	if unicode.IsLetter(r) || r == '_' {
-		return s.scanIdentifier(r)
+		return s.scanIdentifier(sctx, r)
 	} else if unicode.IsDigit(r) {
-		return s.scanNumber(r, 1)
+		return s.scanNumber(sctx, r, 1)
 	} else if r == '+' {
-		r = s.readRune()
+		r = s.readRune(sctx)
 		if unicode.IsDigit(r) {
-			return s.scanNumber(r, 1)
+			return s.scanNumber(sctx, r, 1)
 		}
 		s.unreadRune()
 		return '+'
 	} else if r == '-' {
-		r = s.readRune()
+		r = s.readRune(sctx)
 		if unicode.IsDigit(r) {
-			return s.scanNumber(r, -1)
+			return s.scanNumber(sctx, r, -1)
 		}
 		s.unreadRune()
 		return '-'
 	} else if r == '"' || r == '`' {
-		return s.scanQuotedIdentifier(r)
+		return s.scanQuotedIdentifier(sctx, r)
 	} else if r == '[' {
-		return s.scanQuotedIdentifier(']')
+		return s.scanQuotedIdentifier(sctx, ']')
 	} else if r == '\'' {
-		return s.scanString()
+		return s.scanString(sctx)
 	} else if token.IsOpRune(r) {
 		s.buffer.WriteRune(r)
-		r2 := s.readRune()
+		r2 := s.readRune(sctx)
 		if r2 == '-' || r2 == '+' {
 			s.unreadRune()
 			return r
@@ -155,7 +165,7 @@ SkipWhitespace:
 			if r, ok := token.Operators[s.buffer.String()]; ok {
 				return r
 			}
-			s.Error = fmt.Errorf("unexpected operator %s", s.buffer.String())
+			sctx.Error = fmt.Errorf("unexpected operator %s", s.buffer.String())
 			return token.Error
 		} else {
 			s.unreadRune()
@@ -165,11 +175,11 @@ SkipWhitespace:
 		return r
 	}
 
-	s.Error = fmt.Errorf("unexpected character '%c'", r)
+	sctx.Error = fmt.Errorf("unexpected character '%c'", r)
 	return token.Error
 }
 
-func (s *Scanner) readRune() rune {
+func (s *Scanner) readRune(sctx *ScanCtx) rune {
 	if s.unread {
 		s.unread = false
 		return s.read
@@ -180,7 +190,7 @@ func (s *Scanner) readRune() rune {
 	if err == io.EOF {
 		return token.EOF
 	} else if err != nil {
-		s.Error = err
+		sctx.Error = err
 		return token.Error
 	}
 
@@ -198,10 +208,10 @@ func (s *Scanner) unreadRune() {
 	s.unread = true
 }
 
-func (s *Scanner) scanIdentifier(r rune) rune {
+func (s *Scanner) scanIdentifier(sctx *ScanCtx, r rune) rune {
 	for {
 		s.buffer.WriteRune(r)
-		r = s.readRune()
+		r = s.readRune(sctx)
 		if r == token.EOF {
 			break
 		} else if r == token.Error {
@@ -213,18 +223,18 @@ func (s *Scanner) scanIdentifier(r rune) rune {
 		}
 	}
 
-	s.Identifier = sql.ID(s.buffer.String())
-	if s.Identifier.IsReserved() {
+	sctx.Identifier = sql.ID(s.buffer.String())
+	if sctx.Identifier.IsReserved() {
 		return token.Reserved
 	}
 	return token.Identifier
 }
 
-func (s *Scanner) scanNumber(r rune, sign int64) rune {
+func (s *Scanner) scanNumber(sctx *ScanCtx, r rune, sign int64) rune {
 	dbl := false
 	for {
 		s.buffer.WriteRune(r)
-		r = s.readRune()
+		r = s.readRune(sctx)
 		if r == token.EOF {
 			break
 		} else if r == token.Error {
@@ -240,28 +250,28 @@ func (s *Scanner) scanNumber(r rune, sign int64) rune {
 
 	var err error
 	if dbl {
-		s.Double, err = strconv.ParseFloat(s.buffer.String(), 64)
+		sctx.Double, err = strconv.ParseFloat(s.buffer.String(), 64)
 	} else {
-		s.Integer, err = strconv.ParseInt(s.buffer.String(), 10, 64)
+		sctx.Integer, err = strconv.ParseInt(s.buffer.String(), 10, 64)
 	}
 	if err != nil {
-		s.Error = err
+		sctx.Error = err
 		return token.Error
 	}
 	if dbl {
-		s.Double *= float64(sign)
+		sctx.Double *= float64(sign)
 		return token.Double
 	} else {
-		s.Integer *= sign
+		sctx.Integer *= sign
 		return token.Integer
 	}
 }
 
-func (s *Scanner) scanQuotedIdentifier(delim rune) rune {
+func (s *Scanner) scanQuotedIdentifier(sctx *ScanCtx, delim rune) rune {
 	for {
-		r := s.readRune()
+		r := s.readRune(sctx)
 		if r == token.EOF {
-			s.Error = fmt.Errorf("quoted identifier missing terminating '%c'", delim)
+			sctx.Error = fmt.Errorf("quoted identifier missing terminating '%c'", delim)
 			return token.Error
 		}
 		if r == token.Error {
@@ -273,15 +283,15 @@ func (s *Scanner) scanQuotedIdentifier(delim rune) rune {
 		s.buffer.WriteRune(r)
 	}
 
-	s.Identifier = sql.QuotedID(s.buffer.String())
+	sctx.Identifier = sql.QuotedID(s.buffer.String())
 	return token.Identifier
 }
 
-func (s *Scanner) scanString() rune {
+func (s *Scanner) scanString(sctx *ScanCtx) rune {
 	for {
-		r := s.readRune()
+		r := s.readRune(sctx)
 		if r == token.EOF {
-			s.Error = fmt.Errorf("string missing terminating \"'\"")
+			sctx.Error = fmt.Errorf("string missing terminating \"'\"")
 			return token.Error
 		}
 		if r == token.Error {
@@ -291,9 +301,9 @@ func (s *Scanner) scanString() rune {
 			break
 		}
 		if r == '\\' {
-			r = s.readRune()
+			r = s.readRune(sctx)
 			if r == token.EOF {
-				s.Error = fmt.Errorf("incomplete string escape")
+				sctx.Error = fmt.Errorf("incomplete string escape")
 				return token.Error
 			}
 			if r == token.Error {
@@ -303,6 +313,6 @@ func (s *Scanner) scanString() rune {
 		s.buffer.WriteRune(r)
 	}
 
-	s.String = s.buffer.String()
+	sctx.String = s.buffer.String()
 	return token.String
 }
