@@ -296,7 +296,7 @@ func (p *parser) parseTableAlias(ta *stmt.TableAlias) {
 			ta.Alias = p.scanner.Identifier
 		} else {
 			p.unscan()
-			ta.Alias = atbl.Table
+			ta.Alias = ta.Table
 		}
 	}
 }
@@ -659,9 +659,12 @@ func (p *parser) parseInsert() stmt.Stmt {
     [WHERE <expr>]
 <values> = VALUES '(' <expr> [',' ...] ')' [',' ...]
 <select-list> = '*'
-    | <result-column> [',' ...]
-<result-column> = <expr> [[ AS ] column-alias
-    | table-name '.' '*'
+    | <select-item> [',' ...]
+<select-item> = table '.' '*'
+    | <result-column> [[ AS ] column-alias]
+<result-column> = column
+    | table '.' column
+    | <expr>
 <from-item> = [ database-name '.' ] table-name [[ AS ] table-alias]
     | '(' <select> | <values> ')' [[ AS ] table-alias]
     | '(' <from-item> [',' ...] ')'
@@ -684,26 +687,26 @@ func (p *parser) parseSelect() stmt.Stmt {
 		p.expectReserved(sql.FROM)
 	} else {
 		for done := false; !done; {
-			var sr stmt.SelectResult
-			sr.Column = p.expectIdentifier("expected a table or a column")
+			var tcr stmt.TableColumnResult
+			tcr.Column = p.expectIdentifier("expected a table or a column")
 			if p.maybeToken(token.Dot) {
-				sr.Table = sr.Column
-				sr.Column = p.expectIdentifier("expected a column")
+				tcr.Table = tcr.Column
+				tcr.Column = p.expectIdentifier("expected a column")
 			}
 
-			sr.Alias = sr.Column
+			tcr.Alias = tcr.Column
 			if p.optionalReserved(sql.AS) {
-				sr.Alias = p.expectIdentifier("expected an alias")
+				tcr.Alias = p.expectIdentifier("expected an alias")
 			}
 
 			if p.optionalReserved(sql.FROM) {
 				done = true
 			} else if !p.maybeToken(token.Comma) {
-				sr.Alias = p.expectIdentifier("expected an alias")
+				tcr.Alias = p.expectIdentifier("expected an alias")
 				p.expectTokens(token.Comma)
 			}
 
-			s.Results = append(s.Results, sr)
+			s.Results = append(s.Results, tcr)
 		}
 
 	}

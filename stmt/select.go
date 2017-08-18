@@ -9,27 +9,6 @@ import (
 )
 
 /*
-type ResultColumn struct {
-	ID   sql.Identifier // Table or ColumnAlias
-	Expr sql.Expr
-}
-
-func (rc ResultColumn) Table() sql.Identifier {
-	return rc.ID
-}
-
-func (rc ResultColumn) ColumnAlias() sql.Identifier {
-	return rc.ID
-}
-
-func (rc ResultColumn) IsExpr() bool {
-	return rc.Expr != nil
-}
-
-func (rc ResultColumn) IsTable() bool {
-	return rc.Expr == nil
-}
-
 type Subquery interface {
 	subquery() bool
 }
@@ -73,24 +52,43 @@ func (s *NewSelect) AllResults() bool { // SELECT * ...
 }
 */
 
+/*
+OLD; delete
 type SelectResult struct {
 	Table  sql.Identifier
 	Column sql.Identifier
 	Alias  sql.Identifier
+}
+*/
+
+type SelectResult interface {
+	fmt.Stringer
+}
+
+type TableResult struct {
+	Table sql.Identifier
+}
+
+type ColumnResult struct {
+	Column sql.Identifier
+	Alias  sql.Identifier
+}
+
+type TableColumnResult struct {
+	Table  sql.Identifier
+	Column sql.Identifier
+	Alias  sql.Identifier
+}
+
+type ExprResult struct {
+	Expr  expr.Expr
+	Alias sql.Identifier
 }
 
 type Select struct {
 	Table   TableAlias
 	Results []SelectResult
 	Where   expr.Expr
-}
-
-func (ta TableAlias) String() string {
-	s := ta.TableName.String()
-	if ta.Table != ta.Alias {
-		s += fmt.Sprintf(" AS %s", ta.Alias)
-	}
-	return s
 }
 
 func (stmt *Select) String() string {
@@ -102,19 +100,25 @@ func (stmt *Select) String() string {
 			if i > 0 {
 				s += ", "
 			}
-			if sr.Table == 0 {
-				s += sr.Column.String()
-			} else {
-				s += fmt.Sprintf("%s.%s", sr.Table, sr.Column)
-			}
-			if sr.Alias != sr.Column {
-				s += fmt.Sprintf(" AS %s", sr.Alias)
-			}
+			s += sr.String()
 		}
 	}
 	s += fmt.Sprintf(" FROM %s", stmt.Table)
 	if stmt.Where != nil {
 		s += fmt.Sprintf(" WHERE %s", stmt.Where)
+	}
+	return s
+}
+
+func (tcr TableColumnResult) String() string {
+	var s string
+	if tcr.Table == 0 {
+		s = tcr.Column.String()
+	} else {
+		s = fmt.Sprintf("%s.%s", tcr.Table, tcr.Column)
+	}
+	if tcr.Table != tcr.Alias {
+		s += fmt.Sprintf(" AS %s", tcr.Alias)
 	}
 	return s
 }
