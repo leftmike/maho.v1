@@ -68,26 +68,10 @@ func IsOpRune(r rune) bool {
 
 func Format(r rune) string {
 	if r > 0 {
-		return fmt.Sprintf("%c", r)
+		return fmt.Sprintf("rune %c", r)
 	}
 	if s, ok := operators[r]; ok {
 		return s
-	}
-	switch r {
-	case EOF:
-		return "EOF"
-	case Error:
-		return "Error"
-	case Identifier:
-		return "Identifier"
-	case Reserved:
-		return "Reserved"
-	case String:
-		return "String"
-	case Integer:
-		return "Integer"
-	case Double:
-		return "Double"
 	}
 	return fmt.Sprintf("token %d", r)
 }

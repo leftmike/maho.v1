@@ -56,13 +56,12 @@ func (s *Scanner) Init(rr io.RuneReader, fn string) {
 	s.filename = fn
 }
 
-func (s *Scanner) Scan(sctx *ScanCtx) rune {
+func (s *Scanner) Scan(sctx *ScanCtx) {
 	s.buffer.Reset()
 	sctx.Filename = s.filename
 	sctx.Line = 1
 	sctx.Column = 0
 	sctx.Token = s.scan(sctx)
-	return sctx.Token
 }
 
 func (s *Scanner) scan(sctx *ScanCtx) rune {

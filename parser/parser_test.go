@@ -27,11 +27,11 @@ func TestScan(t *testing.T) {
 
 	p = newParser(strings.NewReader(s), "scan")
 	for i := 0; i < len(tokens); i++ {
-		if i >= lookBack {
-			for j := 0; j < lookBack; j++ {
+		if i >= lookBackAmount {
+			for j := 0; j < lookBackAmount; j++ {
 				p.unscan()
 			}
-			for j := lookBack; j > 0; j-- {
+			for j := lookBackAmount; j > 0; j-- {
 				r := p.scan()
 				if tokens[i-j] != r {
 					t.Errorf("scan(%q) got %s want %s", s, token.Format(r),

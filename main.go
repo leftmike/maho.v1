@@ -10,8 +10,6 @@ To Do:
 - references in expressions
 
 - split out display info from ColumnType
-
-- fix parser.got()
 */
 
 import (

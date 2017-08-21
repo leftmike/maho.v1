@@ -58,9 +58,9 @@ func TestScan(t *testing.T) {
 		var s Scanner
 		s.Init(strings.NewReader(c.s), fmt.Sprintf("cases[%d]", i))
 		var sctx ScanCtx
-		r := s.Scan(&sctx)
-		if r != c.r {
-			t.Errorf("Scan(%q) got %d want %d", c.s, r, c.r)
+		s.Scan(&sctx)
+		if sctx.Token != c.r {
+			t.Errorf("Scan(%q) got %d want %d", c.s, sctx.Token, c.r)
 		}
 	}
 
@@ -80,9 +80,9 @@ func TestScan(t *testing.T) {
 		var s Scanner
 		s.Init(strings.NewReader(n.s), fmt.Sprintf("integers[%d]", i))
 		var sctx ScanCtx
-		r := s.Scan(&sctx)
-		if r != token.Integer {
-			t.Errorf("Scan(%q) got %d want Integer", n.s, r)
+		s.Scan(&sctx)
+		if sctx.Token != token.Integer {
+			t.Errorf("Scan(%q) got %d want Integer", n.s, sctx.Token)
 		}
 		if sctx.Integer != n.n {
 			t.Errorf("Scan(%q).Integer got %d want %d", n.s, sctx.Integer, n.n)
@@ -105,9 +105,9 @@ func TestScan(t *testing.T) {
 		var s Scanner
 		s.Init(strings.NewReader(n.s), fmt.Sprintf("doubles[%d]", i))
 		var sctx ScanCtx
-		r := s.Scan(&sctx)
-		if r != token.Double {
-			t.Errorf("Scan(%q) got %d want Double", n.s, r)
+		s.Scan(&sctx)
+		if sctx.Token != token.Double {
+			t.Errorf("Scan(%q) got %d want Double", n.s, sctx.Token)
 		}
 		if sctx.Double != n.n {
 			t.Errorf("Scan(%q).Double got %f want %f", n.s, sctx.Double, n.n)
@@ -140,9 +140,9 @@ abcd -- identifier
 		s.Init(strings.NewReader(src), "src")
 		for i, e := range expected {
 			var sctx ScanCtx
-			r := s.Scan(&sctx)
-			if r != e.ret {
-				t.Errorf("Scan(%q)[%d] got %d want %d", src, i, r, e.ret)
+			s.Scan(&sctx)
+			if sctx.Token != e.ret {
+				t.Errorf("Scan(%q)[%d] got %d want %d", src, i, sctx.Token, e.ret)
 			}
 			switch e.ret {
 			case token.Identifier:

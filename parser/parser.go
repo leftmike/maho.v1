@@ -22,8 +22,8 @@ const lookBackAmount = 3
 
 type parser struct {
 	scanner   scanner.Scanner
-	sctx      *scanner.ScanCtx
 	lookBack  [lookBackAmount]scanner.ScanCtx
+	sctx      *scanner.ScanCtx // = &lookBack[current]
 	current   uint
 	unscanned uint
 	scanned   rune
@@ -36,7 +36,6 @@ func NewParser(rr io.RuneReader, fn string) Parser {
 func newParser(rr io.RuneReader, fn string) *parser {
 	var p parser
 	p.scanner.Init(rr, fn)
-	p.sctx = &p.lookBack[0]
 	return &p
 }
 
@@ -66,29 +65,35 @@ func (p *parser) error(msg string) {
 }
 
 func (p *parser) scan() rune {
+	p.current = (p.current + 1) % lookBackAmount
+	p.sctx = &p.lookBack[p.current]
+
 	if p.unscanned > 0 {
 		p.unscanned -= 1
-		if p.unscanned > p.current {
-			return p.scanned[lookBack-(p.unscanned-p.current)]
+	} else {
+		p.scanner.Scan(p.sctx)
+		if p.sctx.Token == token.Error {
+			p.error(p.sctx.Error.Error())
 		}
-		return p.scanned[(p.current-p.unscanned)%lookBack]
 	}
-
-	p.current = (p.current + 1) % lookBack
-	p.sctx = &p.lookBack[p.current]
-	p.sctx.Token = p.scanner.Scan(p.sctx)
-	if p.sctx.Token == token.Error {
-		p.error(p.sctx.Error.Error())
-	}
-	return p.scanned[p.current]
+	return p.sctx.Token
 }
 
 func (p *parser) unscan() {
 	p.unscanned += 1
+	if p.unscanned > lookBackAmount {
+		panic("parser: too much lookback")
+	}
+	if p.current == 0 {
+		p.current = lookBackAmount - 1
+	} else {
+		p.current -= 1
+	}
+	p.sctx = &p.lookBack[p.current]
 }
 
 func (p *parser) got() string {
-	switch p.scanned[p.current] {
+	switch p.sctx.Token {
 	case token.EOF:
 		return fmt.Sprintf("end of file")
 	case token.Error:
@@ -105,7 +110,7 @@ func (p *parser) got() string {
 		return fmt.Sprintf("double %f", p.sctx.Double)
 	}
 
-	return fmt.Sprintf("rune %c", p.scanned)
+	return token.Format(p.sctx.Token)
 }
 
 func (p *parser) expectReserved(ids ...sql.Identifier) sql.Identifier {
@@ -535,9 +540,10 @@ func (p *parser) parseExpr() expr.Expr {
 	} else if r == token.Double {
 		e = &expr.Literal{p.sctx.Double}
 	} else if r == token.Identifier {
+		id := p.sctx.Identifier
 		if p.maybeToken(token.LParen) {
 			// <func> ( <expr> [,...] )
-			c := &expr.Call{Name: p.sctx.Identifier}
+			c := &expr.Call{Name: id}
 			if !p.maybeToken(token.RParen) {
 				for {
 					c.Args = append(c.Args, p.parseExpr())
