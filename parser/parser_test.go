@@ -288,20 +288,14 @@ func createTableEqual(stmt1 stmt.CreateTable, s2 stmt.Stmt) bool {
 	if !ok {
 		return false
 	}
-	if stmt1.Table.Database != stmt2.Table.Database || stmt1.Table.Table != stmt2.Table.Table ||
-		len(stmt1.Columns) != len(stmt2.Columns) ||
-		len(stmt1.ColumnTypes) != len(stmt2.ColumnTypes) {
+	if stmt1.Table != stmt2.Table {
 		return false
 	}
-	for i, c1 := range stmt1.Columns {
-		if c1 != stmt2.Columns[i] {
-			return false
-		}
+	if !reflect.DeepEqual(stmt1.Columns, stmt2.Columns) {
+		return false
 	}
-	for i, c1 := range stmt1.ColumnTypes {
-		if !reflect.DeepEqual(c1, stmt2.ColumnTypes[i]) {
-			return false
-		}
+	if !reflect.DeepEqual(stmt1.ColumnTypes, stmt2.ColumnTypes) {
+		return false
 	}
 	return true
 }
@@ -377,29 +371,14 @@ func insertValuesEqual(stmt1 stmt.InsertValues, s2 stmt.Stmt) bool {
 	if !ok {
 		return false
 	}
-	if stmt1.Table.Database != stmt2.Table.Database || stmt1.Table.Table != stmt2.Table.Table ||
-		len(stmt1.Columns) != len(stmt2.Columns) {
+	if stmt1.Table != stmt2.Table {
 		return false
 	}
-	for i, c1 := range stmt1.Columns {
-		if c1 != stmt2.Columns[i] {
-			return false
-		}
-	}
-
-	if len(stmt1.Rows) != len(stmt2.Rows) {
+	if !reflect.DeepEqual(stmt1.Columns, stmt2.Columns) {
 		return false
 	}
-	for i, r1 := range stmt1.Rows {
-		r2 := stmt2.Rows[i]
-		if len(r1) != len(r2) {
-			return false
-		}
-		for j, v1 := range r1 {
-			if !reflect.DeepEqual(v1, r2[j]) {
-				return false
-			}
-		}
+	if !reflect.DeepEqual(stmt1.Rows, stmt2.Rows) {
+		return false
 	}
 	return true
 }
@@ -453,4 +432,51 @@ func TestParseExpr(t *testing.T) {
 			t.Errorf("ParseExpr(%q) did not fail, got %s", f, e)
 		}
 	}
+}
+
+func TestSelect(t *testing.T) {
+	cases := []struct {
+		sql  string
+		stmt stmt.Select
+		fail bool
+	}{
+		{sql: "select", fail: true},
+	}
+
+	for i, c := range cases {
+		p := NewParser(strings.NewReader(c.sql), fmt.Sprintf("tests[%d]", i))
+		stmt, err := p.Parse()
+		if c.fail {
+			if err == nil {
+				t.Errorf("Parse(%q) did not fail", c.sql)
+			}
+		} else {
+			if err != nil {
+				t.Errorf("Parse(%q) failed with %s", c.sql, err)
+			} else if !selectEqual(c.stmt, stmt) {
+				t.Errorf("Parse(%q) got %s want %s", c.sql, stmt.String(), c.stmt.String())
+			}
+		}
+	}
+}
+
+func selectEqual(stmt1 stmt.Select, s2 stmt.Stmt) bool {
+	stmt2, ok := s2.(*stmt.Select)
+	if !ok {
+		return false
+	}
+	if !reflect.DeepEqual(stmt1.Where, stmt2.Where) {
+		return false
+	}
+
+	/*if stmt1.Table != stmt2.Table {
+		return false
+	}
+	if !reflect.DeepEqual(stmt1.Columns, stmt2.Columns) {
+		return false
+	}
+	if !reflect.DeepEqual(stmt1.Rows, stmt2.Rows) {
+		return false
+	}*/
+	return true
 }

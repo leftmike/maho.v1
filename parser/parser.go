@@ -675,19 +675,18 @@ func (p *parser) parseInsert() stmt.Stmt {
 }
 
 /*
-<select> = SELECT <select-list>
-    [FROM <from-item> [',' ...]]
-    [WHERE <expr>]
 <values> = VALUES '(' <expr> [',' ...] ')' [',' ...]
+
+<select> = SELECT <select-list>
+    [ FROM <from-item> [',' ...]]
+    [ WHERE <expr> ]
 <select-list> = '*'
     | <select-item> [',' ...]
 <select-item> = table '.' '*'
-    | <result-column> [[ AS ] column-alias]
-<result-column> = column
-    | table '.' column
-    | <expr>
-<from-item> = [ database-name '.' ] table-name [[ AS ] table-alias]
-    | '(' <select> | <values> ')' [[ AS ] table-alias]
+    | [ table '.' ] column [[ AS ] column-alias ]
+    | <expr> [[ AS ] column-alias ]
+<from-item> = [ database-name '.' ] table-name [[ AS ] table-alias ]
+    | '(' <select> | <values> ')' [[ AS ] table-alias ]
     | '(' <from-item> [',' ...] ')'
     | <from-item> [ NATURAL ] <join-type> <from-item> [ ON <expr> | USING '(' join-column ',' ...]
 <join-type> = [ INNER ] JOIN
@@ -698,41 +697,66 @@ func (p *parser) parseInsert() stmt.Stmt {
 */
 
 func (p *parser) parseSelect() stmt.Stmt {
-	/*
-		SELECT <select-expr> [, ...] FROM [database.]table [[ AS ] name] [WHERE <expr>]
-		<select-expr> = * | [table.]name [[ AS ] name] [, ...]
-	*/
-
 	var s stmt.Select
-	if p.maybeToken(token.Star) {
-		p.expectReserved(sql.FROM)
-	} else {
-		for done := false; !done; {
-			var tcr stmt.TableColumnResult
-			tcr.Column = p.expectIdentifier("expected a table or a column")
-			if p.maybeToken(token.Dot) {
-				tcr.Table = tcr.Column
-				tcr.Column = p.expectIdentifier("expected a column")
-			}
+	if !p.maybeToken(token.Star) {
+		for {
+			t := p.scan()
+			if t == token.Identifier {
+				tbl := p.sctx.Identifier
+				if p.maybeToken(token.Dot) {
+					if p.maybeToken(token.Star) {
+						// table '.' *
+						s.Results = append(s.Results, stmt.TableResult{tbl})
 
-			tcr.Alias = tcr.Column
+						if !p.maybeToken(token.Comma) {
+							break
+						}
+					}
+					p.unscan()
+				}
+			}
+			p.unscan()
+
+			e := p.parseExpr()
+			var a sql.Identifier
 			if p.optionalReserved(sql.AS) {
-				tcr.Alias = p.expectIdentifier("expected an alias")
+				a = p.expectIdentifier("expected an alias")
+			} else {
+				t := p.scan()
+				if t == token.Identifier {
+					a = p.sctx.Identifier
+				} else {
+					p.unscan()
+				}
 			}
 
-			if p.optionalReserved(sql.FROM) {
-				done = true
-			} else if !p.maybeToken(token.Comma) {
-				tcr.Alias = p.expectIdentifier("expected an alias")
-				p.expectTokens(token.Comma)
+			if ref, ok := e.(expr.Ref); ok && (len(ref) == 1 || len(ref) == 2) {
+				// [ table '.' ] column [[ AS ] column-alias]
+				var tcr stmt.TableColumnResult
+				if len(ref) == 1 {
+					tcr.Column = ref[0]
+				} else {
+					tcr.Table = ref[0]
+					tcr.Column = ref[1]
+				}
+				tcr.Alias = a
+				s.Results = append(s.Results, tcr)
+			} else {
+				// <expr> [[ AS ] column-alias]
+				s.Results = append(s.Results, stmt.ExprResult{e, a})
 			}
 
-			s.Results = append(s.Results, tcr)
+			if !p.maybeToken(token.Comma) {
+				break
+			}
 		}
-
 	}
 
-	p.parseTableAlias(&s.Table)
+	if p.optionalReserved(sql.FROM) {
+		var ta stmt.TableAlias
+		p.parseTableAlias(&ta)
+		s.From = stmt.FromTableAlias(ta)
+	}
 
 	if p.optionalReserved(sql.WHERE) {
 		s.Where = p.parseExpr()

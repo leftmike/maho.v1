@@ -6,6 +6,7 @@ To Do:
 - update t.Errorf to be "Operation(args) got %s want %s" and use %q for args
 - or "Operation(args) failed with %s" or "Operation(args) did not fail"
 
+- VALUES as a statement
 - finish parse and execute of select
 - references in expressions
 

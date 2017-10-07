@@ -8,56 +8,44 @@ import (
 	"maho/sql"
 )
 
-/*
-type Subquery interface {
-	subquery() bool
+type FromItem interface {
+	fmt.Stringer
 }
 
-type FromItem struct {
-	Alias    sql.Identifier
-	Subquery interface{} // Select, Values, TableName, or Join
+type FromTableAlias TableAlias
+
+/*
+type FromSelect struct {
+	Select Select
+	Alias  sql.Identifier
+}
+
+type FromValues struct {
+	Values Values
+	Alias  sql.Identifier
 }
 
 type JoinType int
 
 const (
-	PlainJoin = iota // JOIN
+	Join = iota // JOIN
 	InnerJoin
-	CrossJoin
 	LeftJoin
+	LeftOuterJoin
+	RightJoin
+	RightOuterJoin
+	FullJoin
+	FullOuterJoin
+	CrossJoin
 )
 
-type Join struct {
-	Left    interface{}
-	Right   interface{}
+type FromJoin struct {
+	Left    FromItem
+	Right   FromItem
 	Natural bool
-	Outer   bool
 	Type    JoinType
 	On      sql.Expr
 	Using   []sql.Identifier
-}
-
-type NewSelect struct {
-	Results []ResultColumn
-	From    FromItem
-	Where   sql.Expr
-}
-
-func (s *NewSelect) subquery() bool {
-	return true
-}
-
-func (s *NewSelect) AllResults() bool { // SELECT * ...
-	return s.Results == nil
-}
-*/
-
-/*
-OLD; delete
-type SelectResult struct {
-	Table  sql.Identifier
-	Column sql.Identifier
-	Alias  sql.Identifier
 }
 */
 
@@ -67,11 +55,6 @@ type SelectResult interface {
 
 type TableResult struct {
 	Table sql.Identifier
-}
-
-type ColumnResult struct {
-	Column sql.Identifier
-	Alias  sql.Identifier
 }
 
 type TableColumnResult struct {
@@ -86,28 +69,17 @@ type ExprResult struct {
 }
 
 type Select struct {
-	Table   TableAlias
 	Results []SelectResult
+	From    FromItem
 	Where   expr.Expr
 }
 
-func (stmt *Select) String() string {
-	s := "SELECT "
-	if stmt.Results == nil {
-		s += "*"
-	} else {
-		for i, sr := range stmt.Results {
-			if i > 0 {
-				s += ", "
-			}
-			s += sr.String()
-		}
-	}
-	s += fmt.Sprintf(" FROM %s", stmt.Table)
-	if stmt.Where != nil {
-		s += fmt.Sprintf(" WHERE %s", stmt.Where)
-	}
-	return s
+func (fta FromTableAlias) String() string {
+	return TableAlias(fta).String()
+}
+
+func (tr TableResult) String() string {
+	return fmt.Sprintf("%s.*", tr.Table)
 }
 
 func (tcr TableColumnResult) String() string {
@@ -123,14 +95,45 @@ func (tcr TableColumnResult) String() string {
 	return s
 }
 
+func (er ExprResult) String() string {
+	s := er.Expr.String()
+	if er.Alias != 0 {
+		s += fmt.Sprintf(" AS %s", er.Alias)
+	}
+	return s
+}
+
+func (stmt *Select) String() string {
+	s := "SELECT "
+	if stmt.Results == nil {
+		s += "*"
+	} else {
+		for i, sr := range stmt.Results {
+			if i > 0 {
+				s += ", "
+			}
+			s += sr.String()
+		}
+	}
+	s += fmt.Sprintf(" FROM %s", stmt.From)
+	if stmt.Where != nil {
+		s += fmt.Sprintf(" WHERE %s", stmt.Where)
+	}
+	return s
+}
+
 func (stmt *Select) Execute(e *engine.Engine) (interface{}, error) {
 	fmt.Println(stmt)
 
-	db, err := e.LookupDatabase(stmt.Table.Database)
+	fta, ok := stmt.From.(FromTableAlias)
+	if !ok {
+		return nil, fmt.Errorf("select: only table aliases supported now: %s", stmt.From)
+	}
+	db, err := e.LookupDatabase(fta.Database)
 	if err != nil {
 		return nil, err
 	}
-	tbl, err := db.Table(stmt.Table.Table)
+	tbl, err := db.Table(fta.Table)
 	if err != nil {
 		return nil, err
 	}
