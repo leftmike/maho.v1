@@ -173,11 +173,11 @@ var (
 func TestInsert(t *testing.T) {
 	dbase, err := store.Open("test", "test_insert")
 	if err != nil {
-		t.Error(err)
+		t.Fatal(err)
 	}
 	e, err := engine.Start(dbase)
 	if err != nil {
-		t.Error(err)
+		t.Fatal(err)
 	}
 
 	testInsert(t, e, dbase.(db.DatabaseModify), sql.ID("t"), insertColumns1, insertColumnTypes1,

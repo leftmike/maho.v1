@@ -222,7 +222,8 @@ func (p *parser) expectEOF() {
 }
 
 func (p *parser) parseStmt() stmt.Stmt {
-	switch p.expectReserved(sql.CREATE, sql.DELETE, sql.DROP, sql.INSERT, sql.SELECT, sql.UPDATE) {
+	switch p.expectReserved(sql.CREATE, sql.DELETE, sql.DROP, sql.INSERT, sql.SELECT, sql.UPDATE,
+		sql.VALUES) {
 	case sql.CREATE:
 		/*
 			CREATE [UNIQUE] INDEX [IF NOT EXISTS]
@@ -276,6 +277,11 @@ func (p *parser) parseStmt() stmt.Stmt {
 		*/
 		p.expectReserved(sql.INTO)
 		return p.parseInsert()
+	case sql.VALUES:
+		/*
+			VALUES
+		*/
+		return p.parseValues()
 	case sql.SELECT:
 		/*
 			SELECT
@@ -674,9 +680,38 @@ func (p *parser) parseInsert() stmt.Stmt {
 	return &s
 }
 
-/*
-<values> = VALUES '(' <expr> [',' ...] ')' [',' ...]
+func (p *parser) parseValues() stmt.Stmt {
+	/*
+	   VALUES '(' <expr> [',' ...] ')' [',' ...]
+	*/
 
+	var s stmt.Values
+	for {
+		var row []expr.Expr
+
+		p.expectTokens(token.LParen)
+		for {
+			row = append(row, p.parseExpr())
+			r := p.expectTokens(token.Comma, token.RParen)
+			if r == token.RParen {
+				break
+			}
+		}
+
+		if s.Rows != nil && len(s.Rows[0]) != len(row) {
+			p.error("values: all rows must have same number of columns")
+		}
+		s.Rows = append(s.Rows, row)
+
+		if !p.maybeToken(token.Comma) {
+			break
+		}
+	}
+
+	return &s
+}
+
+/*
 <select> = SELECT <select-list>
     [ FROM <from-item> [',' ...]]
     [ WHERE <expr> ]

@@ -294,10 +294,7 @@ func createTableEqual(stmt1 stmt.CreateTable, s2 stmt.Stmt) bool {
 	if !reflect.DeepEqual(stmt1.Columns, stmt2.Columns) {
 		return false
 	}
-	if !reflect.DeepEqual(stmt1.ColumnTypes, stmt2.ColumnTypes) {
-		return false
-	}
-	return true
+	return reflect.DeepEqual(stmt1.ColumnTypes, stmt2.ColumnTypes)
 }
 
 func TestInsertValues(t *testing.T) {
@@ -377,10 +374,7 @@ func insertValuesEqual(stmt1 stmt.InsertValues, s2 stmt.Stmt) bool {
 	if !reflect.DeepEqual(stmt1.Columns, stmt2.Columns) {
 		return false
 	}
-	if !reflect.DeepEqual(stmt1.Rows, stmt2.Rows) {
-		return false
-	}
-	return true
+	return reflect.DeepEqual(stmt1.Rows, stmt2.Rows)
 }
 
 func TestParseExpr(t *testing.T) {
@@ -468,15 +462,66 @@ func selectEqual(stmt1 stmt.Select, s2 stmt.Stmt) bool {
 	if !reflect.DeepEqual(stmt1.Where, stmt2.Where) {
 		return false
 	}
+	if !reflect.DeepEqual(stmt1.From, stmt2.From) {
+		return false
+	}
+	return reflect.DeepEqual(stmt1.Where, stmt2.Where)
+}
 
-	/*if stmt1.Table != stmt2.Table {
+func TestValues(t *testing.T) {
+	cases := []struct {
+		sql  string
+		stmt stmt.Values
+		fail bool
+	}{
+		{sql: "values", fail: true},
+		{sql: "values (", fail: true},
+		{sql: "values ()", fail: true},
+		{sql: "values (1", fail: true},
+		{sql: "values (1, 2", fail: true},
+		{sql: "values (1 2)", fail: true},
+		{sql: "values (1, 2), (3)", fail: true},
+		{sql: "values (1, 2, 3), (4, 5), (6, 7, 8)", fail: true},
+		{
+			sql: "values (1, 'abc', true)",
+			stmt: stmt.Values{
+				Rows: [][]expr.Expr{
+					{&expr.Literal{int64(1)}, &expr.Literal{"abc"}, &expr.Literal{true}},
+				},
+			},
+		},
+		{
+			sql: "values (1, 'abc', true), (2, 'def', false)",
+			stmt: stmt.Values{
+				Rows: [][]expr.Expr{
+					{&expr.Literal{int64(1)}, &expr.Literal{"abc"}, &expr.Literal{true}},
+					{&expr.Literal{int64(2)}, &expr.Literal{"def"}, &expr.Literal{false}},
+				},
+			},
+		},
+	}
+
+	for i, c := range cases {
+		p := NewParser(strings.NewReader(c.sql), fmt.Sprintf("tests[%d]", i))
+		stmt, err := p.Parse()
+		if c.fail {
+			if err == nil {
+				t.Errorf("Parse(%q) did not fail", c.sql)
+			}
+		} else {
+			if err != nil {
+				t.Errorf("Parse(%q) failed with %s", c.sql, err)
+			} else if !valuesEqual(c.stmt, stmt) {
+				t.Errorf("Parse(%q) got %s want %s", c.sql, stmt.String(), c.stmt.String())
+			}
+		}
+	}
+}
+
+func valuesEqual(stmt1 stmt.Values, s2 stmt.Stmt) bool {
+	stmt2, ok := s2.(*stmt.Values)
+	if !ok {
 		return false
 	}
-	if !reflect.DeepEqual(stmt1.Columns, stmt2.Columns) {
-		return false
-	}
-	if !reflect.DeepEqual(stmt1.Rows, stmt2.Rows) {
-		return false
-	}*/
-	return true
+	return reflect.DeepEqual(stmt1.Rows, stmt2.Rows)
 }
