@@ -746,6 +746,7 @@ func (p *parser) parseSelect() stmt.Stmt {
 						if !p.maybeToken(token.Comma) {
 							break
 						}
+						continue
 					}
 					p.unscan()
 				}

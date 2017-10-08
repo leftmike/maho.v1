@@ -435,6 +435,156 @@ func TestSelect(t *testing.T) {
 		fail bool
 	}{
 		{sql: "select", fail: true},
+		{sql: "select *, * from t", fail: true},
+		{sql: "select c, * from t", fail: true},
+		{sql: "select c, from t", fail: true},
+		{sql: "select t.c, c, * from t", fail: true},
+		{
+			sql:  "select *",
+			stmt: stmt.Select{},
+		},
+		{
+			sql: "select * from t",
+			stmt: stmt.Select{
+				From: stmt.FromTableAlias{
+					TableName: stmt.TableName{Table: sql.ID("t")},
+					Alias:     sql.ID("t"),
+				},
+			},
+		},
+		{
+			sql: "select * from t where x > 1",
+			stmt: stmt.Select{
+				From: stmt.FromTableAlias{
+					TableName: stmt.TableName{Table: sql.ID("t")},
+					Alias:     sql.ID("t"),
+				},
+				Where: &expr.Binary{expr.GreaterThanOp,
+					&expr.Ref{sql.ID("x")},
+					&expr.Literal{int64(1)}},
+			},
+		},
+		{
+			sql: "select c from t",
+			stmt: stmt.Select{
+				From: stmt.FromTableAlias{
+					TableName: stmt.TableName{Table: sql.ID("t")},
+					Alias:     sql.ID("t"),
+				},
+				Results: []stmt.SelectResult{
+					stmt.TableColumnResult{Column: sql.ID("c")},
+				},
+			},
+		},
+		{
+			sql: "select c1, c2, t.c3 from t",
+			stmt: stmt.Select{
+				From: stmt.FromTableAlias{
+					TableName: stmt.TableName{Table: sql.ID("t")},
+					Alias:     sql.ID("t"),
+				},
+				Results: []stmt.SelectResult{
+					stmt.TableColumnResult{Column: sql.ID("c1")},
+					stmt.TableColumnResult{Column: sql.ID("c2")},
+					stmt.TableColumnResult{
+						Table:  sql.ID("t"),
+						Column: sql.ID("c3"),
+					},
+				},
+			},
+		},
+		{
+			sql: "select t.*, c1, c2 from t",
+			stmt: stmt.Select{
+				From: stmt.FromTableAlias{
+					TableName: stmt.TableName{Table: sql.ID("t")},
+					Alias:     sql.ID("t"),
+				},
+				Results: []stmt.SelectResult{
+					stmt.TableResult{sql.ID("t")},
+					stmt.TableColumnResult{Column: sql.ID("c1")},
+					stmt.TableColumnResult{Column: sql.ID("c2")},
+				},
+			},
+		},
+		{
+			sql: "select c1, t.*, c2 from t",
+			stmt: stmt.Select{
+				From: stmt.FromTableAlias{
+					TableName: stmt.TableName{Table: sql.ID("t")},
+					Alias:     sql.ID("t"),
+				},
+				Results: []stmt.SelectResult{
+					stmt.TableColumnResult{Column: sql.ID("c1")},
+					stmt.TableResult{sql.ID("t")},
+					stmt.TableColumnResult{Column: sql.ID("c2")},
+				},
+			},
+		},
+		{
+			sql: "select c1, c2, t.* from t",
+			stmt: stmt.Select{
+				From: stmt.FromTableAlias{
+					TableName: stmt.TableName{Table: sql.ID("t")},
+					Alias:     sql.ID("t"),
+				},
+				Results: []stmt.SelectResult{
+					stmt.TableColumnResult{Column: sql.ID("c1")},
+					stmt.TableColumnResult{Column: sql.ID("c2")},
+					stmt.TableResult{sql.ID("t")},
+				},
+			},
+		},
+		{
+			sql: "select t2.c1 as a1, c2 as a2 from t",
+			stmt: stmt.Select{
+				From: stmt.FromTableAlias{
+					TableName: stmt.TableName{Table: sql.ID("t")},
+					Alias:     sql.ID("t"),
+				},
+				Results: []stmt.SelectResult{
+					stmt.TableColumnResult{
+						Column: sql.ID("c1"),
+						Table:  sql.ID("t2"),
+						Alias:  sql.ID("a1"),
+					},
+					stmt.TableColumnResult{Column: sql.ID("c2"), Alias: sql.ID("a2")},
+				},
+			},
+		},
+		{
+			sql: "select t2.c1 a1, c2 a2 from t",
+			stmt: stmt.Select{
+				From: stmt.FromTableAlias{
+					TableName: stmt.TableName{Table: sql.ID("t")},
+					Alias:     sql.ID("t"),
+				},
+				Results: []stmt.SelectResult{
+					stmt.TableColumnResult{
+						Column: sql.ID("c1"),
+						Table:  sql.ID("t2"),
+						Alias:  sql.ID("a1"),
+					},
+					stmt.TableColumnResult{Column: sql.ID("c2"), Alias: sql.ID("a2")},
+				},
+			},
+		},
+		{
+			sql: "select c1 + c2 as a from t",
+			stmt: stmt.Select{
+				From: stmt.FromTableAlias{
+					TableName: stmt.TableName{Table: sql.ID("t")},
+					Alias:     sql.ID("t"),
+				},
+				Results: []stmt.SelectResult{
+					stmt.ExprResult{
+						Expr: &expr.Binary{expr.AddOp,
+							&expr.Ref{sql.ID("c1")}, &expr.Ref{sql.ID("c2")}},
+						Alias: sql.ID("a"),
+					},
+				},
+			},
+		},
 	}
 
 	for i, c := range cases {
@@ -459,13 +609,22 @@ func selectEqual(stmt1 stmt.Select, s2 stmt.Stmt) bool {
 	if !ok {
 		return false
 	}
-	if !reflect.DeepEqual(stmt1.Where, stmt2.Where) {
+
+	if len(stmt1.Results) != len(stmt2.Results) {
 		return false
 	}
+	for i := range stmt1.Results {
+		if !stmt.SelectResultEqual(stmt1.Results[i], stmt2.Results[i]) {
+			return false
+		}
+	}
+
+	// XXX: Likely need to switch to an interface specific DeepEqual
 	if !reflect.DeepEqual(stmt1.From, stmt2.From) {
 		return false
 	}
-	return reflect.DeepEqual(stmt1.Where, stmt2.Where)
+
+	return expr.DeepEqual(stmt1.Where, stmt2.Where)
 }
 
 func TestValues(t *testing.T) {

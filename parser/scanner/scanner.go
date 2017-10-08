@@ -187,6 +187,7 @@ func (s *Scanner) readRune(sctx *ScanCtx) rune {
 	var err error
 	s.read, _, err = s.rr.ReadRune()
 	if err == io.EOF {
+		s.read = token.EOF
 		return token.EOF
 	} else if err != nil {
 		sctx.Error = err

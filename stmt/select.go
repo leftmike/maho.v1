@@ -89,7 +89,7 @@ func (tcr TableColumnResult) String() string {
 	} else {
 		s = fmt.Sprintf("%s.%s", tcr.Table, tcr.Column)
 	}
-	if tcr.Table != tcr.Alias {
+	if tcr.Alias != 0 {
 		s += fmt.Sprintf(" AS %s", tcr.Alias)
 	}
 	return s
@@ -139,4 +139,24 @@ func (stmt *Select) Execute(e *engine.Engine) (interface{}, error) {
 	}
 
 	return tbl.Rows()
+}
+
+func SelectResultEqual(sr1, sr2 SelectResult) bool {
+	switch sr1 := sr1.(type) {
+	case TableResult:
+		if sr2, ok := sr2.(TableResult); ok {
+			return sr1 == sr2
+		}
+	case TableColumnResult:
+		if sr2, ok := sr2.(TableColumnResult); ok {
+			return sr1 == sr2
+		}
+	case ExprResult:
+		if sr2, ok := sr2.(ExprResult); ok {
+			return sr1.Alias == sr2.Alias && expr.DeepEqual(sr1.Expr, sr2.Expr)
+		}
+	default:
+		panic(fmt.Sprintf("unexpected type for SelectResult: %T: %v", sr1, sr1))
+	}
+	return false
 }
