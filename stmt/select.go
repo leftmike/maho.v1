@@ -2,7 +2,6 @@ package stmt
 
 import (
 	"fmt"
-	"reflect"
 
 	"maho/engine"
 	"maho/expr"
@@ -11,7 +10,6 @@ import (
 
 type FromItem interface {
 	fmt.Stringer
-	equal(fi FromItem) bool
 }
 
 type FromTableAlias TableAlias
@@ -91,13 +89,6 @@ func (fta FromTableAlias) String() string {
 	return TableAlias(fta).String()
 }
 
-func (fta FromTableAlias) equal(fi FromItem) bool {
-	if fta2, ok := fi.(FromTableAlias); ok && fta == fta2 {
-		return true
-	}
-	return false
-}
-
 func (fs FromSelect) String() string {
 	s := fmt.Sprintf("(%s)", fs.Select.String())
 	if fs.Alias != 0 {
@@ -106,20 +97,12 @@ func (fs FromSelect) String() string {
 	return s
 }
 
-func (_ FromSelect) equal(fi FromItem) bool {
-	return false // XXX: investigate reflect.DeepEqual and why it is failing
-}
-
 func (fv FromValues) String() string {
 	s := fmt.Sprintf("(%s)", fv.Values.String())
 	if fv.Alias != 0 {
 		s += fmt.Sprintf(" AS %s", fv.Alias)
 	}
 	return s
-}
-
-func (_ FromValues) equal(fi FromItem) bool {
-	return false // XXX: investigate reflect.DeepEqual and why it is failing
 }
 
 func (jt JoinType) String() string {
@@ -147,16 +130,6 @@ func (fj FromJoin) String() string {
 		s += ")"
 	}
 	return s
-}
-
-func (fj FromJoin) equal(fi FromItem) bool {
-	fj2, ok := fi.(FromJoin)
-	if !ok {
-		return false
-	}
-	return FromItemEqual(fj.Left, fj2.Left) && FromItemEqual(fj.Right, fj2.Right) &&
-		fj.Natural == fj2.Natural && fj.Type == fj2.Type && expr.DeepEqual(fj.On, fj2.On) &&
-		reflect.DeepEqual(fj.Using, fj2.Using)
 }
 
 func (tr TableResult) String() string {
@@ -220,31 +193,4 @@ func (stmt *Select) Execute(e *engine.Engine) (interface{}, error) {
 	}
 
 	return tbl.Rows()
-}
-
-func SelectResultEqual(sr1, sr2 SelectResult) bool {
-	switch sr1 := sr1.(type) {
-	case TableResult:
-		if sr2, ok := sr2.(TableResult); ok {
-			return sr1 == sr2
-		}
-	case TableColumnResult:
-		if sr2, ok := sr2.(TableColumnResult); ok {
-			return sr1 == sr2
-		}
-	case ExprResult:
-		if sr2, ok := sr2.(ExprResult); ok {
-			return sr1.Alias == sr2.Alias && expr.DeepEqual(sr1.Expr, sr2.Expr)
-		}
-	default:
-		panic(fmt.Sprintf("unexpected type for SelectResult: %T: %v", sr1, sr1))
-	}
-	return false
-}
-
-func FromItemEqual(fi1, fi2 FromItem) bool {
-	if fi1 == nil {
-		return fi2 == nil
-	}
-	return fi1.equal(fi2)
 }

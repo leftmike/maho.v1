@@ -2,7 +2,6 @@ package parser
 
 import (
 	"fmt"
-	"reflect"
 	"strings"
 	"testing"
 
@@ -11,6 +10,7 @@ import (
 	"maho/parser/token"
 	"maho/sql"
 	"maho/stmt"
+	"maho/test"
 )
 
 func TestScan(t *testing.T) {
@@ -268,7 +268,7 @@ c2 boolean not null default true)`,
 
 	for i, c := range cases {
 		p := NewParser(strings.NewReader(c.sql), fmt.Sprintf("tests[%d]", i))
-		stmt, err := p.Parse()
+		cs, err := p.Parse()
 		if c.fail {
 			if err == nil {
 				t.Errorf("Parse(%q) did not fail", c.sql)
@@ -276,25 +276,11 @@ c2 boolean not null default true)`,
 		} else {
 			if err != nil {
 				t.Errorf("Parse(%q) failed with %s", c.sql, err)
-			} else if !createTableEqual(c.stmt, stmt) {
-				t.Errorf("Parse(%q) got %s want %s", c.sql, stmt.String(), c.stmt.String())
+			} else if cs, ok := cs.(*stmt.CreateTable); !ok || !test.DeepEqual(&c.stmt, cs) {
+				t.Errorf("Parse(%q) got %s want %s", c.sql, cs.String(), c.stmt.String())
 			}
 		}
 	}
-}
-
-func createTableEqual(stmt1 stmt.CreateTable, s2 stmt.Stmt) bool {
-	stmt2, ok := s2.(*stmt.CreateTable)
-	if !ok {
-		return false
-	}
-	if stmt1.Table != stmt2.Table {
-		return false
-	}
-	if !reflect.DeepEqual(stmt1.Columns, stmt2.Columns) {
-		return false
-	}
-	return reflect.DeepEqual(stmt1.ColumnTypes, stmt2.ColumnTypes)
 }
 
 func TestInsertValues(t *testing.T) {
@@ -348,7 +334,7 @@ func TestInsertValues(t *testing.T) {
 
 	for i, c := range cases {
 		p := NewParser(strings.NewReader(c.sql), fmt.Sprintf("tests[%d]", i))
-		stmt, err := p.Parse()
+		is, err := p.Parse()
 		if c.fail {
 			if err == nil {
 				t.Errorf("Parse(%q) did not fail", c.sql)
@@ -356,25 +342,11 @@ func TestInsertValues(t *testing.T) {
 		} else {
 			if err != nil {
 				t.Errorf("Parse(%q) failed with %s", c.sql, err)
-			} else if !insertValuesEqual(c.stmt, stmt) {
-				t.Errorf("Parse(%q) got %s want %s", c.sql, stmt.String(), c.stmt.String())
+			} else if is, ok := is.(*stmt.InsertValues); !ok || !test.DeepEqual(&c.stmt, is) {
+				t.Errorf("Parse(%q) got %s want %s", c.sql, is.String(), c.stmt.String())
 			}
 		}
 	}
-}
-
-func insertValuesEqual(stmt1 stmt.InsertValues, s2 stmt.Stmt) bool {
-	stmt2, ok := s2.(*stmt.InsertValues)
-	if !ok {
-		return false
-	}
-	if stmt1.Table != stmt2.Table {
-		return false
-	}
-	if !reflect.DeepEqual(stmt1.Columns, stmt2.Columns) {
-		return false
-	}
-	return reflect.DeepEqual(stmt1.Rows, stmt2.Rows)
 }
 
 func TestParseExpr(t *testing.T) {
@@ -460,7 +432,7 @@ func TestSelect(t *testing.T) {
 					Alias:     sql.ID("t"),
 				},
 				Where: &expr.Binary{expr.GreaterThanOp,
-					&expr.Ref{sql.ID("x")},
+					expr.Ref{sql.ID("x")},
 					&expr.Literal{int64(1)}},
 			},
 		},
@@ -579,7 +551,7 @@ func TestSelect(t *testing.T) {
 				Results: []stmt.SelectResult{
 					stmt.ExprResult{
 						Expr: &expr.Binary{expr.AddOp,
-							&expr.Ref{sql.ID("c1")}, &expr.Ref{sql.ID("c2")}},
+							expr.Ref{sql.ID("c1")}, expr.Ref{sql.ID("c2")}},
 						Alias: sql.ID("a"),
 					},
 				},
@@ -693,7 +665,7 @@ func TestSelect(t *testing.T) {
 						TableName: stmt.TableName{Table: sql.ID("t2")}, Alias: sql.ID("t2")},
 					Type: stmt.InnerJoin,
 					On: &expr.Binary{expr.GreaterThanOp,
-						&expr.Ref{sql.ID("c1")}, &expr.Literal{int64(5)}},
+						expr.Ref{sql.ID("c1")}, &expr.Literal{int64(5)}},
 				},
 			},
 		},
@@ -723,7 +695,7 @@ func TestSelect(t *testing.T) {
 
 	for i, c := range cases {
 		p := NewParser(strings.NewReader(c.sql), fmt.Sprintf("tests[%d]", i))
-		stmt, err := p.Parse()
+		ss, err := p.Parse()
 		if c.fail {
 			if err == nil {
 				t.Errorf("Parse(%q) did not fail", c.sql)
@@ -731,33 +703,11 @@ func TestSelect(t *testing.T) {
 		} else {
 			if err != nil {
 				t.Errorf("Parse(%q) failed with %s", c.sql, err)
-			} else if !selectEqual(c.stmt, stmt) {
-				t.Errorf("Parse(%q) got %s want %s", c.sql, stmt.String(), c.stmt.String())
+			} else if ss, ok := ss.(*stmt.Select); !ok || !test.DeepEqual(&c.stmt, ss) {
+				t.Errorf("Parse(%q) got %s want %s", c.sql, ss.String(), c.stmt.String())
 			}
 		}
 	}
-}
-
-func selectEqual(stmt1 stmt.Select, s2 stmt.Stmt) bool {
-	stmt2, ok := s2.(*stmt.Select)
-	if !ok {
-		return false
-	}
-
-	if len(stmt1.Results) != len(stmt2.Results) {
-		return false
-	}
-	for i := range stmt1.Results {
-		if !stmt.SelectResultEqual(stmt1.Results[i], stmt2.Results[i]) {
-			return false
-		}
-	}
-
-	if !stmt.FromItemEqual(stmt1.From, stmt2.From) {
-		return false
-	}
-
-	return expr.DeepEqual(stmt1.Where, stmt2.Where)
 }
 
 func TestValues(t *testing.T) {
@@ -795,7 +745,7 @@ func TestValues(t *testing.T) {
 
 	for i, c := range cases {
 		p := NewParser(strings.NewReader(c.sql), fmt.Sprintf("tests[%d]", i))
-		stmt, err := p.Parse()
+		vs, err := p.Parse()
 		if c.fail {
 			if err == nil {
 				t.Errorf("Parse(%q) did not fail", c.sql)
@@ -803,17 +753,9 @@ func TestValues(t *testing.T) {
 		} else {
 			if err != nil {
 				t.Errorf("Parse(%q) failed with %s", c.sql, err)
-			} else if !valuesEqual(c.stmt, stmt) {
-				t.Errorf("Parse(%q) got %s want %s", c.sql, stmt.String(), c.stmt.String())
+			} else if vs, ok := vs.(*stmt.Values); !ok || !test.DeepEqual(&c.stmt, vs) {
+				t.Errorf("Parse(%q) got %s want %s", c.sql, vs.String(), c.stmt.String())
 			}
 		}
 	}
-}
-
-func valuesEqual(stmt1 stmt.Values, s2 stmt.Stmt) bool {
-	stmt2, ok := s2.(*stmt.Values)
-	if !ok {
-		return false
-	}
-	return reflect.DeepEqual(stmt1.Rows, stmt2.Rows)
 }
