@@ -431,8 +431,7 @@ func TestSelect(t *testing.T) {
 					TableName: stmt.TableName{Table: sql.ID("t")},
 					Alias:     sql.ID("t"),
 				},
-				Where: &expr.Binary{expr.GreaterThanOp,
-					expr.Ref{sql.ID("x")},
+				Where: &expr.Binary{expr.GreaterThanOp, expr.Ref{sql.ID("x")},
 					&expr.Literal{int64(1)}},
 			},
 		},
@@ -821,6 +820,115 @@ func TestValues(t *testing.T) {
 				t.Errorf("Parse(%q) failed with %s", c.sql, err)
 			} else if vs, ok := vs.(*stmt.Values); !ok || !test.DeepEqual(&c.stmt, vs) {
 				t.Errorf("Parse(%q) got %s want %s", c.sql, vs.String(), c.stmt.String())
+			}
+		}
+	}
+}
+
+func TestDelete(t *testing.T) {
+	cases := []struct {
+		sql  string
+		stmt stmt.Delete
+		fail bool
+	}{
+		{sql: "delete", fail: true},
+		{sql: "delete t", fail: true},
+		{sql: "delete from", fail: true},
+		{sql: "delete from t1, t2", fail: true},
+		{sql: "delete from t where", fail: true},
+		{
+			sql: "delete from t",
+			stmt: stmt.Delete{
+				Table: stmt.TableName{Table: sql.ID("t")},
+			},
+		},
+		{
+			sql: "delete from t where c > 1",
+			stmt: stmt.Delete{
+				Table: stmt.TableName{Table: sql.ID("t")},
+				Where: &expr.Binary{expr.GreaterThanOp, expr.Ref{sql.ID("c")},
+					&expr.Literal{int64(1)}},
+			},
+		},
+	}
+
+	for i, c := range cases {
+		p := NewParser(strings.NewReader(c.sql), fmt.Sprintf("tests[%d]", i))
+		ds, err := p.Parse()
+		if c.fail {
+			if err == nil {
+				t.Errorf("Parse(%q) did not fail", c.sql)
+			}
+		} else {
+			if err != nil {
+				t.Errorf("Parse(%q) failed with %s", c.sql, err)
+			} else if ds, ok := ds.(*stmt.Delete); !ok || !test.DeepEqual(&c.stmt, ds) {
+				t.Errorf("Parse(%q) got %s want %s", c.sql, ds.String(), c.stmt.String())
+			}
+		}
+	}
+}
+
+func TestUpdate(t *testing.T) {
+	cases := []struct {
+		sql  string
+		stmt stmt.Update
+		fail bool
+	}{
+		{sql: "update", fail: true},
+		{sql: "update t", fail: true},
+		{sql: "update t set", fail: true},
+		{sql: "update set t c = 5", fail: true},
+		{sql: "update t c = 5", fail: true},
+		{sql: "update t set c = 5,", fail: true},
+		{sql: "update t set c = 5, where", fail: true},
+		{sql: "update t set c = 5 where", fail: true},
+		{sql: "update t set where c = 6", fail: true},
+		{
+			sql: "update t set c = 5",
+			stmt: stmt.Update{
+				Table: stmt.TableName{Table: sql.ID("t")},
+				ColumnUpdates: []stmt.ColumnUpdate{
+					{Column: sql.ID("c"), Expr: &expr.Literal{int64(5)}},
+				},
+			},
+		},
+		{
+			sql: "update t set c = 0 where c > 1",
+			stmt: stmt.Update{
+				Table: stmt.TableName{Table: sql.ID("t")},
+				ColumnUpdates: []stmt.ColumnUpdate{
+					{Column: sql.ID("c"), Expr: &expr.Literal{int64(0)}},
+				},
+				Where: &expr.Binary{expr.GreaterThanOp, expr.Ref{sql.ID("c")},
+					&expr.Literal{int64(1)}},
+			},
+		},
+		{
+			sql: "update t set c1 = 1, c2 = 2, c3 = 3",
+			stmt: stmt.Update{
+				Table: stmt.TableName{Table: sql.ID("t")},
+				ColumnUpdates: []stmt.ColumnUpdate{
+					{Column: sql.ID("c1"), Expr: &expr.Literal{int64(1)}},
+					{Column: sql.ID("c2"), Expr: &expr.Literal{int64(2)}},
+					{Column: sql.ID("c3"), Expr: &expr.Literal{int64(3)}},
+				},
+			},
+		},
+	}
+
+	for i, c := range cases {
+		p := NewParser(strings.NewReader(c.sql), fmt.Sprintf("tests[%d]", i))
+		us, err := p.Parse()
+		if c.fail {
+			if err == nil {
+				t.Errorf("Parse(%q) did not fail", c.sql)
+			}
+		} else {
+			if err != nil {
+				t.Errorf("Parse(%q) failed with %s", c.sql, err)
+			} else if us, ok := us.(*stmt.Update); !ok || !test.DeepEqual(&c.stmt, us) {
+				t.Errorf("Parse(%q) got %s want %s", c.sql, us.String(), c.stmt.String())
 			}
 		}
 	}

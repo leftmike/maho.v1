@@ -60,6 +60,7 @@ const (
 	OUTER
 	RIGHT
 	SELECT
+	SET
 	TABLE
 	TEMP
 	TEMPORARY
@@ -121,6 +122,7 @@ var knownKeywords = map[string]struct {
 	"OUTER":     {OUTER, true},
 	"RIGHT":     {RIGHT, true},
 	"SELECT":    {SELECT, true},
+	"SET":       {SET, true},
 	"SMALLINT":  {SMALLINT, false},
 	"TABLE":     {TABLE, true},
 	"TEMP":      {TEMP, true},

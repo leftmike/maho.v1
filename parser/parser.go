@@ -465,8 +465,14 @@ func (p *parser) parseCreateColumns(s *stmt.CreateTable) {
 }
 
 func (p *parser) parseDelete() stmt.Stmt {
-	p.error("DELETE not implemented")
-	return nil
+	// DELETE FROM [ database-name '.'] table-name [WHERE <expr>]
+	var s stmt.Delete
+	p.parseTableName(&s.Table)
+	if p.optionalReserved(sql.WHERE) {
+		s.Where = p.parseExpr()
+	}
+
+	return &s
 }
 
 func (p *parser) parseDropTable() stmt.Stmt {
@@ -906,6 +912,25 @@ func (p *parser) parseFromList() stmt.FromItem {
 }
 
 func (p *parser) parseUpdate() stmt.Stmt {
-	p.error("UPDATE not implemented")
-	return nil
+	// UPDATE [ database-name '.'] table-name SET column '=' <expr> [',' ...] [WHERE <expr>]
+	var s stmt.Update
+	p.parseTableName(&s.Table)
+	p.expectReserved(sql.SET)
+
+	for {
+		var cu stmt.ColumnUpdate
+		cu.Column = p.expectIdentifier("expected a column name")
+		p.expectTokens(token.Equal)
+		cu.Expr = p.parseExpr()
+		s.ColumnUpdates = append(s.ColumnUpdates, cu)
+		if !p.maybeToken(token.Comma) {
+			break
+		}
+	}
+
+	if p.optionalReserved(sql.WHERE) {
+		s.Where = p.parseExpr()
+	}
+
+	return &s
 }

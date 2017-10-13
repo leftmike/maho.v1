@@ -6,9 +6,9 @@ To Do:
 - update t.Errorf to be "Operation(args) got %s want %s" and use %q for args
 - or "Operation(args) failed with %s" or "Operation(args) did not fail"
 
-- parse DELETE and UPDATE
-
-- execute of select
+- execute DELETE
+- execute UPDATE
+- execute SELECT
 - , => CROSS JOIN => INNER JOIN ON (TRUE); is CrossJoin necessary?
 - references in expressions
 
