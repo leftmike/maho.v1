@@ -7,6 +7,7 @@ To Do:
 - or "Operation(args) failed with %s" or "Operation(args) did not fail"
 
 - finish parse and execute of select
+- , => CROSS JOIN => INNER JOIN ON (TRUE); is CrossJoin necessary?
 - references in expressions
 
 - split out display info from ColumnType

@@ -37,19 +37,28 @@ const (
 	AND Identifier = -(iota + 1)
 	AS
 	CREATE
+	CROSS
 	DEFAULT
 	DELETE
 	DROP
 	EXISTS
 	FALSE
 	FROM
+	FULL
 	IF
 	INDEX
+	INNER
 	INSERT
 	INTO
+	JOIN
+	LEFT
+	NATURAL
 	NOT
 	NULL
+	ON
 	OR
+	OUTER
+	RIGHT
 	SELECT
 	TABLE
 	TEMP
@@ -57,6 +66,7 @@ const (
 	TRUE
 	UNIQUE
 	UPDATE
+	USING
 	VALUES
 	WHERE
 )
@@ -84,6 +94,7 @@ var knownKeywords = map[string]struct {
 	"BOOLEAN":   {BOOLEAN, false},
 	"CHAR":      {CHAR, false},
 	"CREATE":    {CREATE, true},
+	"CROSS":     {CROSS, true},
 	"DEFAULT":   {DEFAULT, true},
 	"DELETE":    {DELETE, true},
 	"DOUBLE":    {DOUBLE, false},
@@ -91,16 +102,24 @@ var knownKeywords = map[string]struct {
 	"EXISTS":    {EXISTS, true},
 	"FALSE":     {FALSE, true},
 	"FROM":      {FROM, true},
+	"FULL":      {FULL, true},
 	"IF":        {IF, true},
 	"INDEX":     {INDEX, true},
+	"INNER":     {INNER, true},
 	"INSERT":    {INSERT, true},
 	"INT":       {INT, false},
 	"INTEGER":   {INTEGER, false},
 	"INTO":      {INTO, true},
+	"JOIN":      {JOIN, true},
+	"LEFT":      {LEFT, true},
 	"MEDIUMINT": {MEDIUMINT, false},
+	"NATURAL":   {NATURAL, true},
 	"NOT":       {NOT, true},
 	"NULL":      {NULL, true},
+	"ON":        {ON, true},
 	"OR":        {OR, true},
+	"OUTER":     {OUTER, true},
+	"RIGHT":     {RIGHT, true},
 	"SELECT":    {SELECT, true},
 	"SMALLINT":  {SMALLINT, false},
 	"TABLE":     {TABLE, true},
@@ -111,6 +130,7 @@ var knownKeywords = map[string]struct {
 	"TRUE":      {TRUE, true},
 	"UNIQUE":    {UNIQUE, true},
 	"UPDATE":    {UPDATE, true},
+	"USING":     {USING, true},
 	"VALUES":    {VALUES, true},
 	"VARBINARY": {VARBINARY, false},
 	"VARCHAR":   {VARCHAR, false},

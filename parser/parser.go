@@ -720,15 +720,6 @@ func (p *parser) parseValues() stmt.Stmt {
 <select-item> = table '.' '*'
     | [ table '.' ] column [[ AS ] column-alias ]
     | <expr> [[ AS ] column-alias ]
-<from-item> = [ database-name '.' ] table-name [[ AS ] table-alias ]
-    | '(' <select> | <values> ')' [[ AS ] table-alias ]
-    | '(' <from-item> [',' ...] ')'
-    | <from-item> [ NATURAL ] <join-type> <from-item> [ ON <expr> | USING '(' join-column ',' ...]
-<join-type> = [ INNER ] JOIN
-    | LEFT [ OUTER ] JOIN
-    | RIGHT [ OUTER ] JOIN
-    | FULL [ OUTER ] JOIN
-    | CROSS JOIN
 */
 
 func (p *parser) parseSelect() stmt.Stmt {
@@ -789,9 +780,7 @@ func (p *parser) parseSelect() stmt.Stmt {
 	}
 
 	if p.optionalReserved(sql.FROM) {
-		var ta stmt.TableAlias
-		p.parseTableAlias(&ta)
-		s.From = stmt.FromTableAlias(ta)
+		s.From = p.parseFromList()
 	}
 
 	if p.optionalReserved(sql.WHERE) {
@@ -799,6 +788,120 @@ func (p *parser) parseSelect() stmt.Stmt {
 	}
 
 	return &s
+}
+
+/*
+<from-item> = [ database-name '.' ] table-name [[ AS ] table-alias ]
+    | '(' <select> | <values> ')' [[ AS ] table-alias ]
+    | '(' <from-item> [',' ...] ')'
+    | <from-item> [ NATURAL ] <join-type> <from-item> [ ON <expr> | USING '(' join-column ',' ...]
+<join-type> = [ INNER ] JOIN
+    | LEFT [ OUTER ] JOIN
+    | RIGHT [ OUTER ] JOIN
+    | FULL [ OUTER ] JOIN
+    | CROSS JOIN
+*/
+
+func (p *parser) parseFromItem() stmt.FromItem {
+	var fi stmt.FromItem
+	if p.maybeToken(token.LParen) {
+		// XXX: check for SELECT or VALUES here; remember AS table-alias
+		fi = p.parseFromList()
+		p.expectTokens(token.RParen)
+	} else {
+		var ta stmt.TableAlias
+		p.parseTableAlias(&ta)
+		fi = stmt.FromTableAlias(ta)
+	}
+
+	var nj bool
+	if p.optionalReserved(sql.NATURAL) {
+		nj = true
+	}
+
+	jt := stmt.NoJoin
+	if p.optionalReserved(sql.JOIN) {
+		jt = stmt.Join
+	} else if p.optionalReserved(sql.INNER) {
+		p.expectReserved(sql.JOIN)
+		jt = stmt.InnerJoin
+	} else if p.optionalReserved(sql.LEFT) {
+		if p.optionalReserved(sql.OUTER) {
+			jt = stmt.LeftOuterJoin
+		} else {
+			jt = stmt.LeftJoin
+		}
+		p.expectReserved(sql.JOIN)
+	} else if p.optionalReserved(sql.RIGHT) {
+		if p.optionalReserved(sql.OUTER) {
+			jt = stmt.RightOuterJoin
+		} else {
+			jt = stmt.RightJoin
+		}
+		p.expectReserved(sql.JOIN)
+	} else if p.optionalReserved(sql.FULL) {
+		if p.optionalReserved(sql.OUTER) {
+			jt = stmt.FullOuterJoin
+		} else {
+			jt = stmt.FullJoin
+		}
+		p.expectReserved(sql.JOIN)
+	} else if p.optionalReserved(sql.CROSS) {
+		p.expectReserved(sql.JOIN)
+		jt = stmt.CrossJoin
+	}
+
+	if jt == stmt.NoJoin {
+		return fi
+	}
+
+	fj := stmt.FromJoin{Left: fi, Right: p.parseFromItem(), Natural: nj, Type: jt}
+	if p.optionalReserved(sql.ON) {
+		fj.On = p.parseExpr()
+	} else if p.optionalReserved(sql.USING) {
+		p.expectTokens(token.LParen)
+		for {
+			nam := p.expectIdentifier("expected a column name")
+			for _, c := range fj.Using {
+				if c == nam {
+					p.error(fmt.Sprintf("duplicate column %s", nam))
+				}
+			}
+			fj.Using = append(fj.Using, nam)
+			r := p.expectTokens(token.Comma, token.RParen)
+			if r == token.RParen {
+				break
+			}
+		}
+	}
+
+	if jt == stmt.InnerJoin || jt == stmt.LeftOuterJoin || jt == stmt.RightOuterJoin ||
+		jt == stmt.FullOuterJoin {
+		if nj {
+			if fj.On != nil || fj.Using != nil {
+				p.error(fmt.Sprintf("%s must have one of NATURAL, ON, or USING", jt))
+			}
+		} else if fj.On != nil && fj.Using != nil {
+			p.error(fmt.Sprintf("%s must have one of NATURAL, ON, or USING", jt))
+		} else if fj.On == nil && fj.Using == nil {
+			p.error(fmt.Sprintf("%s must have one of NATURAL, ON, or USING", jt))
+		}
+	}
+	if jt == stmt.CrossJoin {
+		if nj || fj.On != nil || fj.Using != nil {
+			p.error("CROSS JOIN may not have NATURAL, ON, or USING")
+		}
+	}
+
+	return fj
+}
+
+func (p *parser) parseFromList() stmt.FromItem {
+	fi := p.parseFromItem()
+	for p.maybeToken(token.Comma) {
+		fi = stmt.FromJoin{Left: fi, Right: p.parseFromItem(), Type: stmt.CrossJoin}
+	}
+	return fi
 }
 
 func (p *parser) parseUpdate() stmt.Stmt {
