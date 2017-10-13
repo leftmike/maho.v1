@@ -15,12 +15,12 @@ type FromItem interface {
 type FromTableAlias TableAlias
 
 type FromSelect struct {
-	Select Select
+	Select *Select
 	Alias  sql.Identifier
 }
 
 type FromValues struct {
-	Values Values
+	Values *Values
 	Alias  sql.Identifier
 }
 

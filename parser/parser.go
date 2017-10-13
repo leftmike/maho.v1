@@ -312,19 +312,21 @@ func (p *parser) parseTableName(tbl *stmt.TableName) {
 	}
 }
 
+func (p *parser) parseAlias(a sql.Identifier) sql.Identifier {
+	if p.optionalReserved(sql.AS) {
+		return p.expectIdentifier("expected an alias")
+	}
+	r := p.scan()
+	if r == token.Identifier {
+		return p.sctx.Identifier
+	}
+	p.unscan()
+	return a
+}
+
 func (p *parser) parseTableAlias(ta *stmt.TableAlias) {
 	p.parseTableName(&ta.TableName)
-	if p.optionalReserved(sql.AS) {
-		ta.Alias = p.expectIdentifier("expected an alias")
-	} else {
-		r := p.scan()
-		if r == token.Identifier {
-			ta.Alias = p.sctx.Identifier
-		} else {
-			p.unscan()
-			ta.Alias = ta.Table
-		}
-	}
+	ta.Alias = p.parseAlias(ta.Table)
 }
 
 func (p *parser) parseCreateTable(tmp bool, not bool) stmt.Stmt {
@@ -680,7 +682,7 @@ func (p *parser) parseInsert() stmt.Stmt {
 	return &s
 }
 
-func (p *parser) parseValues() stmt.Stmt {
+func (p *parser) parseValues() *stmt.Values {
 	/*
 	   VALUES '(' <expr> [',' ...] ')' [',' ...]
 	*/
@@ -722,7 +724,7 @@ func (p *parser) parseValues() stmt.Stmt {
     | <expr> [[ AS ] column-alias ]
 */
 
-func (p *parser) parseSelect() stmt.Stmt {
+func (p *parser) parseSelect() *stmt.Select {
 	var s stmt.Select
 	if !p.maybeToken(token.Star) {
 		for {
@@ -745,17 +747,7 @@ func (p *parser) parseSelect() stmt.Stmt {
 			p.unscan()
 
 			e := p.parseExpr()
-			var a sql.Identifier
-			if p.optionalReserved(sql.AS) {
-				a = p.expectIdentifier("expected an alias")
-			} else {
-				t := p.scan()
-				if t == token.Identifier {
-					a = p.sctx.Identifier
-				} else {
-					p.unscan()
-				}
-			}
+			a := p.parseAlias(0)
 
 			if ref, ok := e.(expr.Ref); ok && (len(ref) == 1 || len(ref) == 2) {
 				// [ table '.' ] column [[ AS ] column-alias]
@@ -805,9 +797,18 @@ func (p *parser) parseSelect() stmt.Stmt {
 func (p *parser) parseFromItem() stmt.FromItem {
 	var fi stmt.FromItem
 	if p.maybeToken(token.LParen) {
-		// XXX: check for SELECT or VALUES here; remember AS table-alias
-		fi = p.parseFromList()
-		p.expectTokens(token.RParen)
+		if p.optionalReserved(sql.SELECT) {
+			ss := p.parseSelect()
+			p.expectTokens(token.RParen)
+			fi = stmt.FromSelect{Select: ss, Alias: p.parseAlias(0)}
+		} else if p.optionalReserved(sql.VALUES) {
+			vs := p.parseValues()
+			p.expectTokens(token.RParen)
+			fi = stmt.FromValues{Values: vs, Alias: p.parseAlias(0)}
+		} else {
+			fi = p.parseFromList()
+			p.expectTokens(token.RParen)
+		}
 	} else {
 		var ta stmt.TableAlias
 		p.parseTableAlias(&ta)

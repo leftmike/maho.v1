@@ -691,6 +691,72 @@ func TestSelect(t *testing.T) {
 		{sql: "select * from t1 cross join t2 using (c1, c2)", fail: true},
 		{sql: "select * from t1 inner join t2 using ()", fail: true},
 		{sql: "select * from t1 inner join t2 using (c1, c1)", fail: true},
+		{
+			sql: "select * from (select * from t1) join t2",
+			stmt: stmt.Select{
+				From: stmt.FromJoin{
+					Left: stmt.FromSelect{
+						Select: &stmt.Select{
+							From: stmt.FromTableAlias{
+								TableName: stmt.TableName{Table: sql.ID("t1")},
+								Alias:     sql.ID("t1"),
+							},
+						},
+					},
+					Right: stmt.FromTableAlias{
+						TableName: stmt.TableName{Table: sql.ID("t2")},
+						Alias:     sql.ID("t2"),
+					},
+					Type: stmt.Join,
+				},
+			},
+		},
+		{
+			sql: "select * from t2 join (values (1, 'abc', true))",
+			stmt: stmt.Select{
+				From: stmt.FromJoin{
+					Left: stmt.FromTableAlias{
+						TableName: stmt.TableName{Table: sql.ID("t2")},
+						Alias:     sql.ID("t2"),
+					},
+					Right: stmt.FromValues{
+						Values: &stmt.Values{
+							Rows: [][]expr.Expr{
+								{&expr.Literal{int64(1)}, &expr.Literal{"abc"},
+									&expr.Literal{true}},
+							},
+						},
+					},
+					Type: stmt.Join,
+				},
+			},
+		},
+		{
+			sql: "select * from (select * from t1) s1 join (values (1, 'abc', true)) as v1",
+			stmt: stmt.Select{
+				From: stmt.FromJoin{
+					Left: stmt.FromSelect{
+						Select: &stmt.Select{
+							From: stmt.FromTableAlias{
+								TableName: stmt.TableName{Table: sql.ID("t1")},
+								Alias:     sql.ID("t1"),
+							},
+						},
+						Alias: sql.ID("s1"),
+					},
+					Right: stmt.FromValues{
+						Values: &stmt.Values{
+							Rows: [][]expr.Expr{
+								{&expr.Literal{int64(1)}, &expr.Literal{"abc"},
+									&expr.Literal{true}},
+							},
+						},
+						Alias: sql.ID("v1"),
+					},
+					Type: stmt.Join,
+				},
+			},
+		},
 	}
 
 	for i, c := range cases {
