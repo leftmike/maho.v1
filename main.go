@@ -6,11 +6,15 @@ To Do:
 - update t.Errorf to be "Operation(args) got %s want %s" and use %q for args
 - or "Operation(args) failed with %s" or "Operation(args) did not fail"
 
+- references in expressions
 - execute DELETE
 - execute UPDATE
 - execute SELECT
 - , => CROSS JOIN => INNER JOIN ON (TRUE); is CrossJoin necessary?
-- references in expressions
+- func ProcessFrom(fi stmt.FromItem) db.Rows
+- func ProcessWhere(rows db.Rows, e expr.Expr) db.Rows
+- maybe ProcessWhere should be a method on db.Rows or a new interface RowsWhere
+- likely need augmented column information
 
 - split out display info from ColumnType
 */

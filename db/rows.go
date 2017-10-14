@@ -10,7 +10,10 @@ type Rows interface {
 	Next(dest []sql.Value) error
 }
 
+/*
+XXX: remove from store/basic and store/test as well
 type RowsColumnType interface {
 	Rows
 	ColumnTypes() []ColumnType
 }
+*/
