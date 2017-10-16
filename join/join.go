@@ -7,19 +7,30 @@ import (
 	"maho/engine"
 	"maho/expr"
 	"maho/sql"
-	"maho/stmt"
 )
 
-type FromTableAlias stmt.TableAlias
-
-type FromSelect struct {
-	Select *stmt.Select
-	Alias  sql.Identifier
+type FromItem interface {
+	fmt.Stringer
+	Rows(e *engine.Engine) (db.Rows, error)
 }
 
-type FromValues struct {
-	Values *stmt.Values
-	Alias  sql.Identifier
+type FromTableAlias struct {
+	Database sql.Identifier
+	Table    sql.Identifier
+	Alias    sql.Identifier
+}
+
+/*
+- package query
+- type Rows interface { db.Rows }
+- query.Where(engine, rows, cond) (query.Rows, error)
+- move join to query
+- Rows(engine) (query.Rows, error) // instead of db.Rows
+*/
+
+type FromStmt struct {
+	Stmt  FromItem
+	Alias sql.Identifier
 }
 
 type JoinType int
@@ -50,8 +61,8 @@ var joinType = map[JoinType]string{
 }
 
 type FromJoin struct {
-	Left    stmt.FromItem
-	Right   stmt.FromItem
+	Left    FromItem
+	Right   FromItem
 	Natural bool
 	Type    JoinType
 	On      expr.Expr
@@ -59,10 +70,19 @@ type FromJoin struct {
 }
 
 func (fta FromTableAlias) String() string {
-	return stmt.TableAlias(fta).String()
+	var s string
+	if fta.Database == 0 {
+		s = fta.Table.String()
+	} else {
+		s = fmt.Sprintf("%s.%s", fta.Database, fta.Table)
+	}
+	if fta.Table != fta.Alias {
+		s += fmt.Sprintf(" AS %s", fta.Alias)
+	}
+	return s
 }
 
-func (fta FromTableAlias) Join(e *engine.Engine) (db.Rows, error) {
+func (fta FromTableAlias) Rows(e *engine.Engine) (db.Rows, error) {
 	db, err := e.LookupDatabase(fta.Database)
 	if err != nil {
 		return nil, err
@@ -75,28 +95,16 @@ func (fta FromTableAlias) Join(e *engine.Engine) (db.Rows, error) {
 	return tbl.Rows()
 }
 
-func (fs FromSelect) String() string {
-	s := fmt.Sprintf("(%s)", fs.Select.String())
+func (fs FromStmt) String() string {
+	s := fmt.Sprintf("(%s)", fs.Stmt.String())
 	if fs.Alias != 0 {
 		s += fmt.Sprintf(" AS %s", fs.Alias)
 	}
 	return s
 }
 
-func (fs FromSelect) Join(e *engine.Engine) (db.Rows, error) {
-	return nil, fmt.Errorf("FromSelect not implemented yet")
-}
-
-func (fv FromValues) String() string {
-	s := fmt.Sprintf("(%s)", fv.Values.String())
-	if fv.Alias != 0 {
-		s += fmt.Sprintf(" AS %s", fv.Alias)
-	}
-	return s
-}
-
-func (fv FromValues) Join(e *engine.Engine) (db.Rows, error) {
-	return nil, fmt.Errorf("FromValues not implemented yet")
+func (fs FromStmt) Rows(e *engine.Engine) (db.Rows, error) {
+	return fs.Stmt.Rows(e)
 }
 
 func (jt JoinType) String() string {
@@ -126,6 +134,6 @@ func (fj FromJoin) String() string {
 	return s
 }
 
-func (fj FromJoin) Join(e *engine.Engine) (db.Rows, error) {
+func (fj FromJoin) Rows(e *engine.Engine) (db.Rows, error) {
 	return nil, fmt.Errorf("FromJoin not implemented yet")
 }

@@ -11,10 +11,7 @@ To Do:
 - execute UPDATE
 - execute SELECT
 - , => CROSS JOIN => INNER JOIN ON (TRUE); is CrossJoin necessary?
-- func ProcessFrom(fi stmt.FromItem) db.Rows
-- func ProcessWhere(rows db.Rows, e expr.Expr) db.Rows
-- maybe ProcessWhere should be a method on db.Rows or a new interface RowsWhere
-- likely need augmented column information
+- FromJoin.Rows()
 
 - split out display info from ColumnType
 */

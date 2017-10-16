@@ -11,7 +11,7 @@ import (
 
 type FromItem interface {
 	fmt.Stringer
-	Join(e *engine.Engine) (db.Rows, error)
+	Rows(e *engine.Engine) (db.Rows, error)
 }
 
 type SelectResult interface {
@@ -86,8 +86,29 @@ func (stmt *Select) String() string {
 func (stmt *Select) Execute(e *engine.Engine) (interface{}, error) {
 	fmt.Println(stmt)
 
+	return stmt.Rows(e)
+}
+
+func (stmt *Select) Rows(e *engine.Engine) (db.Rows, error) {
 	if stmt.From == nil {
 		return nil, fmt.Errorf("SELECT with no FROM clause is not supported yet")
 	}
-	return stmt.From.Join(e)
+	rows, err := stmt.From.Rows(e)
+	if err != nil {
+		return nil, err
+	}
+	if stmt.Where != nil {
+		/*
+			rows, err = query.Where(e, rows, stmt.Where)
+			if err != nil {
+				return nil, err
+			}
+		*/
+		ctx, _ := rows.(expr.CompileContext) // XXX
+		_, err := expr.Compile(ctx, stmt.Where)
+		if err != nil {
+			return nil, err
+		}
+	}
+	return rows, nil
 }

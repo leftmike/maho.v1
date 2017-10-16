@@ -53,8 +53,9 @@ func TestInsertValues(t *testing.T) {
 func TestSelect(t *testing.T) {
 	s := stmt.Select{
 		From: join.FromTableAlias{
-			stmt.TableName{sql.QuotedID("db"), sql.QuotedID("tbl")},
-			sql.QuotedID("alias"),
+			Database: sql.ID("db"),
+			Table:    sql.ID("tbl"),
+			Alias:    sql.ID("alias"),
 		},
 	}
 	r := "SELECT * FROM db.tbl AS alias"

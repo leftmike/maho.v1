@@ -7,7 +7,7 @@ import (
 )
 
 type CompileContext interface {
-	Simplify() bool
+	Reference(r Ref) (int, error)
 }
 
 func Compile(ctx CompileContext, e Expr) (CExpr, error) {

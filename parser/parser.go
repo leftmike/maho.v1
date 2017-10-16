@@ -707,10 +707,10 @@ func (p *parser) parseValues() *stmt.Values {
 			}
 		}
 
-		if s.Rows != nil && len(s.Rows[0]) != len(row) {
+		if s.Expressions != nil && len(s.Expressions[0]) != len(row) {
 			p.error("values: all rows must have same number of columns")
 		}
-		s.Rows = append(s.Rows, row)
+		s.Expressions = append(s.Expressions, row)
 
 		if !p.maybeToken(token.Comma) {
 			break
@@ -807,11 +807,11 @@ func (p *parser) parseFromItem() stmt.FromItem {
 		if p.optionalReserved(sql.SELECT) {
 			ss := p.parseSelect()
 			p.expectTokens(token.RParen)
-			fi = join.FromSelect{Select: ss, Alias: p.parseAlias(0)}
+			fi = join.FromStmt{Stmt: ss, Alias: p.parseAlias(0)}
 		} else if p.optionalReserved(sql.VALUES) {
 			vs := p.parseValues()
 			p.expectTokens(token.RParen)
-			fi = join.FromValues{Values: vs, Alias: p.parseAlias(0)}
+			fi = join.FromStmt{Stmt: vs, Alias: p.parseAlias(0)}
 		} else {
 			fi = p.parseFromList()
 			p.expectTokens(token.RParen)
@@ -819,7 +819,7 @@ func (p *parser) parseFromItem() stmt.FromItem {
 	} else {
 		var ta stmt.TableAlias
 		p.parseTableAlias(&ta)
-		fi = join.FromTableAlias(ta)
+		fi = join.FromTableAlias{Database: ta.Database, Table: ta.Table, Alias: ta.Alias}
 	}
 
 	var nj bool
