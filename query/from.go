@@ -3,14 +3,13 @@ package query
 import (
 	"fmt"
 
-	"maho/db"
 	"maho/engine"
 	"maho/sql"
 )
 
 type FromItem interface {
 	fmt.Stringer
-	Rows(e *engine.Engine) (db.Rows, error)
+	Rows(e *engine.Engine) (Rows, error)
 }
 
 type FromTableAlias struct {
@@ -37,7 +36,7 @@ func (fta FromTableAlias) String() string {
 	return s
 }
 
-func (fta FromTableAlias) Rows(e *engine.Engine) (db.Rows, error) {
+func (fta FromTableAlias) Rows(e *engine.Engine) (Rows, error) {
 	db, err := e.LookupDatabase(fta.Database)
 	if err != nil {
 		return nil, err
@@ -58,6 +57,6 @@ func (fs FromStmt) String() string {
 	return s
 }
 
-func (fs FromStmt) Rows(e *engine.Engine) (db.Rows, error) {
+func (fs FromStmt) Rows(e *engine.Engine) (Rows, error) {
 	return fs.Stmt.Rows(e)
 }

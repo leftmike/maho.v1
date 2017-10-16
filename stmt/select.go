@@ -3,16 +3,11 @@ package stmt
 import (
 	"fmt"
 
-	"maho/db"
 	"maho/engine"
 	"maho/expr"
+	"maho/query"
 	"maho/sql"
 )
-
-type FromItem interface {
-	fmt.Stringer
-	Rows(e *engine.Engine) (db.Rows, error)
-}
 
 type SelectResult interface {
 	fmt.Stringer
@@ -35,7 +30,7 @@ type ExprResult struct {
 
 type Select struct {
 	Results []SelectResult
-	From    FromItem
+	From    query.FromItem
 	Where   expr.Expr
 }
 
@@ -89,7 +84,7 @@ func (stmt *Select) Execute(e *engine.Engine) (interface{}, error) {
 	return stmt.Rows(e)
 }
 
-func (stmt *Select) Rows(e *engine.Engine) (db.Rows, error) {
+func (stmt *Select) Rows(e *engine.Engine) (query.Rows, error) {
 	if stmt.From == nil {
 		return nil, fmt.Errorf("SELECT with no FROM clause is not supported yet")
 	}
@@ -98,14 +93,7 @@ func (stmt *Select) Rows(e *engine.Engine) (db.Rows, error) {
 		return nil, err
 	}
 	if stmt.Where != nil {
-		/*
-			rows, err = query.Where(e, rows, stmt.Where)
-			if err != nil {
-				return nil, err
-			}
-		*/
-		ctx, _ := rows.(expr.CompileContext) // XXX
-		_, err := expr.Compile(ctx, stmt.Where)
+		rows, err = query.Where(e, rows, stmt.Where)
 		if err != nil {
 			return nil, err
 		}

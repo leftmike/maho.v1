@@ -4,9 +4,9 @@ import (
 	"fmt"
 	"io"
 
-	"maho/db"
 	"maho/engine"
 	"maho/expr"
+	"maho/query"
 	"maho/sql"
 )
 
@@ -49,7 +49,7 @@ func (stmt *Values) Execute(e *engine.Engine) (interface{}, error) {
 	return stmt.Rows(e)
 }
 
-func (stmt *Values) Rows(e *engine.Engine) (db.Rows, error) {
+func (stmt *Values) Rows(e *engine.Engine) (query.Rows, error) {
 	columns := make([]sql.Identifier, len(stmt.Expressions[0]))
 	for i := 0; i < len(columns); i++ {
 		columns[i] = sql.ID(fmt.Sprintf("column-%d", i+1))

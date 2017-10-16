@@ -14,10 +14,6 @@ To Do:
 - FromJoin.Rows()
 
 - split out display info from ColumnType
-
-- type Rows interface { db.Rows }
-- query.Where(engine, rows, cond) (query.Rows, error)
-- Rows(engine) (query.Rows, error) // instead of db.Rows
 */
 
 import (

@@ -3,7 +3,6 @@ package query
 import (
 	"fmt"
 
-	"maho/db"
 	"maho/engine"
 	"maho/expr"
 	"maho/sql"
@@ -72,6 +71,6 @@ func (fj FromJoin) String() string {
 	return s
 }
 
-func (fj FromJoin) Rows(e *engine.Engine) (db.Rows, error) {
+func (fj FromJoin) Rows(e *engine.Engine) (Rows, error) {
 	return nil, fmt.Errorf("FromJoin not implemented yet")
 }

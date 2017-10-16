@@ -801,8 +801,8 @@ func (p *parser) parseSelect() *stmt.Select {
     | CROSS JOIN
 */
 
-func (p *parser) parseFromItem() stmt.FromItem {
-	var fi stmt.FromItem
+func (p *parser) parseFromItem() query.FromItem {
+	var fi query.FromItem
 	if p.maybeToken(token.LParen) {
 		if p.optionalReserved(sql.SELECT) {
 			ss := p.parseSelect()
@@ -904,7 +904,7 @@ func (p *parser) parseFromItem() stmt.FromItem {
 	return fj
 }
 
-func (p *parser) parseFromList() stmt.FromItem {
+func (p *parser) parseFromList() query.FromItem {
 	fi := p.parseFromItem()
 	for p.maybeToken(token.Comma) {
 		fi = query.FromJoin{Left: fi, Right: p.parseFromItem(), Type: query.CrossJoin}
