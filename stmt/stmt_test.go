@@ -3,7 +3,7 @@ package stmt_test
 import (
 	"testing"
 
-	"maho/join"
+	"maho/query"
 	"maho/sql"
 	"maho/stmt"
 )
@@ -52,7 +52,7 @@ func TestInsertValues(t *testing.T) {
 
 func TestSelect(t *testing.T) {
 	s := stmt.Select{
-		From: join.FromTableAlias{
+		From: query.FromTableAlias{
 			Database: sql.ID("db"),
 			Table:    sql.ID("tbl"),
 			Alias:    sql.ID("alias"),

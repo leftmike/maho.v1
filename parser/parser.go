@@ -7,9 +7,9 @@ import (
 
 	"maho/db"
 	"maho/expr"
-	"maho/join"
 	"maho/parser/scanner"
 	"maho/parser/token"
+	"maho/query"
 	"maho/sql"
 	"maho/stmt"
 )
@@ -807,11 +807,11 @@ func (p *parser) parseFromItem() stmt.FromItem {
 		if p.optionalReserved(sql.SELECT) {
 			ss := p.parseSelect()
 			p.expectTokens(token.RParen)
-			fi = join.FromStmt{Stmt: ss, Alias: p.parseAlias(0)}
+			fi = query.FromStmt{Stmt: ss, Alias: p.parseAlias(0)}
 		} else if p.optionalReserved(sql.VALUES) {
 			vs := p.parseValues()
 			p.expectTokens(token.RParen)
-			fi = join.FromStmt{Stmt: vs, Alias: p.parseAlias(0)}
+			fi = query.FromStmt{Stmt: vs, Alias: p.parseAlias(0)}
 		} else {
 			fi = p.parseFromList()
 			p.expectTokens(token.RParen)
@@ -819,7 +819,7 @@ func (p *parser) parseFromItem() stmt.FromItem {
 	} else {
 		var ta stmt.TableAlias
 		p.parseTableAlias(&ta)
-		fi = join.FromTableAlias{Database: ta.Database, Table: ta.Table, Alias: ta.Alias}
+		fi = query.FromTableAlias{Database: ta.Database, Table: ta.Table, Alias: ta.Alias}
 	}
 
 	var nj bool
@@ -827,43 +827,43 @@ func (p *parser) parseFromItem() stmt.FromItem {
 		nj = true
 	}
 
-	jt := join.NoJoin
+	jt := query.NoJoin
 	if p.optionalReserved(sql.JOIN) {
-		jt = join.Join
+		jt = query.Join
 	} else if p.optionalReserved(sql.INNER) {
 		p.expectReserved(sql.JOIN)
-		jt = join.InnerJoin
+		jt = query.InnerJoin
 	} else if p.optionalReserved(sql.LEFT) {
 		if p.optionalReserved(sql.OUTER) {
-			jt = join.LeftOuterJoin
+			jt = query.LeftOuterJoin
 		} else {
-			jt = join.LeftJoin
+			jt = query.LeftJoin
 		}
 		p.expectReserved(sql.JOIN)
 	} else if p.optionalReserved(sql.RIGHT) {
 		if p.optionalReserved(sql.OUTER) {
-			jt = join.RightOuterJoin
+			jt = query.RightOuterJoin
 		} else {
-			jt = join.RightJoin
+			jt = query.RightJoin
 		}
 		p.expectReserved(sql.JOIN)
 	} else if p.optionalReserved(sql.FULL) {
 		if p.optionalReserved(sql.OUTER) {
-			jt = join.FullOuterJoin
+			jt = query.FullOuterJoin
 		} else {
-			jt = join.FullJoin
+			jt = query.FullJoin
 		}
 		p.expectReserved(sql.JOIN)
 	} else if p.optionalReserved(sql.CROSS) {
 		p.expectReserved(sql.JOIN)
-		jt = join.CrossJoin
+		jt = query.CrossJoin
 	}
 
-	if jt == join.NoJoin {
+	if jt == query.NoJoin {
 		return fi
 	}
 
-	fj := join.FromJoin{Left: fi, Right: p.parseFromItem(), Natural: nj, Type: jt}
+	fj := query.FromJoin{Left: fi, Right: p.parseFromItem(), Natural: nj, Type: jt}
 	if p.optionalReserved(sql.ON) {
 		fj.On = p.parseExpr()
 	} else if p.optionalReserved(sql.USING) {
@@ -883,8 +883,8 @@ func (p *parser) parseFromItem() stmt.FromItem {
 		}
 	}
 
-	if jt == join.InnerJoin || jt == join.LeftOuterJoin || jt == join.RightOuterJoin ||
-		jt == join.FullOuterJoin {
+	if jt == query.InnerJoin || jt == query.LeftOuterJoin || jt == query.RightOuterJoin ||
+		jt == query.FullOuterJoin {
 		if nj {
 			if fj.On != nil || fj.Using != nil {
 				p.error(fmt.Sprintf("%s must have one of NATURAL, ON, or USING", jt))
@@ -895,7 +895,7 @@ func (p *parser) parseFromItem() stmt.FromItem {
 			p.error(fmt.Sprintf("%s must have one of NATURAL, ON, or USING", jt))
 		}
 	}
-	if jt == join.CrossJoin {
+	if jt == query.CrossJoin {
 		if nj || fj.On != nil || fj.Using != nil {
 			p.error("CROSS JOIN may not have NATURAL, ON, or USING")
 		}
@@ -907,7 +907,7 @@ func (p *parser) parseFromItem() stmt.FromItem {
 func (p *parser) parseFromList() stmt.FromItem {
 	fi := p.parseFromItem()
 	for p.maybeToken(token.Comma) {
-		fi = join.FromJoin{Left: fi, Right: p.parseFromItem(), Type: join.CrossJoin}
+		fi = query.FromJoin{Left: fi, Right: p.parseFromItem(), Type: query.CrossJoin}
 	}
 	return fi
 }
