@@ -741,7 +741,7 @@ func (p *parser) parseSelect() *stmt.Select {
 				if p.maybeToken(token.Dot) {
 					if p.maybeToken(token.Star) {
 						// table '.' *
-						s.Results = append(s.Results, stmt.TableResult{tbl})
+						s.Results = append(s.Results, query.TableResult{tbl})
 
 						if !p.maybeToken(token.Comma) {
 							break
@@ -758,7 +758,7 @@ func (p *parser) parseSelect() *stmt.Select {
 
 			if ref, ok := e.(expr.Ref); ok && (len(ref) == 1 || len(ref) == 2) {
 				// [ table '.' ] column [[ AS ] column-alias]
-				var tcr stmt.TableColumnResult
+				var tcr query.TableColumnResult
 				if len(ref) == 1 {
 					tcr.Column = ref[0]
 				} else {
@@ -769,7 +769,7 @@ func (p *parser) parseSelect() *stmt.Select {
 				s.Results = append(s.Results, tcr)
 			} else {
 				// <expr> [[ AS ] column-alias]
-				s.Results = append(s.Results, stmt.ExprResult{e, a})
+				s.Results = append(s.Results, query.ExprResult{e, a})
 			}
 
 			if !p.maybeToken(token.Comma) {
@@ -807,11 +807,11 @@ func (p *parser) parseFromItem() query.FromItem {
 		if p.optionalReserved(sql.SELECT) {
 			ss := p.parseSelect()
 			p.expectTokens(token.RParen)
-			fi = query.FromStmt{Stmt: ss, Alias: p.parseAlias(0)}
+			fi = query.FromSelect{Select: query.Select(*ss), Alias: p.parseAlias(0)}
 		} else if p.optionalReserved(sql.VALUES) {
 			vs := p.parseValues()
 			p.expectTokens(token.RParen)
-			fi = query.FromStmt{Stmt: vs, Alias: p.parseAlias(0)}
+			fi = query.FromValues{Values: query.Values(*vs), Alias: p.parseAlias(0)}
 		} else {
 			fi = p.parseFromList()
 			p.expectTokens(token.RParen)

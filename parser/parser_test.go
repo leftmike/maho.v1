@@ -443,8 +443,8 @@ func TestSelect(t *testing.T) {
 					Table: sql.ID("t"),
 					Alias: sql.ID("t"),
 				},
-				Results: []stmt.SelectResult{
-					stmt.TableColumnResult{Column: sql.ID("c")},
+				Results: []query.SelectResult{
+					query.TableColumnResult{Column: sql.ID("c")},
 				},
 			},
 		},
@@ -455,10 +455,10 @@ func TestSelect(t *testing.T) {
 					Table: sql.ID("t"),
 					Alias: sql.ID("t"),
 				},
-				Results: []stmt.SelectResult{
-					stmt.TableColumnResult{Column: sql.ID("c1")},
-					stmt.TableColumnResult{Column: sql.ID("c2")},
-					stmt.TableColumnResult{
+				Results: []query.SelectResult{
+					query.TableColumnResult{Column: sql.ID("c1")},
+					query.TableColumnResult{Column: sql.ID("c2")},
+					query.TableColumnResult{
 						Table:  sql.ID("t"),
 						Column: sql.ID("c3"),
 					},
@@ -472,10 +472,10 @@ func TestSelect(t *testing.T) {
 					Table: sql.ID("t"),
 					Alias: sql.ID("t"),
 				},
-				Results: []stmt.SelectResult{
-					stmt.TableResult{sql.ID("t")},
-					stmt.TableColumnResult{Column: sql.ID("c1")},
-					stmt.TableColumnResult{Column: sql.ID("c2")},
+				Results: []query.SelectResult{
+					query.TableResult{sql.ID("t")},
+					query.TableColumnResult{Column: sql.ID("c1")},
+					query.TableColumnResult{Column: sql.ID("c2")},
 				},
 			},
 		},
@@ -486,10 +486,10 @@ func TestSelect(t *testing.T) {
 					Table: sql.ID("t"),
 					Alias: sql.ID("t"),
 				},
-				Results: []stmt.SelectResult{
-					stmt.TableColumnResult{Column: sql.ID("c1")},
-					stmt.TableResult{sql.ID("t")},
-					stmt.TableColumnResult{Column: sql.ID("c2")},
+				Results: []query.SelectResult{
+					query.TableColumnResult{Column: sql.ID("c1")},
+					query.TableResult{sql.ID("t")},
+					query.TableColumnResult{Column: sql.ID("c2")},
 				},
 			},
 		},
@@ -500,10 +500,10 @@ func TestSelect(t *testing.T) {
 					Table: sql.ID("t"),
 					Alias: sql.ID("t"),
 				},
-				Results: []stmt.SelectResult{
-					stmt.TableColumnResult{Column: sql.ID("c1")},
-					stmt.TableColumnResult{Column: sql.ID("c2")},
-					stmt.TableResult{sql.ID("t")},
+				Results: []query.SelectResult{
+					query.TableColumnResult{Column: sql.ID("c1")},
+					query.TableColumnResult{Column: sql.ID("c2")},
+					query.TableResult{sql.ID("t")},
 				},
 			},
 		},
@@ -514,13 +514,13 @@ func TestSelect(t *testing.T) {
 					Table: sql.ID("t"),
 					Alias: sql.ID("t"),
 				},
-				Results: []stmt.SelectResult{
-					stmt.TableColumnResult{
+				Results: []query.SelectResult{
+					query.TableColumnResult{
 						Column: sql.ID("c1"),
 						Table:  sql.ID("t2"),
 						Alias:  sql.ID("a1"),
 					},
-					stmt.TableColumnResult{Column: sql.ID("c2"), Alias: sql.ID("a2")},
+					query.TableColumnResult{Column: sql.ID("c2"), Alias: sql.ID("a2")},
 				},
 			},
 		},
@@ -531,13 +531,13 @@ func TestSelect(t *testing.T) {
 					Table: sql.ID("t"),
 					Alias: sql.ID("t"),
 				},
-				Results: []stmt.SelectResult{
-					stmt.TableColumnResult{
+				Results: []query.SelectResult{
+					query.TableColumnResult{
 						Column: sql.ID("c1"),
 						Table:  sql.ID("t2"),
 						Alias:  sql.ID("a1"),
 					},
-					stmt.TableColumnResult{Column: sql.ID("c2"), Alias: sql.ID("a2")},
+					query.TableColumnResult{Column: sql.ID("c2"), Alias: sql.ID("a2")},
 				},
 			},
 		},
@@ -548,8 +548,8 @@ func TestSelect(t *testing.T) {
 					Table: sql.ID("t"),
 					Alias: sql.ID("t"),
 				},
-				Results: []stmt.SelectResult{
-					stmt.ExprResult{
+				Results: []query.SelectResult{
+					query.ExprResult{
 						Expr: &expr.Binary{expr.AddOp,
 							expr.Ref{sql.ID("c1")}, expr.Ref{sql.ID("c2")}},
 						Alias: sql.ID("a"),
@@ -565,9 +565,9 @@ func TestSelect(t *testing.T) {
 					Right: query.FromTableAlias{Table: sql.ID("t2"), Alias: sql.ID("t2")},
 					Type:  query.CrossJoin,
 				},
-				Results: []stmt.SelectResult{
-					stmt.TableColumnResult{Column: sql.ID("c1"), Table: sql.ID("t1")},
-					stmt.TableColumnResult{Column: sql.ID("c2"), Table: sql.ID("t2")},
+				Results: []query.SelectResult{
+					query.TableColumnResult{Column: sql.ID("c1"), Table: sql.ID("t1")},
+					query.TableColumnResult{Column: sql.ID("c2"), Table: sql.ID("t2")},
 				},
 			},
 		},
@@ -675,8 +675,8 @@ func TestSelect(t *testing.T) {
 			sql: "select * from (select * from t1) join t2",
 			stmt: stmt.Select{
 				From: query.FromJoin{
-					Left: query.FromStmt{
-						Stmt: &stmt.Select{
+					Left: query.FromSelect{
+						Select: query.Select{
 							From: query.FromTableAlias{Table: sql.ID("t1"), Alias: sql.ID("t1")},
 						},
 					},
@@ -690,8 +690,8 @@ func TestSelect(t *testing.T) {
 			stmt: stmt.Select{
 				From: query.FromJoin{
 					Left: query.FromTableAlias{Table: sql.ID("t2"), Alias: sql.ID("t2")},
-					Right: query.FromStmt{
-						Stmt: &stmt.Values{
+					Right: query.FromValues{
+						Values: query.Values{
 							Expressions: [][]expr.Expr{
 								{&expr.Literal{int64(1)}, &expr.Literal{"abc"},
 									&expr.Literal{true}},
@@ -706,14 +706,14 @@ func TestSelect(t *testing.T) {
 			sql: "select * from (select * from t1) s1 join (values (1, 'abc', true)) as v1",
 			stmt: stmt.Select{
 				From: query.FromJoin{
-					Left: query.FromStmt{
-						Stmt: &stmt.Select{
+					Left: query.FromSelect{
+						Select: query.Select{
 							From: query.FromTableAlias{Table: sql.ID("t1"), Alias: sql.ID("t1")},
 						},
 						Alias: sql.ID("s1"),
 					},
-					Right: query.FromStmt{
-						Stmt: &stmt.Values{
+					Right: query.FromValues{
+						Values: query.Values{
 							Expressions: [][]expr.Expr{
 								{&expr.Literal{int64(1)}, &expr.Literal{"abc"},
 									&expr.Literal{true}},

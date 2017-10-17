@@ -1,11 +1,10 @@
-package stmt
+package query
 
 import (
 	"fmt"
-
+	"maho/db"
 	"maho/engine"
 	"maho/expr"
-	"maho/query"
 	"maho/sql"
 )
 
@@ -30,7 +29,7 @@ type ExprResult struct {
 
 type Select struct {
 	Results []SelectResult
-	From    query.FromItem
+	From    FromItem
 	Where   expr.Expr
 }
 
@@ -78,25 +77,19 @@ func (stmt *Select) String() string {
 	return s
 }
 
-func (stmt *Select) Execute(e *engine.Engine) (interface{}, error) {
-	fmt.Println(stmt)
-
-	return stmt.Rows(e)
-}
-
-func (stmt *Select) Rows(e *engine.Engine) (query.Rows, error) {
+func (stmt *Select) Rows(e *engine.Engine) (db.Rows, error) {
 	if stmt.From == nil {
 		return nil, fmt.Errorf("SELECT with no FROM clause is not supported yet")
 	}
-	rows, err := stmt.From.Rows(e)
+	rows, err := stmt.From.rows(e)
 	if err != nil {
 		return nil, err
 	}
 	if stmt.Where != nil {
-		rows, err = query.Where(e, rows, stmt.Where)
+		rows, err = where(e, rows, stmt.Where) // XXX
 		if err != nil {
 			return nil, err
 		}
 	}
-	return rows, nil
+	return rows.rows, nil
 }

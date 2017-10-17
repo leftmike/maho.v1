@@ -71,6 +71,6 @@ func (fj FromJoin) String() string {
 	return s
 }
 
-func (fj FromJoin) Rows(e *engine.Engine) (Rows, error) {
-	return nil, fmt.Errorf("FromJoin not implemented yet")
+func (fj FromJoin) rows(e *engine.Engine) (*fromRows, error) {
+	return nil, fmt.Errorf("FromJoin.rows not implemented yet")
 }
