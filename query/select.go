@@ -58,6 +58,19 @@ func (er ExprResult) String() string {
 	return s
 }
 
+type FromSelect struct {
+	Select
+	Alias sql.Identifier
+}
+
+func (fs FromSelect) String() string {
+	s := fmt.Sprintf("(%s)", fs.Select.String())
+	if fs.Alias != 0 {
+		s += fmt.Sprintf(" AS %s", fs.Alias)
+	}
+	return s
+}
+
 func (stmt *Select) String() string {
 	s := "SELECT "
 	if stmt.Results == nil {
@@ -85,26 +98,15 @@ func (stmt *Select) Rows(e *engine.Engine) (db.Rows, error) {
 	if err != nil {
 		return nil, err
 	}
-	if stmt.Where != nil {
-		rows, err = where(rows, fctx, stmt.Where)
-		if err != nil {
-			return nil, err
-		}
+	rows, err = where(rows, fctx, stmt.Where)
+	if err != nil {
+		return nil, err
+	}
+	rows, err = results(rows, fctx, stmt.Results)
+	if err != nil {
+		return nil, err
 	}
 	return rows, nil
-}
-
-type FromSelect struct {
-	Select
-	Alias sql.Identifier
-}
-
-func (fs FromSelect) String() string {
-	s := fmt.Sprintf("(%s)", fs.Select.String())
-	if fs.Alias != 0 {
-		s += fmt.Sprintf(" AS %s", fs.Alias)
-	}
-	return s
 }
 
 func (fs FromSelect) rows(e *engine.Engine) (db.Rows, fromContext, error) {
@@ -113,4 +115,64 @@ func (fs FromSelect) rows(e *engine.Engine) (db.Rows, fromContext, error) {
 		return nil, nil, err
 	}
 	return rows, makeFromContext(fs.Alias, rows.Columns()), nil
+}
+
+type whereRows struct {
+	rows db.Rows
+	cond expr.CExpr
+	dest []sql.Value
+}
+
+func (wr *whereRows) EvalRef(idx int) (sql.Value, error) {
+	return wr.dest[idx], nil
+}
+
+func (wr *whereRows) Columns() []sql.Identifier {
+	return wr.rows.Columns()
+}
+
+func (wr *whereRows) Close() error {
+	return wr.rows.Close()
+}
+
+func (wr *whereRows) Next(dest []sql.Value) error {
+	for {
+		err := wr.rows.Next(dest)
+		if err != nil {
+			return err
+		}
+		wr.dest = dest
+		v, err := wr.cond.Eval(wr)
+		wr.dest = nil
+		if err != nil {
+			return err
+		}
+		b, ok := v.(bool)
+		if !ok {
+			return fmt.Errorf("expected boolean result from WHERE condition: %s", sql.Format(v))
+		}
+		if b {
+			break
+		}
+	}
+	return nil
+}
+
+func where(rows db.Rows, fctx fromContext, cond expr.Expr) (db.Rows, error) {
+	if cond == nil {
+		return rows, nil
+	}
+	ce, err := expr.Compile(fctx, cond)
+	if err != nil {
+		return nil, err
+	}
+	return &whereRows{rows: rows, cond: ce}, nil
+}
+
+func results(rows db.Rows, fctx fromContext, results []SelectResult) (db.Rows, error) {
+	if results == nil {
+		return rows, nil
+	}
+	// XXX
+	return rows, nil
 }
