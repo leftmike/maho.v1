@@ -81,15 +81,15 @@ func (stmt *Select) Rows(e *engine.Engine) (db.Rows, error) {
 	if stmt.From == nil {
 		return nil, fmt.Errorf("SELECT with no FROM clause is not supported yet")
 	}
-	rows, err := stmt.From.rows(e)
+	rows, fctx, err := stmt.From.rows(e)
 	if err != nil {
 		return nil, err
 	}
 	if stmt.Where != nil {
-		rows, err = where(e, rows, stmt.Where) // XXX
+		rows, err = where(rows, fctx, stmt.Where)
 		if err != nil {
 			return nil, err
 		}
 	}
-	return rows.rows, nil
+	return rows, nil
 }

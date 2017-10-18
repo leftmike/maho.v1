@@ -570,13 +570,13 @@ func (p *parser) parseExpr() expr.Expr {
 			}
 			e = c
 		} else {
-			// <ref> [. <ref> ...]
-			ref := expr.Ref{p.sctx.Identifier}
-			for p.maybeToken(token.Dot) {
-				ref = append(ref, p.expectIdentifier("expected a reference"))
+			// <ref> [. <ref>]
+			id := p.sctx.Identifier
+			if p.maybeToken(token.Dot) {
+				e = expr.Ref{id, p.expectIdentifier("expected a reference")}
+			} else {
+				e = expr.Ref{id, 0}
 			}
-
-			e = ref
 		}
 	} else if r == token.Minus {
 		// - <expr>
@@ -756,10 +756,10 @@ func (p *parser) parseSelect() *stmt.Select {
 			e := p.parseExpr()
 			a := p.parseAlias(0)
 
-			if ref, ok := e.(expr.Ref); ok && (len(ref) == 1 || len(ref) == 2) {
+			if ref, ok := e.(expr.Ref); ok {
 				// [ table '.' ] column [[ AS ] column-alias]
 				var tcr query.TableColumnResult
-				if len(ref) == 1 {
+				if ref[1] == 0 {
 					tcr.Column = ref[0]
 				} else {
 					tcr.Table = ref[0]

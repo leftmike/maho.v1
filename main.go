@@ -6,9 +6,9 @@ To Do:
 - update t.Errorf to be "Operation(args) got %s want %s" and use %q for args
 - or "Operation(args) failed with %s" or "Operation(args) did not fail"
 
-- references in expressions
 - execute DELETE
 - execute UPDATE
+
 - execute SELECT
 - , => CROSS JOIN => INNER JOIN ON (TRUE); is CrossJoin necessary?
 - FromJoin.Rows()
@@ -65,14 +65,23 @@ func parse(e *engine.Engine, p parser.Parser, w io.Writer) {
 			fmt.Fprintln(w)
 
 			dest := make([]sql.Value, len(cols))
-			for i := 1; rows.Next(dest) == nil; i += 1 {
+			i := 1
+			for {
+				err = rows.Next(dest)
+				if err != nil {
+					break
+				}
 				fmt.Fprintf(w, "%d\t", i)
 				for _, v := range dest {
 					fmt.Fprintf(w, "%s\t", sql.Format(v))
 				}
 				fmt.Fprintln(w)
+				i += 1
 			}
 			w.Flush()
+			if err != io.EOF {
+				fmt.Printf("error: %s\n", err)
+			}
 		}
 	}
 }

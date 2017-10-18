@@ -6,6 +6,7 @@ import (
 )
 
 type EvalContext interface {
+	EvalRef(idx int) (sql.Value, error)
 }
 
 type CExpr interface {
@@ -15,6 +16,16 @@ type CExpr interface {
 
 func (l *Literal) Eval(ctx EvalContext) (sql.Value, error) {
 	return l.Value, nil
+}
+
+type colRef int
+
+func (cr colRef) String() string {
+	return fmt.Sprintf("row[%d]", cr)
+}
+
+func (cr colRef) Eval(ctx EvalContext) (sql.Value, error) {
+	return ctx.EvalRef(int(cr))
 }
 
 type call struct {

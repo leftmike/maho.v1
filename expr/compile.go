@@ -7,7 +7,7 @@ import (
 )
 
 type CompileContext interface {
-	Reference(r Ref) (int, error)
+	CompileRef(r Ref) (int, error)
 }
 
 func Compile(ctx CompileContext, e Expr) (CExpr, error) {
@@ -36,7 +36,14 @@ func Compile(ctx CompileContext, e Expr) (CExpr, error) {
 		}
 		return &call{cf, []CExpr{a1, a2}}, nil
 	case Ref:
-		panic("ref not handled yet")
+		if ctx == nil {
+			return nil, fmt.Errorf("reference %s not found", e)
+		}
+		idx, err := ctx.CompileRef(e)
+		if err != nil {
+			return nil, err
+		}
+		return colRef(idx), nil
 	case *Call:
 		cf, ok := idFuncs[e.Name]
 		if !ok {

@@ -147,7 +147,7 @@ func (et *engineTable) Rows() (db.Rows, error) {
 				if err != nil {
 					continue
 				}
-				rows = append(rows, []sql.Value{dbase.Name(), n, len(tbl.Columns())})
+				rows = append(rows, []sql.Value{dbase.Name(), n, int64(len(tbl.Columns()))})
 			}
 		}
 	case sql.COLUMNS:
@@ -161,8 +161,9 @@ func (et *engineTable) Rows() (db.Rows, error) {
 				cols := tbl.Columns()
 				for i, ct := range tbl.ColumnTypes() {
 					rows = append(rows,
-						[]sql.Value{dbase.Name(), n, cols[i], ct.Type.String(), ct.Size, ct.Width,
-							ct.Fraction, ct.Fixed, ct.Binary, ct.NotNull, ct.Default})
+						[]sql.Value{dbase.Name(), n, cols[i], ct.Type.String(), int64(ct.Size),
+							int64(ct.Width), int64(ct.Fraction), ct.Fixed, ct.Binary, ct.NotNull,
+							ct.Default})
 				}
 			}
 		}
