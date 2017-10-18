@@ -93,3 +93,24 @@ func (stmt *Select) Rows(e *engine.Engine) (db.Rows, error) {
 	}
 	return rows, nil
 }
+
+type FromSelect struct {
+	Select
+	Alias sql.Identifier
+}
+
+func (fs FromSelect) String() string {
+	s := fmt.Sprintf("(%s)", fs.Select.String())
+	if fs.Alias != 0 {
+		s += fmt.Sprintf(" AS %s", fs.Alias)
+	}
+	return s
+}
+
+func (fs FromSelect) rows(e *engine.Engine) (db.Rows, fromContext, error) {
+	rows, err := fs.Select.Rows(e)
+	if err != nil {
+		return nil, nil, err
+	}
+	return rows, makeFromContext(fs.Alias, rows.Columns()), nil
+}

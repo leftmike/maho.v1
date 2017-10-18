@@ -20,16 +20,6 @@ type FromTableAlias struct {
 	Alias    sql.Identifier
 }
 
-type FromSelect struct {
-	Select
-	Alias sql.Identifier
-}
-
-type FromValues struct {
-	Values
-	Alias sql.Identifier
-}
-
 func (fta FromTableAlias) String() string {
 	var s string
 	if fta.Database == 0 {
@@ -56,47 +46,7 @@ func (fta FromTableAlias) rows(e *engine.Engine) (db.Rows, fromContext, error) {
 	if err != nil {
 		return nil, nil, err
 	}
-	return rows, makeFromColumns(fta.Alias, rows.Columns()), nil
-}
-
-func (fs FromSelect) String() string {
-	s := fmt.Sprintf("(%s)", fs.Select.String())
-	if fs.Alias != 0 {
-		s += fmt.Sprintf(" AS %s", fs.Alias)
-	}
-	return s
-}
-
-func (fs FromSelect) rows(e *engine.Engine) (db.Rows, fromContext, error) {
-	/*
-		XXX
-		rows, err := fsa.Stmt.Rows(e)
-		if err != nil {
-			return nil, err
-		}
-		return makeFromRows(rows), nil
-	*/
-	return nil, nil, fmt.Errorf("FromSelect.rows not implemented")
-}
-
-func (fv FromValues) String() string {
-	s := fmt.Sprintf("(%s)", fv.Values.String())
-	if fv.Alias != 0 {
-		s += fmt.Sprintf(" AS %s", fv.Alias)
-	}
-	return s
-}
-
-func (fv FromValues) rows(e *engine.Engine) (db.Rows, fromContext, error) {
-	/*
-		XXX
-		rows, err := fsa.Stmt.Rows(e)
-		if err != nil {
-			return nil, err
-		}
-		return makeFromRows(rows), nil
-	*/
-	return nil, nil, fmt.Errorf("FromValues.rows not implemented")
+	return rows, makeFromContext(fta.Alias, rows.Columns()), nil
 }
 
 type fromColumn struct {
@@ -106,12 +56,13 @@ type fromColumn struct {
 
 type fromContext map[expr.Ref]fromColumn
 
-func makeFromColumns(nam sql.Identifier, cols []sql.Identifier) fromContext {
+func makeFromContext(nam sql.Identifier, cols []sql.Identifier) fromContext {
 	fctx := fromContext{}
 	for idx, col := range cols {
-		ref := expr.Ref{nam, col}
 		fc := fromColumn{true, idx}
-		fctx[ref] = fc
+		if nam != 0 {
+			fctx[expr.Ref{nam, col}] = fc
+		}
 		fctx[expr.Ref{col}] = fc
 	}
 	return fctx

@@ -46,7 +46,7 @@ func (stmt *Values) String() string {
 func (stmt *Values) Rows(e *engine.Engine) (db.Rows, error) {
 	columns := make([]sql.Identifier, len(stmt.Expressions[0]))
 	for i := 0; i < len(columns); i++ {
-		columns[i] = sql.ID(fmt.Sprintf("column-%d", i+1))
+		columns[i] = sql.ID(fmt.Sprintf("column%d", i+1))
 	}
 
 	rows := make([][]sql.Value, len(stmt.Expressions))
@@ -84,4 +84,25 @@ func (v *values) Next(dest []sql.Value) error {
 	copy(dest, v.rows[v.index])
 	v.index += 1
 	return nil
+}
+
+type FromValues struct {
+	Values
+	Alias sql.Identifier
+}
+
+func (fv FromValues) String() string {
+	s := fmt.Sprintf("(%s)", fv.Values.String())
+	if fv.Alias != 0 {
+		s += fmt.Sprintf(" AS %s", fv.Alias)
+	}
+	return s
+}
+
+func (fv FromValues) rows(e *engine.Engine) (db.Rows, fromContext, error) {
+	rows, err := fv.Values.Rows(e)
+	if err != nil {
+		return nil, nil, err
+	}
+	return rows, makeFromContext(fv.Alias, rows.Columns()), nil
 }
