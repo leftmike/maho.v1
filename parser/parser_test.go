@@ -367,7 +367,7 @@ func TestParseExpr(t *testing.T) {
 		{"12 + 34 << 56 + 78", "((12 + 34) << (56 + 78))"},
 		{"abc", "abc"},
 		{"abc.def", "abc.def"},
-		{"abc. def", "abc.def"},
+		{"abc. def . ghi .jkl", "abc.def.ghi.jkl"},
 		{"abc(1 + 2)", "abc((1 + 2))"},
 		{"abc()", "abc()"},
 		{"abc(1 + 2, def() * 3)", "abc((1 + 2), (def() * 3))"},
@@ -551,7 +551,7 @@ func TestSelect(t *testing.T) {
 				Results: []query.SelectResult{
 					query.ExprResult{
 						Expr: &expr.Binary{expr.AddOp,
-							expr.Ref{sql.ID("c1"), 0}, expr.Ref{sql.ID("c2")}},
+							expr.Ref{sql.ID("c1")}, expr.Ref{sql.ID("c2")}},
 						Alias: sql.ID("a"),
 					},
 				},

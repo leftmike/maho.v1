@@ -54,22 +54,33 @@ type fromColumn struct {
 	index int
 }
 
-type fromContext map[expr.Ref]fromColumn
+type colRef struct {
+	table  sql.Identifier
+	column sql.Identifier
+}
+
+type fromContext map[colRef]fromColumn
 
 func makeFromContext(nam sql.Identifier, cols []sql.Identifier) fromContext {
 	fctx := fromContext{}
 	for idx, col := range cols {
 		fc := fromColumn{true, idx}
 		if nam != 0 {
-			fctx[expr.Ref{nam, col}] = fc
+			fctx[colRef{table: nam, column: col}] = fc
 		}
-		fctx[expr.Ref{col}] = fc
+		fctx[colRef{column: col}] = fc
 	}
 	return fctx
 }
 
 func (fctx fromContext) CompileRef(r expr.Ref) (int, error) {
-	fc, ok := fctx[r]
+	var fc fromColumn
+	ok := false
+	if len(r) == 1 {
+		fc, ok = fctx[colRef{column: r[0]}]
+	} else if len(r) == 2 {
+		fc, ok = fctx[colRef{table: r[0], column: r[1]}]
+	}
 	if !ok {
 		return 0, fmt.Errorf("reference %s not found", r.String())
 	}

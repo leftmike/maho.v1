@@ -43,7 +43,7 @@ func Compile(ctx CompileContext, e Expr) (CExpr, error) {
 		if err != nil {
 			return nil, err
 		}
-		return colRef(idx), nil
+		return colIndex(idx), nil
 	case *Call:
 		cf, ok := idFuncs[e.Name]
 		if !ok {

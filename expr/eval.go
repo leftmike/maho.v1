@@ -18,14 +18,14 @@ func (l *Literal) Eval(ctx EvalContext) (sql.Value, error) {
 	return l.Value, nil
 }
 
-type colRef int
+type colIndex int
 
-func (cr colRef) String() string {
-	return fmt.Sprintf("row[%d]", cr)
+func (ci colIndex) String() string {
+	return fmt.Sprintf("row[%d]", ci)
 }
 
-func (cr colRef) Eval(ctx EvalContext) (sql.Value, error) {
-	return ctx.EvalRef(int(cr))
+func (ci colIndex) Eval(ctx EvalContext) (sql.Value, error) {
+	return ctx.EvalRef(int(ci))
 }
 
 type call struct {

@@ -101,12 +101,12 @@ func (b *Binary) String() string {
 	return fmt.Sprintf("(%s %s %s)", b.Left, ops[b.Op].name, b.Right)
 }
 
-type Ref [2]sql.Identifier
+type Ref []sql.Identifier
 
 func (r Ref) String() string {
 	s := r[0].String()
-	if r[1] != 0 {
-		s += fmt.Sprintf(".%s", r[1])
+	for i := 1; i < len(r); i++ {
+		s += fmt.Sprintf(".%s", r[i])
 	}
 	return s
 }
