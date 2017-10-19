@@ -6,10 +6,14 @@ To Do:
 - update t.Errorf to be "Operation(args) got %s want %s" and use %q for args
 - or "Operation(args) failed with %s" or "Operation(args) did not fail"
 
+- change all aliases to be zero if there is no alias
+
 - execute DELETE
 - execute UPDATE
 
-- execute SELECT
+- SELECT ... ORDER BY ...
+- test SELECT
+- joins
 - , => CROSS JOIN => INNER JOIN ON (TRUE); is CrossJoin necessary?
 - FromJoin.Rows()
 

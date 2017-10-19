@@ -59,6 +59,13 @@ type colRef struct {
 	column sql.Identifier
 }
 
+func (cr colRef) String() string {
+	if cr.table == 0 {
+		return cr.column.String()
+	}
+	return fmt.Sprintf("%s.%s", cr.table, cr.column)
+}
+
 type fromContext map[colRef]fromColumn
 
 func makeFromContext(nam sql.Identifier, cols []sql.Identifier) fromContext {
@@ -74,18 +81,24 @@ func makeFromContext(nam sql.Identifier, cols []sql.Identifier) fromContext {
 }
 
 func (fctx fromContext) CompileRef(r expr.Ref) (int, error) {
-	var fc fromColumn
-	ok := false
+	var tbl, col sql.Identifier
 	if len(r) == 1 {
-		fc, ok = fctx[colRef{column: r[0]}]
+		col = r[0]
 	} else if len(r) == 2 {
-		fc, ok = fctx[colRef{table: r[0], column: r[1]}]
+		tbl = r[0]
+		col = r[1]
 	}
+	return fctx.ColumnIndex(tbl, col, "reference")
+}
+
+func (fctx fromContext) ColumnIndex(tbl, col sql.Identifier, what string) (int, error) {
+	cr := colRef{table: tbl, column: col}
+	fc, ok := fctx[cr]
 	if !ok {
-		return 0, fmt.Errorf("reference %s not found", r.String())
+		return 0, fmt.Errorf("%s %s not found", what, cr.String())
 	}
 	if !fc.valid {
-		return 0, fmt.Errorf("reference %s is ambiguous", r.String())
+		return 0, fmt.Errorf("%s %s is ambiguous", what, cr.String())
 	}
 	return fc.index, nil
 }

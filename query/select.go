@@ -169,10 +169,74 @@ func where(rows db.Rows, fctx fromContext, cond expr.Expr) (db.Rows, error) {
 	return &whereRows{rows: rows, cond: ce}, nil
 }
 
+type col2dest struct {
+	destIndex int
+	rowIndex  int
+}
+
+type resultRows struct {
+	rows     db.Rows
+	rowDest  []sql.Value
+	columns  []sql.Identifier
+	row2dest []col2dest
+}
+
+func (rr *resultRows) Columns() []sql.Identifier {
+	return rr.columns
+}
+
+func (rr *resultRows) Close() error {
+	return rr.rows.Close()
+}
+
+func (rr *resultRows) Next(dest []sql.Value) error {
+	if rr.rowDest == nil {
+		rr.rowDest = make([]sql.Value, len(rr.rows.Columns()))
+	}
+	err := rr.rows.Next(rr.rowDest)
+	if err != nil {
+		return err
+	}
+	for _, r2d := range rr.row2dest {
+		dest[r2d.destIndex] = rr.rowDest[r2d.rowIndex]
+	}
+	return nil
+}
+
 func results(rows db.Rows, fctx fromContext, results []SelectResult) (db.Rows, error) {
 	if results == nil {
 		return rows, nil
 	}
-	// XXX
-	return rows, nil
+
+	var row2dest []col2dest
+	var cols []sql.Identifier
+	idx := 0
+	for _, sr := range results {
+		switch sr := sr.(type) {
+		case TableResult:
+			// XXX
+			// add all of the columns for the table
+			return nil, fmt.Errorf("TableResult not implemented")
+		case TableColumnResult:
+			rdx, err := fctx.ColumnIndex(sr.Table, sr.Column, "result")
+			if err != nil {
+				return nil, err
+			}
+			row2dest = append(row2dest, col2dest{destIndex: idx, rowIndex: rdx})
+			col := sr.Column
+			if sr.Alias != 0 {
+				col = sr.Alias
+			}
+			cols = append(cols, col)
+			idx += 1
+		case ExprResult:
+			// XXX
+			// type expr2dest struct { destIndex int, expr expr.CExpr }
+			// []expr2dest
+			return nil, fmt.Errorf("ExprResult not implemented")
+		default:
+			panic(fmt.Sprintf("unexpected type for query.SelectResult: %T: %v", sr, sr))
+		}
+	}
+	return &resultRows{rows: rows, columns: cols, row2dest: row2dest}, nil
 }
