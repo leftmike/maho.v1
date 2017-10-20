@@ -27,7 +27,7 @@ func (fta FromTableAlias) String() string {
 	} else {
 		s = fmt.Sprintf("%s.%s", fta.Database, fta.Table)
 	}
-	if fta.Table != fta.Alias {
+	if fta.Alias != 0 {
 		s += fmt.Sprintf(" AS %s", fta.Alias)
 	}
 	return s
@@ -46,7 +46,11 @@ func (fta FromTableAlias) rows(e *engine.Engine) (db.Rows, fromContext, error) {
 	if err != nil {
 		return nil, nil, err
 	}
-	return rows, makeFromContext(fta.Alias, rows.Columns()), nil
+	nam := fta.Table
+	if fta.Alias != 0 {
+		nam = fta.Alias
+	}
+	return rows, makeFromContext(nam, rows.Columns()), nil
 }
 
 type fromColumn struct {

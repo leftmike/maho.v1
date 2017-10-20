@@ -419,19 +419,13 @@ func TestSelect(t *testing.T) {
 		{
 			sql: "select * from t",
 			stmt: stmt.Select{
-				From: query.FromTableAlias{
-					Table: sql.ID("t"),
-					Alias: sql.ID("t"),
-				},
+				From: query.FromTableAlias{Table: sql.ID("t")},
 			},
 		},
 		{
 			sql: "select * from t where x > 1",
 			stmt: stmt.Select{
-				From: query.FromTableAlias{
-					Table: sql.ID("t"),
-					Alias: sql.ID("t"),
-				},
+				From: query.FromTableAlias{Table: sql.ID("t")},
 				Where: &expr.Binary{expr.GreaterThanOp, expr.Ref{sql.ID("x")},
 					&expr.Literal{int64(1)}},
 			},
@@ -439,10 +433,7 @@ func TestSelect(t *testing.T) {
 		{
 			sql: "select c from t",
 			stmt: stmt.Select{
-				From: query.FromTableAlias{
-					Table: sql.ID("t"),
-					Alias: sql.ID("t"),
-				},
+				From: query.FromTableAlias{Table: sql.ID("t")},
 				Results: []query.SelectResult{
 					query.TableColumnResult{Column: sql.ID("c")},
 				},
@@ -451,10 +442,7 @@ func TestSelect(t *testing.T) {
 		{
 			sql: "select c1, c2, t.c3 from t",
 			stmt: stmt.Select{
-				From: query.FromTableAlias{
-					Table: sql.ID("t"),
-					Alias: sql.ID("t"),
-				},
+				From: query.FromTableAlias{Table: sql.ID("t")},
 				Results: []query.SelectResult{
 					query.TableColumnResult{Column: sql.ID("c1")},
 					query.TableColumnResult{Column: sql.ID("c2")},
@@ -468,10 +456,7 @@ func TestSelect(t *testing.T) {
 		{
 			sql: "select t.*, c1, c2 from t",
 			stmt: stmt.Select{
-				From: query.FromTableAlias{
-					Table: sql.ID("t"),
-					Alias: sql.ID("t"),
-				},
+				From: query.FromTableAlias{Table: sql.ID("t")},
 				Results: []query.SelectResult{
 					query.TableResult{sql.ID("t")},
 					query.TableColumnResult{Column: sql.ID("c1")},
@@ -482,10 +467,7 @@ func TestSelect(t *testing.T) {
 		{
 			sql: "select c1, t.*, c2 from t",
 			stmt: stmt.Select{
-				From: query.FromTableAlias{
-					Table: sql.ID("t"),
-					Alias: sql.ID("t"),
-				},
+				From: query.FromTableAlias{Table: sql.ID("t")},
 				Results: []query.SelectResult{
 					query.TableColumnResult{Column: sql.ID("c1")},
 					query.TableResult{sql.ID("t")},
@@ -496,10 +478,7 @@ func TestSelect(t *testing.T) {
 		{
 			sql: "select c1, c2, t.* from t",
 			stmt: stmt.Select{
-				From: query.FromTableAlias{
-					Table: sql.ID("t"),
-					Alias: sql.ID("t"),
-				},
+				From: query.FromTableAlias{Table: sql.ID("t")},
 				Results: []query.SelectResult{
 					query.TableColumnResult{Column: sql.ID("c1")},
 					query.TableColumnResult{Column: sql.ID("c2")},
@@ -510,10 +489,7 @@ func TestSelect(t *testing.T) {
 		{
 			sql: "select t2.c1 as a1, c2 as a2 from t",
 			stmt: stmt.Select{
-				From: query.FromTableAlias{
-					Table: sql.ID("t"),
-					Alias: sql.ID("t"),
-				},
+				From: query.FromTableAlias{Table: sql.ID("t")},
 				Results: []query.SelectResult{
 					query.TableColumnResult{
 						Column: sql.ID("c1"),
@@ -527,10 +503,7 @@ func TestSelect(t *testing.T) {
 		{
 			sql: "select t2.c1 a1, c2 a2 from t",
 			stmt: stmt.Select{
-				From: query.FromTableAlias{
-					Table: sql.ID("t"),
-					Alias: sql.ID("t"),
-				},
+				From: query.FromTableAlias{Table: sql.ID("t")},
 				Results: []query.SelectResult{
 					query.TableColumnResult{
 						Column: sql.ID("c1"),
@@ -544,10 +517,7 @@ func TestSelect(t *testing.T) {
 		{
 			sql: "select c1 + c2 as a from t",
 			stmt: stmt.Select{
-				From: query.FromTableAlias{
-					Table: sql.ID("t"),
-					Alias: sql.ID("t"),
-				},
+				From: query.FromTableAlias{Table: sql.ID("t")},
 				Results: []query.SelectResult{
 					query.ExprResult{
 						Expr: &expr.Binary{expr.AddOp,
@@ -561,8 +531,8 @@ func TestSelect(t *testing.T) {
 			sql: "select t1.c1, t2.c2 from t1, t2",
 			stmt: stmt.Select{
 				From: query.FromJoin{
-					Left:  query.FromTableAlias{Table: sql.ID("t1"), Alias: sql.ID("t1")},
-					Right: query.FromTableAlias{Table: sql.ID("t2"), Alias: sql.ID("t2")},
+					Left:  query.FromTableAlias{Table: sql.ID("t1")},
+					Right: query.FromTableAlias{Table: sql.ID("t2")},
 					Type:  query.CrossJoin,
 				},
 				Results: []query.SelectResult{
@@ -576,11 +546,11 @@ func TestSelect(t *testing.T) {
 			stmt: stmt.Select{
 				From: query.FromJoin{
 					Left: query.FromJoin{
-						Left:  query.FromTableAlias{Table: sql.ID("t1"), Alias: sql.ID("t1")},
-						Right: query.FromTableAlias{Table: sql.ID("t2"), Alias: sql.ID("t2")},
+						Left:  query.FromTableAlias{Table: sql.ID("t1")},
+						Right: query.FromTableAlias{Table: sql.ID("t2")},
 						Type:  query.CrossJoin,
 					},
-					Right: query.FromTableAlias{Table: sql.ID("t3"), Alias: sql.ID("t3")},
+					Right: query.FromTableAlias{Table: sql.ID("t3")},
 					Type:  query.CrossJoin,
 				},
 			},
@@ -590,11 +560,11 @@ func TestSelect(t *testing.T) {
 			stmt: stmt.Select{
 				From: query.FromJoin{
 					Left: query.FromJoin{
-						Left:  query.FromTableAlias{Table: sql.ID("t1"), Alias: sql.ID("t1")},
-						Right: query.FromTableAlias{Table: sql.ID("t2"), Alias: sql.ID("t2")},
+						Left:  query.FromTableAlias{Table: sql.ID("t1")},
+						Right: query.FromTableAlias{Table: sql.ID("t2")},
 						Type:  query.Join,
 					},
-					Right: query.FromTableAlias{Table: sql.ID("t3"), Alias: sql.ID("t3")},
+					Right: query.FromTableAlias{Table: sql.ID("t3")},
 					Type:  query.CrossJoin,
 				},
 			},
@@ -603,10 +573,10 @@ func TestSelect(t *testing.T) {
 			sql: "select * from t1, t2 natural full outer join t3",
 			stmt: stmt.Select{
 				From: query.FromJoin{
-					Left: query.FromTableAlias{Table: sql.ID("t1"), Alias: sql.ID("t1")},
+					Left: query.FromTableAlias{Table: sql.ID("t1")},
 					Right: query.FromJoin{
-						Left:    query.FromTableAlias{Table: sql.ID("t2"), Alias: sql.ID("t2")},
-						Right:   query.FromTableAlias{Table: sql.ID("t3"), Alias: sql.ID("t3")},
+						Left:    query.FromTableAlias{Table: sql.ID("t2")},
+						Right:   query.FromTableAlias{Table: sql.ID("t3")},
 						Natural: true,
 						Type:    query.FullOuterJoin,
 					},
@@ -619,11 +589,11 @@ func TestSelect(t *testing.T) {
 			stmt: stmt.Select{
 				From: query.FromJoin{
 					Left: query.FromJoin{
-						Left:  query.FromTableAlias{Table: sql.ID("t1"), Alias: sql.ID("t1")},
-						Right: query.FromTableAlias{Table: sql.ID("t2"), Alias: sql.ID("t2")},
+						Left:  query.FromTableAlias{Table: sql.ID("t1")},
+						Right: query.FromTableAlias{Table: sql.ID("t2")},
 						Type:  query.CrossJoin,
 					},
-					Right: query.FromTableAlias{Table: sql.ID("t3"), Alias: sql.ID("t3")},
+					Right: query.FromTableAlias{Table: sql.ID("t3")},
 					Type:  query.RightJoin,
 				},
 			},
@@ -632,8 +602,8 @@ func TestSelect(t *testing.T) {
 			sql: "select * from t1 natural inner join t2",
 			stmt: stmt.Select{
 				From: query.FromJoin{
-					Left:    query.FromTableAlias{Table: sql.ID("t1"), Alias: sql.ID("t1")},
-					Right:   query.FromTableAlias{Table: sql.ID("t2"), Alias: sql.ID("t2")},
+					Left:    query.FromTableAlias{Table: sql.ID("t1")},
+					Right:   query.FromTableAlias{Table: sql.ID("t2")},
 					Natural: true,
 					Type:    query.InnerJoin,
 				},
@@ -643,8 +613,8 @@ func TestSelect(t *testing.T) {
 			sql: "select * from t1 inner join t2 on c1 > 5",
 			stmt: stmt.Select{
 				From: query.FromJoin{
-					Left:  query.FromTableAlias{Table: sql.ID("t1"), Alias: sql.ID("t1")},
-					Right: query.FromTableAlias{Table: sql.ID("t2"), Alias: sql.ID("t2")},
+					Left:  query.FromTableAlias{Table: sql.ID("t1")},
+					Right: query.FromTableAlias{Table: sql.ID("t2")},
 					Type:  query.InnerJoin,
 					On: &expr.Binary{expr.GreaterThanOp,
 						expr.Ref{sql.ID("c1")}, &expr.Literal{int64(5)}},
@@ -655,8 +625,8 @@ func TestSelect(t *testing.T) {
 			sql: "select * from t1 inner join t2 using (c1, c2, c3)",
 			stmt: stmt.Select{
 				From: query.FromJoin{
-					Left:  query.FromTableAlias{Table: sql.ID("t1"), Alias: sql.ID("t1")},
-					Right: query.FromTableAlias{Table: sql.ID("t2"), Alias: sql.ID("t2")},
+					Left:  query.FromTableAlias{Table: sql.ID("t1")},
+					Right: query.FromTableAlias{Table: sql.ID("t2")},
 					Type:  query.InnerJoin,
 					Using: []sql.Identifier{sql.ID("c1"), sql.ID("c2"), sql.ID("c3")},
 				},
@@ -677,10 +647,10 @@ func TestSelect(t *testing.T) {
 				From: query.FromJoin{
 					Left: query.FromSelect{
 						Select: query.Select{
-							From: query.FromTableAlias{Table: sql.ID("t1"), Alias: sql.ID("t1")},
+							From: query.FromTableAlias{Table: sql.ID("t1")},
 						},
 					},
-					Right: query.FromTableAlias{Table: sql.ID("t2"), Alias: sql.ID("t2")},
+					Right: query.FromTableAlias{Table: sql.ID("t2")},
 					Type:  query.Join,
 				},
 			},
@@ -689,7 +659,7 @@ func TestSelect(t *testing.T) {
 			sql: "select * from t2 join (values (1, 'abc', true))",
 			stmt: stmt.Select{
 				From: query.FromJoin{
-					Left: query.FromTableAlias{Table: sql.ID("t2"), Alias: sql.ID("t2")},
+					Left: query.FromTableAlias{Table: sql.ID("t2")},
 					Right: query.FromValues{
 						Values: query.Values{
 							Expressions: [][]expr.Expr{
@@ -708,7 +678,7 @@ func TestSelect(t *testing.T) {
 				From: query.FromJoin{
 					Left: query.FromSelect{
 						Select: query.Select{
-							From: query.FromTableAlias{Table: sql.ID("t1"), Alias: sql.ID("t1")},
+							From: query.FromTableAlias{Table: sql.ID("t1")},
 						},
 						Alias: sql.ID("s1"),
 					},

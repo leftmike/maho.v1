@@ -313,7 +313,7 @@ func (p *parser) parseTableName(tbl *stmt.TableName) {
 	}
 }
 
-func (p *parser) parseAlias(a sql.Identifier) sql.Identifier {
+func (p *parser) parseAlias() sql.Identifier {
 	if p.optionalReserved(sql.AS) {
 		return p.expectIdentifier("expected an alias")
 	}
@@ -322,12 +322,12 @@ func (p *parser) parseAlias(a sql.Identifier) sql.Identifier {
 		return p.sctx.Identifier
 	}
 	p.unscan()
-	return a
+	return 0
 }
 
 func (p *parser) parseTableAlias(ta *stmt.TableAlias) {
 	p.parseTableName(&ta.TableName)
-	ta.Alias = p.parseAlias(ta.Table)
+	ta.Alias = p.parseAlias()
 }
 
 func (p *parser) parseCreateTable(tmp bool, not bool) stmt.Stmt {
@@ -753,7 +753,7 @@ func (p *parser) parseSelect() *stmt.Select {
 			p.unscan()
 
 			e := p.parseExpr()
-			a := p.parseAlias(0)
+			a := p.parseAlias()
 
 			if ref, ok := e.(expr.Ref); ok && (len(ref) == 1 || len(ref) == 2) {
 				// [ table '.' ] column [[ AS ] column-alias]
@@ -806,11 +806,11 @@ func (p *parser) parseFromItem() query.FromItem {
 		if p.optionalReserved(sql.SELECT) {
 			ss := p.parseSelect()
 			p.expectTokens(token.RParen)
-			fi = query.FromSelect{Select: query.Select(*ss), Alias: p.parseAlias(0)}
+			fi = query.FromSelect{Select: query.Select(*ss), Alias: p.parseAlias()}
 		} else if p.optionalReserved(sql.VALUES) {
 			vs := p.parseValues()
 			p.expectTokens(token.RParen)
-			fi = query.FromValues{Values: query.Values(*vs), Alias: p.parseAlias(0)}
+			fi = query.FromValues{Values: query.Values(*vs), Alias: p.parseAlias()}
 		} else {
 			fi = p.parseFromList()
 			p.expectTokens(token.RParen)

@@ -24,7 +24,7 @@ type TableAlias struct {
 
 func (ta TableAlias) String() string {
 	s := ta.TableName.String()
-	if ta.Table != ta.Alias {
+	if ta.Alias != 0 {
 		s += fmt.Sprintf(" AS %s", ta.Alias)
 	}
 	return s
