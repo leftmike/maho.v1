@@ -138,7 +138,7 @@ func (p *parser) expectReserved(ids ...sql.Identifier) sql.Identifier {
 		}
 	}
 
-	p.error(fmt.Sprintf("expected keyword %s got %s", msg, p.got()))
+	p.error(fmt.Sprintf("expected keyword %s, got %s", msg, p.got()))
 	return 0
 }
 
@@ -159,7 +159,7 @@ func (p *parser) optionalReserved(ids ...sql.Identifier) bool {
 func (p *parser) expectIdentifier(msg string) sql.Identifier {
 	t := p.scan()
 	if t != token.Identifier {
-		p.error(fmt.Sprintf("%s got %s", msg, p.got()))
+		p.error(fmt.Sprintf("%s, got %s", msg, p.got()))
 	}
 	return p.sctx.Identifier
 }
@@ -195,7 +195,7 @@ func (p *parser) expectTokens(tokens ...rune) rune {
 		}
 	}
 
-	p.error(fmt.Sprintf("expected %s got %s", msg, p.got()))
+	p.error(fmt.Sprintf("expected %s, got %s", msg, p.got()))
 	return 0
 }
 
@@ -209,7 +209,7 @@ func (p *parser) maybeToken(mr rune) bool {
 
 func (p *parser) expectInteger(min, max int64) int64 {
 	if p.scan() != token.Integer || p.sctx.Integer < min || p.sctx.Integer > max {
-		p.error(fmt.Sprintf("expected a number between %d and %d inclusive got %s", min, max,
+		p.error(fmt.Sprintf("expected a number between %d and %d inclusive, got %s", min, max,
 			p.got()))
 	}
 
@@ -218,7 +218,7 @@ func (p *parser) expectInteger(min, max int64) int64 {
 
 func (p *parser) expectEOF() {
 	if p.scan() != token.EOF {
-		p.error(fmt.Sprintf("expected the end of the statement got %s", p.got()))
+		p.error(fmt.Sprintf("expected the end of the statement, got %s", p.got()))
 	}
 }
 
@@ -401,7 +401,7 @@ func (p *parser) parseCreateColumns(s *stmt.CreateTable) {
 		typ := p.expectIdentifier("expected a data type")
 		def, found := types[typ]
 		if !found {
-			p.error(fmt.Sprintf("expected a data type got %s", typ))
+			p.error(fmt.Sprintf("expected a data type, got %s", typ))
 		}
 
 		ct := def
@@ -584,12 +584,10 @@ func (p *parser) parseExpr() expr.Expr {
 		// ( <expr> )
 		e = &expr.Unary{expr.NoOp, p.parseExpr()}
 		if p.scan() != token.RParen {
-			p.error(fmt.Sprintf("expected closing parenthesis got %s", p.got()))
+			p.error(fmt.Sprintf("expected closing parenthesis, got %s", p.got()))
 		}
 	} else {
-		// XXX: need a better error message
-		p.error(fmt.Sprintf(
-			"expected a string, a number, TRUE, FALSE or NULL for each value got %s", p.got()))
+		p.error(fmt.Sprintf("expected an expression, got %s", p.got()))
 	}
 
 	var op expr.Op
