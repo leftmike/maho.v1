@@ -24,10 +24,9 @@ type basicTable struct {
 }
 
 type basicRows struct {
-	columns     []sql.Identifier
-	columnTypes []db.ColumnType
-	rows        [][]sql.Value
-	index       int
+	columns []sql.Identifier
+	rows    [][]sql.Value
+	index   int
 }
 
 func (bs basicStore) Open(name string) (db.Database, error) {
@@ -99,7 +98,7 @@ func (bt *basicTable) ColumnTypes() []db.ColumnType {
 }
 
 func (bt *basicTable) Rows() (db.Rows, error) {
-	return &basicRows{columns: bt.columns, columnTypes: bt.columnTypes, rows: bt.rows}, nil
+	return &basicRows{columns: bt.columns, rows: bt.rows}, nil
 }
 
 func (bt *basicTable) Insert(row []sql.Value) error {
@@ -109,10 +108,6 @@ func (bt *basicTable) Insert(row []sql.Value) error {
 
 func (br *basicRows) Columns() []sql.Identifier {
 	return br.columns
-}
-
-func (br *basicRows) ColumnTypes() []db.ColumnType {
-	return br.columnTypes
 }
 
 func (br *basicRows) Close() error {

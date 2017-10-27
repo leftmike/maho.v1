@@ -28,10 +28,9 @@ type AllRows interface {
 }
 
 type testRows struct {
-	columns     []sql.Identifier
-	columnTypes []db.ColumnType
-	rows        [][]sql.Value
-	index       int
+	columns []sql.Identifier
+	rows    [][]sql.Value
+	index   int
 }
 
 func (ts testStore) Open(name string) (db.Database, error) {
@@ -104,7 +103,7 @@ func (tt *testTable) ColumnTypes() []db.ColumnType {
 }
 
 func (tt *testTable) Rows() (db.Rows, error) {
-	return &testRows{columns: tt.columns, columnTypes: tt.columnTypes, rows: tt.rows}, nil
+	return &testRows{columns: tt.columns, rows: tt.rows}, nil
 }
 
 func (tt *testTable) Insert(row []sql.Value) error {
@@ -118,10 +117,6 @@ func (tt *testTable) AllRows() [][]sql.Value {
 
 func (tr *testRows) Columns() []sql.Identifier {
 	return tr.columns
-}
-
-func (tr *testRows) ColumnTypes() []db.ColumnType {
-	return tr.columnTypes
 }
 
 func (tr *testRows) Close() error {
