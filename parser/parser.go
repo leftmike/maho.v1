@@ -313,13 +313,15 @@ func (p *parser) parseTableName(tbl *stmt.TableName) {
 	}
 }
 
-func (p *parser) parseAlias() sql.Identifier {
+func (p *parser) parseAlias(required bool) sql.Identifier {
 	if p.optionalReserved(sql.AS) {
 		return p.expectIdentifier("expected an alias")
 	}
 	r := p.scan()
 	if r == token.Identifier {
 		return p.sctx.Identifier
+	} else if required {
+		p.error("an alias is required")
 	}
 	p.unscan()
 	return 0
@@ -327,7 +329,7 @@ func (p *parser) parseAlias() sql.Identifier {
 
 func (p *parser) parseTableAlias(ta *stmt.TableAlias) {
 	p.parseTableName(&ta.TableName)
-	ta.Alias = p.parseAlias()
+	ta.Alias = p.parseAlias(false)
 }
 
 func (p *parser) parseCreateTable(tmp bool, not bool) stmt.Stmt {
@@ -751,7 +753,7 @@ func (p *parser) parseSelect() *stmt.Select {
 			p.unscan()
 
 			e := p.parseExpr()
-			a := p.parseAlias()
+			a := p.parseAlias(false)
 
 			if ref, ok := e.(expr.Ref); ok && (len(ref) == 1 || len(ref) == 2) {
 				// [ table '.' ] column [[ AS ] column-alias]
@@ -787,8 +789,8 @@ func (p *parser) parseSelect() *stmt.Select {
 }
 
 /*
-<from-item> = [ database-name '.' ] table-name [[ AS ] table-alias ]
-    | '(' <select> | <values> ')' [[ AS ] table-alias ]
+<from-item> = [ database-name '.' ] table-name [[ AS ] alias ]
+    | '(' <select> | <values> ')' [ AS ] alias
     | '(' <from-item> [',' ...] ')'
     | <from-item> [ NATURAL ] <join-type> <from-item> [ ON <expr> | USING '(' join-column ',' ...]
 <join-type> = [ INNER ] JOIN
@@ -804,11 +806,11 @@ func (p *parser) parseFromItem() query.FromItem {
 		if p.optionalReserved(sql.SELECT) {
 			ss := p.parseSelect()
 			p.expectTokens(token.RParen)
-			fi = query.FromSelect{Select: query.Select(*ss), Alias: p.parseAlias()}
+			fi = query.FromSelect{Select: query.Select(*ss), Alias: p.parseAlias(true)}
 		} else if p.optionalReserved(sql.VALUES) {
 			vs := p.parseValues()
 			p.expectTokens(token.RParen)
-			fi = query.FromValues{Values: query.Values(*vs), Alias: p.parseAlias()}
+			fi = query.FromValues{Values: query.Values(*vs), Alias: p.parseAlias(true)}
 		} else {
 			fi = p.parseFromList()
 			p.expectTokens(token.RParen)

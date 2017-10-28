@@ -642,13 +642,14 @@ func TestSelect(t *testing.T) {
 		{sql: "select * from t1 inner join t2 using ()", fail: true},
 		{sql: "select * from t1 inner join t2 using (c1, c1)", fail: true},
 		{
-			sql: "select * from (select * from t1) join t2",
+			sql: "select * from (select * from t1) as s1 join t2",
 			stmt: stmt.Select{
 				From: query.FromJoin{
 					Left: query.FromSelect{
 						Select: query.Select{
 							From: query.FromTableAlias{Table: sql.ID("t1")},
 						},
+						Alias: sql.ID("s1"),
 					},
 					Right: query.FromTableAlias{Table: sql.ID("t2")},
 					Type:  query.Join,
@@ -656,7 +657,7 @@ func TestSelect(t *testing.T) {
 			},
 		},
 		{
-			sql: "select * from t2 join (values (1, 'abc', true))",
+			sql: "select * from t2 join (values (1, 'abc', true)) as v1",
 			stmt: stmt.Select{
 				From: query.FromJoin{
 					Left: query.FromTableAlias{Table: sql.ID("t2")},
@@ -667,6 +668,7 @@ func TestSelect(t *testing.T) {
 									&expr.Literal{true}},
 							},
 						},
+						Alias: sql.ID("v1"),
 					},
 					Type: query.Join,
 				},
