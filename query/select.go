@@ -2,6 +2,7 @@ package query
 
 import (
 	"fmt"
+
 	"maho/db"
 	"maho/engine"
 	"maho/expr"
@@ -174,11 +175,21 @@ type col2dest struct {
 	rowIndex  int
 }
 
+type expr2dest struct {
+	destIndex int
+	expr      expr.CExpr
+}
+
 type resultRows struct {
-	rows     db.Rows
-	rowDest  []sql.Value
-	columns  []sql.Identifier
-	row2dest []col2dest
+	rows      db.Rows
+	dest      []sql.Value
+	columns   []sql.Identifier
+	destCols  []col2dest
+	destExprs []expr2dest
+}
+
+func (rr *resultRows) EvalRef(idx int) (sql.Value, error) {
+	return rr.dest[idx], nil
 }
 
 func (rr *resultRows) Columns() []sql.Identifier {
@@ -190,15 +201,22 @@ func (rr *resultRows) Close() error {
 }
 
 func (rr *resultRows) Next(dest []sql.Value) error {
-	if rr.rowDest == nil {
-		rr.rowDest = make([]sql.Value, len(rr.rows.Columns()))
+	if rr.dest == nil {
+		rr.dest = make([]sql.Value, len(rr.rows.Columns()))
 	}
-	err := rr.rows.Next(rr.rowDest)
+	err := rr.rows.Next(rr.dest)
 	if err != nil {
 		return err
 	}
-	for _, r2d := range rr.row2dest {
-		dest[r2d.destIndex] = rr.rowDest[r2d.rowIndex]
+	for _, c2d := range rr.destCols {
+		dest[c2d.destIndex] = rr.dest[c2d.rowIndex]
+	}
+	for _, e2d := range rr.destExprs {
+		val, err := e2d.expr.Eval(rr)
+		if err != nil {
+			return err
+		}
+		dest[e2d.destIndex] = val
 	}
 	return nil
 }
@@ -208,37 +226,46 @@ func results(rows db.Rows, fctx *fromContext, results []SelectResult) (db.Rows, 
 		return rows, nil
 	}
 
-	var row2dest []col2dest
+	var destCols []col2dest
+	var destExprs []expr2dest
 	var cols []sql.Identifier
-	idx := 0
+	cdx := 0
+	edx := 0
 	for _, sr := range results {
 		switch sr := sr.(type) {
 		case TableResult:
 			for _, ci := range fctx.tableColumns(sr.Table) {
-				row2dest = append(row2dest, col2dest{destIndex: idx, rowIndex: ci.index})
+				destCols = append(destCols, col2dest{destIndex: cdx, rowIndex: ci.index})
 				cols = append(cols, ci.column)
-				idx += 1
+				cdx += 1
 			}
 		case TableColumnResult:
 			rdx, err := fctx.columnIndex(sr.Table, sr.Column, "result")
 			if err != nil {
 				return nil, err
 			}
-			row2dest = append(row2dest, col2dest{destIndex: idx, rowIndex: rdx})
+			destCols = append(destCols, col2dest{destIndex: cdx, rowIndex: rdx})
 			col := sr.Column
 			if sr.Alias != 0 {
 				col = sr.Alias
 			}
 			cols = append(cols, col)
-			idx += 1
+			cdx += 1
 		case ExprResult:
-			// XXX
-			// type expr2dest struct { destIndex int, expr expr.CExpr }
-			// []expr2dest
-			return nil, fmt.Errorf("ExprResult not implemented")
+			ce, err := expr.Compile(fctx, sr.Expr)
+			if err != nil {
+				return nil, err
+			}
+			destExprs = append(destExprs, expr2dest{destIndex: edx, expr: ce})
+			col := sr.Alias
+			if col == 0 {
+				col = sql.ID(fmt.Sprintf("expr%d", len(cols)+1))
+			}
+			cols = append(cols, col)
+			edx += 1
 		default:
 			panic(fmt.Sprintf("unexpected type for query.SelectResult: %T: %v", sr, sr))
 		}
 	}
-	return &resultRows{rows: rows, columns: cols, row2dest: row2dest}, nil
+	return &resultRows{rows: rows, columns: cols, destCols: destCols, destExprs: destExprs}, nil
 }
