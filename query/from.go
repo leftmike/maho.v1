@@ -11,7 +11,7 @@ import (
 
 type FromItem interface {
 	fmt.Stringer
-	rows(e *engine.Engine) (db.Rows, fromContext, error)
+	rows(e *engine.Engine) (db.Rows, *fromContext, error)
 }
 
 type FromTableAlias struct {
@@ -33,7 +33,7 @@ func (fta FromTableAlias) String() string {
 	return s
 }
 
-func (fta FromTableAlias) rows(e *engine.Engine) (db.Rows, fromContext, error) {
+func (fta FromTableAlias) rows(e *engine.Engine) (db.Rows, *fromContext, error) {
 	db, err := e.LookupDatabase(fta.Database)
 	if err != nil {
 		return nil, nil, err
@@ -70,21 +70,30 @@ func (cr colRef) String() string {
 	return fmt.Sprintf("%s.%s", cr.table, cr.column)
 }
 
-type fromContext map[colRef]fromColumn
+type colIndex struct {
+	colRef
+	index int
+}
 
-func makeFromContext(nam sql.Identifier, cols []sql.Identifier) fromContext {
-	fctx := fromContext{}
+type fromContext struct {
+	colMap map[colRef]fromColumn
+	cols   []colIndex
+}
+
+func makeFromContext(nam sql.Identifier, cols []sql.Identifier) *fromContext {
+	fctx := &fromContext{colMap: map[colRef]fromColumn{}}
 	for idx, col := range cols {
 		fc := fromColumn{true, idx}
 		if nam != 0 {
-			fctx[colRef{table: nam, column: col}] = fc
+			fctx.colMap[colRef{table: nam, column: col}] = fc
+			fctx.cols = append(fctx.cols, colIndex{colRef{table: nam, column: col}, idx})
 		}
-		fctx[colRef{column: col}] = fc
+		fctx.colMap[colRef{column: col}] = fc
 	}
 	return fctx
 }
 
-func (fctx fromContext) CompileRef(r expr.Ref) (int, error) {
+func (fctx *fromContext) CompileRef(r expr.Ref) (int, error) {
 	var tbl, col sql.Identifier
 	if len(r) == 1 {
 		col = r[0]
@@ -92,12 +101,12 @@ func (fctx fromContext) CompileRef(r expr.Ref) (int, error) {
 		tbl = r[0]
 		col = r[1]
 	}
-	return fctx.ColumnIndex(tbl, col, "reference")
+	return fctx.columnIndex(tbl, col, "reference")
 }
 
-func (fctx fromContext) ColumnIndex(tbl, col sql.Identifier, what string) (int, error) {
+func (fctx *fromContext) columnIndex(tbl, col sql.Identifier, what string) (int, error) {
 	cr := colRef{table: tbl, column: col}
-	fc, ok := fctx[cr]
+	fc, ok := fctx.colMap[cr]
 	if !ok {
 		return 0, fmt.Errorf("%s %s not found", what, cr.String())
 	}
@@ -105,4 +114,14 @@ func (fctx fromContext) ColumnIndex(tbl, col sql.Identifier, what string) (int, 
 		return 0, fmt.Errorf("%s %s is ambiguous", what, cr.String())
 	}
 	return fc.index, nil
+}
+
+func (fctx *fromContext) tableColumns(tbl sql.Identifier) []colIndex {
+	var cols []colIndex
+	for _, ci := range fctx.cols {
+		if ci.table == tbl {
+			cols = append(cols, ci)
+		}
+	}
+	return cols
 }

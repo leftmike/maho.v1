@@ -99,7 +99,7 @@ func (fv FromValues) String() string {
 	return s
 }
 
-func (fv FromValues) rows(e *engine.Engine) (db.Rows, fromContext, error) {
+func (fv FromValues) rows(e *engine.Engine) (db.Rows, *fromContext, error) {
 	rows, err := fv.Values.Rows(e)
 	if err != nil {
 		return nil, nil, err

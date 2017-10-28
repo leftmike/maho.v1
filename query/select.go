@@ -109,7 +109,7 @@ func (stmt *Select) Rows(e *engine.Engine) (db.Rows, error) {
 	return rows, nil
 }
 
-func (fs FromSelect) rows(e *engine.Engine) (db.Rows, fromContext, error) {
+func (fs FromSelect) rows(e *engine.Engine) (db.Rows, *fromContext, error) {
 	rows, err := fs.Select.Rows(e)
 	if err != nil {
 		return nil, nil, err
@@ -158,7 +158,7 @@ func (wr *whereRows) Next(dest []sql.Value) error {
 	return nil
 }
 
-func where(rows db.Rows, fctx fromContext, cond expr.Expr) (db.Rows, error) {
+func where(rows db.Rows, fctx *fromContext, cond expr.Expr) (db.Rows, error) {
 	if cond == nil {
 		return rows, nil
 	}
@@ -203,7 +203,7 @@ func (rr *resultRows) Next(dest []sql.Value) error {
 	return nil
 }
 
-func results(rows db.Rows, fctx fromContext, results []SelectResult) (db.Rows, error) {
+func results(rows db.Rows, fctx *fromContext, results []SelectResult) (db.Rows, error) {
 	if results == nil {
 		return rows, nil
 	}
@@ -214,11 +214,13 @@ func results(rows db.Rows, fctx fromContext, results []SelectResult) (db.Rows, e
 	for _, sr := range results {
 		switch sr := sr.(type) {
 		case TableResult:
-			// XXX
-			// add all of the columns for the table
-			return nil, fmt.Errorf("TableResult not implemented")
+			for _, ci := range fctx.tableColumns(sr.Table) {
+				row2dest = append(row2dest, col2dest{destIndex: idx, rowIndex: ci.index})
+				cols = append(cols, ci.column)
+				idx += 1
+			}
 		case TableColumnResult:
-			rdx, err := fctx.ColumnIndex(sr.Table, sr.Column, "result")
+			rdx, err := fctx.columnIndex(sr.Table, sr.Column, "result")
 			if err != nil {
 				return nil, err
 			}
