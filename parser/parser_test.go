@@ -697,6 +697,92 @@ func TestSelect(t *testing.T) {
 				},
 			},
 		},
+		{sql: "select * from (values (1, 'abc', true)) as v1 (", fail: true},
+		{sql: "select * from (values (1, 'abc', true)) as v1 )", fail: true},
+		{sql: "select * from (values (1, 'abc', true)) as v1 (,", fail: true},
+		{sql: "select * from (values (1, 'abc', true)) as v1 (a,)", fail: true},
+		{sql: "select * from (values (1, 'abc', true)) as v1 (a b)", fail: true},
+		{
+			sql: "select * from (values (1, 'abc', true)) as v1",
+			stmt: stmt.Select{
+				From: query.FromValues{
+					Values: query.Values{
+						Expressions: [][]expr.Expr{
+							{&expr.Literal{int64(1)}, &expr.Literal{"abc"},
+								&expr.Literal{true}},
+						},
+					},
+					Alias: sql.ID("v1"),
+				},
+			},
+		},
+		{
+			sql: "select * from (values (1, 'abc', true)) as v1 (c1, c2, c3)",
+			stmt: stmt.Select{
+				From: query.FromValues{
+					Values: query.Values{
+						Expressions: [][]expr.Expr{
+							{&expr.Literal{int64(1)}, &expr.Literal{"abc"},
+								&expr.Literal{true}},
+						},
+					},
+					Alias:         sql.ID("v1"),
+					ColumnAliases: []sql.Identifier{sql.ID("c1"), sql.ID("c2"), sql.ID("c3")},
+				},
+			},
+		},
+		{sql: "select * from (select * from t1) as s1 (", fail: true},
+		{sql: "select * from (select * from t1) as s1 )", fail: true},
+		{sql: "select * from (select * from t1) as s1 (,", fail: true},
+		{sql: "select * from (select * from t1) as s1 (a,)", fail: true},
+		{sql: "select * from (select * from t1) as s1 (a b)", fail: true},
+		{
+			sql: "select * from (select * from t1) as s1",
+			stmt: stmt.Select{
+				From: query.FromSelect{
+					Select: query.Select{
+						From: query.FromTableAlias{Table: sql.ID("t1")},
+					},
+					Alias: sql.ID("s1"),
+				},
+			},
+		},
+		{
+			sql: "select * from (select * from t1) as s1 (c1)",
+			stmt: stmt.Select{
+				From: query.FromSelect{
+					Select: query.Select{
+						From: query.FromTableAlias{Table: sql.ID("t1")},
+					},
+					Alias:         sql.ID("s1"),
+					ColumnAliases: []sql.Identifier{sql.ID("c1")},
+				},
+			},
+		},
+		{
+			sql: "select * from (select * from t1) as s1 (c1, c2)",
+			stmt: stmt.Select{
+				From: query.FromSelect{
+					Select: query.Select{
+						From: query.FromTableAlias{Table: sql.ID("t1")},
+					},
+					Alias:         sql.ID("s1"),
+					ColumnAliases: []sql.Identifier{sql.ID("c1"), sql.ID("c2")},
+				},
+			},
+		},
+		{
+			sql: "select * from (select * from t1) as s1 (c1, c2, c3)",
+			stmt: stmt.Select{
+				From: query.FromSelect{
+					Select: query.Select{
+						From: query.FromTableAlias{Table: sql.ID("t1")},
+					},
+					Alias:         sql.ID("s1"),
+					ColumnAliases: []sql.Identifier{sql.ID("c1"), sql.ID("c2"), sql.ID("c3")},
+				},
+			},
+		},
 	}
 
 	for i, c := range cases {

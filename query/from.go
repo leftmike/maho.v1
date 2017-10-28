@@ -125,3 +125,11 @@ func (fctx *fromContext) tableColumns(tbl sql.Identifier) []colIndex {
 	}
 	return cols
 }
+
+func (fctx *fromContext) columns() []sql.Identifier {
+	var cols []sql.Identifier
+	for _, ci := range fctx.cols {
+		cols = append(cols, ci.column)
+	}
+	return cols
+}

@@ -61,13 +61,21 @@ func (er ExprResult) String() string {
 
 type FromSelect struct {
 	Select
-	Alias sql.Identifier
+	Alias         sql.Identifier
+	ColumnAliases []sql.Identifier
 }
 
 func (fs FromSelect) String() string {
-	s := fmt.Sprintf("(%s)", fs.Select.String())
-	if fs.Alias != 0 {
-		s += fmt.Sprintf(" AS %s", fs.Alias)
+	s := fmt.Sprintf("(%s) AS %s", fs.Select.String(), fs.Alias)
+	if fs.ColumnAliases != nil {
+		s += " ("
+		for i, col := range fs.ColumnAliases {
+			if i > 0 {
+				s += ", "
+			}
+			s += col.String()
+		}
+		s += ")"
 	}
 	return s
 }
@@ -115,7 +123,14 @@ func (fs FromSelect) rows(e *engine.Engine) (db.Rows, *fromContext, error) {
 	if err != nil {
 		return nil, nil, err
 	}
-	return rows, makeFromContext(fs.Alias, rows.Columns()), nil
+	cols := rows.Columns()
+	if fs.ColumnAliases != nil {
+		if len(fs.ColumnAliases) != len(cols) {
+			return nil, nil, fmt.Errorf("wrong number of column aliases")
+		}
+		cols = fs.ColumnAliases
+	}
+	return rows, makeFromContext(fs.Alias, cols), nil
 }
 
 type whereRows struct {
@@ -168,6 +183,23 @@ func where(rows db.Rows, fctx *fromContext, cond expr.Expr) (db.Rows, error) {
 		return nil, err
 	}
 	return &whereRows{rows: rows, cond: ce}, nil
+}
+
+type allResultRows struct {
+	rows    db.Rows
+	columns []sql.Identifier
+}
+
+func (arr *allResultRows) Columns() []sql.Identifier {
+	return arr.columns
+}
+
+func (arr *allResultRows) Close() error {
+	return arr.rows.Close()
+}
+
+func (arr *allResultRows) Next(dest []sql.Value) error {
+	return arr.rows.Next(dest)
 }
 
 type col2dest struct {
@@ -223,7 +255,7 @@ func (rr *resultRows) Next(dest []sql.Value) error {
 
 func results(rows db.Rows, fctx *fromContext, results []SelectResult) (db.Rows, error) {
 	if results == nil {
-		return rows, nil
+		return &allResultRows{rows: rows, columns: fctx.columns()}, nil
 	}
 
 	var destCols []col2dest

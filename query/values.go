@@ -88,13 +88,21 @@ func (v *values) Next(dest []sql.Value) error {
 
 type FromValues struct {
 	Values
-	Alias sql.Identifier
+	Alias         sql.Identifier
+	ColumnAliases []sql.Identifier
 }
 
 func (fv FromValues) String() string {
-	s := fmt.Sprintf("(%s)", fv.Values.String())
-	if fv.Alias != 0 {
-		s += fmt.Sprintf(" AS %s", fv.Alias)
+	s := fmt.Sprintf("(%s) AS %s", fv.Values.String(), fv.Alias)
+	if fv.ColumnAliases != nil {
+		s += " ("
+		for i, col := range fv.ColumnAliases {
+			if i > 0 {
+				s += ", "
+			}
+			s += col.String()
+		}
+		s += ")"
 	}
 	return s
 }
@@ -104,5 +112,12 @@ func (fv FromValues) rows(e *engine.Engine) (db.Rows, *fromContext, error) {
 	if err != nil {
 		return nil, nil, err
 	}
-	return rows, makeFromContext(fv.Alias, rows.Columns()), nil
+	cols := rows.Columns()
+	if fv.ColumnAliases != nil {
+		if len(fv.ColumnAliases) != len(cols) {
+			return nil, nil, fmt.Errorf("wrong number of column aliases")
+		}
+		cols = fv.ColumnAliases
+	}
+	return rows, makeFromContext(fv.Alias, cols), nil
 }

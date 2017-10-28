@@ -332,6 +332,22 @@ func (p *parser) parseTableAlias(ta *stmt.TableAlias) {
 	ta.Alias = p.parseAlias(false)
 }
 
+func (p *parser) parseColumnAliases() []sql.Identifier {
+	if !p.maybeToken(token.LParen) {
+		return nil
+	}
+
+	var cols []sql.Identifier
+	for {
+		cols = append(cols, p.expectIdentifier("expected a column alias"))
+		if p.maybeToken(token.RParen) {
+			break
+		}
+		p.expectTokens(token.Comma)
+	}
+	return cols
+}
+
 func (p *parser) parseCreateTable(tmp bool, not bool) stmt.Stmt {
 	if tmp {
 		p.error("temporary tables not implemented")
@@ -790,7 +806,7 @@ func (p *parser) parseSelect() *stmt.Select {
 
 /*
 <from-item> = [ database-name '.' ] table-name [[ AS ] alias ]
-    | '(' <select> | <values> ')' [ AS ] alias
+    | '(' <select> | <values> ')' [ AS ] alias ['(' column-alias [',' ...] ')']
     | '(' <from-item> [',' ...] ')'
     | <from-item> [ NATURAL ] <join-type> <from-item> [ ON <expr> | USING '(' join-column ',' ...]
 <join-type> = [ INNER ] JOIN
@@ -806,11 +822,15 @@ func (p *parser) parseFromItem() query.FromItem {
 		if p.optionalReserved(sql.SELECT) {
 			ss := p.parseSelect()
 			p.expectTokens(token.RParen)
-			fi = query.FromSelect{Select: query.Select(*ss), Alias: p.parseAlias(true)}
+			a := p.parseAlias(true)
+			fi = query.FromSelect{Select: query.Select(*ss), Alias: a,
+				ColumnAliases: p.parseColumnAliases()}
 		} else if p.optionalReserved(sql.VALUES) {
 			vs := p.parseValues()
 			p.expectTokens(token.RParen)
-			fi = query.FromValues{Values: query.Values(*vs), Alias: p.parseAlias(true)}
+			a := p.parseAlias(true)
+			fi = query.FromValues{Values: query.Values(*vs), Alias: a,
+				ColumnAliases: p.parseColumnAliases()}
 		} else {
 			fi = p.parseFromList()
 			p.expectTokens(token.RParen)
