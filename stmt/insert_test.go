@@ -9,8 +9,7 @@ import (
 	"maho/expr"
 	"maho/parser"
 	"maho/sql"
-	"maho/store"
-	"maho/store/test"
+	"maho/test"
 )
 
 type insertCase struct {
@@ -171,11 +170,7 @@ var (
 )
 
 func TestInsert(t *testing.T) {
-	dbase, err := store.Open("test", "test_insert")
-	if err != nil {
-		t.Fatal(err)
-	}
-	e, err := engine.Start(dbase)
+	e, dbase, err := test.StartEngine("test_insert")
 	if err != nil {
 		t.Fatal(err)
 	}

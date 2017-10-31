@@ -7,12 +7,11 @@ import (
 	"testing"
 
 	"maho/db"
-	"maho/engine"
 	"maho/parser"
 	"maho/query"
 	"maho/sql"
 	"maho/stmt"
-	"maho/store"
+	"maho/test"
 )
 
 func TestTableName(t *testing.T) {
@@ -90,11 +89,7 @@ func TestValues(t *testing.T) {
 		},
 	}
 
-	dbase, err := store.Open("test", "test_insert")
-	if err != nil {
-		t.Fatal(err)
-	}
-	e, err := engine.Start(dbase)
+	e, _, err := test.StartEngine("test_insert")
 	if err != nil {
 		t.Fatal(err)
 	}

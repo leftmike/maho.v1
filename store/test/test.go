@@ -23,10 +23,6 @@ type testTable struct {
 	rows        [][]sql.Value
 }
 
-type AllRows interface {
-	AllRows() [][]sql.Value
-}
-
 type testRows struct {
 	columns []sql.Identifier
 	rows    [][]sql.Value

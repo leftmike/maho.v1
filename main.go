@@ -9,8 +9,16 @@ To Do:
 - execute DELETE
 - execute UPDATE
 
-- SELECT ... ORDER BY ...
 - test SELECT
+-- test Values: Values struct and FromValues struct result in the correct row
+-- test Select: Select * From a row results in the correct row
+-- more general test framework that leverages:
+--- function to convert db.Rows into SELECT * FROM (VALUES ...) AS tbl (c1, ...)
+--- function to check two db.Rows are equivalent, optionally ignoring ordering
+--- some file format to compare the results of some sql stmts with one or more
+    SELECT * FROM (VALUES ...) ...
+
+- SELECT ... ORDER BY ...
 - joins
 - , => CROSS JOIN => INNER JOIN ON (TRUE); is CrossJoin necessary?
 - FromJoin.Rows()
