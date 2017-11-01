@@ -1,16 +1,13 @@
 package test
 
 import (
+	"io"
 	"maho/db"
 	"maho/engine"
 	"maho/sql"
 	"maho/store"
 	_ "maho/store/test"
 )
-
-type AllRows interface {
-	AllRows() [][]sql.Value
-}
 
 func StartEngine(tbl string) (*engine.Engine, db.Database, error) {
 	dbase, err := store.Open("test", tbl)
@@ -23,4 +20,20 @@ func StartEngine(tbl string) (*engine.Engine, db.Database, error) {
 	}
 
 	return e, dbase, nil
+}
+
+func AllRows(rows db.Rows) ([][]sql.Value, error) {
+	all := [][]sql.Value{}
+	l := len(rows.Columns())
+	for {
+		dest := make([]sql.Value, l)
+		err := rows.Next(dest)
+		if err == io.EOF {
+			break
+		} else if err != nil {
+			return nil, err
+		}
+		all = append(all, dest)
+	}
+	return all, nil
 }

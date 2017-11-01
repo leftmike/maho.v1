@@ -214,25 +214,20 @@ func testInsert(t *testing.T, e *engine.Engine, dbase db.DatabaseModify, nam sql
 			tbl, err := dbase.Table(nam)
 			if err != nil {
 				t.Error(err)
-				return
+				continue
 			}
-
-			all := tbl.(test.AllRows).AllRows()
-			if len(all) != len(c.rows) {
-				t.Errorf("len(%s.Rows()) got %d want %d", nam, len(all), len(c.rows))
-			} else {
-				for i, r := range c.rows {
-					if len(all[i]) != len(r) {
-						t.Errorf("len(%s.Rows()[%d]) got %d want %d", nam, i, len(all[i]), len(r))
-					} else {
-						for j, v := range r {
-							if all[i][j] != v {
-								t.Errorf("%s.Rows()[%d][%d] got %v want %v", nam, i, j, all[i][j],
-									v)
-							}
-						}
-					}
-				}
+			rows, err := tbl.Rows()
+			if err != nil {
+				t.Errorf("(%s).Rows() failed with %s", nam, err)
+				continue
+			}
+			all, err := test.AllRows(rows)
+			if err != nil {
+				t.Errorf("(%s).Rows().Next() failed with %s", nam, err)
+				continue
+			}
+			if !test.DeepEqual(all, c.rows) {
+				t.Errorf("(%s).Rows() got %v want %v", nam, all, c.rows)
 			}
 		}
 

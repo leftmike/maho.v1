@@ -17,6 +17,8 @@ func TestDeepEqual(t *testing.T) {
 		{[]string{"abc", "def"}, []string{"abc", "def"}, true},
 		{sql.ID("id"), sql.ID("id"), true},
 		{sql.ID("id"), sql.ID("di"), false},
+		{[]sql.Value{}, []sql.Value{}, true},
+		{[][]sql.Value{}, [][]sql.Value{}, true},
 	}
 
 	for _, c := range cases {

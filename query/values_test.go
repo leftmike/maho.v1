@@ -1,7 +1,6 @@
 package query
 
 import (
-	"io"
 	"testing"
 
 	"maho/expr"
@@ -70,17 +69,9 @@ func TestValues(t *testing.T) {
 			t.Errorf("(%v).Rows().Columns() got %v want %v", c.values, cols, c.cols)
 			continue
 		}
-		var all [][]sql.Value
-		for {
-			dest := make([]sql.Value, len(cols))
-			err := rows.Next(dest)
-			if err != nil {
-				if err != io.EOF {
-					t.Errorf("(%v).Rows().Next() failed with %s", c.values, err)
-				}
-				break
-			}
-			all = append(all, dest)
+		all, err := test.AllRows(rows)
+		if err != nil {
+			t.Errorf("(%v).Rows().Next() failed with %s", c.values, err)
 		}
 		if !test.DeepEqual(all, c.rows) {
 			t.Errorf("(%v).Rows() got %v want %v", c.values, all, c.rows)
@@ -161,18 +152,9 @@ func TestFromValues(t *testing.T) {
 				c.from, len(cols), len(rows.Columns()))
 			continue
 		}
-
-		var all [][]sql.Value
-		for {
-			dest := make([]sql.Value, len(cols))
-			err := rows.Next(dest)
-			if err != nil {
-				if err != io.EOF {
-					t.Errorf("(%v).Rows().Next() failed with %s", c.from, err)
-				}
-				break
-			}
-			all = append(all, dest)
+		all, err := test.AllRows(rows)
+		if err != nil {
+			t.Errorf("(%v).Rows().Next() failed with %s", c.from, err)
 		}
 		if !test.DeepEqual(all, c.rows) {
 			t.Errorf("(%v).Rows() got %v want %v", c.from, all, c.rows)
