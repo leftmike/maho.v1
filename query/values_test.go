@@ -73,8 +73,9 @@ func TestValues(t *testing.T) {
 		if err != nil {
 			t.Errorf("(%v).Rows().Next() failed with %s", c.values, err)
 		}
-		if !test.DeepEqual(all, c.rows) {
-			t.Errorf("(%v).Rows() got %v want %v", c.values, all, c.rows)
+		var trc string
+		if !test.DeepEqual(all, c.rows, &trc) {
+			t.Errorf("(%v).Rows() got %v want %v\n%s", c.values, all, c.rows, trc)
 		}
 	}
 }
@@ -156,8 +157,9 @@ func TestFromValues(t *testing.T) {
 		if err != nil {
 			t.Errorf("(%v).Rows().Next() failed with %s", c.from, err)
 		}
-		if !test.DeepEqual(all, c.rows) {
-			t.Errorf("(%v).Rows() got %v want %v", c.from, all, c.rows)
+		var trc string
+		if !test.DeepEqual(all, c.rows, &trc) {
+			t.Errorf("(%v).Rows() got %v want %v\n%s", c.from, all, c.rows, trc)
 		}
 	}
 }

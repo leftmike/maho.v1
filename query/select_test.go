@@ -106,8 +106,9 @@ func TestSelect(t *testing.T) {
 		if err != nil {
 			t.Errorf("(%v).Rows().Next() failed with %s", c.stmt, err)
 		}
-		if !test.DeepEqual(all, c.rows) {
-			t.Errorf("(%v).Rows() got %v want %v", c.stmt, all, c.rows)
+		var trc string
+		if !test.DeepEqual(all, c.rows, &trc) {
+			t.Errorf("(%v).Rows() got %v want %v\n%s", c.stmt, all, c.rows, trc)
 		}
 	}
 }

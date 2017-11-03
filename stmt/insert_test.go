@@ -226,8 +226,9 @@ func testInsert(t *testing.T, e *engine.Engine, dbase db.DatabaseModify, nam sql
 				t.Errorf("(%s).Rows().Next() failed with %s", nam, err)
 				continue
 			}
-			if !test.DeepEqual(all, c.rows) {
-				t.Errorf("(%s).Rows() got %v want %v", nam, all, c.rows)
+			var trc string
+			if !test.DeepEqual(all, c.rows, &trc) {
+				t.Errorf("(%s).Rows() got %v want %v\n%s", nam, all, c.rows, trc)
 			}
 		}
 
