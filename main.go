@@ -11,8 +11,6 @@ To Do:
 
 - test SELECT
 -- more general test framework that leverages:
---- function to convert db.Rows into SELECT * FROM (VALUES ...) AS tbl (c1, ...)
---- function to check two db.Rows are equivalent, optionally ignoring ordering
 --- some file format to compare the results of some sql stmts with one or more
     SELECT * FROM (VALUES ...) ...
 --- go test will ignore directory called testdata

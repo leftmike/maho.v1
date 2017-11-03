@@ -107,10 +107,6 @@ func (tt *testTable) Insert(row []sql.Value) error {
 	return nil
 }
 
-func (tt *testTable) AllRows() [][]sql.Value {
-	return tt.rows
-}
-
 func (tr *testRows) Columns() []sql.Identifier {
 	return tr.columns
 }

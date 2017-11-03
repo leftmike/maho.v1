@@ -29,6 +29,71 @@ func Format(v Value) string {
 	return fmt.Sprintf("%v", v)
 }
 
+func Less(v1, v2 Value) bool {
+	if v1 == nil {
+		return v2 != nil
+	}
+	if v2 == nil {
+		return false
+	}
+	switch v1 := v1.(type) {
+	case bool:
+		switch v2 := v2.(type) {
+		case bool:
+			return !v1 && v2
+		case float64:
+			return true
+		case int64:
+			return true
+		case string:
+			return true
+		default:
+			panic(fmt.Sprintf("unexpected type for sql.Value: %T: %v", v2, v2))
+		}
+	case float64:
+		switch v2 := v2.(type) {
+		case bool:
+			return false
+		case float64:
+			return v1 < v2
+		case int64:
+			return true
+		case string:
+			return true
+		default:
+			panic(fmt.Sprintf("unexpected type for sql.Value: %T: %v", v2, v2))
+		}
+	case int64:
+		switch v2 := v2.(type) {
+		case bool:
+			return false
+		case float64:
+			return false
+		case int64:
+			return v1 < v2
+		case string:
+			return true
+		default:
+			panic(fmt.Sprintf("unexpected type for sql.Value: %T: %v", v2, v2))
+		}
+	case string:
+		switch v2 := v2.(type) {
+		case bool:
+			return false
+		case float64:
+			return false
+		case int64:
+			return false
+		case string:
+			return v1 < v2
+		default:
+			panic(fmt.Sprintf("unexpected type for sql.Value: %T: %v", v2, v2))
+		}
+	default:
+		panic(fmt.Sprintf("unexpected type for sql.Value: %T: %v", v1, v1))
+	}
+}
+
 /*
 database/sql package ==>
 Scan converts from columns to Go types:
