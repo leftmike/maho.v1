@@ -79,6 +79,10 @@ SkipWhitespace:
 		r = s.readRune(sctx)
 	}
 
+	if r == ';' {
+		return token.EndOfStatement
+	}
+
 	if r == '-' {
 		if r := s.readRune(sctx); r == '-' {
 			for {
@@ -94,9 +98,7 @@ SkipWhitespace:
 
 			goto SkipWhitespace
 		} else if r < 0 {
-			if r != token.EOF {
-				return r
-			}
+			return r
 		} else {
 			s.unreadRune()
 		}
@@ -118,9 +120,7 @@ SkipWhitespace:
 
 			goto SkipWhitespace
 		} else if r < 0 {
-			if r != token.EOF {
-				return r
-			}
+			return r
 		} else {
 			s.unreadRune()
 		}

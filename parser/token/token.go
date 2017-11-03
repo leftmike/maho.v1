@@ -4,6 +4,7 @@ import "fmt"
 
 const (
 	EOF = -(iota + 1)
+	EndOfStatement
 	Error
 	Identifier
 	Reserved

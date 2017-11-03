@@ -15,9 +15,10 @@ import (
 )
 
 func TestScan(t *testing.T) {
-	s := `create foobar * 123 (,) 'string' "identifier" 456.789`
+	s := `create foobar * 123 (,) 'string' "identifier" ; 456.789`
 	tokens := []rune{token.Reserved, token.Identifier, token.Star, token.Integer, token.LParen,
-		token.Comma, token.RParen, token.String, token.Identifier, token.Double, token.EOF}
+		token.Comma, token.RParen, token.String, token.Identifier, token.EndOfStatement,
+		token.Double, token.EOF}
 	p := newParser(strings.NewReader(s), "scan")
 	for _, e := range tokens {
 		r := p.scan()

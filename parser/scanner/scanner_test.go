@@ -16,6 +16,7 @@ func TestScan(t *testing.T) {
 		r rune
 	}{
 		{"", token.EOF},
+		{";", token.EndOfStatement},
 		{"abc", token.Identifier},
 		{"create", token.Reserved},
 		{"'create'", token.String},

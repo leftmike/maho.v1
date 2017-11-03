@@ -57,7 +57,7 @@ func (p *parser) Parse() (stmt stmt.Stmt, err error) {
 	}()
 
 	stmt = p.parseStmt()
-	p.expectEOF()
+	p.expectEndOfStatement()
 	return
 }
 
@@ -97,6 +97,8 @@ func (p *parser) got() string {
 	switch p.sctx.Token {
 	case token.EOF:
 		return fmt.Sprintf("end of file")
+	case token.EndOfStatement:
+		return fmt.Sprintf("end of statement (;)")
 	case token.Error:
 		return fmt.Sprintf("error %s", p.sctx.Error.Error())
 	case token.Identifier:
@@ -216,8 +218,9 @@ func (p *parser) expectInteger(min, max int64) int64 {
 	return p.sctx.Integer
 }
 
-func (p *parser) expectEOF() {
-	if p.scan() != token.EOF {
+func (p *parser) expectEndOfStatement() {
+	r := p.scan()
+	if r != token.EOF && r != token.EndOfStatement {
 		p.error(fmt.Sprintf("expected the end of the statement, got %s", p.got()))
 	}
 }
