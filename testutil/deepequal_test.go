@@ -1,10 +1,10 @@
-package test_test
+package testutil_test
 
 import (
 	"testing"
 
 	"maho/sql"
-	"maho/test"
+	"maho/testutil"
 )
 
 func TestDeepEqual(t *testing.T) {
@@ -22,14 +22,14 @@ func TestDeepEqual(t *testing.T) {
 	}
 
 	for _, c := range cases {
-		if test.DeepEqual(c.a, c.b) != c.ret {
+		if testutil.DeepEqual(c.a, c.b) != c.ret {
 			t.Errorf("DeepEqual(%v, %v) got %v want %v", c.a, c.b, !c.ret, c.ret)
 		}
 	}
 
 	for _, c := range cases {
 		var s string
-		test.DeepEqual(c.a, c.b, &s)
+		testutil.DeepEqual(c.a, c.b, &s)
 		if c.ret {
 			if s != "" {
 				t.Errorf("DeepEqual(%v, %v, &s) succeeded; got %q for s; want \"\"", c.a, c.b, s)
@@ -47,5 +47,5 @@ func TestDeepEqual(t *testing.T) {
 		}
 	}()
 	var s1, s2 string
-	test.DeepEqual(123, 123, &s1, &s2)
+	testutil.DeepEqual(123, 123, &s1, &s2)
 }

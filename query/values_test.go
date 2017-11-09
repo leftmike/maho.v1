@@ -5,7 +5,7 @@ import (
 
 	"maho/expr"
 	"maho/sql"
-	"maho/test"
+	"maho/testutil"
 )
 
 func TestValues(t *testing.T) {
@@ -49,7 +49,7 @@ func TestValues(t *testing.T) {
 		},
 	}
 
-	e, _, err := test.StartEngine("test")
+	e, _, err := testutil.StartEngine("test")
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -65,16 +65,16 @@ func TestValues(t *testing.T) {
 			continue
 		}
 		cols := rows.Columns()
-		if !test.DeepEqual(cols, c.cols) {
+		if !testutil.DeepEqual(cols, c.cols) {
 			t.Errorf("(%v).Rows().Columns() got %v want %v", c.values, cols, c.cols)
 			continue
 		}
-		all, err := test.AllRows(rows)
+		all, err := testutil.AllRows(rows)
 		if err != nil {
 			t.Errorf("(%v).Rows().Next() failed with %s", c.values, err)
 		}
 		var trc string
-		if !test.DeepEqual(all, c.rows, &trc) {
+		if !testutil.DeepEqual(all, c.rows, &trc) {
 			t.Errorf("(%v).Rows() got %v want %v\n%s", c.values, all, c.rows, trc)
 		}
 	}
@@ -128,7 +128,7 @@ func TestFromValues(t *testing.T) {
 		},
 	}
 
-	e, _, err := test.StartEngine("test")
+	e, _, err := testutil.StartEngine("test")
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -144,7 +144,7 @@ func TestFromValues(t *testing.T) {
 			continue
 		}
 		cols := fctx.columns()
-		if !test.DeepEqual(cols, c.cols) {
+		if !testutil.DeepEqual(cols, c.cols) {
 			t.Errorf("(%v).Rows().Columns() got %v want %v", c.from, cols, c.cols)
 			continue
 		}
@@ -153,12 +153,12 @@ func TestFromValues(t *testing.T) {
 				c.from, len(cols), len(rows.Columns()))
 			continue
 		}
-		all, err := test.AllRows(rows)
+		all, err := testutil.AllRows(rows)
 		if err != nil {
 			t.Errorf("(%v).Rows().Next() failed with %s", c.from, err)
 		}
 		var trc string
-		if !test.DeepEqual(all, c.rows, &trc) {
+		if !testutil.DeepEqual(all, c.rows, &trc) {
 			t.Errorf("(%v).Rows() got %v want %v\n%s", c.from, all, c.rows, trc)
 		}
 	}

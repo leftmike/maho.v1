@@ -6,14 +6,13 @@ To Do:
 - update t.Errorf to be "Operation(args) got %s want %s" and use %q for args
 - or "Operation(args) failed with %s" or "Operation(args) did not fail"
 
+- fuzzing: parser.Parse
+
 - execute DELETE
 - execute UPDATE
 
 - test SELECT
--- more general test framework that leverages:
---- some file format to compare the results of some sql stmts with one or more
-    SELECT * FROM (VALUES ...) ...
---- go test will ignore directory called testdata
+-- use sqltest framework (and tests)
 
 - SELECT ... ORDER BY ...
 - joins

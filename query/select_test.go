@@ -6,7 +6,7 @@ import (
 	"maho/expr"
 	"maho/query"
 	"maho/sql"
-	"maho/test"
+	"maho/testutil"
 )
 
 func TestSelect(t *testing.T) {
@@ -82,7 +82,7 @@ func TestSelect(t *testing.T) {
 		},
 	}
 
-	e, _, err := test.StartEngine("test")
+	e, _, err := testutil.StartEngine("test")
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -98,16 +98,16 @@ func TestSelect(t *testing.T) {
 			continue
 		}
 		cols := rows.Columns()
-		if !test.DeepEqual(cols, c.cols) {
+		if !testutil.DeepEqual(cols, c.cols) {
 			t.Errorf("(%v).Rows().Columns() got %v want %v", c.stmt, cols, c.cols)
 			continue
 		}
-		all, err := test.AllRows(rows)
+		all, err := testutil.AllRows(rows)
 		if err != nil {
 			t.Errorf("(%v).Rows().Next() failed with %s", c.stmt, err)
 		}
 		var trc string
-		if !test.DeepEqual(all, c.rows, &trc) {
+		if !testutil.DeepEqual(all, c.rows, &trc) {
 			t.Errorf("(%v).Rows() got %v want %v\n%s", c.stmt, all, c.rows, trc)
 		}
 	}

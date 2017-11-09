@@ -9,7 +9,7 @@ import (
 	"maho/expr"
 	"maho/parser"
 	"maho/sql"
-	"maho/test"
+	"maho/testutil"
 )
 
 type insertCase struct {
@@ -170,7 +170,7 @@ var (
 )
 
 func TestInsert(t *testing.T) {
-	e, dbase, err := test.StartEngine("test_insert")
+	e, dbase, err := testutil.StartEngine("test_insert")
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -221,13 +221,13 @@ func testInsert(t *testing.T, e *engine.Engine, dbase db.DatabaseModify, nam sql
 				t.Errorf("(%s).Rows() failed with %s", nam, err)
 				continue
 			}
-			all, err := test.AllRows(rows)
+			all, err := testutil.AllRows(rows)
 			if err != nil {
 				t.Errorf("(%s).Rows().Next() failed with %s", nam, err)
 				continue
 			}
 			var trc string
-			if !test.DeepEqual(all, c.rows, &trc) {
+			if !testutil.DeepEqual(all, c.rows, &trc) {
 				t.Errorf("(%s).Rows() got %v want %v\n%s", nam, all, c.rows, trc)
 			}
 		}

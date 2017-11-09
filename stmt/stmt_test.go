@@ -11,7 +11,7 @@ import (
 	"maho/query"
 	"maho/sql"
 	"maho/stmt"
-	"maho/test"
+	"maho/testutil"
 )
 
 func TestTableName(t *testing.T) {
@@ -89,7 +89,7 @@ func TestValues(t *testing.T) {
 		},
 	}
 
-	e, _, err := test.StartEngine("test_insert")
+	e, _, err := testutil.StartEngine("test_insert")
 	if err != nil {
 		t.Fatal(err)
 	}
