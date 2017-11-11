@@ -14,5 +14,5 @@ type Database interface {
 type DatabaseModify interface {
 	Database
 	CreateTable(name sql.Identifier, cols []sql.Identifier, colTypes []ColumnType) error
-	DropTable(name sql.Identifier) error
+	DropTable(name sql.Identifier, exists bool) error
 }

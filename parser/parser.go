@@ -306,7 +306,8 @@ func (p *parser) parseCreateIndex(unq bool, not bool) stmt.Stmt {
 	return nil
 }
 
-func (p *parser) parseTableName(tbl *stmt.TableName) {
+func (p *parser) parseTableName() stmt.TableName {
+	var tbl stmt.TableName
 	id := p.expectIdentifier("expected a database or a table")
 	if p.maybeToken(token.Dot) {
 		tbl.Database = id
@@ -314,6 +315,7 @@ func (p *parser) parseTableName(tbl *stmt.TableName) {
 	} else {
 		tbl.Table = id
 	}
+	return tbl
 }
 
 func (p *parser) parseAlias(required bool) sql.Identifier {
@@ -330,9 +332,11 @@ func (p *parser) parseAlias(required bool) sql.Identifier {
 	return 0
 }
 
-func (p *parser) parseTableAlias(ta *stmt.TableAlias) {
-	p.parseTableName(&ta.TableName)
+func (p *parser) parseTableAlias() stmt.TableAlias {
+	var ta stmt.TableAlias
+	ta.TableName = p.parseTableName()
 	ta.Alias = p.parseAlias(false)
+	return ta
 }
 
 func (p *parser) parseColumnAliases() []sql.Identifier {
@@ -361,7 +365,7 @@ func (p *parser) parseCreateTable(tmp bool, not bool) stmt.Stmt {
 
 	// CREATE TABLE [database .] table ([<column>,] ...)
 	var s stmt.CreateTable
-	p.parseTableName(&s.Table)
+	s.Table = p.parseTableName()
 
 	if p.maybeToken(token.LParen) {
 		p.parseCreateColumns(&s)
@@ -489,7 +493,7 @@ func (p *parser) parseCreateColumns(s *stmt.CreateTable) {
 func (p *parser) parseDelete() stmt.Stmt {
 	// DELETE FROM [ database-name '.'] table-name [WHERE <expr>]
 	var s stmt.Delete
-	p.parseTableName(&s.Table)
+	s.Table = p.parseTableName()
 	if p.optionalReserved(sql.WHERE) {
 		s.Where = p.parseExpr()
 	}
@@ -498,8 +502,18 @@ func (p *parser) parseDelete() stmt.Stmt {
 }
 
 func (p *parser) parseDropTable() stmt.Stmt {
-	p.error("DROP not implemented")
-	return nil
+	// DROP TABLE [ IF EXISTS ] [ database-name '.' ] table-name [, ...]
+	var s stmt.DropTable
+	if p.optionalReserved(sql.IF) {
+		p.expectReserved(sql.EXISTS)
+		s.IfExists = true
+	}
+
+	s.Tables = []stmt.TableName{p.parseTableName()}
+	for p.maybeToken(token.Comma) {
+		s.Tables = append(s.Tables, p.parseTableName())
+	}
+	return &s
 }
 
 func (p *parser) ParseExpr() (e expr.Expr, err error) {
@@ -659,7 +673,7 @@ func (p *parser) parseInsert() stmt.Stmt {
 	*/
 
 	var s stmt.InsertValues
-	p.parseTableName(&s.Table)
+	s.Table = p.parseTableName()
 
 	if p.maybeToken(token.LParen) {
 		for {
@@ -839,8 +853,7 @@ func (p *parser) parseFromItem() query.FromItem {
 			p.expectTokens(token.RParen)
 		}
 	} else {
-		var ta stmt.TableAlias
-		p.parseTableAlias(&ta)
+		ta := p.parseTableAlias()
 		fi = query.FromTableAlias{Database: ta.Database, Table: ta.Table, Alias: ta.Alias}
 	}
 
@@ -937,7 +950,7 @@ func (p *parser) parseFromList() query.FromItem {
 func (p *parser) parseUpdate() stmt.Stmt {
 	// UPDATE [ database-name '.'] table-name SET column '=' <expr> [',' ...] [WHERE <expr>]
 	var s stmt.Update
-	p.parseTableName(&s.Table)
+	s.Table = p.parseTableName()
 	p.expectReserved(sql.SET)
 
 	for {

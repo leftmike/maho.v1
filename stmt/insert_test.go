@@ -232,7 +232,7 @@ func testInsert(t *testing.T, e *engine.Engine, dbase db.DatabaseModify, nam sql
 			}
 		}
 
-		err = dbase.DropTable(nam)
+		err = dbase.DropTable(nam, false)
 		if err != nil {
 			t.Error(err)
 			return

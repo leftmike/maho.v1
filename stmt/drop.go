@@ -8,11 +8,15 @@ import (
 )
 
 type DropTable struct {
-	Tables []TableName
+	IfExists bool
+	Tables   []TableName
 }
 
 func (stmt *DropTable) String() string {
 	s := "DROP TABLE "
+	if stmt.IfExists {
+		s += "IF EXISTS "
+	}
 	for i, tbl := range stmt.Tables {
 		if i > 0 {
 			s += ", "
@@ -34,7 +38,7 @@ func (stmt *DropTable) Execute(e *engine.Engine) (interface{}, error) {
 		if !ok {
 			return nil, fmt.Errorf("\"%s\" database can't be modified", d.Name())
 		}
-		err = dbase.DropTable(tbl.Table)
+		err = dbase.DropTable(tbl.Table, stmt.IfExists)
 		if err != nil {
 			return nil, err
 		}

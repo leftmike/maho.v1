@@ -60,8 +60,11 @@ func (tdb *testDatabase) CreateTable(name sql.Identifier, cols []sql.Identifier,
 	return nil
 }
 
-func (tdb *testDatabase) DropTable(name sql.Identifier) error {
+func (tdb *testDatabase) DropTable(name sql.Identifier, exists bool) error {
 	if _, ok := tdb.tables[name]; !ok {
+		if exists {
+			return nil
+		}
 		return fmt.Errorf("test: table \"%s\" does not exist in database \"%s\"", name, tdb.name)
 	}
 	delete(tdb.tables, name)
