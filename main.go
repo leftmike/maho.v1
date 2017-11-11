@@ -12,7 +12,6 @@ To Do:
 - execute UPDATE
 
 - test SELECT
--- use sqltest framework (and tests)
 
 - SELECT ... ORDER BY ...
 - joins

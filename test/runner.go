@@ -1,6 +1,7 @@
 package test
 
 import (
+	"fmt"
 	"io"
 	"strings"
 
@@ -17,8 +18,8 @@ type Runner struct {
 }
 
 func (run *Runner) RunExec(tst *sqltest.Test) error {
-	// XXX: include test name in the test
-	p := parser.NewParser(strings.NewReader(strings.Join(tst.Stmts, " ")), "XXX")
+	p := parser.NewParser(strings.NewReader(strings.Join(tst.Stmts, " ")),
+		fmt.Sprintf("%s:%d", tst.Filename, tst.LineNumber))
 	for {
 		stmt, err := p.Parse()
 		if err == io.EOF {
@@ -36,23 +37,42 @@ func (run *Runner) RunExec(tst *sqltest.Test) error {
 }
 
 func (run *Runner) RunQuery(tst *sqltest.Test) ([]string, [][]string, error) {
+	p := parser.NewParser(strings.NewReader(strings.Join(tst.Stmts, " ")),
+		fmt.Sprintf("%s:%d", tst.Filename, tst.LineNumber))
+	stmt, err := p.Parse()
+	if err != nil {
+		return nil, nil, err
+	}
+	ret, err := stmt.Execute(run.Engine)
+	if err != nil {
+		return nil, nil, err
+	}
+	rows, ok := ret.(db.Rows)
+	if !ok {
+		return nil, nil, fmt.Errorf("%s:%d: expected a query", tst.Filename, tst.LineNumber)
+	}
 
-	return nil, nil, nil
-}
+	cols := rows.Columns()
+	lenCols := len(cols)
+	resultCols := make([]string, 0, lenCols)
+	for _, col := range cols {
+		resultCols = append(resultCols, col.String())
+	}
 
-// AllRows returns all of the rows from a db.Rows as slices of values.
-func AllRows(rows db.Rows) ([][]sql.Value, error) {
-	all := [][]sql.Value{}
-	l := len(rows.Columns())
+	var results [][]string
+	dest := make([]sql.Value, lenCols)
 	for {
-		dest := make([]sql.Value, l)
 		err := rows.Next(dest)
 		if err == io.EOF {
 			break
 		} else if err != nil {
-			return nil, err
+			return nil, nil, err
 		}
-		all = append(all, dest)
+		row := make([]string, 0, lenCols)
+		for _, v := range dest {
+			row = append(row, sql.Format(v))
+		}
+		results = append(results, row)
 	}
-	return all, nil
+	return resultCols, results, nil
 }
