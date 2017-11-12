@@ -32,7 +32,7 @@ func TestSQL(t *testing.T) {
 
 	run := test.Runner{Engine: e}
 	var reporter reporter
-	err = sqltest.RunTests(testData, &run, &reporter)
+	err = sqltest.RunTests(testData, &run, &reporter, sqltest.Dialect{"maho"})
 	if err != nil {
 		t.Errorf("RunTests(%q) failed with %s", testData, err)
 		return

@@ -407,6 +407,8 @@ func (p *parser) parseCreateColumns(s *stmt.CreateTable) {
 			| CHAR [(length)] [BINARY]
 			| VARCHAR [(length)] [BINARY]
 			| TEXT [(length)] [BINARY]
+			| BOOL
+			| BOOLEAN
 			| DOUBLE [PRECISION]
 			| REAL
 			| SMALLINT

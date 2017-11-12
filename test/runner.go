@@ -18,7 +18,7 @@ type Runner struct {
 }
 
 func (run *Runner) RunExec(tst *sqltest.Test) error {
-	p := parser.NewParser(strings.NewReader(strings.Join(tst.Stmts, " ")),
+	p := parser.NewParser(strings.NewReader(tst.Test),
 		fmt.Sprintf("%s:%d", tst.Filename, tst.LineNumber))
 	for {
 		stmt, err := p.Parse()
@@ -37,7 +37,7 @@ func (run *Runner) RunExec(tst *sqltest.Test) error {
 }
 
 func (run *Runner) RunQuery(tst *sqltest.Test) ([]string, [][]string, error) {
-	p := parser.NewParser(strings.NewReader(strings.Join(tst.Stmts, " ")),
+	p := parser.NewParser(strings.NewReader(tst.Test),
 		fmt.Sprintf("%s:%d", tst.Filename, tst.LineNumber))
 	stmt, err := p.Parse()
 	if err != nil {
