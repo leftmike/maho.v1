@@ -124,25 +124,12 @@ func TestCreateTable(t *testing.T) {
 				Columns: []sql.Identifier{sql.ID("c1"), sql.ID("c2"), sql.ID("c3"), sql.ID("c4"),
 					sql.ID("c5"), sql.ID("c6")},
 				ColumnTypes: []db.ColumnType{
-					{Type: sql.IntegerType, Size: 2, Width: 255},
-					{Type: sql.IntegerType, Size: 2, Width: 255},
-					{Type: sql.IntegerType, Size: 4, Width: 255},
-					{Type: sql.IntegerType, Size: 4, Width: 255},
-					{Type: sql.IntegerType, Size: 8, Width: 255},
-					{Type: sql.IntegerType, Size: 8, Width: 255},
-				},
-			},
-		},
-		{
-			sql: "create table t (c1 int2(1), c2 smallint(2), c3 int4(3), c4 integer(4))",
-			stmt: stmt.CreateTable{
-				Table:   stmt.TableName{Table: sql.ID("t")},
-				Columns: []sql.Identifier{sql.ID("c1"), sql.ID("c2"), sql.ID("c3"), sql.ID("c4")},
-				ColumnTypes: []db.ColumnType{
-					{Type: sql.IntegerType, Size: 2, Width: 1},
-					{Type: sql.IntegerType, Size: 2, Width: 2},
-					{Type: sql.IntegerType, Size: 4, Width: 3},
-					{Type: sql.IntegerType, Size: 4, Width: 4},
+					{Type: sql.IntegerType, Size: 2},
+					{Type: sql.IntegerType, Size: 2},
+					{Type: sql.IntegerType, Size: 4},
+					{Type: sql.IntegerType, Size: 4},
+					{Type: sql.IntegerType, Size: 8},
+					{Type: sql.IntegerType, Size: 8},
 				},
 			},
 		},
@@ -154,19 +141,8 @@ func TestCreateTable(t *testing.T) {
 				ColumnTypes: []db.ColumnType{
 					{Type: sql.BooleanType, Size: 1},
 					{Type: sql.BooleanType, Size: 1},
-					{Type: sql.DoubleType, Size: 8, Width: 255, Fraction: 30},
-					{Type: sql.DoubleType, Size: 8, Width: 255, Fraction: 30},
-				},
-			},
-		},
-		{
-			sql: "create table t (d1 double(123,4), d2 double(12,3))",
-			stmt: stmt.CreateTable{
-				Table:   stmt.TableName{Table: sql.ID("t")},
-				Columns: []sql.Identifier{sql.ID("d1"), sql.ID("d2")},
-				ColumnTypes: []db.ColumnType{
-					{Type: sql.DoubleType, Size: 8, Width: 123, Fraction: 4},
-					{Type: sql.DoubleType, Size: 8, Width: 12, Fraction: 3},
+					{Type: sql.DoubleType, Size: 8},
+					{Type: sql.DoubleType, Size: 8},
 				},
 			},
 		},
@@ -238,8 +214,7 @@ func TestCreateTable(t *testing.T) {
 				ColumnTypes: []db.ColumnType{
 					{Type: sql.CharacterType, Fixed: false, Size: 64,
 						Default: &expr.Literal{"abcd"}},
-					{Type: sql.IntegerType, Size: 4, Width: 255,
-						Default: &expr.Literal{int64(123)}},
+					{Type: sql.IntegerType, Size: 4, Default: &expr.Literal{int64(123)}},
 				},
 			},
 		},

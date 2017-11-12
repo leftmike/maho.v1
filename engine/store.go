@@ -41,9 +41,9 @@ var (
 	}
 
 	columnsColumns = []sql.Identifier{sql.QuotedID("database"), sql.QuotedID("table"),
-		sql.QuotedID("column"), sql.QuotedID("type"), sql.QuotedID("size"), sql.QuotedID("width"),
-		sql.QuotedID("fraction"), sql.QuotedID("fixed"), sql.QuotedID("binary"),
-		sql.QuotedID("not_null"), sql.QuotedID("default")}
+		sql.QuotedID("column"), sql.QuotedID("type"), sql.QuotedID("size"),
+		sql.QuotedID("fixed"), sql.QuotedID("binary"), sql.QuotedID("not_null"),
+		sql.QuotedID("default")}
 
 	columnsColumnTypes = []db.ColumnType{
 		{Type: sql.CharacterType, Size: sql.MaxIdentifier, NotNull: true},
@@ -51,8 +51,6 @@ var (
 		{Type: sql.CharacterType, Size: sql.MaxIdentifier, NotNull: true},
 		{Type: sql.CharacterType, Size: sql.MaxIdentifier, NotNull: true},
 		{Type: sql.IntegerType, Size: 4, NotNull: true},
-		{Type: sql.IntegerType, Size: 1, NotNull: true},
-		{Type: sql.IntegerType, Size: 1, NotNull: true},
 		{Type: sql.BooleanType, NotNull: true},
 		{Type: sql.BooleanType, NotNull: true},
 		{Type: sql.BooleanType, NotNull: true},
@@ -162,8 +160,7 @@ func (et *engineTable) Rows() (db.Rows, error) {
 				for i, ct := range tbl.ColumnTypes() {
 					rows = append(rows,
 						[]sql.Value{dbase.Name(), n, cols[i], ct.Type.String(), int64(ct.Size),
-							int64(ct.Width), int64(ct.Fraction), ct.Fixed, ct.Binary, ct.NotNull,
-							ct.Default})
+							ct.Fixed, ct.Binary, ct.NotNull, ct.Default})
 				}
 			}
 		}

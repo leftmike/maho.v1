@@ -25,7 +25,7 @@ func TestMain(t *testing.T) {
  1   engine      stores           1
  2   engine   databases           2
  3   engine      tables           3
- 4   engine     columns          11
+ 4   engine     columns           9
  5   engine identifiers           3
 `},
 	}

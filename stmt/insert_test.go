@@ -23,8 +23,8 @@ var (
 	insertColumnTypes1 = []db.ColumnType{
 		{Type: sql.BooleanType, Size: 1},
 		{Type: sql.CharacterType, Size: 128},
-		{Type: sql.DoubleType, Size: 8, Width: 255, Fraction: 30},
-		{Type: sql.IntegerType, Size: 4, Width: 255},
+		{Type: sql.DoubleType, Size: 8},
+		{Type: sql.IntegerType, Size: 4},
 	}
 	insertCases1 = []insertCase{
 		{
@@ -144,9 +144,9 @@ var (
 
 	insertColumns3     = []sql.Identifier{sql.ID("c1"), sql.ID("c2"), sql.ID("c3")}
 	insertColumnTypes3 = []db.ColumnType{
-		{Type: sql.IntegerType, Size: 4, Width: 255, Default: &expr.Literal{int64(1)}},
-		{Type: sql.IntegerType, Size: 4, Width: 255, NotNull: true},
-		{Type: sql.IntegerType, Size: 4, Width: 255, Default: &expr.Literal{int64(3)},
+		{Type: sql.IntegerType, Size: 4, Default: &expr.Literal{int64(1)}},
+		{Type: sql.IntegerType, Size: 4, NotNull: true},
+		{Type: sql.IntegerType, Size: 4, Default: &expr.Literal{int64(3)},
 			NotNull: true},
 	}
 	insertCases3 = []insertCase{

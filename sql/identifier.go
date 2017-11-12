@@ -26,6 +26,8 @@ const (
 	INT4
 	INT8
 	INTEGER
+	PRECISION
+	REAL
 	SMALLINT
 	STORES
 	TABLES
@@ -123,6 +125,8 @@ var knownKeywords = map[string]struct {
 	"ON":        {ON, true},
 	"OR":        {OR, true},
 	"OUTER":     {OUTER, true},
+	"PRECISION": {PRECISION, false},
+	"REAL":      {REAL, false},
 	"RIGHT":     {RIGHT, true},
 	"SELECT":    {SELECT, true},
 	"SET":       {SET, true},

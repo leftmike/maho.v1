@@ -385,14 +385,15 @@ var types = map[sql.Identifier]db.ColumnType{
 	sql.TEXT:      {Type: sql.CharacterType, Fixed: false, Size: db.MaxColumnSize},
 	sql.BOOL:      {Type: sql.BooleanType, Size: 1},
 	sql.BOOLEAN:   {Type: sql.BooleanType, Size: 1},
-	sql.DOUBLE:    {Type: sql.DoubleType, Size: 8, Width: 255, Fraction: 30},
-	sql.SMALLINT:  {Type: sql.IntegerType, Size: 2, Width: 255},
-	sql.INT2:      {Type: sql.IntegerType, Size: 2, Width: 255},
-	sql.INT:       {Type: sql.IntegerType, Size: 4, Width: 255},
-	sql.INTEGER:   {Type: sql.IntegerType, Size: 4, Width: 255},
-	sql.INT4:      {Type: sql.IntegerType, Size: 4, Width: 255},
-	sql.INT8:      {Type: sql.IntegerType, Size: 8, Width: 255},
-	sql.BIGINT:    {Type: sql.IntegerType, Size: 8, Width: 255},
+	sql.DOUBLE:    {Type: sql.DoubleType, Size: 8},
+	sql.REAL:      {Type: sql.DoubleType, Size: 4},
+	sql.SMALLINT:  {Type: sql.IntegerType, Size: 2},
+	sql.INT2:      {Type: sql.IntegerType, Size: 2},
+	sql.INT:       {Type: sql.IntegerType, Size: 4},
+	sql.INTEGER:   {Type: sql.IntegerType, Size: 4},
+	sql.INT4:      {Type: sql.IntegerType, Size: 4},
+	sql.INT8:      {Type: sql.IntegerType, Size: 8},
+	sql.BIGINT:    {Type: sql.IntegerType, Size: 8},
 }
 
 func (p *parser) parseCreateColumns(s *stmt.CreateTable) {
@@ -406,14 +407,15 @@ func (p *parser) parseCreateColumns(s *stmt.CreateTable) {
 			| CHAR [(length)] [BINARY]
 			| VARCHAR [(length)] [BINARY]
 			| TEXT [(length)] [BINARY]
-			| DOUBLE [(length, decimals)]
-			| SMALLINT [(length)]
-			| INT2 [(length)]
-			| INT [(length)]
-			| INT4 [(length)]
-			| INTEGER [(length)]
-			| BIGINT [(length)]
-			| INT8 [(length)]
+			| DOUBLE [PRECISION]
+			| REAL
+			| SMALLINT
+			| INT2
+			| INT
+			| INT4
+			| INTEGER
+			| BIGINT
+			| INT8
 	*/
 
 	for {
@@ -437,27 +439,13 @@ func (p *parser) parseCreateColumns(s *stmt.CreateTable) {
 			p.expectTokens(token.LParen)
 			ct.Size = uint32(p.expectInteger(0, db.MaxColumnSize))
 			p.expectTokens(token.RParen)
-		} else {
-			switch ct.Type {
-			case sql.CharacterType:
-				if !p.maybeToken(token.LParen) {
-					break
-				}
+		} else if typ == sql.DOUBLE {
+			p.maybeIdentifier(sql.PRECISION)
+		}
+
+		if ct.Type == sql.CharacterType {
+			if p.maybeToken(token.LParen) {
 				ct.Size = uint32(p.expectInteger(0, db.MaxColumnSize))
-				p.expectTokens(token.RParen)
-			case sql.DoubleType:
-				if !p.maybeToken(token.LParen) {
-					break
-				}
-				ct.Width = uint8(p.expectInteger(1, 255))
-				p.expectTokens(token.Comma)
-				ct.Fraction = uint8(p.expectInteger(0, 30))
-				p.expectTokens(token.RParen)
-			case sql.IntegerType:
-				if !p.maybeToken(token.LParen) {
-					break
-				}
-				ct.Width = uint8(p.expectInteger(1, 255))
 				p.expectTokens(token.RParen)
 			}
 		}

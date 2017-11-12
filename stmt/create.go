@@ -22,11 +22,6 @@ func (stmt *CreateTable) String() string {
 			s += ", "
 		}
 		s += fmt.Sprintf("%s %s", stmt.Columns[i], ct.DataType())
-		if ct.Type == sql.IntegerType && ct.Width < 255 {
-			s += fmt.Sprintf("(%d)", ct.Width)
-		} else if ct.Type == sql.DoubleType && (ct.Width < 255 || ct.Fraction < 30) {
-			s += fmt.Sprintf("(%d, %d)", ct.Width, ct.Fraction)
-		}
 		if ct.NotNull {
 			s += " NOT NULL"
 		}
