@@ -22,13 +22,14 @@ const (
 	ENGINE
 	IDENTIFIERS
 	INT
+	INT2
+	INT4
+	INT8
 	INTEGER
-	MEDIUMINT
 	SMALLINT
 	STORES
 	TABLES
 	TEXT
-	TINYINT
 	VARBINARY
 	VARCHAR
 )
@@ -109,11 +110,13 @@ var knownKeywords = map[string]struct {
 	"INNER":     {INNER, true},
 	"INSERT":    {INSERT, true},
 	"INT":       {INT, false},
+	"INT2":      {INT2, false},
+	"INT4":      {INT4, false},
+	"INT8":      {INT8, false},
 	"INTEGER":   {INTEGER, false},
 	"INTO":      {INTO, true},
 	"JOIN":      {JOIN, true},
 	"LEFT":      {LEFT, true},
-	"MEDIUMINT": {MEDIUMINT, false},
 	"NATURAL":   {NATURAL, true},
 	"NOT":       {NOT, true},
 	"NULL":      {NULL, true},
@@ -128,7 +131,6 @@ var knownKeywords = map[string]struct {
 	"TEMP":      {TEMP, true},
 	"TEMPORARY": {TEMPORARY, true},
 	"TEXT":      {TEXT, false},
-	"TINYINT":   {TINYINT, false},
 	"TRUE":      {TRUE, true},
 	"UNIQUE":    {UNIQUE, true},
 	"UPDATE":    {UPDATE, true},

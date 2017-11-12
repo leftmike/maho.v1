@@ -118,29 +118,30 @@ func TestCreateTable(t *testing.T) {
 		{sql: "create table t (c char default, d int)", fail: true},
 		{sql: "create table t (c int default 0 default 1)", fail: true},
 		{
-			sql: "create table t (c1 tinyint, c2 smallint, c3 mediumint, c4 integer, c5 bigint)",
+			sql: "create table t (c1 int2, c2 smallint, c3 int4, c4 integer, c5 bigint, c6 int8)",
 			stmt: stmt.CreateTable{
 				Table: stmt.TableName{Table: sql.ID("t")},
 				Columns: []sql.Identifier{sql.ID("c1"), sql.ID("c2"), sql.ID("c3"), sql.ID("c4"),
-					sql.ID("c5")},
+					sql.ID("c5"), sql.ID("c6")},
 				ColumnTypes: []db.ColumnType{
-					{Type: sql.IntegerType, Size: 1, Width: 255},
 					{Type: sql.IntegerType, Size: 2, Width: 255},
-					{Type: sql.IntegerType, Size: 3, Width: 255},
+					{Type: sql.IntegerType, Size: 2, Width: 255},
 					{Type: sql.IntegerType, Size: 4, Width: 255},
+					{Type: sql.IntegerType, Size: 4, Width: 255},
+					{Type: sql.IntegerType, Size: 8, Width: 255},
 					{Type: sql.IntegerType, Size: 8, Width: 255},
 				},
 			},
 		},
 		{
-			sql: "create table t (c1 tinyint(1), c2 smallint(2), c3 mediumint(3), c4 integer(4))",
+			sql: "create table t (c1 int2(1), c2 smallint(2), c3 int4(3), c4 integer(4))",
 			stmt: stmt.CreateTable{
 				Table:   stmt.TableName{Table: sql.ID("t")},
 				Columns: []sql.Identifier{sql.ID("c1"), sql.ID("c2"), sql.ID("c3"), sql.ID("c4")},
 				ColumnTypes: []db.ColumnType{
-					{Type: sql.IntegerType, Size: 1, Width: 1},
+					{Type: sql.IntegerType, Size: 2, Width: 1},
 					{Type: sql.IntegerType, Size: 2, Width: 2},
-					{Type: sql.IntegerType, Size: 3, Width: 3},
+					{Type: sql.IntegerType, Size: 4, Width: 3},
 					{Type: sql.IntegerType, Size: 4, Width: 4},
 				},
 			},

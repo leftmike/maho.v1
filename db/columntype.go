@@ -55,12 +55,8 @@ func (ct ColumnType) DataType() string {
 		return "DOUBLE"
 	case sql.IntegerType:
 		switch ct.Size {
-		case 1:
-			return "TINYINT"
 		case 2:
 			return "SMALLINT"
-		case 3:
-			return "MEDIUMINT"
 		case 4:
 			return "INT"
 		case 8:

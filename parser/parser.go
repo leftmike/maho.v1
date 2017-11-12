@@ -386,11 +386,12 @@ var types = map[sql.Identifier]db.ColumnType{
 	sql.BOOL:      {Type: sql.BooleanType, Size: 1},
 	sql.BOOLEAN:   {Type: sql.BooleanType, Size: 1},
 	sql.DOUBLE:    {Type: sql.DoubleType, Size: 8, Width: 255, Fraction: 30},
-	sql.TINYINT:   {Type: sql.IntegerType, Size: 1, Width: 255},
 	sql.SMALLINT:  {Type: sql.IntegerType, Size: 2, Width: 255},
-	sql.MEDIUMINT: {Type: sql.IntegerType, Size: 3, Width: 255},
+	sql.INT2:      {Type: sql.IntegerType, Size: 2, Width: 255},
 	sql.INT:       {Type: sql.IntegerType, Size: 4, Width: 255},
 	sql.INTEGER:   {Type: sql.IntegerType, Size: 4, Width: 255},
+	sql.INT4:      {Type: sql.IntegerType, Size: 4, Width: 255},
+	sql.INT8:      {Type: sql.IntegerType, Size: 8, Width: 255},
 	sql.BIGINT:    {Type: sql.IntegerType, Size: 8, Width: 255},
 }
 
@@ -406,12 +407,13 @@ func (p *parser) parseCreateColumns(s *stmt.CreateTable) {
 			| VARCHAR [(length)] [BINARY]
 			| TEXT [(length)] [BINARY]
 			| DOUBLE [(length, decimals)]
-			| TINYINT [(length)]
 			| SMALLINT [(length)]
-			| MEDIUMINT [(length)]
+			| INT2 [(length)]
 			| INT [(length)]
+			| INT4 [(length)]
 			| INTEGER [(length)]
 			| BIGINT [(length)]
+			| INT8 [(length)]
 	*/
 
 	for {
