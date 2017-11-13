@@ -1,6 +1,7 @@
 package test_test
 
 import (
+	"fmt"
 	"testing"
 
 	"sqltest"
@@ -23,6 +24,19 @@ func (r *reporter) Report(test string, err error) error {
 
 var testData = "../../sqltest/testdata"
 
+type mahoDialect struct{}
+
+func (_ mahoDialect) DriverName() string {
+	return "maho"
+}
+
+func (_ mahoDialect) ColumnType(typ string, arg []int) string {
+	if len(arg) > 0 {
+		return fmt.Sprintf("%s(%d)", typ, arg[0])
+	}
+	return typ
+}
+
 func TestSQL(t *testing.T) {
 	e, _, err := testutil.StartEngine("test")
 	if err != nil {
@@ -32,7 +46,7 @@ func TestSQL(t *testing.T) {
 
 	run := test.Runner{Engine: e}
 	var reporter reporter
-	err = sqltest.RunTests(testData, &run, &reporter, sqltest.Dialect{"maho"})
+	err = sqltest.RunTests(testData, &run, &reporter, mahoDialect{})
 	if err != nil {
 		t.Errorf("RunTests(%q) failed with %s", testData, err)
 		return

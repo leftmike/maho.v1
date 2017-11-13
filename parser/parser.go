@@ -402,10 +402,10 @@ func (p *parser) parseCreateColumns(s *stmt.CreateTable) {
 		<column> = name <data_type> [DEFAULT <expr>] | [NOT NULL]
 		<data_type> =
 			| BINARY [(length)]
-			| VARBINARY [(length)]
+			| VARBINARY (length)
 			| BLOB [(length)]
 			| CHAR [(length)]
-			| VARCHAR [(length)]
+			| VARCHAR (length)
 			| TEXT [(length)]
 			| BOOL
 			| BOOLEAN
