@@ -404,9 +404,9 @@ func (p *parser) parseCreateColumns(s *stmt.CreateTable) {
 			| BINARY [(length)]
 			| VARBINARY [(length)]
 			| BLOB [(length)]
-			| CHAR [(length)] [BINARY]
-			| VARCHAR [(length)] [BINARY]
-			| TEXT [(length)] [BINARY]
+			| CHAR [(length)]
+			| VARCHAR [(length)]
+			| TEXT [(length)]
 			| BOOL
 			| BOOLEAN
 			| DOUBLE [PRECISION]
@@ -450,10 +450,6 @@ func (p *parser) parseCreateColumns(s *stmt.CreateTable) {
 				ct.Size = uint32(p.expectInteger(0, db.MaxColumnSize))
 				p.expectTokens(token.RParen)
 			}
-		}
-
-		if ct.Type == sql.CharacterType && !ct.Binary && p.maybeIdentifier(sql.BINARY) {
-			ct.Binary = true
 		}
 
 		for {

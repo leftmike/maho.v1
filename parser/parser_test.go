@@ -109,7 +109,7 @@ func TestCreateTable(t *testing.T) {
 		{sql: "create table t (c blob binary)", fail: true},
 		{sql: "create table t (c int binary)", fail: true},
 		{sql: "create table t (c bool binary)", fail: true},
-		{sql: "create table t (c char binary(123))", fail: true},
+		{sql: "create table t (c char(123) binary)", fail: true},
 		{sql: "create table t (c double binary)", fail: true},
 		{sql: "create table t (c char null)", fail: true},
 		{sql: "create table t (c char null, d int)", fail: true},
@@ -191,18 +191,6 @@ func TestCreateTable(t *testing.T) {
 					{Type: sql.CharacterType, Fixed: true, Size: 123},
 					{Type: sql.CharacterType, Fixed: false, Size: 456},
 					{Type: sql.CharacterType, Fixed: false, Size: 789},
-				},
-			},
-		},
-		{
-			sql: "create table t (b1 char binary, b2 varchar(123) binary, b3 text binary)",
-			stmt: stmt.CreateTable{
-				Table:   stmt.TableName{Table: sql.ID("t")},
-				Columns: []sql.Identifier{sql.ID("b1"), sql.ID("b2"), sql.ID("b3")},
-				ColumnTypes: []db.ColumnType{
-					{Type: sql.CharacterType, Fixed: true, Binary: true, Size: 1},
-					{Type: sql.CharacterType, Fixed: false, Binary: true, Size: 123},
-					{Type: sql.CharacterType, Fixed: false, Binary: true, Size: db.MaxColumnSize},
 				},
 			},
 		},
