@@ -1,7 +1,6 @@
 package test_test
 
 import (
-	"fmt"
 	"testing"
 
 	"sqltest"
@@ -24,17 +23,12 @@ func (r *reporter) Report(test string, err error) error {
 
 var testData = "../../sqltest/testdata"
 
-type mahoDialect struct{}
+type mahoDialect struct {
+	sqltest.DefaultDialect
+}
 
 func (_ mahoDialect) DriverName() string {
 	return "maho"
-}
-
-func (_ mahoDialect) ColumnType(typ string, arg []int) string {
-	if len(arg) > 0 {
-		return fmt.Sprintf("%s(%d)", typ, arg[0])
-	}
-	return typ
 }
 
 func TestSQL(t *testing.T) {
