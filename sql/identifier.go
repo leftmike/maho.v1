@@ -65,8 +65,6 @@ const (
 	SELECT
 	SET
 	TABLE
-	TEMP
-	TEMPORARY
 	TRUE
 	UNIQUE
 	UPDATE
@@ -132,8 +130,6 @@ var knownKeywords = map[string]struct {
 	"SET":       {SET, true},
 	"SMALLINT":  {SMALLINT, false},
 	"TABLE":     {TABLE, true},
-	"TEMP":      {TEMP, true},
-	"TEMPORARY": {TEMPORARY, true},
 	"TEXT":      {TEXT, false},
 	"TRUE":      {TRUE, true},
 	"UNIQUE":    {UNIQUE, true},

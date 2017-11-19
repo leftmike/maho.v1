@@ -230,39 +230,10 @@ func (p *parser) parseStmt() stmt.Stmt {
 		sql.VALUES) {
 	case sql.CREATE:
 		/*
-			CREATE [UNIQUE] INDEX [IF NOT EXISTS]
-			CREATE [TEMP | TEMPORARY] TABLE [IF NOT EXISTS]
+			CREATE TABLE ...
 		*/
-		{
-			var (
-				tmp bool
-				unq bool
-				typ sql.Identifier
-				not bool
-			)
-
-			if p.optionalReserved(sql.TEMP, sql.TEMPORARY) {
-				typ = p.expectReserved(sql.TABLE)
-				tmp = true
-			} else if p.optionalReserved(sql.UNIQUE) {
-				typ = p.expectReserved(sql.INDEX)
-				unq = true
-			} else {
-				typ = p.expectReserved(sql.TABLE, sql.INDEX)
-			}
-			if p.optionalReserved(sql.IF) {
-				p.expectReserved(sql.NOT)
-				p.expectReserved(sql.EXISTS)
-				not = true
-			}
-
-			switch typ {
-			case sql.INDEX:
-				return p.parseCreateIndex(unq, not)
-			case sql.TABLE:
-				return p.parseCreateTable(tmp, not)
-			}
-		}
+		p.expectReserved(sql.TABLE)
+		return p.parseCreateTable()
 	case sql.DELETE:
 		/*
 		   DELETE FROM
@@ -298,11 +269,6 @@ func (p *parser) parseStmt() stmt.Stmt {
 		return p.parseUpdate()
 	}
 
-	return nil
-}
-
-func (p *parser) parseCreateIndex(unq bool, not bool) stmt.Stmt {
-	p.error("CREATE INDEX not implemented")
 	return nil
 }
 
@@ -355,14 +321,7 @@ func (p *parser) parseColumnAliases() []sql.Identifier {
 	return cols
 }
 
-func (p *parser) parseCreateTable(tmp bool, not bool) stmt.Stmt {
-	if tmp {
-		p.error("temporary tables not implemented")
-	}
-	if not {
-		p.error("IF NOT EXISTS not implemented")
-	}
-
+func (p *parser) parseCreateTable() stmt.Stmt {
 	// CREATE TABLE [database .] table ([<column>,] ...)
 	var s stmt.CreateTable
 	s.Table = p.parseTableName()
@@ -398,15 +357,15 @@ var types = map[sql.Identifier]db.ColumnType{
 
 func (p *parser) parseCreateColumns(s *stmt.CreateTable) {
 	/*
-		CREATE TABLE [database .] table (<column> [, ...])
-		<column> = name <data_type> [DEFAULT <expr>] | [NOT NULL]
+		CREATE TABLE [database '.'] table '(' <column> [',' ...] ')'
+		<column> = name <data_type> ([DEFAULT <expr>] | [NOT NULL])
 		<data_type> =
-			| BINARY [(length)]
-			| VARBINARY (length)
-			| BLOB [(length)]
-			| CHAR [(length)]
-			| VARCHAR (length)
-			| TEXT [(length)]
+			| BINARY ['(' <length> ')']
+			| VARBINARY ['(' <length> ')']
+			| BLOB ['(' <length> ')']
+			| CHAR ['(' <length> ')']
+			| VARCHAR ['(' <length> ')']
+			| TEXT ['(' <length> ')']
 			| BOOL
 			| BOOLEAN
 			| DOUBLE [PRECISION]
@@ -437,11 +396,7 @@ func (p *parser) parseCreateColumns(s *stmt.CreateTable) {
 
 		ct := def
 
-		if typ == sql.VARCHAR || typ == sql.VARBINARY {
-			p.expectTokens(token.LParen)
-			ct.Size = uint32(p.expectInteger(0, db.MaxColumnSize))
-			p.expectTokens(token.RParen)
-		} else if typ == sql.DOUBLE {
+		if typ == sql.DOUBLE {
 			p.maybeIdentifier(sql.PRECISION)
 		}
 

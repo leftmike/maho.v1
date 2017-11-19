@@ -70,7 +70,11 @@ func (run *Runner) RunQuery(tst *sqltest.Test) ([]string, [][]string, error) {
 		}
 		row := make([]string, 0, lenCols)
 		for _, v := range dest {
-			row = append(row, sql.Format(v))
+			if s, ok := v.(string); ok {
+				row = append(row, s)
+			} else {
+				row = append(row, sql.Format(v))
+			}
 		}
 		results = append(results, row)
 	}

@@ -46,7 +46,7 @@ func TestSQL(t *testing.T) {
 		return
 	}
 	for _, report := range reporter {
-		if report.err != nil {
+		if report.err != nil && report.err != sqltest.Skipped {
 			t.Errorf("%s: %s", report.test, report.err)
 		}
 	}

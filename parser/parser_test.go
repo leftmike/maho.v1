@@ -102,8 +102,6 @@ func TestCreateTable(t *testing.T) {
 		{sql: "create table t (c int(1,2))", fail: true},
 		{sql: "create table t (c int(0))", fail: true},
 		{sql: "create table t (c int(256))", fail: true},
-		{sql: "create table t (c varbinary)", fail: true},
-		{sql: "create table t (c varchar)", fail: true},
 		{sql: "create table t (c char(1,2))", fail: true},
 		{sql: "create table t (c char(-1))", fail: true},
 		{sql: "create table t (c blob binary)", fail: true},
