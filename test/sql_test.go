@@ -1,6 +1,7 @@
 package test_test
 
 import (
+	"flag"
 	"testing"
 
 	"sqltest"
@@ -21,7 +22,10 @@ func (r *reporter) Report(test string, err error) error {
 	return nil
 }
 
-var testData = "../../sqltest/testdata"
+var (
+	update   = flag.Bool("update", false, "update expected to output")
+	testData = flag.String("testdata", "../../sqltest/sql/testdata", "directory of testdata")
+)
 
 type mahoDialect struct {
 	sqltest.DefaultDialect
@@ -40,7 +44,7 @@ func TestSQL(t *testing.T) {
 
 	run := test.Runner{Engine: e}
 	var reporter reporter
-	err = sqltest.RunTests(testData, &run, &reporter, mahoDialect{})
+	err = sqltest.RunTests(*testData, &run, &reporter, mahoDialect{}, *update)
 	if err != nil {
 		t.Errorf("RunTests(%q) failed with %s", testData, err)
 		return
