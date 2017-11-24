@@ -34,8 +34,6 @@ func (stmt *CreateTable) String() string {
 }
 
 func (stmt *CreateTable) Execute(e *engine.Engine) (interface{}, error) {
-	fmt.Println(stmt)
-
 	d, err := e.LookupDatabase(stmt.Table.Database)
 	if err != nil {
 		return nil, err

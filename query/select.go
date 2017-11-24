@@ -2,6 +2,7 @@ package query
 
 import (
 	"fmt"
+	"io"
 
 	"maho/db"
 	"maho/engine"
@@ -100,22 +101,23 @@ func (stmt *Select) String() string {
 }
 
 func (stmt *Select) Rows(e *engine.Engine) (db.Rows, error) {
+	var rows db.Rows
+	var fctx *fromContext
+	var err error
+
 	if stmt.From == nil {
-		return nil, fmt.Errorf("SELECT with no FROM clause is not supported yet")
-	}
-	rows, fctx, err := stmt.From.rows(e)
-	if err != nil {
-		return nil, err
+		rows = &oneEmptyRow{}
+	} else {
+		rows, fctx, err = stmt.From.rows(e)
+		if err != nil {
+			return nil, err
+		}
 	}
 	rows, err = where(rows, fctx, stmt.Where)
 	if err != nil {
 		return nil, err
 	}
-	rows, err = results(rows, fctx, stmt.Results)
-	if err != nil {
-		return nil, err
-	}
-	return rows, nil
+	return results(rows, fctx, stmt.Results)
 }
 
 func (fs FromSelect) rows(e *engine.Engine) (db.Rows, *fromContext, error) {
@@ -139,8 +141,8 @@ type whereRows struct {
 	dest []sql.Value
 }
 
-func (wr *whereRows) EvalRef(idx int) (sql.Value, error) {
-	return wr.dest[idx], nil
+func (wr *whereRows) EvalRef(idx int) sql.Value {
+	return wr.dest[idx]
 }
 
 func (wr *whereRows) Columns() []sql.Identifier {
@@ -185,6 +187,27 @@ func where(rows db.Rows, fctx *fromContext, cond expr.Expr) (db.Rows, error) {
 	return &whereRows{rows: rows, cond: ce}, nil
 }
 
+type oneEmptyRow struct {
+	one bool
+}
+
+func (oer *oneEmptyRow) Columns() []sql.Identifier {
+	return []sql.Identifier{}
+}
+
+func (oer *oneEmptyRow) Close() error {
+	oer.one = true
+	return nil
+}
+
+func (oer *oneEmptyRow) Next(dest []sql.Value) error {
+	if oer.one {
+		return io.EOF
+	}
+	oer.one = true
+	return nil
+}
+
 type allResultRows struct {
 	rows    db.Rows
 	columns []sql.Identifier
@@ -220,8 +243,8 @@ type resultRows struct {
 	destExprs []expr2dest
 }
 
-func (rr *resultRows) EvalRef(idx int) (sql.Value, error) {
-	return rr.dest[idx], nil
+func (rr *resultRows) EvalRef(idx int) sql.Value {
+	return rr.dest[idx]
 }
 
 func (rr *resultRows) Columns() []sql.Identifier {

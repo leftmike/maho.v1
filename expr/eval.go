@@ -6,7 +6,7 @@ import (
 )
 
 type EvalContext interface {
-	EvalRef(idx int) (sql.Value, error)
+	EvalRef(idx int) sql.Value
 }
 
 type CExpr interface {
@@ -25,7 +25,7 @@ func (ci colIndex) String() string {
 }
 
 func (ci colIndex) Eval(ctx EvalContext) (sql.Value, error) {
-	return ctx.EvalRef(int(ci))
+	return ctx.EvalRef(int(ci)), nil
 }
 
 type call struct {

@@ -27,8 +27,6 @@ func (stmt *DropTable) String() string {
 }
 
 func (stmt *DropTable) Execute(e *engine.Engine) (interface{}, error) {
-	fmt.Println(stmt)
-
 	for _, tbl := range stmt.Tables {
 		d, err := e.LookupDatabase(tbl.Database)
 		if err != nil {

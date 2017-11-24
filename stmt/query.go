@@ -16,7 +16,6 @@ func (stmt *Select) String() string {
 }
 
 func (stmt *Select) Execute(e *engine.Engine) (interface{}, error) {
-	fmt.Println(stmt)
 	return (*query.Select)(stmt).Rows(e)
 }
 
@@ -27,7 +26,6 @@ func (stmt *Values) String() string {
 }
 
 func (stmt *Values) Execute(e *engine.Engine) (interface{}, error) {
-	fmt.Println(stmt)
 	return (*query.Values)(stmt).Rows(e)
 }
 
@@ -45,8 +43,6 @@ func (stmt *Delete) String() string {
 }
 
 func (stmt *Delete) Execute(e *engine.Engine) (interface{}, error) {
-	fmt.Println(stmt)
-
 	return nil, fmt.Errorf("DELETE: not implemented yet")
 }
 
@@ -76,7 +72,5 @@ func (stmt *Update) String() string {
 }
 
 func (stmt *Update) Execute(e *engine.Engine) (interface{}, error) {
-	fmt.Println(stmt)
-
 	return nil, fmt.Errorf("UPDATE: not implemented yet")
 }

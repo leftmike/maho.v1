@@ -51,8 +51,6 @@ func (stmt *InsertValues) String() string {
 }
 
 func (stmt *InsertValues) Execute(e *engine.Engine) (interface{}, error) {
-	fmt.Println(stmt)
-
 	dbase, err := e.LookupDatabase(stmt.Table.Database)
 	if err != nil {
 		return nil, err
