@@ -474,6 +474,50 @@ func (p *parser) ParseExpr() (e expr.Expr, err error) {
 	return
 }
 
+func adjustPrecedence(e expr.Expr) expr.Expr {
+	switch e := e.(type) {
+	case *expr.Unary:
+		e.Expr = adjustPrecedence(e.Expr)
+		if e.Op == expr.NoOp {
+			return e
+		}
+
+		// - {2 * 3}  --> {- 2} * 3
+		if b, ok := e.Expr.(*expr.Binary); ok && b.Op.Precedence() < e.Op.Precedence() {
+			e.Expr = b.Left
+			b.Left = e
+			return adjustPrecedence(b)
+		}
+	case *expr.Binary:
+		e.Left = adjustPrecedence(e.Left)
+		e.Right = adjustPrecedence(e.Right)
+
+		// 1 * {2 + 3} --> {1 * 2} + 3
+		if b, ok := e.Right.(*expr.Binary); ok && b.Op.Precedence() <= e.Op.Precedence() {
+			e.Right = b.Left
+			b.Left = e
+			return adjustPrecedence(b)
+		}
+
+		// {1 + 2} * 3 --> 1 + {2 * 3}
+		if b, ok := e.Left.(*expr.Binary); ok && b.Op.Precedence() < e.Op.Precedence() {
+			e.Left = b.Right
+			b.Right = e
+			return adjustPrecedence(b)
+		}
+	case *expr.Call:
+		for i, a := range e.Args {
+			e.Args[i] = adjustPrecedence(a)
+		}
+	}
+
+	return e
+}
+
+func (p *parser) parseExpr() expr.Expr {
+	return adjustPrecedence(p.parseSubExpr())
+}
+
 /*
 <expr>:
       <literal>
@@ -511,7 +555,7 @@ var binaryOps = map[rune]expr.Op{
 	token.Star:           expr.MultiplyOp,
 }
 
-func (p *parser) parseExpr() expr.Expr {
+func (p *parser) parseSubExpr() expr.Expr {
 	var e expr.Expr
 	r := p.scan()
 	if r == token.Reserved {
@@ -522,7 +566,7 @@ func (p *parser) parseExpr() expr.Expr {
 		} else if p.sctx.Identifier == sql.NULL {
 			e = &expr.Literal{nil}
 		} else if p.sctx.Identifier == sql.NOT {
-			e = p.parseUnaryExpr(expr.NotOp)
+			e = &expr.Unary{expr.NotOp, p.parseSubExpr()}
 		} else {
 			p.error(fmt.Sprintf("unexpected identifier %s", p.sctx.Identifier))
 		}
@@ -539,7 +583,7 @@ func (p *parser) parseExpr() expr.Expr {
 			c := &expr.Call{Name: id}
 			if !p.maybeToken(token.RParen) {
 				for {
-					c.Args = append(c.Args, p.parseExpr())
+					c.Args = append(c.Args, p.parseSubExpr())
 					if p.maybeToken(token.RParen) {
 						break
 					}
@@ -557,10 +601,10 @@ func (p *parser) parseExpr() expr.Expr {
 		}
 	} else if r == token.Minus {
 		// - <expr>
-		e = p.parseUnaryExpr(expr.NegateOp)
+		e = &expr.Unary{expr.NegateOp, p.parseSubExpr()}
 	} else if r == token.LParen {
 		// ( <expr> )
-		e = &expr.Unary{expr.NoOp, p.parseExpr()}
+		e = &expr.Unary{expr.NoOp, p.parseSubExpr()}
 		if p.scan() != token.RParen {
 			p.error(fmt.Sprintf("expected closing parenthesis, got %s", p.got()))
 		}
@@ -582,32 +626,7 @@ func (p *parser) parseExpr() expr.Expr {
 		}
 	}
 
-	e2 := p.parseExpr()
-	if b2, ok := e2.(*expr.Binary); ok && b2.Op.Precedence() < op.Precedence() {
-		b2.Left = &expr.Binary{op, e, b2.Left}
-		e = b2
-	} else {
-		e = &expr.Binary{op, e, e2}
-	}
-	return e
-}
-
-func (p *parser) parseUnaryExpr(op expr.Op) expr.Expr {
-	e := p.parseExpr()
-	if b, ok := e.(*expr.Binary); ok && b.Op.Precedence() < op.Precedence() {
-		for {
-			if bl, ok := b.Left.(*expr.Binary); ok && bl.Op.Precedence() < op.Precedence() {
-				b = bl
-			} else {
-				break
-			}
-		}
-
-		b.Left = &expr.Unary{op, b.Left}
-		return e
-	}
-
-	return &expr.Unary{op, e}
+	return &expr.Binary{op, e, p.parseSubExpr()}
 }
 
 func (p *parser) parseInsert() stmt.Stmt {

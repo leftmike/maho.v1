@@ -16,6 +16,7 @@ func TestCompile(t *testing.T) {
 		r string
 	}{
 		{"1 + 2", `"+"(1, 2)`},
+		{"1 * 2 + 3 / - 4", `"+"("*"(1, 2), "/"(3, "-"(4)))`},
 		{"abs(1 * 2 + 3 / - 4)", `abs("+"("*"(1, 2), "/"(3, "-"(4))))`},
 		{"concat('abc', 123, 45.6, true, null)",
 			"concat('abc', 123, 45.6, " + sql.TrueString + ", " + sql.NullString + ")"},
