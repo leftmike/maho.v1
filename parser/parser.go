@@ -824,27 +824,18 @@ func (p *parser) parseFromItem() query.FromItem {
 		jt = query.Join
 	} else if p.optionalReserved(sql.INNER) {
 		p.expectReserved(sql.JOIN)
-		jt = query.InnerJoin
+		jt = query.Join
 	} else if p.optionalReserved(sql.LEFT) {
-		if p.optionalReserved(sql.OUTER) {
-			jt = query.LeftOuterJoin
-		} else {
-			jt = query.LeftJoin
-		}
+		p.optionalReserved(sql.OUTER)
+		jt = query.LeftJoin
 		p.expectReserved(sql.JOIN)
 	} else if p.optionalReserved(sql.RIGHT) {
-		if p.optionalReserved(sql.OUTER) {
-			jt = query.RightOuterJoin
-		} else {
-			jt = query.RightJoin
-		}
+		p.optionalReserved(sql.OUTER)
+		jt = query.RightJoin
 		p.expectReserved(sql.JOIN)
 	} else if p.optionalReserved(sql.FULL) {
-		if p.optionalReserved(sql.OUTER) {
-			jt = query.FullOuterJoin
-		} else {
-			jt = query.FullJoin
-		}
+		p.optionalReserved(sql.OUTER)
+		jt = query.FullJoin
 		p.expectReserved(sql.JOIN)
 	} else if p.optionalReserved(sql.CROSS) {
 		p.expectReserved(sql.JOIN)
@@ -875,8 +866,7 @@ func (p *parser) parseFromItem() query.FromItem {
 		}
 	}
 
-	if jt == query.InnerJoin || jt == query.LeftOuterJoin || jt == query.RightOuterJoin ||
-		jt == query.FullOuterJoin {
+	if jt == query.Join || jt == query.LeftJoin || jt == query.RightJoin || jt == query.FullJoin {
 		if (fj.On != nil && fj.Using != nil) || (fj.On == nil && fj.Using == nil) {
 			p.error(fmt.Sprintf("%s must have one of ON or USING", jt))
 		}

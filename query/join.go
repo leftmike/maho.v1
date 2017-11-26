@@ -13,27 +13,20 @@ type JoinType int
 
 const (
 	NoJoin JoinType = iota
-	Join
-	InnerJoin
-	LeftJoin
-	LeftOuterJoin
-	RightJoin
-	RightOuterJoin
-	FullJoin
-	FullOuterJoin
+
+	Join      // INNER JOIN
+	LeftJoin  // LEFT OUTER JOIN
+	RightJoin // RIGHT OUTER JOIN
+	FullJoin  // FULL OUTER JOIN
 	CrossJoin
 )
 
 var joinType = map[JoinType]string{
-	Join:           "JOIN",
-	InnerJoin:      "INNER JOIN",
-	LeftJoin:       "LEFT JOIN",
-	LeftOuterJoin:  "LEFT OUTER JOIN",
-	RightJoin:      "RIGHT JOIN",
-	RightOuterJoin: "RIGHT OUTER JOIN",
-	FullJoin:       "FULL JOIN",
-	FullOuterJoin:  "FULL OUTER JOIN",
-	CrossJoin:      "CROSS JOIN",
+	Join:      "JOIN",
+	LeftJoin:  "LEFT JOIN",
+	RightJoin: "RIGHT JOIN",
+	FullJoin:  "FULL JOIN",
+	CrossJoin: "CROSS JOIN",
 }
 
 type FromJoin struct {
