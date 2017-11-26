@@ -55,7 +55,6 @@ const (
 	INTO
 	JOIN
 	LEFT
-	NATURAL
 	NOT
 	NULL
 	ON
@@ -117,7 +116,6 @@ var knownKeywords = map[string]struct {
 	"INTO":      {INTO, true},
 	"JOIN":      {JOIN, true},
 	"LEFT":      {LEFT, true},
-	"NATURAL":   {NATURAL, true},
 	"NOT":       {NOT, true},
 	"NULL":      {NULL, true},
 	"ON":        {ON, true},

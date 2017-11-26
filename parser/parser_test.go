@@ -547,21 +547,6 @@ func TestSelect(t *testing.T) {
 			},
 		},
 		{
-			sql: "select * from t1, t2 natural full outer join t3",
-			stmt: stmt.Select{
-				From: query.FromJoin{
-					Left: query.FromTableAlias{Table: sql.ID("t1")},
-					Right: query.FromJoin{
-						Left:    query.FromTableAlias{Table: sql.ID("t2")},
-						Right:   query.FromTableAlias{Table: sql.ID("t3")},
-						Natural: true,
-						Type:    query.FullOuterJoin,
-					},
-					Type: query.CrossJoin,
-				},
-			},
-		},
-		{
 			sql: "select * from (t1, t2) right join t3",
 			stmt: stmt.Select{
 				From: query.FromJoin{
@@ -572,17 +557,6 @@ func TestSelect(t *testing.T) {
 					},
 					Right: query.FromTableAlias{Table: sql.ID("t3")},
 					Type:  query.RightJoin,
-				},
-			},
-		},
-		{
-			sql: "select * from t1 natural inner join t2",
-			stmt: stmt.Select{
-				From: query.FromJoin{
-					Left:    query.FromTableAlias{Table: sql.ID("t1")},
-					Right:   query.FromTableAlias{Table: sql.ID("t2")},
-					Natural: true,
-					Type:    query.InnerJoin,
 				},
 			},
 		},
@@ -609,11 +583,11 @@ func TestSelect(t *testing.T) {
 				},
 			},
 		},
+		{sql: "select * from t1, t2 full outer join t3", fail: true},
 		{sql: "select * from t1 inner join t2", fail: true},
-		{sql: "select * from t1 natural inner join t2 on c1 > 5", fail: true},
-		{sql: "select * from t1 natural inner join t2 using (c1, c2)", fail: true},
+		{sql: "select * from t1 inner join t2", fail: true},
+		{sql: "select * from t1 inner join t2", fail: true},
 		{sql: "select * from t1 inner join t2 on c1 > 5 using (c1, c2)", fail: true},
-		{sql: "select * from t1 natural cross join t2", fail: true},
 		{sql: "select * from t1 cross join t2 on c1 > 5", fail: true},
 		{sql: "select * from t1 cross join t2 using (c1, c2)", fail: true},
 		{sql: "select * from t1 inner join t2 using ()", fail: true},

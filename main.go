@@ -11,12 +11,10 @@ To Do:
 - execute DELETE
 - execute UPDATE
 
-- test SELECT
-
 - SELECT ... ORDER BY ...
 - joins
 - , => CROSS JOIN => INNER JOIN ON (TRUE); is CrossJoin necessary?
-- FromJoin.Rows()
+- FromJoin.rows()
 
 - split out display info from ColumnType
 */

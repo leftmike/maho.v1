@@ -787,7 +787,7 @@ func (p *parser) parseSelect() *stmt.Select {
 <from-item> = [ database-name '.' ] table-name [[ AS ] alias ]
     | '(' <select> | <values> ')' [ AS ] alias ['(' column-alias [',' ...] ')']
     | '(' <from-item> [',' ...] ')'
-    | <from-item> [ NATURAL ] <join-type> <from-item> [ ON <expr> | USING '(' join-column ',' ...]
+    | <from-item> <join-type> <from-item> [ ON <expr> | USING '(' join-column ',' ...]
 <join-type> = [ INNER ] JOIN
     | LEFT [ OUTER ] JOIN
     | RIGHT [ OUTER ] JOIN
@@ -817,11 +817,6 @@ func (p *parser) parseFromItem() query.FromItem {
 	} else {
 		ta := p.parseTableAlias()
 		fi = query.FromTableAlias{Database: ta.Database, Table: ta.Table, Alias: ta.Alias}
-	}
-
-	var nj bool
-	if p.optionalReserved(sql.NATURAL) {
-		nj = true
 	}
 
 	jt := query.NoJoin
@@ -860,7 +855,7 @@ func (p *parser) parseFromItem() query.FromItem {
 		return fi
 	}
 
-	fj := query.FromJoin{Left: fi, Right: p.parseFromItem(), Natural: nj, Type: jt}
+	fj := query.FromJoin{Left: fi, Right: p.parseFromItem(), Type: jt}
 	if p.optionalReserved(sql.ON) {
 		fj.On = p.parseExpr()
 	} else if p.optionalReserved(sql.USING) {
@@ -882,19 +877,13 @@ func (p *parser) parseFromItem() query.FromItem {
 
 	if jt == query.InnerJoin || jt == query.LeftOuterJoin || jt == query.RightOuterJoin ||
 		jt == query.FullOuterJoin {
-		if nj {
-			if fj.On != nil || fj.Using != nil {
-				p.error(fmt.Sprintf("%s must have one of NATURAL, ON, or USING", jt))
-			}
-		} else if fj.On != nil && fj.Using != nil {
-			p.error(fmt.Sprintf("%s must have one of NATURAL, ON, or USING", jt))
-		} else if fj.On == nil && fj.Using == nil {
-			p.error(fmt.Sprintf("%s must have one of NATURAL, ON, or USING", jt))
+		if (fj.On != nil && fj.Using != nil) || (fj.On == nil && fj.Using == nil) {
+			p.error(fmt.Sprintf("%s must have one of ON or USING", jt))
 		}
 	}
 	if jt == query.CrossJoin {
-		if nj || fj.On != nil || fj.Using != nil {
-			p.error("CROSS JOIN may not have NATURAL, ON, or USING")
+		if fj.On != nil || fj.Using != nil {
+			p.error("CROSS JOIN may not have ON or USING")
 		}
 	}
 

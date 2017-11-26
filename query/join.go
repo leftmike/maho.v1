@@ -37,12 +37,11 @@ var joinType = map[JoinType]string{
 }
 
 type FromJoin struct {
-	Left    FromItem
-	Right   FromItem
-	Natural bool
-	Type    JoinType
-	On      expr.Expr
-	Using   []sql.Identifier
+	Left  FromItem
+	Right FromItem
+	Type  JoinType
+	On    expr.Expr
+	Using []sql.Identifier
 }
 
 func (jt JoinType) String() string {
@@ -50,12 +49,7 @@ func (jt JoinType) String() string {
 }
 
 func (fj FromJoin) String() string {
-	s := fj.Left.String()
-	if fj.Natural {
-		s += " NATURAL"
-	}
-	s += fmt.Sprintf(" %s ", fj.Type.String())
-	s += fj.Right.String()
+	s := fmt.Sprintf("%s %s %s", fj.Left, fj.Type.String(), fj.Right)
 	if fj.On != nil {
 		s += fmt.Sprintf(" ON %s", fj.On.String())
 	}
