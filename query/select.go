@@ -160,8 +160,10 @@ func (wr *whereRows) Next(dest []sql.Value) error {
 			return err
 		}
 		wr.dest = dest
+		defer func() {
+			wr.dest = nil
+		}()
 		v, err := wr.cond.Eval(wr)
-		wr.dest = nil
 		if err != nil {
 			return err
 		}

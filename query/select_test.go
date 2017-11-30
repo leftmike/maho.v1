@@ -102,7 +102,7 @@ func TestSelect(t *testing.T) {
 			t.Errorf("(%v).Rows().Columns() got %v want %v", c.stmt, cols, c.cols)
 			continue
 		}
-		all, err := testutil.AllRows(rows)
+		all, err := query.AllRows(rows)
 		if err != nil {
 			t.Errorf("(%v).Rows().Next() failed with %s", c.stmt, err)
 		}

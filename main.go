@@ -13,7 +13,7 @@ To Do:
 
 - SELECT ... ORDER BY ...
 - joins
-- , => CROSS JOIN => INNER JOIN ON (TRUE); is CrossJoin necessary?
+- , => CROSS JOIN => JOIN ON (TRUE); is CrossJoin necessary?
 - FromJoin.rows()
 
 - split out display info from ColumnType

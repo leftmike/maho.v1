@@ -8,6 +8,7 @@ import (
 	"maho/engine"
 	"maho/expr"
 	"maho/parser"
+	"maho/query"
 	"maho/sql"
 	"maho/testutil"
 )
@@ -221,7 +222,7 @@ func testInsert(t *testing.T, e *engine.Engine, dbase db.DatabaseModify, nam sql
 				t.Errorf("(%s).Rows() failed with %s", nam, err)
 				continue
 			}
-			all, err := testutil.AllRows(rows)
+			all, err := query.AllRows(rows)
 			if err != nil {
 				t.Errorf("(%s).Rows().Next() failed with %s", nam, err)
 				continue

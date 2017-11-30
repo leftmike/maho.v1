@@ -93,6 +93,33 @@ func makeFromContext(nam sql.Identifier, cols []sql.Identifier) *fromContext {
 	return fctx
 }
 
+func joinContexts(lctx, rctx *fromContext) *fromContext {
+	// Create a new fromContext as a copy of the left context.
+	fctx := &fromContext{colMap: map[colRef]fromColumn{}, cols: lctx.cols}
+	for cr, fc := range lctx.colMap {
+		fctx.colMap[cr] = fc
+	}
+
+	// Merge in the right context, offsetting indexes and marking colRefs as invalid if they
+	// refer to more than one column.
+	off := len(lctx.cols)
+	for cr, fc := range rctx.colMap {
+		if efc, ok := fctx.colMap[cr]; ok {
+			efc.valid = false
+			fctx.colMap[cr] = efc
+		} else {
+			fc.index += off
+			fctx.colMap[cr] = fc
+		}
+	}
+	for _, ci := range rctx.cols {
+		ci.index += off
+		fctx.cols = append(fctx.cols, ci)
+	}
+
+	return fctx
+}
+
 func (fctx *fromContext) CompileRef(r expr.Ref) (int, error) {
 	var tbl, col sql.Identifier
 	if len(r) == 1 {
