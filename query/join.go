@@ -77,17 +77,34 @@ func AllRows(rows db.Rows) ([][]sql.Value, error) {
 	return all, nil
 }
 
+type joinState int
+
+const (
+	matchRows joinState = iota
+	rightRemaining
+	allDone
+)
+
 type joinRows struct {
-	leftRows     db.Rows
-	haveLeftDest bool
-	leftDest     []sql.Value
-	leftUsed     bool
+	state joinState
+
+	leftRows db.Rows
+	haveLeft bool
+	leftDest []sql.Value
+	leftLen  int
+	leftUsed bool
+	needLeft bool
 
 	rightRows  [][]sql.Value
 	rightIndex int
+	rightDest  []sql.Value
+	rightLen   int
 	rightUsed  []bool
 
 	columns []sql.Identifier
+
+	on expr.CExpr
+	// XXX: using []using
 }
 
 func (jr *joinRows) Columns() []sql.Identifier {
@@ -95,79 +112,111 @@ func (jr *joinRows) Columns() []sql.Identifier {
 }
 
 func (jr *joinRows) Close() error {
-	jr.haveLeftDest = false
+	jr.state = allDone
 	return jr.leftRows.Close()
 }
 
-func (jr *joinRows) next() error {
-	if !jr.haveLeftDest || jr.rightIndex == len(jr.rightRows) {
-		if len(jr.rightRows) == 0 {
-			return io.EOF
-		}
-		err := jr.leftRows.Next(jr.leftDest)
-		if err != nil {
-			return err
-		}
-		jr.haveLeftDest = true
-		jr.rightIndex = 0
-		jr.leftUsed = false
+func (jr *joinRows) EvalRef(idx int) sql.Value {
+	if idx < jr.leftLen {
+		return jr.leftDest[idx]
 	}
-	return nil
+	return jr.rightDest[idx-jr.leftLen]
 }
 
-type joinOnRows struct {
-	joinRows
-	on   expr.CExpr
-	dest []sql.Value
+func (jr *joinRows) onMatch(dest []sql.Value) (bool, error) {
+	v, err := jr.on.Eval(jr)
+	if err != nil {
+		return true, err
+	}
+	b, ok := v.(bool)
+	if !ok {
+		return true, fmt.Errorf("expected boolean result from ON condition: %s", sql.Format(v))
+	}
+	if b {
+		jr.leftUsed = true
+		if jr.rightUsed != nil {
+			jr.rightUsed[jr.rightIndex-1] = true
+		}
+		copy(dest, jr.leftDest)
+		copy(dest[jr.leftLen:], jr.rightDest)
+		return true, nil
+	}
+
+	return false, nil
 }
 
-func (jor *joinOnRows) EvalRef(idx int) sql.Value {
-	return jor.dest[idx]
-}
-
-func (jor *joinOnRows) Next(dest []sql.Value) error {
-	for {
-		err := jor.next()
-		if err != nil {
-			return err
-		}
-
-		copy(dest, jor.leftDest)
-		leftLen := len(jor.leftDest)
-		rightLen := len(jor.rightRows[jor.rightIndex])
-		for idx := 0; idx < rightLen; idx++ {
-			dest[idx+leftLen] = jor.rightRows[jor.rightIndex][idx]
-		}
-		jor.rightIndex += 1
-
-		if jor.on == nil {
-			break
-		}
-		jor.dest = dest
-		defer func() {
-			jor.dest = nil
-		}()
-		v, err := jor.on.Eval(jor)
-		if err != nil {
-			return err
-		}
-		b, ok := v.(bool)
-		if !ok {
-			return fmt.Errorf("expected boolean result from ON condition: %s", sql.Format(v))
-		}
-		if b {
-			jor.leftUsed = true
-			if jor.rightUsed != nil {
-				jor.rightUsed[jor.rightIndex-1] = true
+func (jr *joinRows) Next(dest []sql.Value) error {
+	if jr.state == allDone {
+		return io.EOF
+	} else if jr.state == rightRemaining {
+		for jr.rightIndex < len(jr.rightRows) {
+			if !jr.rightUsed[jr.rightIndex] {
+				for idx := 0; idx < jr.leftLen; idx++ {
+					dest[idx] = nil
+				}
+				copy(dest[jr.leftLen:], jr.rightRows[jr.rightIndex])
+				jr.rightIndex += 1
+				return nil
 			}
-			break
+
+			jr.rightIndex += 1
+		}
+
+		jr.state = allDone
+		return io.EOF
+	}
+
+	// jr.state == matchRows
+	for {
+		// Make sure that we have a left row.
+		if !jr.haveLeft {
+			err := jr.leftRows.Next(jr.leftDest)
+			if err == io.EOF && jr.rightUsed != nil {
+				jr.state = rightRemaining
+				jr.rightIndex = 0
+				return jr.Next(dest)
+			}
+			if err != nil {
+				jr.state = allDone
+				return err
+			}
+			jr.rightIndex = 0
+			jr.haveLeft = true
+			jr.leftUsed = false
+		}
+
+		// Get a right row.
+		jr.rightDest = jr.rightRows[jr.rightIndex]
+		jr.rightIndex += 1
+		if jr.rightIndex == len(jr.rightRows) {
+			jr.haveLeft = false
+		}
+
+		// Compare the left and right rows, and decide whether to combine and return them as a
+		// result row.
+		if jr.on != nil {
+			if done, err := jr.onMatch(dest); done {
+				return err
+			}
+		} else {
+			copy(dest, jr.leftDest)
+			copy(dest[jr.leftLen:], jr.rightDest)
+			return nil
+		}
+
+		// Check if the left row did not match any of the right rows and if we need it (LEFT JOIN
+		// or FULL JOIN).
+		if !jr.haveLeft && !jr.leftUsed && jr.needLeft {
+			// Return the unused left row combined with a NULL right row as the result row.
+			copy(dest, jr.leftDest)
+			if jr.on != nil {
+				for idx := 0; idx < jr.rightLen; idx++ {
+					dest[idx+jr.leftLen] = nil
+				}
+			}
+			return nil
 		}
 	}
-	return nil
-}
-
-type joinUsingRows struct {
-	joinRows
 }
 
 func (fj FromJoin) rows(e *engine.Engine) (db.Rows, *fromContext, error) {
@@ -185,21 +234,28 @@ func (fj FromJoin) rows(e *engine.Engine) (db.Rows, *fromContext, error) {
 	if err != nil {
 		return nil, nil, err
 	}
-	rows := joinOnRows{
-		joinRows: joinRows{
-			leftRows:  leftRows,
-			rightRows: rrows,
-			leftDest:  make([]sql.Value, len(leftCtx.cols)),
-			columns:   fctx.columns(),
-		},
+	leftLen := len(leftCtx.cols)
+	rows := joinRows{
+		leftRows:  leftRows,
+		leftDest:  make([]sql.Value, leftLen),
+		leftLen:   leftLen,
+		rightRows: rrows,
+		rightLen:  len(rightCtx.cols),
+		columns:   fctx.columns(),
 	}
 	if fj.On != nil {
 		rows.on, err = expr.Compile(fctx, fj.On)
 		if err != nil {
 			return nil, nil, err
 		}
+	} else if fj.Using != nil {
+		// XXX: rows.using =
 	}
-	// fj.JoinType == CrossJoin || fj.JoinType == Join
-	// fj.Using == nil
+	if fj.Type == LeftJoin || fj.Type == FullJoin {
+		rows.needLeft = true
+	}
+	if fj.Type == RightJoin || fj.Type == FullJoin {
+		rows.rightUsed = make([]bool, len(rrows))
+	}
 	return &rows, fctx, nil
 }

@@ -12,9 +12,10 @@ To Do:
 - execute UPDATE
 
 - SELECT ... ORDER BY ...
+
 - joins
-- , => CROSS JOIN => JOIN ON (TRUE); is CrossJoin necessary?
 - FromJoin.rows()
+- test joins with left and/or right being empty
 
 - split out display info from ColumnType
 */
