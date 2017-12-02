@@ -13,9 +13,7 @@ To Do:
 
 - SELECT ... ORDER BY ...
 
-- joins
-- FromJoin.rows()
-- test joins with left and/or right being empty
+- joins: using
 
 - split out display info from ColumnType
 */

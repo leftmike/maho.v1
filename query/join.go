@@ -85,6 +85,12 @@ const (
 	allDone
 )
 
+/*
+type using struct {
+	left, right int
+}
+*/
+
 type joinRows struct {
 	state joinState
 
@@ -185,23 +191,27 @@ func (jr *joinRows) Next(dest []sql.Value) error {
 			jr.leftUsed = false
 		}
 
-		// Get a right row.
-		jr.rightDest = jr.rightRows[jr.rightIndex]
-		jr.rightIndex += 1
 		if jr.rightIndex == len(jr.rightRows) {
 			jr.haveLeft = false
-		}
-
-		// Compare the left and right rows, and decide whether to combine and return them as a
-		// result row.
-		if jr.on != nil {
-			if done, err := jr.onMatch(dest); done {
-				return err
-			}
 		} else {
-			copy(dest, jr.leftDest)
-			copy(dest[jr.leftLen:], jr.rightDest)
-			return nil
+			// Get a right row.
+			jr.rightDest = jr.rightRows[jr.rightIndex]
+			jr.rightIndex += 1
+			if jr.rightIndex == len(jr.rightRows) {
+				jr.haveLeft = false
+			}
+
+			// Compare the left and right rows, and decide whether to combine and return them as a
+			// result row.
+			if jr.on != nil {
+				if done, err := jr.onMatch(dest); done {
+					return err
+				}
+			} else {
+				copy(dest, jr.leftDest)
+				copy(dest[jr.leftLen:], jr.rightDest)
+				return nil
+			}
 		}
 
 		// Check if the left row did not match any of the right rows and if we need it (LEFT JOIN
