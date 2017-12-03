@@ -85,11 +85,9 @@ const (
 	allDone
 )
 
-/*
-type using struct {
-	left, right int
+type usingMatch struct {
+	leftColIndex, rightColIndex int
 }
-*/
 
 type joinRows struct {
 	state joinState
@@ -110,7 +108,9 @@ type joinRows struct {
 	columns []sql.Identifier
 
 	on expr.CExpr
-	// XXX: using []using
+
+	using    []usingMatch
+	src2dest []int
 }
 
 func (jr *joinRows) Columns() []sql.Identifier {
@@ -149,6 +149,24 @@ func (jr *joinRows) onMatch(dest []sql.Value) (bool, error) {
 	}
 
 	return false, nil
+}
+
+func (jr *joinRows) onUsing(dest []sql.Value) (bool, error) {
+	for _, use := range jr.using {
+		if jr.leftDest[use.leftColIndex] != jr.rightDest[use.rightColIndex] {
+			return false, nil
+		}
+	}
+
+	jr.leftUsed = true
+	if jr.rightUsed != nil {
+		jr.rightUsed[jr.rightIndex-1] = true
+	}
+	copy(dest, jr.leftDest)
+	for destIndex, srcIndex := range jr.src2dest {
+		dest[destIndex+jr.leftLen] = jr.rightDest[srcIndex]
+	}
+	return true, nil
 }
 
 func (jr *joinRows) Next(dest []sql.Value) error {
@@ -207,6 +225,10 @@ func (jr *joinRows) Next(dest []sql.Value) error {
 				if done, err := jr.onMatch(dest); done {
 					return err
 				}
+			} else if jr.using != nil {
+				if done, err := jr.onUsing(dest); done {
+					return err
+				}
 			} else {
 				copy(dest, jr.leftDest)
 				copy(dest[jr.leftLen:], jr.rightDest)
@@ -219,10 +241,8 @@ func (jr *joinRows) Next(dest []sql.Value) error {
 		if !jr.haveLeft && !jr.leftUsed && jr.needLeft {
 			// Return the unused left row combined with a NULL right row as the result row.
 			copy(dest, jr.leftDest)
-			if jr.on != nil {
-				for idx := 0; idx < jr.rightLen; idx++ {
-					dest[idx+jr.leftLen] = nil
-				}
+			for idx := 0; idx < jr.rightLen; idx++ {
+				dest[idx+jr.leftLen] = nil
 			}
 			return nil
 		}
@@ -239,7 +259,6 @@ func (fj FromJoin) rows(e *engine.Engine) (db.Rows, *fromContext, error) {
 		return nil, nil, err
 	}
 
-	fctx := joinContexts(leftCtx, rightCtx)
 	rrows, err := AllRows(rightRows)
 	if err != nil {
 		return nil, nil, err
@@ -250,16 +269,6 @@ func (fj FromJoin) rows(e *engine.Engine) (db.Rows, *fromContext, error) {
 		leftDest:  make([]sql.Value, leftLen),
 		leftLen:   leftLen,
 		rightRows: rrows,
-		rightLen:  len(rightCtx.cols),
-		columns:   fctx.columns(),
-	}
-	if fj.On != nil {
-		rows.on, err = expr.Compile(fctx, fj.On)
-		if err != nil {
-			return nil, nil, err
-		}
-	} else if fj.Using != nil {
-		// XXX: rows.using =
 	}
 	if fj.Type == LeftJoin || fj.Type == FullJoin {
 		rows.needLeft = true
@@ -267,5 +276,36 @@ func (fj FromJoin) rows(e *engine.Engine) (db.Rows, *fromContext, error) {
 	if fj.Type == RightJoin || fj.Type == FullJoin {
 		rows.rightUsed = make([]bool, len(rrows))
 	}
+
+	var fctx *fromContext
+	if fj.Using != nil {
+		useSet := map[colRef]struct{}{}
+		for _, col := range fj.Using {
+			lcdx, err := leftCtx.usingIndex(col, "left")
+			if err != nil {
+				return nil, nil, err
+			}
+			rcdx, err := rightCtx.usingIndex(col, "right")
+			if err != nil {
+				return nil, nil, err
+			}
+			rows.using = append(rows.using, usingMatch{leftColIndex: lcdx, rightColIndex: rcdx})
+			useSet[colRef{column: col}] = struct{}{}
+		}
+
+		fctx, rows.src2dest = joinContextsUsing(leftCtx, rightCtx, useSet)
+		rows.rightLen = len(rows.src2dest)
+	} else {
+		fctx = joinContextsOn(leftCtx, rightCtx)
+		rows.rightLen = len(rightCtx.cols)
+		if fj.On != nil {
+			rows.on, err = expr.Compile(fctx, fj.On)
+			if err != nil {
+				return nil, nil, err
+			}
+		}
+	}
+
+	rows.columns = fctx.columns()
 	return &rows, fctx, nil
 }

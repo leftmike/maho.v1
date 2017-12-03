@@ -93,7 +93,7 @@ func makeFromContext(nam sql.Identifier, cols []sql.Identifier) *fromContext {
 	return fctx
 }
 
-func joinContexts(lctx, rctx *fromContext) *fromContext {
+func joinContextsOn(lctx, rctx *fromContext) *fromContext {
 	// Create a new fromContext as a copy of the left context.
 	fctx := &fromContext{colMap: map[colRef]fromColumn{}, cols: lctx.cols}
 	for cr, fc := range lctx.colMap {
@@ -120,6 +120,66 @@ func joinContexts(lctx, rctx *fromContext) *fromContext {
 	return fctx
 }
 
+func (fctx *fromContext) usingIndex(col sql.Identifier, side string) (int, error) {
+	cr := colRef{column: col}
+	fc, ok := fctx.colMap[cr]
+	if !ok {
+		return -1, fmt.Errorf("%s not found on %s side of join", cr.String(), side)
+	}
+	if !fc.valid {
+		return -1, fmt.Errorf("%s is ambigous on %s side of join", cr.String(), side)
+	}
+	return fc.index, nil
+}
+
+func joinContextsUsing(lctx, rctx *fromContext, useSet map[colRef]struct{}) (*fromContext, []int) {
+	// Create a new fromContext as a copy of the left context.
+	fctx := &fromContext{colMap: map[colRef]fromColumn{}, cols: lctx.cols}
+	for cr, fc := range lctx.colMap {
+		fctx.colMap[cr] = fc
+	}
+
+	// XXX: clean this up: this seems like it is more complex than it needs to be.
+
+	// Merge in the right context: after skipping columns in useSet (they will be included as part
+	// of the left context), offset indexes and mark colRefs as invalid if they refer to more than
+	// one column.
+	off := len(lctx.cols)
+	skippedIndexes := map[int]struct{}{}
+	for cr, fc := range rctx.colMap {
+		if _, ok := useSet[cr]; ok {
+			skippedIndexes[fc.index] = struct{}{}
+			continue
+		}
+
+		if efc, ok := fctx.colMap[cr]; ok {
+			efc.valid = false
+			fctx.colMap[cr] = efc
+		} else {
+			fc.index += off
+			fctx.colMap[cr] = fc
+		}
+	}
+	for _, ci := range rctx.cols {
+		if _, ok := skippedIndexes[ci.index]; ok {
+			continue
+		}
+
+		ci.index += off
+		fctx.cols = append(fctx.cols, ci)
+	}
+	src2dest := make([]int, len(fctx.cols)-off)
+	idx := 0
+	for _, ci := range rctx.cols {
+		if _, ok := skippedIndexes[ci.index]; ok {
+			continue
+		}
+		src2dest[idx] = ci.index
+		idx += 1
+	}
+	return fctx, src2dest
+}
+
 func (fctx *fromContext) CompileRef(r expr.Ref) (int, error) {
 	var tbl, col sql.Identifier
 	if len(r) == 1 {
@@ -135,10 +195,10 @@ func (fctx *fromContext) columnIndex(tbl, col sql.Identifier, what string) (int,
 	cr := colRef{table: tbl, column: col}
 	fc, ok := fctx.colMap[cr]
 	if !ok {
-		return 0, fmt.Errorf("%s %s not found", what, cr.String())
+		return -1, fmt.Errorf("%s %s not found", what, cr.String())
 	}
 	if !fc.valid {
-		return 0, fmt.Errorf("%s %s is ambiguous", what, cr.String())
+		return -1, fmt.Errorf("%s %s is ambiguous", what, cr.String())
 	}
 	return fc.index, nil
 }

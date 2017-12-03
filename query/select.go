@@ -227,21 +227,21 @@ func (arr *allResultRows) Next(dest []sql.Value) error {
 	return arr.rows.Next(dest)
 }
 
-type col2dest struct {
-	destIndex int
-	rowIndex  int
+type src2dest struct {
+	destColIndex int
+	srcColIndex  int
 }
 
 type expr2dest struct {
-	destIndex int
-	expr      expr.CExpr
+	destColIndex int
+	expr         expr.CExpr
 }
 
 type resultRows struct {
 	rows      db.Rows
 	dest      []sql.Value
 	columns   []sql.Identifier
-	destCols  []col2dest
+	destCols  []src2dest
 	destExprs []expr2dest
 }
 
@@ -266,14 +266,14 @@ func (rr *resultRows) Next(dest []sql.Value) error {
 		return err
 	}
 	for _, c2d := range rr.destCols {
-		dest[c2d.destIndex] = rr.dest[c2d.rowIndex]
+		dest[c2d.destColIndex] = rr.dest[c2d.srcColIndex]
 	}
 	for _, e2d := range rr.destExprs {
 		val, err := e2d.expr.Eval(rr)
 		if err != nil {
 			return err
 		}
-		dest[e2d.destIndex] = val
+		dest[e2d.destColIndex] = val
 	}
 	return nil
 }
@@ -283,7 +283,7 @@ func results(rows db.Rows, fctx *fromContext, results []SelectResult) (db.Rows, 
 		return &allResultRows{rows: rows, columns: fctx.columns()}, nil
 	}
 
-	var destCols []col2dest
+	var destCols []src2dest
 	var destExprs []expr2dest
 	var cols []sql.Identifier
 	cdx := 0
@@ -292,7 +292,7 @@ func results(rows db.Rows, fctx *fromContext, results []SelectResult) (db.Rows, 
 		switch sr := sr.(type) {
 		case TableResult:
 			for _, ci := range fctx.tableColumns(sr.Table) {
-				destCols = append(destCols, col2dest{destIndex: cdx, rowIndex: ci.index})
+				destCols = append(destCols, src2dest{destColIndex: cdx, srcColIndex: ci.index})
 				cols = append(cols, ci.column)
 				cdx += 1
 			}
@@ -301,7 +301,7 @@ func results(rows db.Rows, fctx *fromContext, results []SelectResult) (db.Rows, 
 			if err != nil {
 				return nil, err
 			}
-			destCols = append(destCols, col2dest{destIndex: cdx, rowIndex: rdx})
+			destCols = append(destCols, src2dest{destColIndex: cdx, srcColIndex: rdx})
 			col := sr.Column
 			if sr.Alias != 0 {
 				col = sr.Alias
@@ -313,7 +313,7 @@ func results(rows db.Rows, fctx *fromContext, results []SelectResult) (db.Rows, 
 			if err != nil {
 				return nil, err
 			}
-			destExprs = append(destExprs, expr2dest{destIndex: edx, expr: ce})
+			destExprs = append(destExprs, expr2dest{destColIndex: edx, expr: ce})
 			col := sr.Alias
 			if col == 0 {
 				col = sql.ID(fmt.Sprintf("expr%d", len(cols)+1))
