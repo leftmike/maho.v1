@@ -279,7 +279,7 @@ func (fj FromJoin) rows(e *engine.Engine) (db.Rows, *fromContext, error) {
 
 	var fctx *fromContext
 	if fj.Using != nil {
-		useSet := map[colRef]struct{}{}
+		useSet := map[sql.Identifier]struct{}{}
 		for _, col := range fj.Using {
 			lcdx, err := leftCtx.usingIndex(col, "left")
 			if err != nil {
@@ -290,7 +290,7 @@ func (fj FromJoin) rows(e *engine.Engine) (db.Rows, *fromContext, error) {
 				return nil, nil, err
 			}
 			rows.using = append(rows.using, usingMatch{leftColIndex: lcdx, rightColIndex: rcdx})
-			useSet[colRef{column: col}] = struct{}{}
+			useSet[col] = struct{}{}
 		}
 
 		fctx, rows.src2dest = joinContextsUsing(leftCtx, rightCtx, useSet)

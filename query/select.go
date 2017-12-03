@@ -291,13 +291,14 @@ func results(rows db.Rows, fctx *fromContext, results []SelectResult) (db.Rows, 
 	for _, sr := range results {
 		switch sr := sr.(type) {
 		case TableResult:
-			for _, ci := range fctx.tableColumns(sr.Table) {
-				destCols = append(destCols, src2dest{destColIndex: cdx, srcColIndex: ci.index})
-				cols = append(cols, ci.column)
+			tblCols, tblIdxs := fctx.tableColumns(sr.Table)
+			for idx, col := range tblCols {
+				destCols = append(destCols, src2dest{destColIndex: cdx, srcColIndex: tblIdxs[idx]})
+				cols = append(cols, col)
 				cdx += 1
 			}
 		case TableColumnResult:
-			rdx, err := fctx.columnIndex(sr.Table, sr.Column, "result")
+			rdx, err := fctx.tblColIndex(sr.Table, sr.Column, "result")
 			if err != nil {
 				return nil, err
 			}
