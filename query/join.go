@@ -178,7 +178,13 @@ func (jr *joinRows) Next(dest []sql.Value) error {
 				for idx := 0; idx < jr.leftLen; idx++ {
 					dest[idx] = nil
 				}
-				copy(dest[jr.leftLen:], jr.rightRows[jr.rightIndex])
+				if jr.using != nil {
+					for destIndex, srcIndex := range jr.src2dest {
+						dest[destIndex+jr.leftLen] = jr.rightRows[jr.rightIndex][srcIndex]
+					}
+				} else {
+					copy(dest[jr.leftLen:], jr.rightRows[jr.rightIndex])
+				}
 				jr.rightIndex += 1
 				return nil
 			}
