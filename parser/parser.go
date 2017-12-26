@@ -322,7 +322,7 @@ func (p *parser) parseColumnAliases() []sql.Identifier {
 }
 
 func (p *parser) parseCreateTable() stmt.Stmt {
-	// CREATE TABLE [database .] table ([<column>,] ...)
+	// CREATE TABLE ...
 	var s stmt.CreateTable
 	s.Table = p.parseTableName()
 
@@ -358,14 +358,14 @@ var types = map[sql.Identifier]db.ColumnType{
 func (p *parser) parseCreateColumns(s *stmt.CreateTable) {
 	/*
 		CREATE TABLE [database '.'] table '(' <column> [',' ...] ')'
-		<column> = name <data_type> ([DEFAULT <expr>] | [NOT NULL])
+		<column> = name <data_type> [(DEFAULT <expr>) | (NOT NULL)]
 		<data_type> =
-			| BINARY ['(' <length> ')']
-			| VARBINARY ['(' <length> ')']
-			| BLOB ['(' <length> ')']
-			| CHAR ['(' <length> ')']
-			| VARCHAR ['(' <length> ')']
-			| TEXT ['(' <length> ')']
+			| BINARY ['(' length ')']
+			| VARBINARY ['(' length ')']
+			| BLOB ['(' length ')']
+			| CHAR ['(' length ')']
+			| VARCHAR ['(' length ')']
+			| TEXT ['(' length ')']
 			| BOOL
 			| BOOLEAN
 			| DOUBLE [PRECISION]
@@ -434,7 +434,7 @@ func (p *parser) parseCreateColumns(s *stmt.CreateTable) {
 }
 
 func (p *parser) parseDelete() stmt.Stmt {
-	// DELETE FROM [ database-name '.'] table-name [WHERE <expr>]
+	// DELETE FROM [database '.'] table [WHERE <expr>]
 	var s stmt.Delete
 	s.Table = p.parseTableName()
 	if p.optionalReserved(sql.WHERE) {
@@ -445,7 +445,7 @@ func (p *parser) parseDelete() stmt.Stmt {
 }
 
 func (p *parser) parseDropTable() stmt.Stmt {
-	// DROP TABLE [ IF EXISTS ] [ database-name '.' ] table-name [, ...]
+	// DROP TABLE [IF EXISTS] [database '.' ] table [',' ...]
 	var s stmt.DropTable
 	if p.optionalReserved(sql.IF) {
 		p.expectReserved(sql.EXISTS)
@@ -519,18 +519,16 @@ func (p *parser) parseExpr() expr.Expr {
 }
 
 /*
-<expr>:
-      <literal>
-    | - <expr>
+<expr> = <literal>
+    | '-' <expr>
     | NOT <expr>
-    | ( <expr> )
+    | '(' <expr> ')'
     | <expr> <op> <expr>
-    | <ref> [. <ref> ...]
-    | <func> ( [<expr> [,...]] )
-<op>:
-      + - * / %
-    | = == != <> < <= > >=
-    | << >> & |
+    | <ref> ['.' <ref> ...]
+    | <func> '(' [<expr> [',' ...]] ')'
+<op> = '+' '-' '*' '/' '%'
+    | '=' '==' '!=' '<>' '<' '<=' '>' '>='
+    | '<<' '>>' '&' '|'
     | AND | OR
 */
 
@@ -631,7 +629,8 @@ func (p *parser) parseSubExpr() expr.Expr {
 
 func (p *parser) parseInsert() stmt.Stmt {
 	/*
-		INSERT INTO [database .] table [(column, ...)] VALUES (<expr> | DEFAULT, ...), ...
+		INSERT INTO [database '.'] table ['(' column [',' ...] ')']
+			VALUES '(' <expr> | DEFAULT [',' ...] ')' [',' ...]
 	*/
 
 	var s stmt.InsertValues
@@ -685,7 +684,7 @@ func (p *parser) parseInsert() stmt.Stmt {
 
 func (p *parser) parseValues() *stmt.Values {
 	/*
-	   VALUES '(' <expr> [',' ...] ')' [',' ...]
+	   <values> = VALUES '(' <expr> [',' ...] ')' [',' ...]
 	*/
 
 	var s stmt.Values
@@ -715,14 +714,12 @@ func (p *parser) parseValues() *stmt.Values {
 }
 
 /*
-<select> = SELECT <select-list>
-    [ FROM <from-item> [',' ...]]
-    [ WHERE <expr> ]
+<select> = SELECT <select-list> [FROM <from-item> [',' ...]] [WHERE <expr>]
 <select-list> = '*'
     | <select-item> [',' ...]
 <select-item> = table '.' '*'
-    | [ table '.' ] column [[ AS ] column-alias ]
-    | <expr> [[ AS ] column-alias ]
+    | [table '.' ] column [[AS] column-alias]
+    | <expr> [[AS] column-alias]
 */
 
 func (p *parser) parseSelect() *stmt.Select {
@@ -784,14 +781,14 @@ func (p *parser) parseSelect() *stmt.Select {
 }
 
 /*
-<from-item> = [ database-name '.' ] table-name [[ AS ] alias ]
-    | '(' <select> | <values> ')' [ AS ] alias ['(' column-alias [',' ...] ')']
+<from-item> = [database '.'] table [[AS] alias]
+    | '(' <select> | <values> ')' [AS] alias ['(' column-alias [',' ...] ')']
     | '(' <from-item> [',' ...] ')'
-    | <from-item> <join-type> <from-item> [ ON <expr> | USING '(' join-column ',' ...]
-<join-type> = [ INNER ] JOIN
-    | LEFT [ OUTER ] JOIN
-    | RIGHT [ OUTER ] JOIN
-    | FULL [ OUTER ] JOIN
+    | <from-item> <join-type> <from-item> [ON <expr> | USING '(' join-column [',' ...] ')']
+<join-type> = [INNER] JOIN
+    | LEFT [OUTER] JOIN
+    | RIGHT [OUTER] JOIN
+    | FULL [OUTER] JOIN
     | CROSS JOIN
 */
 
@@ -889,7 +886,7 @@ func (p *parser) parseFromList() query.FromItem {
 }
 
 func (p *parser) parseUpdate() stmt.Stmt {
-	// UPDATE [ database-name '.'] table-name SET column '=' <expr> [',' ...] [WHERE <expr>]
+	// UPDATE [database '.'] table SET column '=' <expr> [',' ...] [WHERE <expr>]
 	var s stmt.Update
 	s.Table = p.parseTableName()
 	p.expectReserved(sql.SET)

@@ -13,8 +13,6 @@ To Do:
 
 - SELECT ... ORDER BY ...
 
-- joins: using
-
 - split out display info from ColumnType
 */
 
