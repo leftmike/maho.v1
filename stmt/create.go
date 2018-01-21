@@ -3,9 +3,9 @@ package stmt
 import (
 	"fmt"
 
-	"maho/db"
-	"maho/engine"
-	"maho/sql"
+	"github.com/leftmike/maho/db"
+	"github.com/leftmike/maho/engine"
+	"github.com/leftmike/maho/sql"
 )
 
 type CreateTable struct {

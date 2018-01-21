@@ -3,8 +3,8 @@ package expr_test
 import (
 	"testing"
 
-	. "maho/expr"
-	"maho/sql"
+	. "github.com/leftmike/maho/expr"
+	"github.com/leftmike/maho/sql"
 )
 
 func TestExpr(t *testing.T) {

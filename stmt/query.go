@@ -3,10 +3,10 @@ package stmt
 import (
 	"fmt"
 
-	"maho/engine"
-	"maho/expr"
-	"maho/query"
-	"maho/sql"
+	"github.com/leftmike/maho/engine"
+	"github.com/leftmike/maho/expr"
+	"github.com/leftmike/maho/query"
+	"github.com/leftmike/maho/sql"
 )
 
 type Select query.Select

@@ -4,7 +4,7 @@ import (
 	"fmt"
 	"sync"
 
-	"maho/db"
+	"github.com/leftmike/maho/db"
 )
 
 type Store interface {

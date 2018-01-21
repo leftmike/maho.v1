@@ -6,7 +6,7 @@ import (
 	"strings"
 	"testing"
 
-	"maho/parser"
+	"github.com/leftmike/maho/parser"
 )
 
 func TestMain(t *testing.T) {

@@ -3,8 +3,8 @@ package engine
 import (
 	"fmt"
 
-	"maho/db"
-	"maho/sql"
+	"github.com/leftmike/maho/db"
+	"github.com/leftmike/maho/sql"
 )
 
 type Engine struct {

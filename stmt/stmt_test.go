@@ -6,12 +6,12 @@ import (
 	"strings"
 	"testing"
 
-	"maho/db"
-	"maho/parser"
-	"maho/query"
-	"maho/sql"
-	"maho/stmt"
-	"maho/testutil"
+	"github.com/leftmike/maho/db"
+	"github.com/leftmike/maho/parser"
+	"github.com/leftmike/maho/query"
+	"github.com/leftmike/maho/sql"
+	"github.com/leftmike/maho/stmt"
+	"github.com/leftmike/maho/testutil"
 )
 
 func TestTableName(t *testing.T) {

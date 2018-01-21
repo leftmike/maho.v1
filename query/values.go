@@ -4,10 +4,10 @@ import (
 	"fmt"
 	"io"
 
-	"maho/db"
-	"maho/engine"
-	"maho/expr"
-	"maho/sql"
+	"github.com/leftmike/maho/db"
+	"github.com/leftmike/maho/engine"
+	"github.com/leftmike/maho/expr"
+	"github.com/leftmike/maho/sql"
 )
 
 type Values struct {

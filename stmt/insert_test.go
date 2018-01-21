@@ -4,13 +4,13 @@ import (
 	"strings"
 	"testing"
 
-	"maho/db"
-	"maho/engine"
-	"maho/expr"
-	"maho/parser"
-	"maho/query"
-	"maho/sql"
-	"maho/testutil"
+	"github.com/leftmike/maho/db"
+	"github.com/leftmike/maho/engine"
+	"github.com/leftmike/maho/expr"
+	"github.com/leftmike/maho/parser"
+	"github.com/leftmike/maho/query"
+	"github.com/leftmike/maho/sql"
+	"github.com/leftmike/maho/testutil"
 )
 
 type insertCase struct {

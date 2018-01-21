@@ -4,10 +4,10 @@ import (
 	"flag"
 	"testing"
 
-	"sqltest"
+	"github.com/leftmike/sqltest/pkg/sqltest"
 
-	"maho/test"
-	"maho/testutil"
+	"github.com/leftmike/maho/test"
+	"github.com/leftmike/maho/testutil"
 )
 
 type report struct {

@@ -2,8 +2,9 @@ package expr
 
 import (
 	"fmt"
-	"maho/sql"
 	"math"
+
+	"github.com/leftmike/maho/sql"
 )
 
 type CompileContext interface {

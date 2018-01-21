@@ -2,7 +2,8 @@ package stmt
 
 import (
 	"fmt"
-	"maho/sql"
+
+	"github.com/leftmike/maho/sql"
 )
 
 type TableName struct {

@@ -3,7 +3,7 @@ package stmt
 import (
 	"fmt"
 
-	"maho/engine"
+	"github.com/leftmike/maho/engine"
 )
 
 type Stmt interface {

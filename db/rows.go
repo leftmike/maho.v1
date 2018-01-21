@@ -1,7 +1,7 @@
 package db
 
 import (
-	"maho/sql"
+	"github.com/leftmike/maho/sql"
 )
 
 type Rows interface {

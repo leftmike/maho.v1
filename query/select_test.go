@@ -3,10 +3,10 @@ package query_test
 import (
 	"testing"
 
-	"maho/expr"
-	"maho/query"
-	"maho/sql"
-	"maho/testutil"
+	"github.com/leftmike/maho/expr"
+	"github.com/leftmike/maho/query"
+	"github.com/leftmike/maho/sql"
+	"github.com/leftmike/maho/testutil"
 )
 
 func TestSelect(t *testing.T) {

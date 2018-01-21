@@ -3,8 +3,8 @@ package stmt
 import (
 	"fmt"
 
-	"maho/db"
-	"maho/engine"
+	"github.com/leftmike/maho/db"
+	"github.com/leftmike/maho/engine"
 )
 
 type DropTable struct {

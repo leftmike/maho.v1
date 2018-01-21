@@ -5,9 +5,9 @@ import (
 	"strings"
 	"testing"
 
-	. "maho/parser/scanner"
-	"maho/parser/token"
-	"maho/sql"
+	. "github.com/leftmike/maho/parser/scanner"
+	"github.com/leftmike/maho/parser/token"
+	"github.com/leftmike/maho/sql"
 )
 
 func TestScan(t *testing.T) {

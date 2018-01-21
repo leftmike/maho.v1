@@ -7,8 +7,8 @@ import (
 	"strconv"
 	"unicode"
 
-	"maho/parser/token"
-	"maho/sql"
+	"github.com/leftmike/maho/parser/token"
+	"github.com/leftmike/maho/sql"
 )
 
 type Position struct {

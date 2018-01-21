@@ -2,7 +2,8 @@ package expr
 
 import (
 	"fmt"
-	"maho/sql"
+
+	"github.com/leftmike/maho/sql"
 )
 
 type EvalContext interface {

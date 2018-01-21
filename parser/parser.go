@@ -5,13 +5,13 @@ import (
 	"io"
 	"runtime"
 
-	"maho/db"
-	"maho/expr"
-	"maho/parser/scanner"
-	"maho/parser/token"
-	"maho/query"
-	"maho/sql"
-	"maho/stmt"
+	"github.com/leftmike/maho/db"
+	"github.com/leftmike/maho/expr"
+	"github.com/leftmike/maho/parser/scanner"
+	"github.com/leftmike/maho/parser/token"
+	"github.com/leftmike/maho/query"
+	"github.com/leftmike/maho/sql"
+	"github.com/leftmike/maho/stmt"
 )
 
 type Parser interface {

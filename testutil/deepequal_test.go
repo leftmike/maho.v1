@@ -3,8 +3,8 @@ package testutil_test
 import (
 	"testing"
 
-	"maho/sql"
-	"maho/testutil"
+	"github.com/leftmike/maho/sql"
+	"github.com/leftmike/maho/testutil"
 )
 
 func TestDeepEqual(t *testing.T) {

@@ -4,9 +4,9 @@ import (
 	"fmt"
 	"io"
 
-	"maho/db"
-	"maho/sql"
-	"maho/store"
+	"github.com/leftmike/maho/db"
+	"github.com/leftmike/maho/sql"
+	"github.com/leftmike/maho/store"
 )
 
 type basicStore struct{}

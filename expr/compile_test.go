@@ -5,9 +5,9 @@ import (
 	"strings"
 	"testing"
 
-	"maho/expr"
-	"maho/parser"
-	"maho/sql"
+	"github.com/leftmike/maho/expr"
+	"github.com/leftmike/maho/parser"
+	"github.com/leftmike/maho/sql"
 )
 
 func TestCompile(t *testing.T) {

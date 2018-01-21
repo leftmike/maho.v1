@@ -6,8 +6,8 @@ import (
 	"strconv"
 	"strings"
 
-	"maho/expr"
-	"maho/sql"
+	"github.com/leftmike/maho/expr"
+	"github.com/leftmike/maho/sql"
 )
 
 const (

@@ -1,10 +1,10 @@
 package testutil
 
 import (
-	"maho/db"
-	"maho/engine"
-	"maho/store"
-	_ "maho/store/test"
+	"github.com/leftmike/maho/db"
+	"github.com/leftmike/maho/engine"
+	"github.com/leftmike/maho/store"
+	_ "github.com/leftmike/maho/store/test"
 )
 
 // StartEngine creates a test database and starts an engine; it is intended for use by testing.

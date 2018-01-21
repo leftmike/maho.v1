@@ -5,12 +5,12 @@ import (
 	"io"
 	"strings"
 
-	"sqltest"
+	"github.com/leftmike/sqltest/pkg/sqltest"
 
-	"maho/db"
-	"maho/engine"
-	"maho/parser"
-	"maho/sql"
+	"github.com/leftmike/maho/db"
+	"github.com/leftmike/maho/engine"
+	"github.com/leftmike/maho/parser"
+	"github.com/leftmike/maho/sql"
 )
 
 type Runner struct {

@@ -24,12 +24,12 @@ import (
 	"strings"
 	"text/tabwriter"
 
-	"maho/db"
-	"maho/engine"
-	"maho/parser"
-	"maho/sql"
-	"maho/store"
-	_ "maho/store/basic"
+	"github.com/leftmike/maho/db"
+	"github.com/leftmike/maho/engine"
+	"github.com/leftmike/maho/parser"
+	"github.com/leftmike/maho/sql"
+	"github.com/leftmike/maho/store"
+	_ "github.com/leftmike/maho/store/basic"
 )
 
 func parse(e *engine.Engine, p parser.Parser, w io.Writer) {

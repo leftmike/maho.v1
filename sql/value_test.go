@@ -3,7 +3,7 @@ package sql_test
 import (
 	"testing"
 
-	"maho/sql"
+	"github.com/leftmike/maho/sql"
 )
 
 func TestLess(t *testing.T) {
