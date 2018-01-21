@@ -805,7 +805,8 @@ func TestValues(t *testing.T) {
 			if err != nil {
 				t.Errorf("Parse(%q) failed with %s", c.sql, err)
 			} else if vs, ok := vs.(*stmt.Values); !ok || !testutil.DeepEqual(&c.stmt, vs, &trc) {
-				t.Errorf("Parse(%q) got %s want %s\n", c.sql, vs.String(), c.stmt.String(), trc)
+				t.Errorf("Parse(%q) got %s want %s: %s\n", c.sql, vs.String(), c.stmt.String(),
+					trc)
 			}
 		}
 	}
