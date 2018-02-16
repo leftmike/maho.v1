@@ -558,22 +558,22 @@ func (p *parser) parseSubExpr() expr.Expr {
 	r := p.scan()
 	if r == token.Reserved {
 		if p.sctx.Identifier == sql.TRUE {
-			e = &expr.Literal{true}
+			e = expr.True()
 		} else if p.sctx.Identifier == sql.FALSE {
-			e = &expr.Literal{false}
+			e = expr.False()
 		} else if p.sctx.Identifier == sql.NULL {
-			e = &expr.Literal{nil}
+			e = expr.Nil()
 		} else if p.sctx.Identifier == sql.NOT {
 			e = &expr.Unary{expr.NotOp, p.parseSubExpr()}
 		} else {
 			p.error(fmt.Sprintf("unexpected identifier %s", p.sctx.Identifier))
 		}
 	} else if r == token.String {
-		e = &expr.Literal{p.sctx.String}
+		e = expr.StringLiteral(p.sctx.String)
 	} else if r == token.Integer {
-		e = &expr.Literal{p.sctx.Integer}
+		e = expr.Int64Literal(p.sctx.Integer)
 	} else if r == token.Double {
-		e = &expr.Literal{p.sctx.Double}
+		e = expr.Float64Literal(p.sctx.Double)
 	} else if r == token.Identifier {
 		id := p.sctx.Identifier
 		if p.maybeToken(token.LParen) {

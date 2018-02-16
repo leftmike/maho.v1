@@ -26,7 +26,7 @@ func (stmt *CreateTable) String() string {
 			s += " NOT NULL"
 		}
 		if ct.Default != nil {
-			s += fmt.Sprintf(" DEFAULT %s", sql.Format(ct.Default))
+			s += fmt.Sprintf(" DEFAULT %s", ct.Default)
 		}
 	}
 	s += ")"

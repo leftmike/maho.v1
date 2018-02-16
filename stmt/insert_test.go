@@ -38,15 +38,20 @@ var (
 		},
 		{
 			stmt: "insert into t values (true, 'abcd', 123.456, 789)",
-			rows: [][]sql.Value{{true, "abcd", 123.456, int64(789)}},
+			rows: [][]sql.Value{{sql.BoolValue(true), sql.StringValue("abcd"),
+				sql.Float64Value(123.456), sql.Int64Value(789)}},
 		},
 		{
 			stmt: "insert into t (c4, c1) values (123, false), (456)",
-			rows: [][]sql.Value{{false, nil, nil, int64(123)}, {nil, nil, nil, int64(456)}},
+			rows: [][]sql.Value{
+				{sql.BoolValue(false), nil, nil, sql.Int64Value(123)},
+				{nil, nil, nil, sql.Int64Value(456)},
+			},
 		},
 		{
 			stmt: "insert into t (c3, c2, c1, c4) values (987.654, 'efghi', false, 321)",
-			rows: [][]sql.Value{{false, "efghi", 987.654, int64(321)}},
+			rows: [][]sql.Value{{sql.BoolValue(false), sql.StringValue("efghi"),
+				sql.Float64Value(987.654), sql.Int64Value(321)}},
 		},
 		{
 			stmt: "insert into t (c1, c4) values (true, 123, 123)",
@@ -82,11 +87,11 @@ var (
 		},
 		{
 			stmt: "insert into t (c2) values (123)",
-			rows: [][]sql.Value{{nil, "123", nil, nil}},
+			rows: [][]sql.Value{{nil, sql.StringValue("123"), nil, nil}},
 		},
 		{
 			stmt: "insert into t (c2) values (123.456)",
-			rows: [][]sql.Value{{nil, "123.456", nil, nil}},
+			rows: [][]sql.Value{{nil, sql.StringValue("123.456"), nil, nil}},
 		},
 		{
 			stmt: "insert into t (c3) values (true)",
@@ -94,11 +99,11 @@ var (
 		},
 		{
 			stmt: "insert into t (c3) values ('   123   ')",
-			rows: [][]sql.Value{{nil, nil, float64(123), nil}},
+			rows: [][]sql.Value{{nil, nil, sql.Float64Value(123), nil}},
 		},
 		{
 			stmt: "insert into t (c3) values ('123.456')",
-			rows: [][]sql.Value{{nil, nil, 123.456, nil}},
+			rows: [][]sql.Value{{nil, nil, sql.Float64Value(123.456), nil}},
 		},
 		{
 			stmt: "insert into t (c3) values ('123.456b')",
@@ -110,11 +115,11 @@ var (
 		},
 		{
 			stmt: "insert into t (c4) values ('   123   ')",
-			rows: [][]sql.Value{{nil, nil, nil, int64(123)}},
+			rows: [][]sql.Value{{nil, nil, nil, sql.Int64Value(123)}},
 		},
 		{
 			stmt: "insert into t (c4) values (123.456)",
-			rows: [][]sql.Value{{nil, nil, nil, int64(123)}},
+			rows: [][]sql.Value{{nil, nil, nil, sql.Int64Value(123)}},
 		},
 		{
 			stmt: "insert into t (c4) values ('123b')",
@@ -135,19 +140,21 @@ var (
 	insertCases2 = []insertCase{
 		{
 			stmt: "insert into t2 values ('t', 'true', 'y', 'yes', 'on', '1')",
-			rows: [][]sql.Value{{true, true, true, true, true, true}},
+			rows: [][]sql.Value{{sql.BoolValue(true), sql.BoolValue(true), sql.BoolValue(true),
+				sql.BoolValue(true), sql.BoolValue(true), sql.BoolValue(true)}},
 		},
 		{
 			stmt: "insert into t2 values ('f', 'false', 'n', 'no', 'off', '0')",
-			rows: [][]sql.Value{{false, false, false, false, false, false}},
+			rows: [][]sql.Value{{sql.BoolValue(false), sql.BoolValue(false), sql.BoolValue(false),
+				sql.BoolValue(false), sql.BoolValue(false), sql.BoolValue(false)}},
 		},
 	}
 
 	insertColumns3     = []sql.Identifier{sql.ID("c1"), sql.ID("c2"), sql.ID("c3")}
 	insertColumnTypes3 = []db.ColumnType{
-		{Type: sql.IntegerType, Size: 4, Default: &expr.Literal{int64(1)}},
+		{Type: sql.IntegerType, Size: 4, Default: expr.Int64Literal(1)},
 		{Type: sql.IntegerType, Size: 4, NotNull: true},
-		{Type: sql.IntegerType, Size: 4, Default: &expr.Literal{int64(3)},
+		{Type: sql.IntegerType, Size: 4, Default: expr.Int64Literal(3),
 			NotNull: true},
 	}
 	insertCases3 = []insertCase{
@@ -157,11 +164,11 @@ var (
 		},
 		{
 			stmt: "insert into t3 (c2) values (2)",
-			rows: [][]sql.Value{{int64(1), int64(2), int64(3)}},
+			rows: [][]sql.Value{{sql.Int64Value(1), sql.Int64Value(2), sql.Int64Value(3)}},
 		},
 		{
 			stmt: "insert into t3 (c1, c2) values (NULL, 2)",
-			rows: [][]sql.Value{{nil, int64(2), int64(3)}},
+			rows: [][]sql.Value{{nil, sql.Int64Value(2), sql.Int64Value(3)}},
 		},
 		{
 			stmt: "insert into t3 (c1, c2, c3) values (1, 2, NULL)",

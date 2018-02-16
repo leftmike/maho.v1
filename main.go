@@ -14,6 +14,8 @@ To Do:
 - SELECT ... ORDER BY ...
 
 - split out display info from ColumnType
+
+- eval.go: numFunc, intFunc, shiftFun
 */
 
 import (

@@ -134,7 +134,7 @@ func (jr *joinRows) onMatch(dest []sql.Value) (bool, error) {
 	if err != nil {
 		return true, err
 	}
-	b, ok := v.(bool)
+	b, ok := v.(sql.BoolValue)
 	if !ok {
 		return true, fmt.Errorf("expected boolean result from ON condition: %s", sql.Format(v))
 	}

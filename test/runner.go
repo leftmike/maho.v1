@@ -72,8 +72,8 @@ func (run *Runner) RunQuery(tst *sqltest.Test) ([]string, [][]string, error) {
 		for _, v := range dest {
 			if v == nil {
 				row = append(row, "")
-			} else if s, ok := v.(string); ok {
-				row = append(row, s)
+			} else if s, ok := v.(sql.StringValue); ok {
+				row = append(row, string(s))
 			} else {
 				row = append(row, sql.Format(v))
 			}

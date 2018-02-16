@@ -41,7 +41,7 @@ func (stmt *InsertValues) String() string {
 			if j > 0 {
 				s += ", "
 			}
-			s += sql.Format(v)
+			s += v.String()
 		}
 
 		s += ")"

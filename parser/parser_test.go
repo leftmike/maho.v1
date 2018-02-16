@@ -199,8 +199,8 @@ func TestCreateTable(t *testing.T) {
 				Columns: []sql.Identifier{sql.ID("c1"), sql.ID("c2")},
 				ColumnTypes: []db.ColumnType{
 					{Type: sql.CharacterType, Fixed: false, Size: 64,
-						Default: &expr.Literal{"abcd"}},
-					{Type: sql.IntegerType, Size: 4, Default: &expr.Literal{int64(123)}},
+						Default: expr.StringLiteral("abcd")},
+					{Type: sql.IntegerType, Size: 4, Default: expr.Int64Literal(123)},
 				},
 			},
 		},
@@ -210,7 +210,7 @@ func TestCreateTable(t *testing.T) {
 				Table:   stmt.TableName{Table: sql.ID("t")},
 				Columns: []sql.Identifier{sql.ID("c1"), sql.ID("c2")},
 				ColumnTypes: []db.ColumnType{
-					{Type: sql.BooleanType, Size: 1, Default: &expr.Literal{true}},
+					{Type: sql.BooleanType, Size: 1, Default: expr.True()},
 					{Type: sql.BooleanType, Size: 1, NotNull: true},
 				},
 			},
@@ -222,9 +222,8 @@ c2 boolean not null default true)`,
 				Table:   stmt.TableName{Table: sql.ID("t")},
 				Columns: []sql.Identifier{sql.ID("c1"), sql.ID("c2")},
 				ColumnTypes: []db.ColumnType{
-					{Type: sql.BooleanType, Size: 1, Default: &expr.Literal{true}, NotNull: true},
-					{Type: sql.BooleanType, Size: 1, NotNull: true,
-						Default: &expr.Literal{true}},
+					{Type: sql.BooleanType, Size: 1, Default: expr.True(), NotNull: true},
+					{Type: sql.BooleanType, Size: 1, NotNull: true, Default: expr.True()},
 				},
 			},
 		},
@@ -273,7 +272,7 @@ func TestInsertValues(t *testing.T) {
 			stmt: stmt.InsertValues{
 				Table: stmt.TableName{Table: sql.ID("t")},
 				Rows: [][]expr.Expr{
-					{&expr.Literal{int64(1)}, &expr.Literal{"abc"}, &expr.Literal{true}},
+					{expr.Int64Literal(1), expr.StringLiteral("abc"), expr.True()},
 				},
 			},
 		},
@@ -282,8 +281,8 @@ func TestInsertValues(t *testing.T) {
 			stmt: stmt.InsertValues{
 				Table: stmt.TableName{Table: sql.ID("t")},
 				Rows: [][]expr.Expr{
-					{&expr.Literal{int64(1)}, &expr.Literal{"abc"}, &expr.Literal{true}},
-					{&expr.Literal{int64(2)}, &expr.Literal{"def"}, &expr.Literal{false}},
+					{expr.Int64Literal(1), expr.StringLiteral("abc"), expr.True()},
+					{expr.Int64Literal(2), expr.StringLiteral("def"), expr.False()},
 				},
 			},
 		},
@@ -292,7 +291,7 @@ func TestInsertValues(t *testing.T) {
 			stmt: stmt.InsertValues{
 				Table: stmt.TableName{Table: sql.ID("t")},
 				Rows: [][]expr.Expr{
-					{&expr.Literal{nil}, &expr.Literal{"abc"}, &expr.Literal{nil}},
+					{expr.Nil(), expr.StringLiteral("abc"), expr.Nil()},
 				},
 			},
 		},
@@ -404,7 +403,7 @@ func TestSelect(t *testing.T) {
 			stmt: stmt.Select{
 				From: query.FromTableAlias{Table: sql.ID("t")},
 				Where: &expr.Binary{expr.GreaterThanOp, expr.Ref{sql.ID("x")},
-					&expr.Literal{int64(1)}},
+					expr.Int64Literal(1)},
 			},
 		},
 		{
@@ -570,7 +569,7 @@ func TestSelect(t *testing.T) {
 					Right: query.FromTableAlias{Table: sql.ID("t2")},
 					Type:  query.Join,
 					On: &expr.Binary{expr.GreaterThanOp,
-						expr.Ref{sql.ID("c1")}, &expr.Literal{int64(5)}},
+						expr.Ref{sql.ID("c1")}, expr.Int64Literal(5)},
 				},
 			},
 		},
@@ -618,8 +617,7 @@ func TestSelect(t *testing.T) {
 					Right: query.FromValues{
 						Values: query.Values{
 							Expressions: [][]expr.Expr{
-								{&expr.Literal{int64(1)}, &expr.Literal{"abc"},
-									&expr.Literal{true}},
+								{expr.Int64Literal(1), expr.StringLiteral("abc"), expr.True()},
 							},
 						},
 						Alias: sql.ID("v1"),
@@ -643,8 +641,7 @@ func TestSelect(t *testing.T) {
 					Right: query.FromValues{
 						Values: query.Values{
 							Expressions: [][]expr.Expr{
-								{&expr.Literal{int64(1)}, &expr.Literal{"abc"},
-									&expr.Literal{true}},
+								{expr.Int64Literal(1), expr.StringLiteral("abc"), expr.True()},
 							},
 						},
 						Alias: sql.ID("v1"),
@@ -665,8 +662,7 @@ func TestSelect(t *testing.T) {
 				From: query.FromValues{
 					Values: query.Values{
 						Expressions: [][]expr.Expr{
-							{&expr.Literal{int64(1)}, &expr.Literal{"abc"},
-								&expr.Literal{true}},
+							{expr.Int64Literal(1), expr.StringLiteral("abc"), expr.True()},
 						},
 					},
 					Alias: sql.ID("v1"),
@@ -679,8 +675,7 @@ func TestSelect(t *testing.T) {
 				From: query.FromValues{
 					Values: query.Values{
 						Expressions: [][]expr.Expr{
-							{&expr.Literal{int64(1)}, &expr.Literal{"abc"},
-								&expr.Literal{true}},
+							{expr.Int64Literal(1), expr.StringLiteral("abc"), expr.True()},
 						},
 					},
 					Alias:         sql.ID("v1"),
@@ -778,7 +773,7 @@ func TestValues(t *testing.T) {
 			sql: "values (1, 'abc', true)",
 			stmt: stmt.Values{
 				Expressions: [][]expr.Expr{
-					{&expr.Literal{int64(1)}, &expr.Literal{"abc"}, &expr.Literal{true}},
+					{expr.Int64Literal(1), expr.StringLiteral("abc"), expr.True()},
 				},
 			},
 		},
@@ -786,8 +781,8 @@ func TestValues(t *testing.T) {
 			sql: "values (1, 'abc', true), (2, 'def', false)",
 			stmt: stmt.Values{
 				Expressions: [][]expr.Expr{
-					{&expr.Literal{int64(1)}, &expr.Literal{"abc"}, &expr.Literal{true}},
-					{&expr.Literal{int64(2)}, &expr.Literal{"def"}, &expr.Literal{false}},
+					{expr.Int64Literal(1), expr.StringLiteral("abc"), expr.True()},
+					{expr.Int64Literal(2), expr.StringLiteral("def"), expr.False()},
 				},
 			},
 		},
@@ -834,7 +829,7 @@ func TestDelete(t *testing.T) {
 			stmt: stmt.Delete{
 				Table: stmt.TableName{Table: sql.ID("t")},
 				Where: &expr.Binary{expr.GreaterThanOp, expr.Ref{sql.ID("c")},
-					&expr.Literal{int64(1)}},
+					expr.Int64Literal(1)},
 			},
 		},
 	}
@@ -877,7 +872,7 @@ func TestUpdate(t *testing.T) {
 			stmt: stmt.Update{
 				Table: stmt.TableName{Table: sql.ID("t")},
 				ColumnUpdates: []stmt.ColumnUpdate{
-					{Column: sql.ID("c"), Expr: &expr.Literal{int64(5)}},
+					{Column: sql.ID("c"), Expr: expr.Int64Literal(5)},
 				},
 			},
 		},
@@ -886,10 +881,10 @@ func TestUpdate(t *testing.T) {
 			stmt: stmt.Update{
 				Table: stmt.TableName{Table: sql.ID("t")},
 				ColumnUpdates: []stmt.ColumnUpdate{
-					{Column: sql.ID("c"), Expr: &expr.Literal{int64(0)}},
+					{Column: sql.ID("c"), Expr: expr.Int64Literal(0)},
 				},
 				Where: &expr.Binary{expr.GreaterThanOp, expr.Ref{sql.ID("c")},
-					&expr.Literal{int64(1)}},
+					expr.Int64Literal(1)},
 			},
 		},
 		{
@@ -897,9 +892,9 @@ func TestUpdate(t *testing.T) {
 			stmt: stmt.Update{
 				Table: stmt.TableName{Table: sql.ID("t")},
 				ColumnUpdates: []stmt.ColumnUpdate{
-					{Column: sql.ID("c1"), Expr: &expr.Literal{int64(1)}},
-					{Column: sql.ID("c2"), Expr: &expr.Literal{int64(2)}},
-					{Column: sql.ID("c3"), Expr: &expr.Literal{int64(3)}},
+					{Column: sql.ID("c1"), Expr: expr.Int64Literal(1)},
+					{Column: sql.ID("c2"), Expr: expr.Int64Literal(2)},
+					{Column: sql.ID("c3"), Expr: expr.Int64Literal(3)},
 				},
 			},
 		},

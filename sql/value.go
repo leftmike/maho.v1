@@ -2,6 +2,7 @@ package sql
 
 import (
 	"fmt"
+	"strings"
 )
 
 const (
@@ -10,88 +11,160 @@ const (
 	FalseString = "false"
 )
 
-type Value interface{}
+type Value interface {
+	fmt.Stringer
 
-func Format(v Value) string {
-	if v == nil {
-		return NullString
-	}
-
-	if b, ok := v.(bool); ok {
-		if b {
-			return TrueString
-		}
-		return FalseString
-	} else if s, ok := v.(string); ok {
-		return fmt.Sprintf("'%s'", s)
-	}
-
-	return fmt.Sprintf("%v", v)
+	// return -1 if v1 < v2
+	// return 0 if v1 == v2
+	// return 1 if v1 > v2
+	Compare(v2 Value) (int, error)
 }
 
-func Less(v1, v2 Value) bool {
+type BoolValue bool
+
+func (b BoolValue) String() string {
+	if b {
+		return TrueString
+	}
+	return FalseString
+}
+
+func (b1 BoolValue) Compare(v2 Value) (int, error) {
+	if b2, ok := v2.(BoolValue); ok {
+		if b1 {
+			if b2 {
+				return 0, nil
+			}
+			return 1, nil
+		} else {
+			if b2 {
+				return -1, nil
+			}
+			return 0, nil
+		}
+	}
+	return 0, fmt.Errorf("engine: want boolean got %v", v2)
+}
+
+type Int64Value int64
+
+func (i Int64Value) String() string {
+	return fmt.Sprintf("%v", int64(i))
+}
+
+func (i1 Int64Value) Compare(v2 Value) (int, error) {
+	switch v2 := v2.(type) {
+	case Int64Value:
+		if i1 < v2 {
+			return -1, nil
+		} else if i1 > v2 {
+			return 1, nil
+		}
+		return 0, nil
+	case Float64Value:
+		if Float64Value(i1) < v2 {
+			return -1, nil
+		} else if Float64Value(i1) > v2 {
+			return 1, nil
+		}
+		return 0, nil
+	}
+	return 0, fmt.Errorf("engine: want number got %v", v2)
+}
+
+type Float64Value float64
+
+func (d Float64Value) String() string {
+	return fmt.Sprintf("%v", float64(d))
+}
+
+func (d1 Float64Value) Compare(v2 Value) (int, error) {
+	switch v2 := v2.(type) {
+	case Int64Value:
+		if d1 < Float64Value(v2) {
+			return -1, nil
+		} else if d1 > Float64Value(v2) {
+			return 1, nil
+		}
+		return 0, nil
+	case Float64Value:
+		if d1 < Float64Value(v2) {
+			return -1, nil
+		} else if d1 > Float64Value(v2) {
+			return 1, nil
+		}
+		return 0, nil
+	}
+	return 0, fmt.Errorf("engine: want number got %v", v2)
+}
+
+type StringValue string
+
+func (s StringValue) String() string {
+	return fmt.Sprintf("'%s'", string(s))
+}
+
+func (s1 StringValue) Compare(v2 Value) (int, error) {
+	if s2, ok := v2.(StringValue); ok {
+		return strings.Compare(string(s1), string(s2)), nil
+	}
+	return 0, fmt.Errorf("engine: want string got %v", v2)
+}
+
+func Compare(v1, v2 Value) int {
 	if v1 == nil {
-		return v2 != nil
+		if v2 == nil {
+			return 0
+		}
+		return -1
 	}
 	if v2 == nil {
-		return false
+		return 1
 	}
 	switch v1 := v1.(type) {
-	case bool:
+	case BoolValue:
 		switch v2 := v2.(type) {
-		case bool:
-			return !v1 && v2
-		case float64:
-			return true
-		case int64:
-			return true
-		case string:
-			return true
+		case BoolValue:
+			cmp, _ := v1.Compare(v2)
+			return cmp
+		case Float64Value, Int64Value, StringValue:
+			return -1
 		default:
 			panic(fmt.Sprintf("unexpected type for sql.Value: %T: %v", v2, v2))
 		}
-	case float64:
+	case Float64Value, Int64Value:
 		switch v2 := v2.(type) {
-		case bool:
-			return false
-		case float64:
-			return v1 < v2
-		case int64:
-			return true
-		case string:
-			return true
+		case BoolValue:
+			return 1
+		case Float64Value, Int64Value:
+			cmp, _ := v1.Compare(v2)
+			return cmp
+		case StringValue:
+			return -1
 		default:
 			panic(fmt.Sprintf("unexpected type for sql.Value: %T: %v", v2, v2))
 		}
-	case int64:
+	case StringValue:
 		switch v2 := v2.(type) {
-		case bool:
-			return false
-		case float64:
-			return false
-		case int64:
-			return v1 < v2
-		case string:
-			return true
-		default:
-			panic(fmt.Sprintf("unexpected type for sql.Value: %T: %v", v2, v2))
-		}
-	case string:
-		switch v2 := v2.(type) {
-		case bool:
-			return false
-		case float64:
-			return false
-		case int64:
-			return false
-		case string:
-			return v1 < v2
+		case BoolValue, Float64Value, Int64Value:
+			return 1
+		case StringValue:
+			cmp, _ := v1.Compare(v2)
+			return cmp
 		default:
 			panic(fmt.Sprintf("unexpected type for sql.Value: %T: %v", v2, v2))
 		}
 	default:
 		panic(fmt.Sprintf("unexpected type for sql.Value: %T: %v", v1, v1))
 	}
+}
+
+func Format(v Value) string {
+	if v == nil {
+		return NullString
+	}
+
+	return v.String()
 }
 
 /*

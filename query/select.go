@@ -167,7 +167,7 @@ func (wr *whereRows) Next(dest []sql.Value) error {
 		if err != nil {
 			return err
 		}
-		b, ok := v.(bool)
+		b, ok := v.(sql.BoolValue)
 		if !ok {
 			return fmt.Errorf("expected boolean result from WHERE condition: %s", sql.Format(v))
 		}

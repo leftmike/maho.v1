@@ -74,38 +74,39 @@ func Compile(ctx CompileContext, e Expr) (CExpr, error) {
 }
 
 type callFunc struct {
-	fn      func(ctx EvalContext, args []sql.Value) (sql.Value, error)
-	minArgs int16
-	maxArgs int16
-	name    string
+	fn         func(ctx EvalContext, args []sql.Value) (sql.Value, error)
+	minArgs    int16
+	maxArgs    int16
+	name       string
+	handleNull bool
 }
 
 var opFuncs = map[Op]*callFunc{
-	AddOp:          {addCall, 2, 2, ""},
-	AndOp:          {andCall, 2, 2, ""},
-	BinaryAndOp:    {binaryAndCall, 2, 2, ""},
-	BinaryOrOp:     {binaryOrCall, 2, 2, ""},
-	ConcatOp:       {concatCall, 2, 2, ""},
-	DivideOp:       {divideCall, 2, 2, ""},
-	EqualOp:        {equalCall, 2, 2, ""},
-	GreaterEqualOp: {greaterEqualCall, 2, 2, ""},
-	GreaterThanOp:  {greaterThanCall, 2, 2, ""},
-	LessEqualOp:    {lessEqualCall, 2, 2, ""},
-	LessThanOp:     {lessThanCall, 2, 2, ""},
-	LShiftOp:       {lShiftCall, 2, 2, ""},
-	ModuloOp:       {moduloCall, 2, 2, ""},
-	MultiplyOp:     {multiplyCall, 2, 2, ""},
-	NegateOp:       {negateCall, 1, 1, ""},
-	NotEqualOp:     {notEqualCall, 2, 2, ""},
-	NotOp:          {notCall, 1, 1, ""},
-	OrOp:           {orCall, 2, 2, ""},
-	RShiftOp:       {rShiftCall, 2, 2, ""},
-	SubtractOp:     {subtractCall, 2, 2, ""},
+	AddOp:          {fn: addCall, minArgs: 2, maxArgs: 2},
+	AndOp:          {fn: andCall, minArgs: 2, maxArgs: 2},
+	BinaryAndOp:    {fn: binaryAndCall, minArgs: 2, maxArgs: 2},
+	BinaryOrOp:     {fn: binaryOrCall, minArgs: 2, maxArgs: 2},
+	ConcatOp:       {fn: concatCall, minArgs: 2, maxArgs: 2, handleNull: true},
+	DivideOp:       {fn: divideCall, minArgs: 2, maxArgs: 2},
+	EqualOp:        {fn: equalCall, minArgs: 2, maxArgs: 2},
+	GreaterEqualOp: {fn: greaterEqualCall, minArgs: 2, maxArgs: 2},
+	GreaterThanOp:  {fn: greaterThanCall, minArgs: 2, maxArgs: 2},
+	LessEqualOp:    {fn: lessEqualCall, minArgs: 2, maxArgs: 2},
+	LessThanOp:     {fn: lessThanCall, minArgs: 2, maxArgs: 2},
+	LShiftOp:       {fn: lShiftCall, minArgs: 2, maxArgs: 2},
+	ModuloOp:       {fn: moduloCall, minArgs: 2, maxArgs: 2},
+	MultiplyOp:     {fn: multiplyCall, minArgs: 2, maxArgs: 2},
+	NegateOp:       {fn: negateCall, minArgs: 1, maxArgs: 1},
+	NotEqualOp:     {fn: notEqualCall, minArgs: 2, maxArgs: 2},
+	NotOp:          {fn: notCall, minArgs: 1, maxArgs: 1},
+	OrOp:           {fn: orCall, minArgs: 2, maxArgs: 2},
+	RShiftOp:       {fn: rShiftCall, minArgs: 2, maxArgs: 2},
+	SubtractOp:     {fn: subtractCall, minArgs: 2, maxArgs: 2},
 }
 
 var idFuncs = map[sql.Identifier]*callFunc{
-	sql.ID("abs"):    {absCall, 1, 1, ""},
-	sql.ID("concat"): {concatCall, 2, math.MaxInt16, ""},
+	sql.ID("abs"):    {fn: absCall, minArgs: 1, maxArgs: 1},
+	sql.ID("concat"): {fn: concatCall, minArgs: 2, maxArgs: math.MaxInt16, handleNull: true},
 }
 
 func init() {

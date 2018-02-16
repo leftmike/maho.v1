@@ -102,14 +102,15 @@ func TestValues(t *testing.T) {
 		rows [][]sql.Value
 	}{
 		{
-			sql:  "values (true, 'abcd', 123.456, 789)",
-			rows: [][]sql.Value{{true, "abcd", 123.456, int64(789)}},
+			sql: "values (true, 'abcd', 123.456, 789)",
+			rows: [][]sql.Value{{sql.BoolValue(true), sql.StringValue("abcd"),
+				sql.Float64Value(123.456), sql.Int64Value(789)}},
 		},
 		{
 			sql: "values (1 + 2, 3, 4 - 5), (12, 34, 56.7 * 8)",
 			rows: [][]sql.Value{
-				{int64(3), int64(3), int64(-1)},
-				{int64(12), int64(34), 453.6},
+				{sql.Int64Value(3), sql.Int64Value(3), sql.Int64Value(-1)},
+				{sql.Int64Value(12), sql.Int64Value(34), sql.Float64Value(453.6)},
 			},
 		},
 	}

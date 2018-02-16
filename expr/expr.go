@@ -79,6 +79,30 @@ func (l *Literal) String() string {
 	return sql.Format(l.Value)
 }
 
+func Nil() *Literal {
+	return &Literal{nil}
+}
+
+func True() *Literal {
+	return &Literal{sql.BoolValue(true)}
+}
+
+func False() *Literal {
+	return &Literal{sql.BoolValue(false)}
+}
+
+func Int64Literal(i int64) *Literal {
+	return &Literal{sql.Int64Value(i)}
+}
+
+func Float64Literal(f float64) *Literal {
+	return &Literal{sql.Float64Value(f)}
+}
+
+func StringLiteral(s string) *Literal {
+	return &Literal{sql.StringValue(s)}
+}
+
 type Unary struct {
 	Op   Op
 	Expr Expr

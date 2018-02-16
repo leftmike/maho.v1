@@ -73,50 +73,50 @@ func (ct ColumnType) ConvertValue(n sql.Identifier, v sql.Value) (sql.Value, err
 
 	switch ct.Type {
 	case sql.BooleanType:
-		if s, ok := v.(string); ok {
-			s = strings.Trim(s, " \t\n")
+		if sv, ok := v.(sql.StringValue); ok {
+			s := strings.Trim(string(sv), " \t\n")
 			if s == "t" || s == "true" || s == "y" || s == "yes" || s == "on" || s == "1" {
-				return true, nil
+				return sql.BoolValue(true), nil
 			} else if s == "f" || s == "false" || s == "n" || s == "no" || s == "off" || s == "0" {
-				return false, nil
+				return sql.BoolValue(false), nil
 			} else {
 				return nil, fmt.Errorf("column: %s: expected a boolean value: %v", n, v)
 			}
-		} else if _, ok := v.(bool); !ok {
+		} else if _, ok := v.(sql.BoolValue); !ok {
 			return nil, fmt.Errorf("column: %s: expected a boolean value: %v", n, v)
 		}
 	case sql.CharacterType:
-		if i, ok := v.(int64); ok {
-			return strconv.FormatInt(i, 10), nil
-		} else if f, ok := v.(float64); ok {
-			return strconv.FormatFloat(f, 'g', -1, 64), nil
-		} else if _, ok := v.(string); !ok {
+		if i, ok := v.(sql.Int64Value); ok {
+			return sql.StringValue(strconv.FormatInt(int64(i), 10)), nil
+		} else if f, ok := v.(sql.Float64Value); ok {
+			return sql.StringValue(strconv.FormatFloat(float64(f), 'g', -1, 64)), nil
+		} else if _, ok := v.(sql.StringValue); !ok {
 			return nil, fmt.Errorf("column: %s: expected a string value: %v", n, v)
 		}
 	case sql.DoubleType:
-		if i, ok := v.(int64); ok {
-			return float64(i), nil
-		} else if s, ok := v.(string); ok {
-			d, err := strconv.ParseFloat(strings.Trim(s, " \t\n"), 64)
+		if i, ok := v.(sql.Int64Value); ok {
+			return sql.Float64Value(i), nil
+		} else if s, ok := v.(sql.StringValue); ok {
+			d, err := strconv.ParseFloat(strings.Trim(string(s), " \t\n"), 64)
 			if err != nil {
 				return nil, fmt.Errorf("column: %s: expected a float: %v: %s", n, v,
 					err.Error())
 			}
-			return d, nil
-		} else if _, ok := v.(float64); !ok {
+			return sql.Float64Value(d), nil
+		} else if _, ok := v.(sql.Float64Value); !ok {
 			return nil, fmt.Errorf("column: %s: expected a float value: %v", n, v)
 		}
 	case sql.IntegerType:
-		if f, ok := v.(float64); ok {
-			return int64(f), nil
-		} else if s, ok := v.(string); ok {
-			i, err := strconv.ParseInt(strings.Trim(s, " \t\n"), 10, 64)
+		if f, ok := v.(sql.Float64Value); ok {
+			return sql.Int64Value(f), nil
+		} else if s, ok := v.(sql.StringValue); ok {
+			i, err := strconv.ParseInt(strings.Trim(string(s), " \t\n"), 10, 64)
 			if err != nil {
 				return nil, fmt.Errorf("column: %s: expected an integer: %v: %s", n, v,
 					err.Error())
 			}
-			return i, nil
-		} else if _, ok := v.(int64); !ok {
+			return sql.Int64Value(i), nil
+		} else if _, ok := v.(sql.Int64Value); !ok {
 			return nil, fmt.Errorf("column: %s: expected an integer value: %v", n, v)
 		}
 	}

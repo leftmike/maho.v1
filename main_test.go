@@ -20,13 +20,13 @@ func TestMain(t *testing.T) {
 		s string
 		r string
 	}{
-		{"select * from engine.tables", `   database       table num_columns
-   --------       ----- -----------
- 1   engine      stores           1
- 2   engine   databases           2
- 3   engine      tables           3
- 4   engine     columns           9
- 5   engine identifiers           3
+		{"select * from engine.tables", `   database         table num_columns
+   --------         ----- -----------
+ 1 'engine'      'stores'           1
+ 2 'engine'   'databases'           2
+ 3 'engine'      'tables'           3
+ 4 'engine'     'columns'           9
+ 5 'engine' 'identifiers'           3
 `},
 	}
 

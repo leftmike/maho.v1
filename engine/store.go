@@ -129,13 +129,17 @@ func (et *engineTable) Rows() (db.Rows, error) {
 
 	switch et.name {
 	case sql.STORES:
-		rows = append(rows, []sql.Value{sql.ENGINE.String()})
+		rows = append(rows, []sql.Value{sql.StringValue(sql.ENGINE.String())})
 		for _, s := range store.Stores() {
-			rows = append(rows, []sql.Value{s})
+			rows = append(rows, []sql.Value{sql.StringValue(s)})
 		}
 	case sql.DATABASES:
 		for _, s := range et.engine.databases {
-			rows = append(rows, []sql.Value{s.Name(), s.Type()})
+			rows = append(rows,
+				[]sql.Value{
+					sql.StringValue(s.Name().String()),
+					sql.StringValue(s.Type().String()),
+				})
 		}
 	case sql.TABLES:
 		for _, dbase := range et.engine.databases {
@@ -145,7 +149,12 @@ func (et *engineTable) Rows() (db.Rows, error) {
 				if err != nil {
 					continue
 				}
-				rows = append(rows, []sql.Value{dbase.Name(), n, int64(len(tbl.Columns()))})
+				rows = append(rows,
+					[]sql.Value{
+						sql.StringValue(dbase.Name().String()),
+						sql.StringValue(n.String()),
+						sql.Int64Value(len(tbl.Columns())),
+					})
 			}
 		}
 	case sql.COLUMNS:
@@ -158,15 +167,33 @@ func (et *engineTable) Rows() (db.Rows, error) {
 				}
 				cols := tbl.Columns()
 				for i, ct := range tbl.ColumnTypes() {
+					var def sql.Value
+					if ct.Default != nil {
+						def = sql.StringValue(ct.Default.String())
+					}
 					rows = append(rows,
-						[]sql.Value{dbase.Name(), n, cols[i], ct.Type.String(), int64(ct.Size),
-							ct.Fixed, ct.Binary, ct.NotNull, ct.Default})
+						[]sql.Value{
+							sql.StringValue(dbase.Name().String()),
+							sql.StringValue(n.String()),
+							sql.StringValue(cols[i].String()),
+							sql.StringValue(ct.Type.String()),
+							sql.Int64Value(ct.Size),
+							sql.BoolValue(ct.Fixed),
+							sql.BoolValue(ct.Binary),
+							sql.BoolValue(ct.NotNull),
+							def,
+						})
 				}
 			}
 		}
 	case sql.IDENTIFIERS:
 		for id, n := range sql.Names {
-			rows = append(rows, []sql.Value{n, int(id), id.IsReserved()})
+			rows = append(rows,
+				[]sql.Value{
+					sql.StringValue(n),
+					sql.Int64Value(id),
+					sql.BoolValue(id.IsReserved()),
+				})
 		}
 	}
 
