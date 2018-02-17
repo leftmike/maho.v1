@@ -26,20 +26,24 @@ func (stmt *DropTable) String() string {
 	return s
 }
 
-func (stmt *DropTable) Execute(e *engine.Engine) (interface{}, error) {
+func (stmt *DropTable) Plan(e *engine.Engine) (interface{}, error) {
+	return stmt, nil
+}
+
+func (stmt *DropTable) Execute(e *engine.Engine) (int64, error) {
 	for _, tbl := range stmt.Tables {
 		d, err := e.LookupDatabase(tbl.Database)
 		if err != nil {
-			return nil, err
+			return 0, err
 		}
 		dbase, ok := d.(db.DatabaseModify)
 		if !ok {
-			return nil, fmt.Errorf("\"%s\" database can't be modified", d.Name())
+			return 0, fmt.Errorf("\"%s\" database can't be modified", d.Name())
 		}
 		err = dbase.DropTable(tbl.Table, stmt.IfExists)
 		if err != nil {
-			return nil, err
+			return 0, err
 		}
 	}
-	return nil, nil
+	return 0, nil
 }

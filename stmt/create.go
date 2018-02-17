@@ -33,14 +33,18 @@ func (stmt *CreateTable) String() string {
 	return s
 }
 
-func (stmt *CreateTable) Execute(e *engine.Engine) (interface{}, error) {
+func (stmt *CreateTable) Plan(e *engine.Engine) (interface{}, error) {
+	return stmt, nil
+}
+
+func (stmt *CreateTable) Execute(e *engine.Engine) (int64, error) {
 	d, err := e.LookupDatabase(stmt.Table.Database)
 	if err != nil {
-		return nil, err
+		return 0, err
 	}
 	dbase, ok := d.(db.DatabaseModify)
 	if !ok {
-		return nil, fmt.Errorf("\"%s\" database can't be modified", d.Name())
+		return 0, fmt.Errorf("\"%s\" database can't be modified", d.Name())
 	}
-	return nil, dbase.CreateTable(stmt.Table.Table, stmt.Columns, stmt.ColumnTypes)
+	return 0, dbase.CreateTable(stmt.Table.Table, stmt.Columns, stmt.ColumnTypes)
 }

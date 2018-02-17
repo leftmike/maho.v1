@@ -13,9 +13,28 @@ To Do:
 
 - SELECT ... ORDER BY ...
 
-- split out display info from ColumnType
+- SELECT ...
+    [GROUP BY <column-expr> [, ...] [HAVING <condition>]]
+- aggregate functions
+-- aggregate function in SELECT list or a GROUP BY forces an aggregate context for SELECT list
+-- columns must be mentioned in the GROUP BY or must be within an aggregate function
+-- column-expr must be *exactly* the same in the SELECT list and in the HAVING condition
+-- aggregate functions must not be nested => simple context within an aggregate function
+-- HAVING condition applies to GROUP BY rows, so must be an aggregate context
+-- need to special case count(*)
+-- algorithm:
+for (each rows using FROM and WHERE) {
+    break into groups using column-expr in GROUP BY, and saving only the GROUP BY column-expr(s)
+    accumulate all aggregate functions in each group
+}
+// result is a Row set of column-expr(s) and aggregate results
+for (each group) {
+    if not HAVING condition using aggregate results {
+        continue
+    }
+    return SELECT list using aggregate results
+}
 
-- eval.go: numFunc, intFunc, shiftFun
 */
 
 import (
@@ -26,15 +45,15 @@ import (
 	"strings"
 	"text/tabwriter"
 
-	"github.com/leftmike/maho/db"
 	"github.com/leftmike/maho/engine"
 	"github.com/leftmike/maho/parser"
+	"github.com/leftmike/maho/plan"
 	"github.com/leftmike/maho/sql"
 	"github.com/leftmike/maho/store"
 	_ "github.com/leftmike/maho/store/basic"
 )
 
-func parse(e *engine.Engine, p parser.Parser, w io.Writer) {
+func replSQL(e *engine.Engine, p parser.Parser, w io.Writer) {
 	for {
 		stmt, err := p.Parse()
 		if err == io.EOF {
@@ -45,13 +64,20 @@ func parse(e *engine.Engine, p parser.Parser, w io.Writer) {
 			break
 		}
 
-		ret, err := stmt.Execute(e)
+		ret, err := stmt.Plan(e)
 		if err != nil {
 			fmt.Println(err)
 			break
 		}
 
-		if rows, ok := ret.(db.Rows); ok {
+		if exec, ok := ret.(plan.Executer); ok {
+			cnt, err := exec.Execute(e)
+			if err != nil {
+				fmt.Println(err)
+				break
+			}
+			fmt.Printf("%d rows updated\n", cnt)
+		} else if rows, ok := ret.(plan.Rows); ok {
 			w := tabwriter.NewWriter(w, 0, 0, 1, ' ', tabwriter.AlignRight)
 
 			cols := rows.Columns()
@@ -105,16 +131,16 @@ func main() {
 	}
 
 	if len(os.Args) == 1 {
-		parse(e, parser.NewParser(bufio.NewReader(os.Stdin), "[Stdin]"), os.Stdout)
+		replSQL(e, parser.NewParser(bufio.NewReader(os.Stdin), "[Stdin]"), os.Stdout)
 	} else {
 		for idx := 1; idx < len(os.Args); idx++ {
 			/*			f, err := os.Open(os.Args[idx])
 						if err != nil {
 							log.Fatal(err)
 						}
-						parse(e, bufio.NewReader(f), os.Args[idx])*/
-			parse(e, parser.NewParser(strings.NewReader(os.Args[idx]), fmt.Sprintf("os.Args[%d]",
-				idx)), os.Stdout)
+						replSQL(e, bufio.NewReader(f), os.Args[idx])*/
+			replSQL(e, parser.NewParser(strings.NewReader(os.Args[idx]),
+				fmt.Sprintf("os.Args[%d]", idx)), os.Stdout)
 		}
 	}
 }

@@ -8,6 +8,7 @@ import (
 	"github.com/leftmike/maho/engine"
 	"github.com/leftmike/maho/expr"
 	"github.com/leftmike/maho/parser"
+	"github.com/leftmike/maho/plan"
 	"github.com/leftmike/maho/query"
 	"github.com/leftmike/maho/sql"
 	"github.com/leftmike/maho/testutil"
@@ -197,7 +198,11 @@ func statement(e *engine.Engine, s string) error {
 	if err != nil {
 		return err
 	}
-	_, err = stmt.Execute(e)
+	ret, err := stmt.Plan(e)
+	if err != nil {
+		return err
+	}
+	_, err = ret.(plan.Executer).Execute(e)
 	return err
 }
 

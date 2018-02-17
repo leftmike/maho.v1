@@ -8,5 +8,5 @@ import (
 
 type Stmt interface {
 	fmt.Stringer
-	Execute(e *engine.Engine) (interface{}, error)
+	Plan(e *engine.Engine) (interface{}, error)
 }

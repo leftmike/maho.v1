@@ -7,9 +7,9 @@ import (
 
 	"github.com/leftmike/sqltest/pkg/sqltest"
 
-	"github.com/leftmike/maho/db"
 	"github.com/leftmike/maho/engine"
 	"github.com/leftmike/maho/parser"
+	"github.com/leftmike/maho/plan"
 	"github.com/leftmike/maho/sql"
 )
 
@@ -28,7 +28,11 @@ func (run *Runner) RunExec(tst *sqltest.Test) error {
 		if err != nil {
 			return err
 		}
-		_, err = stmt.Execute(run.Engine)
+		ret, err := stmt.Plan(run.Engine)
+		if err != nil {
+			return err
+		}
+		_, err = ret.(plan.Executer).Execute(run.Engine)
 		if err != nil {
 			return err
 		}
@@ -43,11 +47,11 @@ func (run *Runner) RunQuery(tst *sqltest.Test) ([]string, [][]string, error) {
 	if err != nil {
 		return nil, nil, err
 	}
-	ret, err := stmt.Execute(run.Engine)
+	ret, err := stmt.Plan(run.Engine)
 	if err != nil {
 		return nil, nil, err
 	}
-	rows, ok := ret.(db.Rows)
+	rows, ok := ret.(plan.Rows)
 	if !ok {
 		return nil, nil, fmt.Errorf("%s:%d: expected a query", tst.Filename, tst.LineNumber)
 	}

@@ -15,7 +15,7 @@ func (stmt *Select) String() string {
 	return (*query.Select)(stmt).String()
 }
 
-func (stmt *Select) Execute(e *engine.Engine) (interface{}, error) {
+func (stmt *Select) Plan(e *engine.Engine) (interface{}, error) {
 	return (*query.Select)(stmt).Rows(e)
 }
 
@@ -25,7 +25,7 @@ func (stmt *Values) String() string {
 	return (*query.Values)(stmt).String()
 }
 
-func (stmt *Values) Execute(e *engine.Engine) (interface{}, error) {
+func (stmt *Values) Plan(e *engine.Engine) (interface{}, error) {
 	return (*query.Values)(stmt).Rows(e)
 }
 
@@ -42,7 +42,7 @@ func (stmt *Delete) String() string {
 	return s
 }
 
-func (stmt *Delete) Execute(e *engine.Engine) (interface{}, error) {
+func (stmt *Delete) Plan(e *engine.Engine) (interface{}, error) {
 	return nil, fmt.Errorf("DELETE: not implemented yet")
 }
 
@@ -71,6 +71,6 @@ func (stmt *Update) String() string {
 	return s
 }
 
-func (stmt *Update) Execute(e *engine.Engine) (interface{}, error) {
+func (stmt *Update) Plan(e *engine.Engine) (interface{}, error) {
 	return nil, fmt.Errorf("UPDATE: not implemented yet")
 }

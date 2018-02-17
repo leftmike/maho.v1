@@ -50,18 +50,22 @@ func (stmt *InsertValues) String() string {
 	return s
 }
 
-func (stmt *InsertValues) Execute(e *engine.Engine) (interface{}, error) {
+func (stmt *InsertValues) Plan(e *engine.Engine) (interface{}, error) {
+	return stmt, nil
+}
+
+func (stmt *InsertValues) Execute(e *engine.Engine) (int64, error) {
 	dbase, err := e.LookupDatabase(stmt.Table.Database)
 	if err != nil {
-		return nil, err
+		return 0, err
 	}
 	t, err := dbase.Table(stmt.Table.Table)
 	if err != nil {
-		return nil, err
+		return 0, err
 	}
 	tbl, ok := t.(db.TableInsert)
 	if !ok {
-		return nil, fmt.Errorf("\"%s.%s\" table can't be modified", dbase.Name(), t.Name())
+		return 0, fmt.Errorf("\"%s.%s\" table can't be modified", dbase.Name(), t.Name())
 	}
 
 	cols := tbl.Columns()
@@ -86,7 +90,7 @@ func (stmt *InsertValues) Execute(e *engine.Engine) (interface{}, error) {
 		for v, nam := range stmt.Columns {
 			c, ok := cmap[nam]
 			if !ok {
-				return nil, fmt.Errorf("engine: %s: column not found: %s", tbl.Name(), nam)
+				return 0, fmt.Errorf("engine: %s: column not found: %s", tbl.Name(), nam)
 			}
 			c2v[c] = v
 		}
@@ -94,7 +98,7 @@ func (stmt *InsertValues) Execute(e *engine.Engine) (interface{}, error) {
 
 	for _, r := range stmt.Rows {
 		if len(r) > mv {
-			return nil, fmt.Errorf("engine: %s: too many values", tbl.Name())
+			return 0, fmt.Errorf("engine: %s: too many values", tbl.Name())
 		}
 		row := make([]sql.Value, len(cols))
 		for i, c := range colTypes {
@@ -109,25 +113,25 @@ func (stmt *InsertValues) Execute(e *engine.Engine) (interface{}, error) {
 			if e != nil {
 				ce, err := expr.Compile(nil, e)
 				if err != nil {
-					return nil, err
+					return 0, err
 				}
 				v, err = ce.Eval(nil)
 				if err != nil {
-					return nil, err
+					return 0, err
 				}
 			}
 
 			row[i], err = c.ConvertValue(cols[i], v)
 			if err != nil {
-				return nil, fmt.Errorf("%s: %s", tbl.Name(), err.Error())
+				return 0, fmt.Errorf("%s: %s", tbl.Name(), err.Error())
 			}
 		}
 
 		err := tbl.Insert(row)
 		if err != nil {
-			return nil, err
+			return 0, err
 		}
 	}
 
-	return nil, nil
+	return int64(len(stmt.Rows)), nil
 }

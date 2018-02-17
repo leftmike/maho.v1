@@ -6,8 +6,8 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/leftmike/maho/db"
 	"github.com/leftmike/maho/parser"
+	"github.com/leftmike/maho/plan"
 	"github.com/leftmike/maho/query"
 	"github.com/leftmike/maho/sql"
 	"github.com/leftmike/maho/stmt"
@@ -127,30 +127,30 @@ func TestValues(t *testing.T) {
 			t.Errorf("Parse(%q) failed with %s", c.sql, err)
 			continue
 		}
-		ret, err := stmt.Execute(e)
+		ret, err := stmt.Plan(e)
 		if c.fail {
 			if err == nil {
-				t.Errorf("Execute(%q) did not fail", c.sql)
+				t.Errorf("Plan(%q) did not fail", c.sql)
 			}
 			continue
 		}
 		if err != nil {
-			t.Errorf("Execute(%q) failed with %s", c.sql, err)
+			t.Errorf("Plan(%q) failed with %s", c.sql, err)
 			continue
 		}
-		rows, ok := ret.(db.Rows)
+		rows, ok := ret.(plan.Rows)
 		if !ok {
-			t.Errorf("Execute(%q).(db.Rows) failed", c.sql)
+			t.Errorf("Plan(%q).(plan.Rows) failed", c.sql)
 			continue
 		}
 		dest := make([]sql.Value, len(rows.Columns()))
 		for i, r := range c.rows {
 			if rows.Next(dest) != nil {
-				t.Errorf("Execute(%q) got %d rows; want %d rows", c.sql, i, len(c.rows))
+				t.Errorf("Plan(%q).Rows() got %d rows; want %d rows", c.sql, i, len(c.rows))
 				break
 			}
 			if !reflect.DeepEqual(dest, r) {
-				t.Errorf("Execute(%q)[%d] got %q want %q", c.sql, i, dest, r)
+				t.Errorf("Plan(%q).Rows()[%d] got %q want %q", c.sql, i, dest, r)
 				break
 			}
 		}
