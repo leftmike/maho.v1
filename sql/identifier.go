@@ -17,6 +17,8 @@ const (
 	BOOLEAN
 	CHAR
 	COLUMNS
+	COUNT
+	COUNT_ALL
 	DATABASES
 	DOUBLE
 	ENGINE
@@ -78,6 +80,8 @@ const (
 var knownIdentifiers = map[string]Identifier{
 	"basic":       BASIC,
 	"columns":     COLUMNS,
+	"count":       COUNT,
+	"count_all":   COUNT_ALL,
 	"databases":   DATABASES,
 	"engine":      ENGINE,
 	"identifiers": IDENTIFIERS,

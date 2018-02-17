@@ -347,6 +347,9 @@ func TestParseExpr(t *testing.T) {
 		{"- (2 * 3)", "(- (2 * 3))"},
 		{"1 + 2 * 3", "(1 + (2 * 3))"},
 		{"1 * 2 + 3 / - 4", "((1 * 2) + (3 / (- 4)))"},
+		{"count(*)", "count_all()"},
+		{"count(123)", "count(123)"},
+		{"count(1,23,456)", "count(1, 23, 456)"},
 	}
 
 	for i, c := range cases {
@@ -366,6 +369,7 @@ func TestParseExpr(t *testing.T) {
 		"abc.123",
 		"((1 + 2) * 3",
 		"abc(123,",
+		"abc(*)",
 	}
 
 	for i, f := range fails {

@@ -526,6 +526,7 @@ func (p *parser) parseExpr() expr.Expr {
     | <expr> <op> <expr>
     | <ref> ['.' <ref> ...]
     | <func> '(' [<expr> [',' ...]] ')'
+    | 'count' '(' '*' ')'
 <op> = '+' '-' '*' '/' '%'
     | '=' '==' '!=' '<>' '<' '<=' '>' '>='
     | '<<' '>>' '&' '|'
@@ -580,12 +581,17 @@ func (p *parser) parseSubExpr() expr.Expr {
 			// <func> ( <expr> [,...] )
 			c := &expr.Call{Name: id}
 			if !p.maybeToken(token.RParen) {
-				for {
-					c.Args = append(c.Args, p.parseSubExpr())
-					if p.maybeToken(token.RParen) {
-						break
+				if id == sql.COUNT && p.maybeToken(token.Star) {
+					p.expectTokens(token.RParen)
+					c.Name = sql.COUNT_ALL
+				} else {
+					for {
+						c.Args = append(c.Args, p.parseSubExpr())
+						if p.maybeToken(token.RParen) {
+							break
+						}
+						p.expectTokens(token.Comma)
 					}
-					p.expectTokens(token.Comma)
 				}
 			}
 			e = c

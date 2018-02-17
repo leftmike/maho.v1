@@ -22,7 +22,6 @@ To Do:
 -- column-expr must be *exactly* the same in the SELECT list and in the HAVING condition
 -- aggregate functions must not be nested => simple context within an aggregate function
 -- HAVING condition applies to GROUP BY rows, so must be an aggregate context
--- need to special case count(*) ==> count_all()
 -- algorithm:
 for (each rows using FROM and WHERE) {
     break into groups using column-expr in GROUP BY, and saving only the GROUP BY column-expr(s)
