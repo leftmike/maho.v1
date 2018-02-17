@@ -39,6 +39,7 @@ const (
 const (
 	AND Identifier = -(iota + 1)
 	AS
+	BY
 	CREATE
 	CROSS
 	DEFAULT
@@ -48,6 +49,8 @@ const (
 	FALSE
 	FROM
 	FULL
+	GROUP
+	HAVING
 	IF
 	INDEX
 	INNER
@@ -88,6 +91,7 @@ var knownKeywords = map[string]struct {
 }{
 	"AND":       {AND, true},
 	"AS":        {AS, true},
+	"BY":        {BY, true},
 	"BIGINT":    {BIGINT, false},
 	"BINARY":    {BINARY, false},
 	"BLOB":      {BLOB, false},
@@ -104,6 +108,8 @@ var knownKeywords = map[string]struct {
 	"FALSE":     {FALSE, true},
 	"FROM":      {FROM, true},
 	"FULL":      {FULL, true},
+	"GROUP":     {GROUP, true},
+	"HAVING":    {HAVING, true},
 	"IF":        {IF, true},
 	"INDEX":     {INDEX, true},
 	"INNER":     {INNER, true},

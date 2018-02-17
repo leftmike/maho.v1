@@ -14,14 +14,15 @@ To Do:
 - SELECT ... ORDER BY ...
 
 - SELECT ...
-    [GROUP BY <column-expr> [, ...] [HAVING <condition>]]
+    [GROUP BY <column-expr> [, ...]]
+    [HAVING <condition>]
 - aggregate functions
 -- aggregate function in SELECT list or a GROUP BY forces an aggregate context for SELECT list
 -- columns must be mentioned in the GROUP BY or must be within an aggregate function
 -- column-expr must be *exactly* the same in the SELECT list and in the HAVING condition
 -- aggregate functions must not be nested => simple context within an aggregate function
 -- HAVING condition applies to GROUP BY rows, so must be an aggregate context
--- need to special case count(*)
+-- need to special case count(*) ==> count_all()
 -- algorithm:
 for (each rows using FROM and WHERE) {
     break into groups using column-expr in GROUP BY, and saving only the GROUP BY column-expr(s)
@@ -34,7 +35,6 @@ for (each group) {
     }
     return SELECT list using aggregate results
 }
-
 */
 
 import (

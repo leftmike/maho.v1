@@ -33,6 +33,8 @@ type Select struct {
 	Results []SelectResult
 	From    FromItem
 	Where   expr.Expr
+	GroupBy []expr.Expr
+	Having  expr.Expr
 }
 
 func (tr TableResult) String() string {
@@ -96,6 +98,18 @@ func (stmt *Select) String() string {
 	s += fmt.Sprintf(" FROM %s", stmt.From)
 	if stmt.Where != nil {
 		s += fmt.Sprintf(" WHERE %s", stmt.Where)
+	}
+	if stmt.GroupBy != nil {
+		s += " GROUP BY "
+		for i, e := range stmt.GroupBy {
+			if i > 0 {
+				s += ", "
+			}
+			s += e.String()
+		}
+		if stmt.Having != nil {
+			s += fmt.Sprintf(" HAVING %s", stmt.Having)
+		}
 	}
 	return s
 }

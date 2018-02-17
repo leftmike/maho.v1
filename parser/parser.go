@@ -714,7 +714,11 @@ func (p *parser) parseValues() *stmt.Values {
 }
 
 /*
-<select> = SELECT <select-list> [FROM <from-item> [',' ...]] [WHERE <expr>]
+<select> = SELECT <select-list>
+    [FROM <from-item> [',' ...]]
+    [WHERE <expr>]
+    [GROUP BY <expr> [',' ...]]
+    [HAVING <expr>]
 <select-list> = '*'
     | <select-item> [',' ...]
 <select-item> = table '.' '*'
@@ -775,6 +779,21 @@ func (p *parser) parseSelect() *stmt.Select {
 
 	if p.optionalReserved(sql.WHERE) {
 		s.Where = p.parseExpr()
+	}
+
+	if p.optionalReserved(sql.GROUP) {
+		p.expectReserved(sql.BY)
+
+		for {
+			s.GroupBy = append(s.GroupBy, p.parseExpr())
+			if !p.maybeToken(token.Comma) {
+				break
+			}
+		}
+	}
+
+	if p.optionalReserved(sql.HAVING) {
+		s.Having = p.parseExpr()
 	}
 
 	return &s

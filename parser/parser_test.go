@@ -735,6 +735,48 @@ func TestSelect(t *testing.T) {
 				},
 			},
 		},
+		{sql: "select c where c > 5 from t", fail: true},
+		{sql: "select c from t group", fail: true},
+		{sql: "select c from t group by", fail: true},
+		{sql: "select c from t group by c where c > 5", fail: true},
+		{sql: "select c from t group by c having", fail: true},
+		{sql: "select c from t group by c, d, having c > 5", fail: true},
+		{
+			sql: "select c from t group by c",
+			stmt: stmt.Select{
+				From: query.FromTableAlias{Table: sql.ID("t")},
+				Results: []query.SelectResult{
+					query.TableColumnResult{Column: sql.ID("c")},
+				},
+				GroupBy: []expr.Expr{expr.Ref{sql.ID("c")}},
+			},
+		},
+		{
+			sql: "select c from t group by c, d, e + f",
+			stmt: stmt.Select{
+				From: query.FromTableAlias{Table: sql.ID("t")},
+				Results: []query.SelectResult{
+					query.TableColumnResult{Column: sql.ID("c")},
+				},
+				GroupBy: []expr.Expr{
+					expr.Ref{sql.ID("c")},
+					expr.Ref{sql.ID("d")},
+					&expr.Binary{expr.AddOp, expr.Ref{sql.ID("e")}, expr.Ref{sql.ID("f")}},
+				},
+			},
+		},
+		{
+			sql: "select c from t group by c having c > 1",
+			stmt: stmt.Select{
+				From: query.FromTableAlias{Table: sql.ID("t")},
+				Results: []query.SelectResult{
+					query.TableColumnResult{Column: sql.ID("c")},
+				},
+				GroupBy: []expr.Expr{expr.Ref{sql.ID("c")}},
+				Having: &expr.Binary{expr.GreaterThanOp, expr.Ref{sql.ID("c")},
+					expr.Int64Literal(1)},
+			},
+		},
 	}
 
 	for i, c := range cases {
