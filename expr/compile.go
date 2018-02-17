@@ -37,9 +37,6 @@ func Compile(ctx CompileContext, e Expr) (CExpr, error) {
 		}
 		return &call{cf, []CExpr{a1, a2}}, nil
 	case Ref:
-		if ctx == nil {
-			return nil, fmt.Errorf("reference %s not found", e)
-		}
 		idx, err := ctx.CompileRef(e)
 		if err != nil {
 			return nil, err

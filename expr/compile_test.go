@@ -10,6 +10,12 @@ import (
 	"github.com/leftmike/maho/sql"
 )
 
+type compileCtx struct{}
+
+func (_ compileCtx) CompileRef(r expr.Ref) (int, error) {
+	return -1, fmt.Errorf("reference %s not found", r)
+}
+
 func TestCompile(t *testing.T) {
 	cases := []struct {
 		s string
@@ -28,7 +34,7 @@ func TestCompile(t *testing.T) {
 		if err != nil {
 			t.Errorf("ParseExpr(%q) failed with %s", c.s, err)
 		}
-		r, err := expr.Compile(nil, e)
+		r, err := expr.Compile(compileCtx{}, e)
 		if err != nil {
 			t.Errorf("expr.Compile(%q) failed with %s", c.s, err)
 		}
@@ -51,7 +57,7 @@ func TestCompile(t *testing.T) {
 		if err != nil {
 			t.Errorf("ParseExpr(%q) failed with %s", f, err)
 		}
-		r, err := expr.Compile(nil, e)
+		r, err := expr.Compile(compileCtx{}, e)
 		if err == nil {
 			t.Errorf("expr.Compile(%q) did not fail, got %s", f, r)
 		}

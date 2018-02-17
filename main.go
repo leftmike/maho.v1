@@ -16,8 +16,9 @@ To Do:
 - SELECT ...
     [GROUP BY <column-expr> [, ...]]
     [HAVING <condition>]
-- aggregate functions
--- aggregate function in SELECT list or a GROUP BY forces an aggregate context for SELECT list
+- aggregate functions:, count, count_all, avg, max, min, every, some, sum, string_agg
+-- aggregate function in SELECT list or a GROUP BY or a HAVING forces an aggregate context for
+   SELECT list
 -- columns must be mentioned in the GROUP BY or must be within an aggregate function
 -- column-expr must be *exactly* the same in the SELECT list and in the HAVING condition
 -- aggregate functions must not be nested => simple context within an aggregate function
