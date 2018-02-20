@@ -192,16 +192,14 @@ func (fctx *fromContext) tblColIndex(tbl, col sql.Identifier, what string) (int,
 	return idx, nil
 }
 
-func (fctx *fromContext) tableColumns(tbl sql.Identifier) ([]sql.Identifier, []int) {
+func (fctx *fromContext) tableColumns(tbl sql.Identifier) []sql.Identifier {
 	var cols []sql.Identifier
-	var idxs []int
-	for idx, cr := range fctx.cols {
+	for _, cr := range fctx.cols {
 		if cr.table == tbl {
 			cols = append(cols, cr.column)
-			idxs = append(idxs, idx)
 		}
 	}
-	return cols, idxs
+	return cols
 }
 
 func (fctx *fromContext) columns() []sql.Identifier {

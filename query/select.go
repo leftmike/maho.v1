@@ -129,19 +129,16 @@ func (stmt *Select) Rows(e *engine.Engine) (db.Rows, error) {
 	if err != nil {
 		return nil, err
 	}
-	return results(rows, fctx, stmt.Results)
-	/*
-		if stmt.GroupBy == nil && stmt.Having == nil {
-			rows, err = results(rows, fctx, stmt.Results)
-			if err == nil {
-				return rows, nil
-			} else if _, ok := err.(*expr.ContextError); !ok {
-				return nil, err
-			}
-			// Aggregrate function used in SELECT results causes an implicit GROUP BY
+	if stmt.GroupBy == nil && stmt.Having == nil {
+		rows, err = results(rows, fctx, stmt.Results)
+		if err == nil {
+			return rows, nil
+		} else if _, ok := err.(*expr.ContextError); !ok {
+			return nil, err
 		}
-		return group(rows, fctx, stmt.Results, stmt.GroupBy, stmt.Having)
-	*/
+		// Aggregrate function used in SELECT results causes an implicit GROUP BY
+	}
+	return group(rows, fctx, stmt.Results, stmt.GroupBy, stmt.Having)
 }
 
 func (fs FromSelect) rows(e *engine.Engine) (db.Rows, *fromContext, error) {
@@ -310,29 +307,27 @@ func results(rows db.Rows, fctx *fromContext, results []SelectResult) (db.Rows, 
 
 	var destExprs []expr2dest
 	var cols []sql.Identifier
-	cdx := 0
-	edx := 0
+	ddx := 0
 	for _, sr := range results {
 		switch sr := sr.(type) {
 		case TableResult:
-			tblCols, tblIdxs := fctx.tableColumns(sr.Table)
-			for idx, col := range tblCols {
+			for _, col := range fctx.tableColumns(sr.Table) {
 				ce, err := expr.Compile(fctx, expr.Ref{sr.Table, col})
 				if err != nil {
 					panic(err)
 				}
-				destExprs = append(destExprs, expr2dest{destColIndex: tblIdxs[idx], expr: ce})
+				destExprs = append(destExprs, expr2dest{destColIndex: ddx, expr: ce})
 				cols = append(cols, col)
-				cdx += 1
+				ddx += 1
 			}
 		case ExprResult:
 			ce, err := expr.Compile(fctx, sr.Expr)
 			if err != nil {
 				return nil, err
 			}
-			destExprs = append(destExprs, expr2dest{destColIndex: edx, expr: ce})
+			destExprs = append(destExprs, expr2dest{destColIndex: ddx, expr: ce})
 			cols = append(cols, sr.Column(len(cols)))
-			edx += 1
+			ddx += 1
 		default:
 			panic(fmt.Sprintf("unexpected type for query.SelectResult: %T: %v", sr, sr))
 		}
