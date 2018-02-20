@@ -29,6 +29,13 @@ func (ci colIndex) Eval(ctx EvalContext) (sql.Value, error) {
 	return ctx.EvalRef(int(ci)), nil
 }
 
+func ColumnIndex(ce CExpr) (int, bool) {
+	if ci, ok := ce.(colIndex); ok {
+		return int(ci), true
+	}
+	return 0, false
+}
+
 type call struct {
 	call *callFunc
 	args []CExpr
@@ -300,7 +307,6 @@ func subtractCall(ctx EvalContext, args []sql.Value) (sql.Value, error) {
 }
 
 func absCall(ctx EvalContext, args []sql.Value) (sql.Value, error) {
-
 	switch a0 := args[0].(type) {
 	case sql.Float64Value:
 		if a0 < 0 {
@@ -314,4 +320,12 @@ func absCall(ctx EvalContext, args []sql.Value) (sql.Value, error) {
 		return a0, nil
 	}
 	return nil, fmt.Errorf("engine: want number got %v", args[0])
+}
+
+func countCall(ctx EvalContext, args []sql.Value) (sql.Value, error) {
+	return nil, nil
+}
+
+func countAllCall(ctx EvalContext, _ []sql.Value) (sql.Value, error) {
+	return nil, nil
 }

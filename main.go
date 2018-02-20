@@ -8,6 +8,8 @@ To Do:
 
 - fuzzing: parser.Parse
 
+- clean up error messages: engine: ... or parser: ... or scanner: ..., etc
+
 - execute DELETE
 - execute UPDATE
 

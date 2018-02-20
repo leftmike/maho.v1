@@ -754,24 +754,9 @@ func (p *parser) parseSelect() *stmt.Select {
 			}
 			p.unscan()
 
-			e := p.parseExpr()
-			a := p.parseAlias(false)
-
-			if ref, ok := e.(expr.Ref); ok && (len(ref) == 1 || len(ref) == 2) {
-				// [ table '.' ] column [[ AS ] column-alias]
-				var tcr query.TableColumnResult
-				if len(ref) == 1 {
-					tcr.Column = ref[0]
-				} else {
-					tcr.Table = ref[0]
-					tcr.Column = ref[1]
-				}
-				tcr.Alias = a
-				s.Results = append(s.Results, tcr)
-			} else {
-				// <expr> [[ AS ] column-alias]
-				s.Results = append(s.Results, query.ExprResult{e, a})
-			}
+			// <expr> [[ AS ] column-alias]
+			s.Results = append(s.Results, query.ExprResult{p.parseExpr(), p.parseAlias(false)})
+			//}
 
 			if !p.maybeToken(token.Comma) {
 				break

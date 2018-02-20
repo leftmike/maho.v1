@@ -127,10 +127,10 @@ func joinContextsOn(lctx, rctx *fromContext) *fromContext {
 func (fctx *fromContext) usingIndex(col sql.Identifier, side string) (int, error) {
 	idx, ok := fctx.colMap[col]
 	if !ok {
-		return -1, fmt.Errorf("%s not found on %s side of join", col, side)
+		return -1, fmt.Errorf("engine: %s not found on %s side of join", col, side)
 	}
 	if idx < 0 {
-		return -1, fmt.Errorf("%s is ambigous on %s side of join", col, side)
+		return -1, fmt.Errorf("engine: %s is ambigous on %s side of join", col, side)
 	}
 	return idx, nil
 }
@@ -159,16 +159,20 @@ func (fctx *fromContext) CompileRef(r expr.Ref) (int, error) {
 	} else if len(r) == 2 {
 		return fctx.tblColIndex(r[0], r[1], "reference")
 	}
-	return -1, fmt.Errorf("%s is not a valid reference", r)
+	return -1, fmt.Errorf("engine: %s is not a valid reference", r)
+}
+
+func (_ *fromContext) ScalarContext() bool {
+	return true
 }
 
 func (fctx *fromContext) colIndex(col sql.Identifier, what string) (int, error) {
 	idx, ok := fctx.colMap[col]
 	if !ok {
-		return -1, fmt.Errorf("%s %s not found", what, col)
+		return -1, fmt.Errorf("engine: %s %s not found", what, col)
 	}
 	if idx < 0 {
-		return -1, fmt.Errorf("%s %s is ambiguous", what, col)
+		return -1, fmt.Errorf("engine: %s %s is ambiguous", what, col)
 	}
 	return idx, nil
 }
@@ -180,10 +184,10 @@ func (fctx *fromContext) tblColIndex(tbl, col sql.Identifier, what string) (int,
 	cr := colRef{table: tbl, column: col}
 	idx, ok := fctx.colRefMap[cr]
 	if !ok {
-		return -1, fmt.Errorf("%s %s not found", what, cr.String())
+		return -1, fmt.Errorf("engine: %s %s not found", what, cr.String())
 	}
 	if idx < 0 {
-		return -1, fmt.Errorf("%s %s is ambiguous", what, cr.String())
+		return -1, fmt.Errorf("engine: %s %s is ambiguous", what, cr.String())
 	}
 	return idx, nil
 }

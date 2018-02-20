@@ -16,6 +16,10 @@ func (_ compileCtx) CompileRef(r expr.Ref) (int, error) {
 	return -1, fmt.Errorf("reference %s not found", r)
 }
 
+func (_ compileCtx) ScalarContext() bool {
+	return true
+}
+
 func TestCompile(t *testing.T) {
 	cases := []struct {
 		s string

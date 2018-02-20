@@ -9,6 +9,15 @@ import (
 
 type CompileContext interface {
 	CompileRef(r Ref) (int, error)
+	ScalarContext() bool
+}
+
+type ContextError struct {
+	name sql.Identifier
+}
+
+func (e *ContextError) Error() string {
+	return fmt.Sprintf("engine: aggregrate function \"%s\" used in scalar context", e.name)
 }
 
 func Compile(ctx CompileContext, e Expr) (CExpr, error) {
@@ -47,6 +56,9 @@ func Compile(ctx CompileContext, e Expr) (CExpr, error) {
 		if !ok {
 			return nil, fmt.Errorf("engine: function \"%s\" not found", e.Name)
 		}
+		if cf.aggregrate && ctx.ScalarContext() {
+			return nil, &ContextError{e.Name}
+		}
 		if len(e.Args) < int(cf.minArgs) {
 			return nil, fmt.Errorf("engine: function \"%s\": minimum %d arguments got %d",
 				e.Name, cf.minArgs, len(e.Args))
@@ -76,6 +88,7 @@ type callFunc struct {
 	maxArgs    int16
 	name       string
 	handleNull bool
+	aggregrate bool
 }
 
 var opFuncs = map[Op]*callFunc{
@@ -102,8 +115,10 @@ var opFuncs = map[Op]*callFunc{
 }
 
 var idFuncs = map[sql.Identifier]*callFunc{
-	sql.ID("abs"):    {fn: absCall, minArgs: 1, maxArgs: 1},
-	sql.ID("concat"): {fn: concatCall, minArgs: 2, maxArgs: math.MaxInt16, handleNull: true},
+	sql.ID("abs"):       {fn: absCall, minArgs: 1, maxArgs: 1},
+	sql.ID("concat"):    {fn: concatCall, minArgs: 2, maxArgs: math.MaxInt16, handleNull: true},
+	sql.ID("count"):     {fn: countCall, minArgs: 1, maxArgs: 1, aggregrate: true},
+	sql.ID("count_all"): {fn: countAllCall, minArgs: 0, maxArgs: 0, aggregrate: true},
 }
 
 func init() {

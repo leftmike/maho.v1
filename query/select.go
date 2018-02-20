@@ -18,12 +18,6 @@ type TableResult struct {
 	Table sql.Identifier
 }
 
-type TableColumnResult struct {
-	Table  sql.Identifier
-	Column sql.Identifier
-	Alias  sql.Identifier
-}
-
 type ExprResult struct {
 	Expr  expr.Expr
 	Alias sql.Identifier
@@ -41,25 +35,29 @@ func (tr TableResult) String() string {
 	return fmt.Sprintf("%s.*", tr.Table)
 }
 
-func (tcr TableColumnResult) String() string {
-	var s string
-	if tcr.Table == 0 {
-		s = tcr.Column.String()
-	} else {
-		s = fmt.Sprintf("%s.%s", tcr.Table, tcr.Column)
-	}
-	if tcr.Alias != 0 {
-		s += fmt.Sprintf(" AS %s", tcr.Alias)
-	}
-	return s
-}
-
 func (er ExprResult) String() string {
 	s := er.Expr.String()
 	if er.Alias != 0 {
 		s += fmt.Sprintf(" AS %s", er.Alias)
 	}
 	return s
+}
+
+func (er ExprResult) Column(idx int) sql.Identifier {
+	col := er.Alias
+	if col == 0 {
+		if ref, ok := er.Expr.(expr.Ref); ok && (len(ref) == 1 || len(ref) == 2) {
+			// [ table '.' ] column
+			if len(ref) == 1 {
+				col = ref[0]
+			} else {
+				col = ref[1]
+			}
+		} else {
+			col = sql.ID(fmt.Sprintf("expr%d", idx+1))
+		}
+	}
+	return col
 }
 
 type FromSelect struct {
@@ -132,6 +130,18 @@ func (stmt *Select) Rows(e *engine.Engine) (db.Rows, error) {
 		return nil, err
 	}
 	return results(rows, fctx, stmt.Results)
+	/*
+		if stmt.GroupBy == nil && stmt.Having == nil {
+			rows, err = results(rows, fctx, stmt.Results)
+			if err == nil {
+				return rows, nil
+			} else if _, ok := err.(*expr.ContextError); !ok {
+				return nil, err
+			}
+			// Aggregrate function used in SELECT results causes an implicit GROUP BY
+		}
+		return group(rows, fctx, stmt.Results, stmt.GroupBy, stmt.Having)
+	*/
 }
 
 func (fs FromSelect) rows(e *engine.Engine) (db.Rows, *fromContext, error) {
@@ -142,7 +152,7 @@ func (fs FromSelect) rows(e *engine.Engine) (db.Rows, *fromContext, error) {
 	cols := rows.Columns()
 	if fs.ColumnAliases != nil {
 		if len(fs.ColumnAliases) != len(cols) {
-			return nil, nil, fmt.Errorf("wrong number of column aliases")
+			return nil, nil, fmt.Errorf("engine: wrong number of column aliases")
 		}
 		cols = fs.ColumnAliases
 	}
@@ -183,7 +193,8 @@ func (wr *whereRows) Next(dest []sql.Value) error {
 		}
 		b, ok := v.(sql.BoolValue)
 		if !ok {
-			return fmt.Errorf("expected boolean result from WHERE condition: %s", sql.Format(v))
+			return fmt.Errorf("engine: expected boolean result from WHERE condition: %s",
+				sql.Format(v))
 		}
 		if b {
 			break
@@ -297,7 +308,6 @@ func results(rows db.Rows, fctx *fromContext, results []SelectResult) (db.Rows, 
 		return &allResultRows{rows: rows, columns: fctx.columns()}, nil
 	}
 
-	var destCols []src2dest
 	var destExprs []expr2dest
 	var cols []sql.Identifier
 	cdx := 0
@@ -307,37 +317,46 @@ func results(rows db.Rows, fctx *fromContext, results []SelectResult) (db.Rows, 
 		case TableResult:
 			tblCols, tblIdxs := fctx.tableColumns(sr.Table)
 			for idx, col := range tblCols {
-				destCols = append(destCols, src2dest{destColIndex: cdx, srcColIndex: tblIdxs[idx]})
+				ce, err := expr.Compile(fctx, expr.Ref{sr.Table, col})
+				if err != nil {
+					panic(err)
+				}
+				destExprs = append(destExprs, expr2dest{destColIndex: tblIdxs[idx], expr: ce})
 				cols = append(cols, col)
 				cdx += 1
 			}
-		case TableColumnResult:
-			rdx, err := fctx.tblColIndex(sr.Table, sr.Column, "result")
-			if err != nil {
-				return nil, err
-			}
-			destCols = append(destCols, src2dest{destColIndex: cdx, srcColIndex: rdx})
-			col := sr.Column
-			if sr.Alias != 0 {
-				col = sr.Alias
-			}
-			cols = append(cols, col)
-			cdx += 1
 		case ExprResult:
 			ce, err := expr.Compile(fctx, sr.Expr)
 			if err != nil {
 				return nil, err
 			}
 			destExprs = append(destExprs, expr2dest{destColIndex: edx, expr: ce})
-			col := sr.Alias
-			if col == 0 {
-				col = sql.ID(fmt.Sprintf("expr%d", len(cols)+1))
-			}
-			cols = append(cols, col)
+			cols = append(cols, sr.Column(len(cols)))
 			edx += 1
 		default:
 			panic(fmt.Sprintf("unexpected type for query.SelectResult: %T: %v", sr, sr))
 		}
 	}
-	return &resultRows{rows: rows, columns: cols, destCols: destCols, destExprs: destExprs}, nil
+	return makeResultRows(rows, cols, destExprs), nil
+}
+
+func makeResultRows(rows db.Rows, cols []sql.Identifier, destExprs []expr2dest) db.Rows {
+	rr := resultRows{rows: rows, columns: cols}
+	for _, de := range destExprs {
+		if ci, ok := expr.ColumnIndex(de.expr); ok {
+			rr.destCols = append(rr.destCols,
+				src2dest{destColIndex: de.destColIndex, srcColIndex: ci})
+		} else {
+			rr.destExprs = append(rr.destExprs, de)
+		}
+	}
+	if rr.destExprs != nil && len(rows.Columns()) != len(cols) {
+		return &rr
+	}
+	for cdx, dc := range rr.destCols {
+		if dc.destColIndex != cdx || dc.srcColIndex != cdx {
+			return &rr
+		}
+	}
+	return &allResultRows{rows: rows, columns: cols}
 }

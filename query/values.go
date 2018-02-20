@@ -115,7 +115,7 @@ func (fv FromValues) rows(e *engine.Engine) (db.Rows, *fromContext, error) {
 	cols := rows.Columns()
 	if fv.ColumnAliases != nil {
 		if len(fv.ColumnAliases) != len(cols) {
-			return nil, nil, fmt.Errorf("wrong number of column aliases")
+			return nil, nil, fmt.Errorf("engine: wrong number of column aliases")
 		}
 		cols = fv.ColumnAliases
 	}
