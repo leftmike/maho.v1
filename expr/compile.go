@@ -9,6 +9,7 @@ import (
 
 type CompileContext interface {
 	CompileRef(r Ref) (int, error)
+	CompileRefExpr(e Expr) (int, bool)
 }
 
 type ContextError struct {
@@ -24,6 +25,12 @@ func CompileRef(idx int) CExpr {
 }
 
 func Compile(ctx CompileContext, e Expr, aggFlag bool) (CExpr, error) {
+	if aggFlag {
+		idx, ok := ctx.CompileRefExpr(e)
+		if ok {
+			return colIndex(idx), nil
+		}
+	}
 	switch e := e.(type) {
 	case *Literal:
 		return e, nil

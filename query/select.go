@@ -345,7 +345,7 @@ func makeResultRows(rows db.Rows, cols []sql.Identifier, destExprs []expr2dest) 
 			rr.destExprs = append(rr.destExprs, de)
 		}
 	}
-	if rr.destExprs != nil && len(rows.Columns()) != len(cols) {
+	if rr.destExprs != nil || len(rows.Columns()) != len(cols) {
 		return &rr
 	}
 	for cdx, dc := range rr.destCols {

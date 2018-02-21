@@ -70,6 +70,7 @@ func (op Op) String() string {
 type Expr interface {
 	fmt.Stringer
 	Equal(e Expr) bool
+	HasRef() bool
 }
 
 type Literal struct {
@@ -86,6 +87,10 @@ func (l *Literal) Equal(e Expr) bool {
 		return false
 	}
 	return sql.Compare(l.Value, l2.Value) == 0
+}
+
+func (_ *Literal) HasRef() bool {
+	return false
 }
 
 func Nil() *Literal {
@@ -132,6 +137,10 @@ func (u *Unary) Equal(e Expr) bool {
 	return u.Op == u2.Op && u.Expr.Equal(u2.Expr)
 }
 
+func (u *Unary) HasRef() bool {
+	return u.Expr.HasRef()
+}
+
 type Binary struct {
 	Op    Op
 	Left  Expr
@@ -148,6 +157,10 @@ func (b *Binary) Equal(e Expr) bool {
 		return false
 	}
 	return b.Op == b2.Op && b.Left.Equal(b2.Left) && b.Right.Equal(b2.Right)
+}
+
+func (b *Binary) HasRef() bool {
+	return b.Left.HasRef() || b.Right.HasRef()
 }
 
 type Ref []sql.Identifier
@@ -173,6 +186,10 @@ func (r Ref) Equal(e Expr) bool {
 			return false
 		}
 	}
+	return true
+}
+
+func (_ Ref) HasRef() bool {
 	return true
 }
 
@@ -207,4 +224,13 @@ func (c *Call) Equal(e Expr) bool {
 		}
 	}
 	return true
+}
+
+func (c *Call) HasRef() bool {
+	for _, a := range c.Args {
+		if a.HasRef() {
+			return true
+		}
+	}
+	return false
 }

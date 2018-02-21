@@ -73,7 +73,9 @@ func (gr *groupRows) Next(dest []sql.Value) error {
 }
 
 type groupContext struct {
-	fctx *fromContext
+	fctx      *fromContext
+	group     []expr.Expr
+	groupRefs []bool
 }
 
 func (gc *groupContext) CompileRef(r expr.Ref) (int, error) {
@@ -81,7 +83,16 @@ func (gc *groupContext) CompileRef(r expr.Ref) (int, error) {
 		"aggregrate function", r)
 }
 
-func group(rows db.Rows, fctx *fromContext, resultsXXX []SelectResult, group []expr.Expr,
+func (gc *groupContext) CompileRefExpr(e expr.Expr) (int, bool) {
+	for gdx, ge := range gc.group {
+		if gc.groupRefs[gdx] && e.Equal(ge) {
+			return gdx, true
+		}
+	}
+	return 0, false
+}
+
+func group(rows db.Rows, fctx *fromContext, results []SelectResult, group []expr.Expr,
 	having expr.Expr) (db.Rows, error) {
 
 	if group == nil {
@@ -90,6 +101,7 @@ func group(rows db.Rows, fctx *fromContext, resultsXXX []SelectResult, group []e
 
 	var groupExprs []expr2dest
 	var groupCols []sql.Identifier
+	var groupRefs []bool
 	ddx := 0
 	for _, e := range group {
 		ce, err := expr.Compile(fctx, e, false)
@@ -102,71 +114,26 @@ func group(rows db.Rows, fctx *fromContext, resultsXXX []SelectResult, group []e
 		} else {
 			groupCols = append(groupCols, sql.ID(fmt.Sprintf("expr%d", len(groupCols)+1)))
 		}
+		groupRefs = append(groupRefs, e.HasRef())
 		ddx += 1
 	}
 
 	var destExprs []expr2dest
 	var resultCols []sql.Identifier
-	gctx := &groupContext{fctx: fctx}
-	for ddx, sr := range resultsXXX {
+	gctx := &groupContext{fctx: fctx, group: group, groupRefs: groupRefs}
+	for ddx, sr := range results {
 		er, ok := sr.(ExprResult)
 		if !ok {
 			panic(fmt.Sprintf("unexpected type for query.SelectResult: %T: %v", sr, sr))
 		}
-		for gdx, e := range group {
-			if er.Expr.Equal(e) {
-				destExprs = append(destExprs,
-					expr2dest{destColIndex: ddx, expr: expr.CompileRef(gdx)})
-				resultCols = append(resultCols, groupCols[gdx])
-			} else {
-				ce, err := expr.Compile(gctx, er.Expr, true)
-				if err != nil {
-					return nil, err
-				}
-				destExprs = append(destExprs, expr2dest{destColIndex: ddx, expr: ce})
-				resultCols = append(resultCols, er.Column(len(resultCols)))
-			}
+		ce, err := expr.Compile(gctx, er.Expr, true)
+		if err != nil {
+			return nil, err
 		}
+		destExprs = append(destExprs, expr2dest{destColIndex: ddx, expr: ce})
+		resultCols = append(resultCols, er.Column(len(resultCols)))
 	}
 
-	// return &groupRows{rows: rows, columns: groupCols, groupExprs: groupExprs}, nil
 	rows = &groupRows{rows: rows, columns: groupCols, groupExprs: groupExprs}
-	// return results(rows, makeFromContext(0, rows.Columns()), resultsXXX)
 	return makeResultRows(rows, resultCols, destExprs), nil
-	// change resultsXXX to results
 }
-
-//return nil, fmt.Errorf("GROUP BY and HAVING not implemented yet")
-/*
-	for _, e := range stmt.GroupBy {
-		ce, err := expr.Compile(fctx, e)
-		colExprs = append(colExprs, expr2dest{destCol, ce})
-		cols = append(cols, col) // actually need the expr as well
-	}
-	groupCount = destCol
-
-	rows, err = results(rows, fctx, stmt.GroupBy)
-	if err != nil {
-		return nil, err
-	}
-	// gctx is based on stmt.GroupBy
-	// determine list of
-
-	var gctx *groupContext
-	if stmt.GroupBy {
-		rows, gctx, err = group(rows, fctx, stmt.GroupBy)
-		if err != nil {
-			return nil, err
-		}
-	} else {
-		gctx = fctx
-		rows = oneGroup(rows)
-	}
-	if stmt.Having {
-		rows, err = having(rows, gctx, stmt.Having)
-		if err != nil {
-			return nil, err
-		}
-	}
-	return results(rows, gctx, stmt.Results)
-*/
