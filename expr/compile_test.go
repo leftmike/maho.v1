@@ -16,10 +16,6 @@ func (_ compileCtx) CompileRef(r expr.Ref) (int, error) {
 	return -1, fmt.Errorf("reference %s not found", r)
 }
 
-func (_ compileCtx) ScalarContext() bool {
-	return true
-}
-
 func TestCompile(t *testing.T) {
 	cases := []struct {
 		s string
@@ -38,7 +34,7 @@ func TestCompile(t *testing.T) {
 		if err != nil {
 			t.Errorf("ParseExpr(%q) failed with %s", c.s, err)
 		}
-		r, err := expr.Compile(compileCtx{}, e)
+		r, err := expr.Compile(compileCtx{}, e, false)
 		if err != nil {
 			t.Errorf("expr.Compile(%q) failed with %s", c.s, err)
 		}
@@ -61,7 +57,7 @@ func TestCompile(t *testing.T) {
 		if err != nil {
 			t.Errorf("ParseExpr(%q) failed with %s", f, err)
 		}
-		r, err := expr.Compile(compileCtx{}, e)
+		r, err := expr.Compile(compileCtx{}, e, false)
 		if err == nil {
 			t.Errorf("expr.Compile(%q) did not fail, got %s", f, r)
 		}

@@ -9,7 +9,6 @@ import (
 
 type CompileContext interface {
 	CompileRef(r Ref) (int, error)
-	ScalarContext() bool
 }
 
 type ContextError struct {
@@ -20,27 +19,31 @@ func (e *ContextError) Error() string {
 	return fmt.Sprintf("engine: aggregrate function \"%s\" used in scalar context", e.name)
 }
 
-func Compile(ctx CompileContext, e Expr) (CExpr, error) {
+func CompileRef(idx int) CExpr {
+	return colIndex(idx)
+}
+
+func Compile(ctx CompileContext, e Expr, aggFlag bool) (CExpr, error) {
 	switch e := e.(type) {
 	case *Literal:
 		return e, nil
 	case *Unary:
 		if e.Op == NoOp {
-			return Compile(ctx, e.Expr)
+			return Compile(ctx, e.Expr, aggFlag)
 		}
 		cf := opFuncs[e.Op]
-		a1, err := Compile(ctx, e.Expr)
+		a1, err := Compile(ctx, e.Expr, aggFlag)
 		if err != nil {
 			return nil, err
 		}
 		return &call{cf, []CExpr{a1}}, nil
 	case *Binary:
 		cf := opFuncs[e.Op]
-		a1, err := Compile(ctx, e.Left)
+		a1, err := Compile(ctx, e.Left, aggFlag)
 		if err != nil {
 			return nil, err
 		}
-		a2, err := Compile(ctx, e.Right)
+		a2, err := Compile(ctx, e.Right, aggFlag)
 		if err != nil {
 			return nil, err
 		}
@@ -56,7 +59,7 @@ func Compile(ctx CompileContext, e Expr) (CExpr, error) {
 		if !ok {
 			return nil, fmt.Errorf("engine: function \"%s\" not found", e.Name)
 		}
-		if cf.aggregrate && ctx.ScalarContext() {
+		if cf.aggregrate && !aggFlag {
 			return nil, &ContextError{e.Name}
 		}
 		if len(e.Args) < int(cf.minArgs) {
@@ -71,7 +74,7 @@ func Compile(ctx CompileContext, e Expr) (CExpr, error) {
 		args := make([]CExpr, len(e.Args))
 		for i, a := range e.Args {
 			var err error
-			args[i], err = Compile(ctx, a)
+			args[i], err = Compile(ctx, a, aggFlag)
 			if err != nil {
 				return nil, err
 			}

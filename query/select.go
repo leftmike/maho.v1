@@ -204,7 +204,7 @@ func where(rows db.Rows, fctx *fromContext, cond expr.Expr) (db.Rows, error) {
 	if cond == nil {
 		return rows, nil
 	}
-	ce, err := expr.Compile(fctx, cond)
+	ce, err := expr.Compile(fctx, cond, false)
 	if err != nil {
 		return nil, err
 	}
@@ -312,7 +312,7 @@ func results(rows db.Rows, fctx *fromContext, results []SelectResult) (db.Rows, 
 		switch sr := sr.(type) {
 		case TableResult:
 			for _, col := range fctx.tableColumns(sr.Table) {
-				ce, err := expr.Compile(fctx, expr.Ref{sr.Table, col})
+				ce, err := expr.Compile(fctx, expr.Ref{sr.Table, col}, false)
 				if err != nil {
 					panic(err)
 				}
@@ -321,7 +321,7 @@ func results(rows db.Rows, fctx *fromContext, results []SelectResult) (db.Rows, 
 				ddx += 1
 			}
 		case ExprResult:
-			ce, err := expr.Compile(fctx, sr.Expr)
+			ce, err := expr.Compile(fctx, sr.Expr, false)
 			if err != nil {
 				return nil, err
 			}

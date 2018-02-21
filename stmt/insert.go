@@ -111,7 +111,7 @@ func (stmt *InsertValues) Execute(e *engine.Engine) (int64, error) {
 			}
 			var v sql.Value
 			if e != nil {
-				ce, err := expr.Compile(nil, e)
+				ce, err := expr.Compile(nil, e, false)
 				if err != nil {
 					return 0, err
 				}

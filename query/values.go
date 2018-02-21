@@ -53,7 +53,7 @@ func (stmt *Values) Rows(e *engine.Engine) (db.Rows, error) {
 	for i, r := range stmt.Expressions {
 		row := make([]sql.Value, len(r))
 		for j := range r {
-			ce, err := expr.Compile(nil, r[j])
+			ce, err := expr.Compile(nil, r[j], false)
 			if err != nil {
 				return nil, err
 			}

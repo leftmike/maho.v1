@@ -157,7 +157,7 @@ func TestEval(t *testing.T) {
 			t.Errorf("ParseExpr(%q) failed with %s", c.s, err)
 			continue
 		}
-		r, err := expr.Compile(nil, e)
+		r, err := expr.Compile(nil, e, false)
 		if err != nil {
 			t.Errorf("expr.Compile(%q) failed with %s", c.s, err)
 			continue
@@ -291,7 +291,7 @@ func TestEval(t *testing.T) {
 			t.Errorf("ParseExpr(%q) failed with %s", f, err)
 			continue
 		}
-		r, err := expr.Compile(nil, e)
+		r, err := expr.Compile(nil, e, false)
 		if err != nil {
 			t.Errorf("expr.Compile(%q) failed with %s", f, err)
 			continue
@@ -321,7 +321,7 @@ func compareTest(t *testing.T, m, op, n string, b bool) {
 		t.Errorf("ParseExpr(%q) failed with %s", s, err)
 		return
 	}
-	r, err := expr.Compile(nil, e)
+	r, err := expr.Compile(nil, e, false)
 	if err != nil {
 		t.Errorf("expr.Compile(%q) failed with %s", s, err)
 		return

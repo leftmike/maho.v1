@@ -305,7 +305,7 @@ func (fj FromJoin) rows(e *engine.Engine) (db.Rows, *fromContext, error) {
 		fctx = joinContextsOn(leftCtx, rightCtx)
 		rows.rightLen = len(rightCtx.cols)
 		if fj.On != nil {
-			rows.on, err = expr.Compile(fctx, fj.On)
+			rows.on, err = expr.Compile(fctx, fj.On, false)
 			if err != nil {
 				return nil, nil, err
 			}
