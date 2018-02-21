@@ -79,7 +79,10 @@ func (gr *groupRows) group() error {
 				}
 				args[idx] = val
 			}
-			group.aggregators[adx].Accumulate(args)
+			err := group.aggregators[adx].Accumulate(args)
+			if err != nil {
+				return err
+			}
 		}
 	}
 	gr.rows.Close()
@@ -88,7 +91,11 @@ func (gr *groupRows) group() error {
 	for _, group := range groups {
 		cdx := len(gr.groupExprs)
 		for adx := range group.aggregators {
-			group.row[cdx] = group.aggregators[adx].Total()
+			val, err := group.aggregators[adx].Total()
+			if err != nil {
+				return err
+			}
+			group.row[cdx] = val
 			cdx += 1
 		}
 		gr.groups = append(gr.groups, group.row)
