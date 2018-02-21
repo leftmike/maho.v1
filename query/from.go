@@ -162,10 +162,6 @@ func (fctx *fromContext) CompileRef(r expr.Ref) (int, error) {
 	return -1, fmt.Errorf("engine: %s is not a valid reference", r)
 }
 
-func (_ *fromContext) CompileRefExpr(e expr.Expr) (int, bool) {
-	return 0, false
-}
-
 func (fctx *fromContext) colIndex(col sql.Identifier, what string) (int, error) {
 	idx, ok := fctx.colMap[col]
 	if !ok {

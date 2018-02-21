@@ -9,7 +9,11 @@ import (
 
 type CompileContext interface {
 	CompileRef(r Ref) (int, error)
-	CompileRefExpr(e Expr) (int, bool)
+}
+
+type AggregatorContext interface {
+	MaybeRefExpr(e Expr) (int, bool)
+	CompileAggregator(c *Call, maker MakeAggregator) int
 }
 
 type ContextError struct {
@@ -17,16 +21,16 @@ type ContextError struct {
 }
 
 func (e *ContextError) Error() string {
-	return fmt.Sprintf("engine: aggregrate function \"%s\" used in scalar context", e.name)
+	return fmt.Sprintf("engine: aggregate function \"%s\" used in scalar context", e.name)
 }
 
 func CompileRef(idx int) CExpr {
 	return colIndex(idx)
 }
 
-func Compile(ctx CompileContext, e Expr, aggFlag bool) (CExpr, error) {
-	if aggFlag {
-		idx, ok := ctx.CompileRefExpr(e)
+func Compile(ctx CompileContext, e Expr, agg bool) (CExpr, error) {
+	if agg {
+		idx, ok := ctx.(AggregatorContext).MaybeRefExpr(e)
 		if ok {
 			return colIndex(idx), nil
 		}
@@ -36,21 +40,21 @@ func Compile(ctx CompileContext, e Expr, aggFlag bool) (CExpr, error) {
 		return e, nil
 	case *Unary:
 		if e.Op == NoOp {
-			return Compile(ctx, e.Expr, aggFlag)
+			return Compile(ctx, e.Expr, agg)
 		}
 		cf := opFuncs[e.Op]
-		a1, err := Compile(ctx, e.Expr, aggFlag)
+		a1, err := Compile(ctx, e.Expr, agg)
 		if err != nil {
 			return nil, err
 		}
 		return &call{cf, []CExpr{a1}}, nil
 	case *Binary:
 		cf := opFuncs[e.Op]
-		a1, err := Compile(ctx, e.Left, aggFlag)
+		a1, err := Compile(ctx, e.Left, agg)
 		if err != nil {
 			return nil, err
 		}
-		a2, err := Compile(ctx, e.Right, aggFlag)
+		a2, err := Compile(ctx, e.Right, agg)
 		if err != nil {
 			return nil, err
 		}
@@ -66,9 +70,6 @@ func Compile(ctx CompileContext, e Expr, aggFlag bool) (CExpr, error) {
 		if !ok {
 			return nil, fmt.Errorf("engine: function \"%s\" not found", e.Name)
 		}
-		if cf.aggregrate && !aggFlag {
-			return nil, &ContextError{e.Name}
-		}
 		if len(e.Args) < int(cf.minArgs) {
 			return nil, fmt.Errorf("engine: function \"%s\": minimum %d arguments got %d",
 				e.Name, cf.minArgs, len(e.Args))
@@ -77,11 +78,19 @@ func Compile(ctx CompileContext, e Expr, aggFlag bool) (CExpr, error) {
 			return nil, fmt.Errorf("engine: function \"%s\": maximum %d arguments got %d",
 				e.Name, cf.maxArgs, len(e.Args))
 		}
+		if cf.makeAggregator != nil {
+			if agg {
+				return colIndex(ctx.(AggregatorContext).CompileAggregator(e, cf.makeAggregator)),
+					nil
+			} else {
+				return nil, &ContextError{e.Name}
+			}
+		}
 
 		args := make([]CExpr, len(e.Args))
 		for i, a := range e.Args {
 			var err error
-			args[i], err = Compile(ctx, a, aggFlag)
+			args[i], err = Compile(ctx, a, agg)
 			if err != nil {
 				return nil, err
 			}
@@ -93,12 +102,12 @@ func Compile(ctx CompileContext, e Expr, aggFlag bool) (CExpr, error) {
 }
 
 type callFunc struct {
-	fn         func(ctx EvalContext, args []sql.Value) (sql.Value, error)
-	minArgs    int16
-	maxArgs    int16
-	name       string
-	handleNull bool
-	aggregrate bool
+	fn             func(ctx EvalContext, args []sql.Value) (sql.Value, error)
+	minArgs        int16
+	maxArgs        int16
+	name           string
+	handleNull     bool
+	makeAggregator MakeAggregator
 }
 
 var opFuncs = map[Op]*callFunc{
@@ -127,8 +136,8 @@ var opFuncs = map[Op]*callFunc{
 var idFuncs = map[sql.Identifier]*callFunc{
 	sql.ID("abs"):       {fn: absCall, minArgs: 1, maxArgs: 1},
 	sql.ID("concat"):    {fn: concatCall, minArgs: 2, maxArgs: math.MaxInt16, handleNull: true},
-	sql.ID("count"):     {fn: countCall, minArgs: 1, maxArgs: 1, aggregrate: true},
-	sql.ID("count_all"): {fn: countAllCall, minArgs: 0, maxArgs: 0, aggregrate: true},
+	sql.ID("count"):     {minArgs: 1, maxArgs: 1, makeAggregator: makeCountAggregator},
+	sql.ID("count_all"): {minArgs: 0, maxArgs: 0, makeAggregator: makeCountAllAggregator},
 }
 
 func init() {

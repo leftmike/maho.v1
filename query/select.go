@@ -53,6 +53,8 @@ func (er ExprResult) Column(idx int) sql.Identifier {
 			} else {
 				col = ref[1]
 			}
+		} else if call, ok := er.Expr.(*expr.Call); ok {
+			col = call.Name
 		} else {
 			col = sql.ID(fmt.Sprintf("expr%d", idx+1))
 		}

@@ -321,11 +321,3 @@ func absCall(ctx EvalContext, args []sql.Value) (sql.Value, error) {
 	}
 	return nil, fmt.Errorf("engine: want number got %v", args[0])
 }
-
-func countCall(ctx EvalContext, args []sql.Value) (sql.Value, error) {
-	return nil, nil
-}
-
-func countAllCall(ctx EvalContext, _ []sql.Value) (sql.Value, error) {
-	return nil, nil
-}
