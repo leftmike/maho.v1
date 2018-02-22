@@ -59,7 +59,12 @@ INSERT INTO [database '.'] table ['(' column [',' ...] ')']
 ```
 
 ```
-<select> = SELECT <select-list> [FROM <from-item> [',' ...]] [WHERE <expr>]
+<select> =
+    SELECT <select-list>
+    [FROM <from-item> [',' ...]]
+    [WHERE <expr>]
+    [GROUP BY <expr> [',' ...]]
+    [HAVING <expr>]
 <select-list> = '*'
     | <select-item> [',' ...]
 <select-item> = table '.' '*'
@@ -94,6 +99,13 @@ UPDATE [database '.'] table SET column '=' <expr> [',' ...] [WHERE <expr>]
     | AND | OR
 ```
 
-Functions:
+Scalar Functions:
 * `abs(<number>)`
 * `concat(<arg1>, <arg2>, ...)`
+
+Aggregate Functions:
+* `avg(<number>)`
+* `count(<arg>)` or `count(*)`
+* `max(<number>)`
+* `min(<number>)`
+* `sum(<number>)`

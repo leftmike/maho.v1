@@ -350,6 +350,8 @@ func TestParseExpr(t *testing.T) {
 		{"count(*)", "count_all()"},
 		{"count(123)", "count(123)"},
 		{"count(1,23,456)", "count(1, 23, 456)"},
+		{"x AND y AND z", "((x AND y) AND z)"},
+		{"x * y / z", "((x * y) / z)"},
 	}
 
 	for i, c := range cases {

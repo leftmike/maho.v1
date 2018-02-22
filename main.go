@@ -10,33 +10,17 @@ To Do:
 
 - clean up error messages: engine: ... or parser: ... or scanner: ..., etc
 
+- aggregate function: GROUP_CONCAT
+
 - execute DELETE
 - execute UPDATE
 
 - SELECT ... ORDER BY ...
 
 - SELECT ...
-    [GROUP BY <column-expr> [, ...]]
     [HAVING <condition>]
-- aggregate functions:, count, count_all, avg, max, min, every, some, sum, string_agg
--- aggregate function in SELECT list or a GROUP BY or a HAVING forces an aggregate context for
-   SELECT list
--- columns must be mentioned in the GROUP BY or must be within an aggregate function
--- column-expr must be *exactly* the same in the SELECT list and in the HAVING condition
--- aggregate functions must not be nested => simple context within an aggregate function
+-- aggregate function in SELECT list or a HAVING forces an aggregate context for SELECT list
 -- HAVING condition applies to GROUP BY rows, so must be an aggregate context
--- algorithm:
-for (each rows using FROM and WHERE) {
-    break into groups using column-expr in GROUP BY, and saving only the GROUP BY column-expr(s)
-    accumulate all aggregate functions in each group
-}
-// result is a Row set of column-expr(s) and aggregate results
-for (each group) {
-    if not HAVING condition using aggregate results {
-        continue
-    }
-    return SELECT list using aggregate results
-}
 */
 
 import (

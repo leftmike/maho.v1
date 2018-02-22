@@ -134,10 +134,17 @@ var opFuncs = map[Op]*callFunc{
 }
 
 var idFuncs = map[sql.Identifier]*callFunc{
-	sql.ID("abs"):       {fn: absCall, minArgs: 1, maxArgs: 1},
-	sql.ID("concat"):    {fn: concatCall, minArgs: 2, maxArgs: math.MaxInt16, handleNull: true},
+	// Scalar functions
+	sql.ID("abs"):    {fn: absCall, minArgs: 1, maxArgs: 1},
+	sql.ID("concat"): {fn: concatCall, minArgs: 2, maxArgs: math.MaxInt16, handleNull: true},
+
+	// Aggregate functions
+	sql.ID("avg"):       {minArgs: 1, maxArgs: 1, makeAggregator: makeAvgAggregator},
 	sql.ID("count"):     {minArgs: 1, maxArgs: 1, makeAggregator: makeCountAggregator},
 	sql.ID("count_all"): {minArgs: 0, maxArgs: 0, makeAggregator: makeCountAllAggregator},
+	sql.ID("max"):       {minArgs: 1, maxArgs: 1, makeAggregator: makeMaxAggregator},
+	sql.ID("min"):       {minArgs: 1, maxArgs: 1, makeAggregator: makeMinAggregator},
+	sql.ID("sum"):       {minArgs: 1, maxArgs: 1, makeAggregator: makeSumAggregator},
 }
 
 func init() {

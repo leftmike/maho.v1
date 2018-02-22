@@ -720,7 +720,8 @@ func (p *parser) parseValues() *stmt.Values {
 }
 
 /*
-<select> = SELECT <select-list>
+<select> =
+    SELECT <select-list>
     [FROM <from-item> [',' ...]]
     [WHERE <expr>]
     [GROUP BY <expr> [',' ...]]
