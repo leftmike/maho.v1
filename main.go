@@ -16,10 +16,6 @@ To Do:
 - execute UPDATE
 
 - SELECT ... ORDER BY ...
-
-- SELECT ...
-    [HAVING <condition>]
--- HAVING condition applies to GROUP BY rows, so must be an aggregate context
 */
 
 import (

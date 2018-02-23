@@ -121,39 +121,57 @@ func (gr *groupRows) Next(dest []sql.Value) error {
 
 type groupContext struct {
 	group       []expr.Expr
+	groupExprs  []expr2dest
+	groupCols   []sql.Identifier
 	groupRefs   []bool
 	aggregators []*expr.Call
 	makers      []expr.MakeAggregator
 }
 
-func (gc *groupContext) CompileRef(r expr.Ref) (int, error) {
+func (_ *groupContext) CompileRef(r expr.Ref) (int, error) {
 	return 0, fmt.Errorf("engine: column \"%s\" must appear in a GROUP BY clause or in an "+
 		"aggregate function", r)
 }
 
-func (gc *groupContext) MaybeRefExpr(e expr.Expr) (int, bool) {
-	for gdx, ge := range gc.group {
-		if gc.groupRefs[gdx] && e.Equal(ge) {
+func (gctx *groupContext) MaybeRefExpr(e expr.Expr) (int, bool) {
+	for gdx, ge := range gctx.group {
+		if gctx.groupRefs[gdx] && e.Equal(ge) {
 			return gdx, true
 		}
 	}
 	return 0, false
 }
 
-func (gc *groupContext) CompileAggregator(c *expr.Call, maker expr.MakeAggregator) int {
-	for adx, ae := range gc.aggregators {
+func (gctx *groupContext) CompileAggregator(c *expr.Call, maker expr.MakeAggregator) int {
+	for adx, ae := range gctx.aggregators {
 		if ae.Equal(c) {
-			return adx + len(gc.group)
+			return adx + len(gctx.group)
 		}
 	}
-	gc.aggregators = append(gc.aggregators, c)
-	gc.makers = append(gc.makers, maker)
-	return len(gc.group) + len(gc.aggregators) - 1
+	gctx.aggregators = append(gctx.aggregators, c)
+	gctx.makers = append(gctx.makers, maker)
+	return len(gctx.group) + len(gctx.aggregators) - 1
 }
 
-func group(rows db.Rows, fctx *fromContext, results []SelectResult, group []expr.Expr,
-	having expr.Expr) (db.Rows, error) {
+func (gctx *groupContext) makeGroupRows(rows db.Rows, fctx *fromContext) (db.Rows, error) {
 
+	gr := &groupRows{rows: rows, columns: gctx.groupCols, groupExprs: gctx.groupExprs}
+	for idx := range gctx.aggregators {
+		agg := aggregator{maker: gctx.makers[idx]}
+		for _, a := range gctx.aggregators[idx].Args {
+			ce, err := expr.Compile(fctx, a, false)
+			if err != nil {
+				return nil, err
+			}
+			agg.args = append(agg.args, ce)
+		}
+		gr.aggregators = append(gr.aggregators, agg)
+		gr.columns = append(gr.columns, sql.ID(fmt.Sprintf("agg%d", len(gr.columns)+1)))
+	}
+	return gr, nil
+}
+
+func makeGroupContext(fctx *fromContext, group []expr.Expr) (*groupContext, error) {
 	var groupExprs []expr2dest
 	var groupCols []sql.Identifier
 	var groupRefs []bool
@@ -173,9 +191,18 @@ func group(rows db.Rows, fctx *fromContext, results []SelectResult, group []expr
 		ddx += 1
 	}
 
+	return &groupContext{group: group, groupExprs: groupExprs, groupCols: groupCols,
+		groupRefs: groupRefs}, nil
+
+}
+
+func group(rows db.Rows, fctx *fromContext, results []SelectResult, group []expr.Expr,
+	having expr.Expr) (db.Rows, error) {
+
+	gctx, err := makeGroupContext(fctx, group)
+
 	var destExprs []expr2dest
 	var resultCols []sql.Identifier
-	gctx := &groupContext{group: group, groupRefs: groupRefs}
 	for ddx, sr := range results {
 		er, ok := sr.(ExprResult)
 		if !ok {
@@ -189,19 +216,22 @@ func group(rows db.Rows, fctx *fromContext, results []SelectResult, group []expr
 		resultCols = append(resultCols, er.Column(len(resultCols)))
 	}
 
-	grows := &groupRows{rows: rows, columns: groupCols, groupExprs: groupExprs}
-	for idx := range gctx.aggregators {
-		agg := aggregator{maker: gctx.makers[idx]}
-		for _, a := range gctx.aggregators[idx].Args {
-			ce, err := expr.Compile(fctx, a, false)
-			if err != nil {
-				return nil, err
-			}
-			agg.args = append(agg.args, ce)
+	var hce expr.CExpr
+	if having != nil {
+		hce, err = expr.Compile(gctx, having, true)
+		if err != nil {
+			return nil, err
 		}
-		grows.aggregators = append(grows.aggregators, agg)
-		grows.columns = append(grows.columns, sql.ID(fmt.Sprintf("agg%d", len(grows.columns)+1)))
 	}
 
-	return makeResultRows(grows, resultCols, destExprs), nil
+	rows, err = gctx.makeGroupRows(rows, fctx)
+	if err != nil {
+		return nil, err
+	}
+
+	if having != nil {
+		rows = &filterRows{rows: rows, cond: hce}
+	}
+
+	return makeResultRows(rows, resultCols, destExprs), nil
 }

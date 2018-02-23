@@ -158,35 +158,35 @@ func (fs FromSelect) rows(e *engine.Engine) (db.Rows, *fromContext, error) {
 	return rows, makeFromContext(fs.Alias, cols), nil
 }
 
-type whereRows struct {
+type filterRows struct {
 	rows db.Rows
 	cond expr.CExpr
 	dest []sql.Value
 }
 
-func (wr *whereRows) EvalRef(idx int) sql.Value {
-	return wr.dest[idx]
+func (fr *filterRows) EvalRef(idx int) sql.Value {
+	return fr.dest[idx]
 }
 
-func (wr *whereRows) Columns() []sql.Identifier {
-	return wr.rows.Columns()
+func (fr *filterRows) Columns() []sql.Identifier {
+	return fr.rows.Columns()
 }
 
-func (wr *whereRows) Close() error {
-	return wr.rows.Close()
+func (fr *filterRows) Close() error {
+	return fr.rows.Close()
 }
 
-func (wr *whereRows) Next(dest []sql.Value) error {
+func (fr *filterRows) Next(dest []sql.Value) error {
 	for {
-		err := wr.rows.Next(dest)
+		err := fr.rows.Next(dest)
 		if err != nil {
 			return err
 		}
-		wr.dest = dest
+		fr.dest = dest
 		defer func() {
-			wr.dest = nil
+			fr.dest = nil
 		}()
-		v, err := wr.cond.Eval(wr)
+		v, err := fr.cond.Eval(fr)
 		if err != nil {
 			return err
 		}
@@ -210,7 +210,7 @@ func where(rows db.Rows, fctx *fromContext, cond expr.Expr) (db.Rows, error) {
 	if err != nil {
 		return nil, err
 	}
-	return &whereRows{rows: rows, cond: ce}, nil
+	return &filterRows{rows: rows, cond: ce}, nil
 }
 
 type oneEmptyRow struct {
