@@ -154,10 +154,6 @@ func (gc *groupContext) CompileAggregator(c *expr.Call, maker expr.MakeAggregato
 func group(rows db.Rows, fctx *fromContext, results []SelectResult, group []expr.Expr,
 	having expr.Expr) (db.Rows, error) {
 
-	if group == nil {
-		panic("GroupBy == nil is not implemented")
-	}
-
 	var groupExprs []expr2dest
 	var groupCols []sql.Identifier
 	var groupRefs []bool

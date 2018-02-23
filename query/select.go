@@ -132,9 +132,9 @@ func (stmt *Select) Rows(e *engine.Engine) (db.Rows, error) {
 		return nil, err
 	}
 	if stmt.GroupBy == nil && stmt.Having == nil {
-		rows, err = results(rows, fctx, stmt.Results)
+		rrows, err := results(rows, fctx, stmt.Results)
 		if err == nil {
-			return rows, nil
+			return rrows, nil
 		} else if _, ok := err.(*expr.ContextError); !ok {
 			return nil, err
 		}

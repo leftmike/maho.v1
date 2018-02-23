@@ -19,7 +19,6 @@ To Do:
 
 - SELECT ...
     [HAVING <condition>]
--- aggregate function in SELECT list or a HAVING forces an aggregate context for SELECT list
 -- HAVING condition applies to GROUP BY rows, so must be an aggregate context
 */
 
