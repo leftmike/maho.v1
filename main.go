@@ -8,10 +8,6 @@ To Do:
 
 - fuzzing: parser.Parse
 
-- clean up error messages: engine: ... or parser: ... or scanner: ..., etc
-
-- aggregate function: GROUP_CONCAT
-
 - execute DELETE
 - execute UPDATE
 

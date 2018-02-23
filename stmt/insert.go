@@ -65,7 +65,7 @@ func (stmt *InsertValues) Execute(e *engine.Engine) (int64, error) {
 	}
 	tbl, ok := t.(db.TableInsert)
 	if !ok {
-		return 0, fmt.Errorf("\"%s.%s\" table can't be modified", dbase.Name(), t.Name())
+		return 0, fmt.Errorf("engine: table \"%s.%s\" can't be modified", dbase.Name(), t.Name())
 	}
 
 	cols := tbl.Columns()
@@ -123,7 +123,7 @@ func (stmt *InsertValues) Execute(e *engine.Engine) (int64, error) {
 
 			row[i], err = c.ConvertValue(cols[i], v)
 			if err != nil {
-				return 0, fmt.Errorf("%s: %s", tbl.Name(), err.Error())
+				return 0, fmt.Errorf("engine: table \"%s\": %s", tbl.Name(), err.Error())
 			}
 		}
 

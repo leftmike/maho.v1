@@ -55,12 +55,11 @@ INSERT INTO [database '.'] table ['(' column [',' ...] ')']
 ```
 
 ```
-<values> = VALUES '(' <expr> [',' ...] ')' [',' ...]
+VALUES '(' <expr> [',' ...] ')' [',' ...]
 ```
 
 ```
-<select> =
-    SELECT <select-list>
+SELECT <select-list>
     [FROM <from-item> [',' ...]]
     [WHERE <expr>]
     [GROUP BY <expr> [',' ...]]

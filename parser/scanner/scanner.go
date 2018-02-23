@@ -164,7 +164,7 @@ SkipWhitespace:
 			if r, ok := token.Operators[s.buffer.String()]; ok {
 				return r
 			}
-			sctx.Error = fmt.Errorf("unexpected operator %s", s.buffer.String())
+			sctx.Error = fmt.Errorf("scanner: unexpected operator %s", s.buffer.String())
 			return token.Error
 		} else {
 			s.unreadRune()
@@ -174,7 +174,7 @@ SkipWhitespace:
 		return r
 	}
 
-	sctx.Error = fmt.Errorf("unexpected character '%c'", r)
+	sctx.Error = fmt.Errorf("scanner: unexpected character '%c'", r)
 	return token.Error
 }
 
@@ -271,7 +271,7 @@ func (s *Scanner) scanQuotedIdentifier(sctx *ScanCtx, delim rune) rune {
 	for {
 		r := s.readRune(sctx)
 		if r == token.EOF {
-			sctx.Error = fmt.Errorf("quoted identifier missing terminating '%c'", delim)
+			sctx.Error = fmt.Errorf("scanner: quoted identifier missing terminating '%c'", delim)
 			return token.Error
 		}
 		if r == token.Error {
@@ -291,7 +291,7 @@ func (s *Scanner) scanString(sctx *ScanCtx) rune {
 	for {
 		r := s.readRune(sctx)
 		if r == token.EOF {
-			sctx.Error = fmt.Errorf("string missing terminating \"'\"")
+			sctx.Error = fmt.Errorf("scanner: string missing terminating \"'\"")
 			return token.Error
 		}
 		if r == token.Error {
@@ -303,7 +303,7 @@ func (s *Scanner) scanString(sctx *ScanCtx) rune {
 		if r == '\\' {
 			r = s.readRune(sctx)
 			if r == token.EOF {
-				sctx.Error = fmt.Errorf("incomplete string escape")
+				sctx.Error = fmt.Errorf("scanner: incomplete string escape")
 				return token.Error
 			}
 			if r == token.Error {

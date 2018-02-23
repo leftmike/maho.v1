@@ -136,7 +136,8 @@ func (jr *joinRows) onMatch(dest []sql.Value) (bool, error) {
 	}
 	b, ok := v.(sql.BoolValue)
 	if !ok {
-		return true, fmt.Errorf("expected boolean result from ON condition: %s", sql.Format(v))
+		return true, fmt.Errorf("engine: expected boolean result from ON condition: %s",
+			sql.Format(v))
 	}
 	if b {
 		jr.leftUsed = true

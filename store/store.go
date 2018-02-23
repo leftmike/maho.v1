@@ -34,7 +34,7 @@ func Open(typ string, name string) (db.Database, error) {
 	if store, ok := stores[typ]; ok {
 		return store.Open(name)
 	}
-	return nil, fmt.Errorf("store %s not found", typ)
+	return nil, fmt.Errorf("store: \"%s\" not found", typ)
 }
 
 func Stores() []string {

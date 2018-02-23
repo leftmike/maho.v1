@@ -38,7 +38,7 @@ func (stmt *DropTable) Execute(e *engine.Engine) (int64, error) {
 		}
 		dbase, ok := d.(db.DatabaseModify)
 		if !ok {
-			return 0, fmt.Errorf("\"%s\" database can't be modified", d.Name())
+			return 0, fmt.Errorf("engine: database \"%s\" can't be modified", d.Name())
 		}
 		err = dbase.DropTable(tbl.Table, stmt.IfExists)
 		if err != nil {

@@ -62,7 +62,7 @@ func (p *parser) Parse() (stmt stmt.Stmt, err error) {
 }
 
 func (p *parser) error(msg string) {
-	panic(fmt.Errorf("%s: %s", p.sctx.Position, msg))
+	panic(fmt.Errorf("parser: %s: %s", p.sctx.Position, msg))
 }
 
 func (p *parser) scan() rune {

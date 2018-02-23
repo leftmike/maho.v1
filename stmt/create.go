@@ -44,7 +44,7 @@ func (stmt *CreateTable) Execute(e *engine.Engine) (int64, error) {
 	}
 	dbase, ok := d.(db.DatabaseModify)
 	if !ok {
-		return 0, fmt.Errorf("\"%s\" database can't be modified", d.Name())
+		return 0, fmt.Errorf("engine: database \"%s\" can't be modified", d.Name())
 	}
 	return 0, dbase.CreateTable(stmt.Table.Table, stmt.Columns, stmt.ColumnTypes)
 }
