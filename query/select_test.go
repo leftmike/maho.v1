@@ -9,6 +9,20 @@ import (
 	"github.com/leftmike/maho/testutil"
 )
 
+func TestSelectString(t *testing.T) {
+	s := query.Select{
+		From: query.FromTableAlias{
+			Database: sql.ID("db"),
+			Table:    sql.ID("tbl"),
+			Alias:    sql.ID("alias"),
+		},
+	}
+	r := "SELECT * FROM db.tbl AS alias"
+	if s.String() != r {
+		t.Errorf("Select{}.String() got %s want %s", s.String(), r)
+	}
+}
+
 func TestSelect(t *testing.T) {
 	cases := []struct {
 		stmt query.Select

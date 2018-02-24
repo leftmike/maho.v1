@@ -6,9 +6,6 @@ To Do:
 - update t.Errorf to be "Operation(args) got %s want %s" and use %q for args
 - or "Operation(args) failed with %s" or "Operation(args) did not fail"
 
-- move some common types like TableName, TableAlias, etc to the sql package instead of duplicating
-    in both stmt and query
-
 - fuzzing: parser.Parse
 
 - execute UPDATE

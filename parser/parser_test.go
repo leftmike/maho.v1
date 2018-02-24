@@ -118,7 +118,7 @@ func TestCreateTable(t *testing.T) {
 		{
 			sql: "create table t (c1 int2, c2 smallint, c3 int4, c4 integer, c5 bigint, c6 int8)",
 			stmt: stmt.CreateTable{
-				Table: stmt.TableName{Table: sql.ID("t")},
+				Table: sql.TableName{Table: sql.ID("t")},
 				Columns: []sql.Identifier{sql.ID("c1"), sql.ID("c2"), sql.ID("c3"), sql.ID("c4"),
 					sql.ID("c5"), sql.ID("c6")},
 				ColumnTypes: []db.ColumnType{
@@ -134,7 +134,7 @@ func TestCreateTable(t *testing.T) {
 		{
 			sql: "create table t (b1 bool, b2 boolean, d1 double, d2 double)",
 			stmt: stmt.CreateTable{
-				Table:   stmt.TableName{Table: sql.ID("t")},
+				Table:   sql.TableName{Table: sql.ID("t")},
 				Columns: []sql.Identifier{sql.ID("b1"), sql.ID("b2"), sql.ID("d1"), sql.ID("d2")},
 				ColumnTypes: []db.ColumnType{
 					{Type: sql.BooleanType, Size: 1},
@@ -147,7 +147,7 @@ func TestCreateTable(t *testing.T) {
 		{
 			sql: "create table t (b1 binary, b2 varbinary(123), b3 blob)",
 			stmt: stmt.CreateTable{
-				Table:   stmt.TableName{Table: sql.ID("t")},
+				Table:   sql.TableName{Table: sql.ID("t")},
 				Columns: []sql.Identifier{sql.ID("b1"), sql.ID("b2"), sql.ID("b3")},
 				ColumnTypes: []db.ColumnType{
 					{Type: sql.CharacterType, Fixed: true, Binary: true, Size: 1},
@@ -159,7 +159,7 @@ func TestCreateTable(t *testing.T) {
 		{
 			sql: "create table t (b1 binary(123), b2 varbinary(456), b3 blob(789))",
 			stmt: stmt.CreateTable{
-				Table:   stmt.TableName{Table: sql.ID("t")},
+				Table:   sql.TableName{Table: sql.ID("t")},
 				Columns: []sql.Identifier{sql.ID("b1"), sql.ID("b2"), sql.ID("b3")},
 				ColumnTypes: []db.ColumnType{
 					{Type: sql.CharacterType, Fixed: true, Binary: true, Size: 123},
@@ -171,7 +171,7 @@ func TestCreateTable(t *testing.T) {
 		{
 			sql: "create table t (c1 char, c2 varchar(123), c3 text)",
 			stmt: stmt.CreateTable{
-				Table:   stmt.TableName{Table: sql.ID("t")},
+				Table:   sql.TableName{Table: sql.ID("t")},
 				Columns: []sql.Identifier{sql.ID("c1"), sql.ID("c2"), sql.ID("c3")},
 				ColumnTypes: []db.ColumnType{
 					{Type: sql.CharacterType, Fixed: true, Size: 1},
@@ -183,7 +183,7 @@ func TestCreateTable(t *testing.T) {
 		{
 			sql: "create table t (c1 char(123), c2 varchar(456), c3 text(789))",
 			stmt: stmt.CreateTable{
-				Table:   stmt.TableName{Table: sql.ID("t")},
+				Table:   sql.TableName{Table: sql.ID("t")},
 				Columns: []sql.Identifier{sql.ID("c1"), sql.ID("c2"), sql.ID("c3")},
 				ColumnTypes: []db.ColumnType{
 					{Type: sql.CharacterType, Fixed: true, Size: 123},
@@ -195,7 +195,7 @@ func TestCreateTable(t *testing.T) {
 		{
 			sql: "create table t (c1 varchar(64) default 'abcd', c2 int default 123)",
 			stmt: stmt.CreateTable{
-				Table:   stmt.TableName{Table: sql.ID("t")},
+				Table:   sql.TableName{Table: sql.ID("t")},
 				Columns: []sql.Identifier{sql.ID("c1"), sql.ID("c2")},
 				ColumnTypes: []db.ColumnType{
 					{Type: sql.CharacterType, Fixed: false, Size: 64,
@@ -207,7 +207,7 @@ func TestCreateTable(t *testing.T) {
 		{
 			sql: "create table t (c1 boolean default true, c2 boolean not null)",
 			stmt: stmt.CreateTable{
-				Table:   stmt.TableName{Table: sql.ID("t")},
+				Table:   sql.TableName{Table: sql.ID("t")},
 				Columns: []sql.Identifier{sql.ID("c1"), sql.ID("c2")},
 				ColumnTypes: []db.ColumnType{
 					{Type: sql.BooleanType, Size: 1, Default: expr.True()},
@@ -219,7 +219,7 @@ func TestCreateTable(t *testing.T) {
 			sql: `create table t (c1 boolean default true not null,
 c2 boolean not null default true)`,
 			stmt: stmt.CreateTable{
-				Table:   stmt.TableName{Table: sql.ID("t")},
+				Table:   sql.TableName{Table: sql.ID("t")},
 				Columns: []sql.Identifier{sql.ID("c1"), sql.ID("c2")},
 				ColumnTypes: []db.ColumnType{
 					{Type: sql.BooleanType, Size: 1, Default: expr.True(), NotNull: true},
@@ -270,7 +270,7 @@ func TestInsertValues(t *testing.T) {
 		{
 			sql: "insert into t values (1, 'abc', true)",
 			stmt: stmt.InsertValues{
-				Table: stmt.TableName{Table: sql.ID("t")},
+				Table: sql.TableName{Table: sql.ID("t")},
 				Rows: [][]expr.Expr{
 					{expr.Int64Literal(1), expr.StringLiteral("abc"), expr.True()},
 				},
@@ -279,7 +279,7 @@ func TestInsertValues(t *testing.T) {
 		{
 			sql: "insert into t values (1, 'abc', true), (2, 'def', false)",
 			stmt: stmt.InsertValues{
-				Table: stmt.TableName{Table: sql.ID("t")},
+				Table: sql.TableName{Table: sql.ID("t")},
 				Rows: [][]expr.Expr{
 					{expr.Int64Literal(1), expr.StringLiteral("abc"), expr.True()},
 					{expr.Int64Literal(2), expr.StringLiteral("def"), expr.False()},
@@ -289,7 +289,7 @@ func TestInsertValues(t *testing.T) {
 		{
 			sql: "insert into t values (NULL, 'abc', NULL)",
 			stmt: stmt.InsertValues{
-				Table: stmt.TableName{Table: sql.ID("t")},
+				Table: sql.TableName{Table: sql.ID("t")},
 				Rows: [][]expr.Expr{
 					{expr.Nil(), expr.StringLiteral("abc"), expr.Nil()},
 				},
@@ -386,7 +386,7 @@ func TestParseExpr(t *testing.T) {
 func TestSelect(t *testing.T) {
 	cases := []struct {
 		sql  string
-		stmt stmt.Select
+		stmt query.Select
 		fail bool
 	}{
 		{sql: "select", fail: true},
@@ -396,17 +396,17 @@ func TestSelect(t *testing.T) {
 		{sql: "select t.c, c, * from t", fail: true},
 		{
 			sql:  "select *",
-			stmt: stmt.Select{},
+			stmt: query.Select{},
 		},
 		{
 			sql: "select * from t",
-			stmt: stmt.Select{
+			stmt: query.Select{
 				From: query.FromTableAlias{Table: sql.ID("t")},
 			},
 		},
 		{
 			sql: "select * from t where x > 1",
-			stmt: stmt.Select{
+			stmt: query.Select{
 				From: query.FromTableAlias{Table: sql.ID("t")},
 				Where: &expr.Binary{expr.GreaterThanOp, expr.Ref{sql.ID("x")},
 					expr.Int64Literal(1)},
@@ -414,7 +414,7 @@ func TestSelect(t *testing.T) {
 		},
 		{
 			sql: "select c from t",
-			stmt: stmt.Select{
+			stmt: query.Select{
 				From: query.FromTableAlias{Table: sql.ID("t")},
 				Results: []query.SelectResult{
 					query.ExprResult{Expr: expr.Ref{sql.ID("c")}},
@@ -423,7 +423,7 @@ func TestSelect(t *testing.T) {
 		},
 		{
 			sql: "select c1, c2, t.c3 from t",
-			stmt: stmt.Select{
+			stmt: query.Select{
 				From: query.FromTableAlias{Table: sql.ID("t")},
 				Results: []query.SelectResult{
 					query.ExprResult{Expr: expr.Ref{sql.ID("c1")}},
@@ -434,7 +434,7 @@ func TestSelect(t *testing.T) {
 		},
 		{
 			sql: "select t.*, c1, c2 from t",
-			stmt: stmt.Select{
+			stmt: query.Select{
 				From: query.FromTableAlias{Table: sql.ID("t")},
 				Results: []query.SelectResult{
 					query.TableResult{sql.ID("t")},
@@ -445,7 +445,7 @@ func TestSelect(t *testing.T) {
 		},
 		{
 			sql: "select c1, t.*, c2 from t",
-			stmt: stmt.Select{
+			stmt: query.Select{
 				From: query.FromTableAlias{Table: sql.ID("t")},
 				Results: []query.SelectResult{
 					query.ExprResult{Expr: expr.Ref{sql.ID("c1")}},
@@ -456,7 +456,7 @@ func TestSelect(t *testing.T) {
 		},
 		{
 			sql: "select c1, c2, t.* from t",
-			stmt: stmt.Select{
+			stmt: query.Select{
 				From: query.FromTableAlias{Table: sql.ID("t")},
 				Results: []query.SelectResult{
 					query.ExprResult{Expr: expr.Ref{sql.ID("c1")}},
@@ -467,7 +467,7 @@ func TestSelect(t *testing.T) {
 		},
 		{
 			sql: "select t2.c1 as a1, c2 as a2 from t",
-			stmt: stmt.Select{
+			stmt: query.Select{
 				From: query.FromTableAlias{Table: sql.ID("t")},
 				Results: []query.SelectResult{
 					query.ExprResult{
@@ -480,7 +480,7 @@ func TestSelect(t *testing.T) {
 		},
 		{
 			sql: "select t2.c1 a1, c2 a2 from t",
-			stmt: stmt.Select{
+			stmt: query.Select{
 				From: query.FromTableAlias{Table: sql.ID("t")},
 				Results: []query.SelectResult{
 					query.ExprResult{
@@ -493,7 +493,7 @@ func TestSelect(t *testing.T) {
 		},
 		{
 			sql: "select c1 + c2 as a from t",
-			stmt: stmt.Select{
+			stmt: query.Select{
 				From: query.FromTableAlias{Table: sql.ID("t")},
 				Results: []query.SelectResult{
 					query.ExprResult{
@@ -506,7 +506,7 @@ func TestSelect(t *testing.T) {
 		},
 		{
 			sql: "select t1.c1, t2.c2 from t1, t2",
-			stmt: stmt.Select{
+			stmt: query.Select{
 				From: query.FromJoin{
 					Left:  query.FromTableAlias{Table: sql.ID("t1")},
 					Right: query.FromTableAlias{Table: sql.ID("t2")},
@@ -520,7 +520,7 @@ func TestSelect(t *testing.T) {
 		},
 		{
 			sql: "select * from t1, t2, t3",
-			stmt: stmt.Select{
+			stmt: query.Select{
 				From: query.FromJoin{
 					Left: query.FromJoin{
 						Left:  query.FromTableAlias{Table: sql.ID("t1")},
@@ -534,7 +534,7 @@ func TestSelect(t *testing.T) {
 		},
 		{
 			sql: "select * from t1 join t2 using (c1), t3",
-			stmt: stmt.Select{
+			stmt: query.Select{
 				From: query.FromJoin{
 					Left: query.FromJoin{
 						Left:  query.FromTableAlias{Table: sql.ID("t1")},
@@ -549,7 +549,7 @@ func TestSelect(t *testing.T) {
 		},
 		{
 			sql: "select * from (t1, t2) right join t3 using (c1)",
-			stmt: stmt.Select{
+			stmt: query.Select{
 				From: query.FromJoin{
 					Left: query.FromJoin{
 						Left:  query.FromTableAlias{Table: sql.ID("t1")},
@@ -564,7 +564,7 @@ func TestSelect(t *testing.T) {
 		},
 		{
 			sql: "select * from t1 inner join t2 on c1 > 5",
-			stmt: stmt.Select{
+			stmt: query.Select{
 				From: query.FromJoin{
 					Left:  query.FromTableAlias{Table: sql.ID("t1")},
 					Right: query.FromTableAlias{Table: sql.ID("t2")},
@@ -576,7 +576,7 @@ func TestSelect(t *testing.T) {
 		},
 		{
 			sql: "select * from t1 inner join t2 using (c1, c2, c3)",
-			stmt: stmt.Select{
+			stmt: query.Select{
 				From: query.FromJoin{
 					Left:  query.FromTableAlias{Table: sql.ID("t1")},
 					Right: query.FromTableAlias{Table: sql.ID("t2")},
@@ -596,7 +596,7 @@ func TestSelect(t *testing.T) {
 		{sql: "select * from t1 inner join t2 using (c1, c1)", fail: true},
 		{
 			sql: "select * from (select * from t1) as s1 join t2 using (c1)",
-			stmt: stmt.Select{
+			stmt: query.Select{
 				From: query.FromJoin{
 					Left: query.FromSelect{
 						Select: query.Select{
@@ -612,7 +612,7 @@ func TestSelect(t *testing.T) {
 		},
 		{
 			sql: "select * from t2 join (values (1, 'abc', true)) as v1 using (c1, c2)",
-			stmt: stmt.Select{
+			stmt: query.Select{
 				From: query.FromJoin{
 					Left: query.FromTableAlias{Table: sql.ID("t2")},
 					Right: query.FromValues{
@@ -631,7 +631,7 @@ func TestSelect(t *testing.T) {
 		{
 			sql: "select * from (select * from t1) s1 join (values (1, 'abc', true)) as v1 " +
 				"using (c1, c2)",
-			stmt: stmt.Select{
+			stmt: query.Select{
 				From: query.FromJoin{
 					Left: query.FromSelect{
 						Select: query.Select{
@@ -659,7 +659,7 @@ func TestSelect(t *testing.T) {
 		{sql: "select * from (values (1, 'abc', true)) as v1 (a b)", fail: true},
 		{
 			sql: "select * from (values (1, 'abc', true)) as v1",
-			stmt: stmt.Select{
+			stmt: query.Select{
 				From: query.FromValues{
 					Values: query.Values{
 						Expressions: [][]expr.Expr{
@@ -672,7 +672,7 @@ func TestSelect(t *testing.T) {
 		},
 		{
 			sql: "select * from (values (1, 'abc', true)) as v1 (c1, c2, c3)",
-			stmt: stmt.Select{
+			stmt: query.Select{
 				From: query.FromValues{
 					Values: query.Values{
 						Expressions: [][]expr.Expr{
@@ -691,7 +691,7 @@ func TestSelect(t *testing.T) {
 		{sql: "select * from (select * from t1) as s1 (a b)", fail: true},
 		{
 			sql: "select * from (select * from t1) as s1",
-			stmt: stmt.Select{
+			stmt: query.Select{
 				From: query.FromSelect{
 					Select: query.Select{
 						From: query.FromTableAlias{Table: sql.ID("t1")},
@@ -702,7 +702,7 @@ func TestSelect(t *testing.T) {
 		},
 		{
 			sql: "select * from (select * from t1) as s1 (c1)",
-			stmt: stmt.Select{
+			stmt: query.Select{
 				From: query.FromSelect{
 					Select: query.Select{
 						From: query.FromTableAlias{Table: sql.ID("t1")},
@@ -714,7 +714,7 @@ func TestSelect(t *testing.T) {
 		},
 		{
 			sql: "select * from (select * from t1) as s1 (c1, c2)",
-			stmt: stmt.Select{
+			stmt: query.Select{
 				From: query.FromSelect{
 					Select: query.Select{
 						From: query.FromTableAlias{Table: sql.ID("t1")},
@@ -726,7 +726,7 @@ func TestSelect(t *testing.T) {
 		},
 		{
 			sql: "select * from (select * from t1) as s1 (c1, c2, c3)",
-			stmt: stmt.Select{
+			stmt: query.Select{
 				From: query.FromSelect{
 					Select: query.Select{
 						From: query.FromTableAlias{Table: sql.ID("t1")},
@@ -744,7 +744,7 @@ func TestSelect(t *testing.T) {
 		{sql: "select c from t group by c, d, having c > 5", fail: true},
 		{
 			sql: "select c from t group by c",
-			stmt: stmt.Select{
+			stmt: query.Select{
 				From: query.FromTableAlias{Table: sql.ID("t")},
 				Results: []query.SelectResult{
 					query.ExprResult{Expr: expr.Ref{sql.ID("c")}},
@@ -754,7 +754,7 @@ func TestSelect(t *testing.T) {
 		},
 		{
 			sql: "select c from t group by c, d, e + f",
-			stmt: stmt.Select{
+			stmt: query.Select{
 				From: query.FromTableAlias{Table: sql.ID("t")},
 				Results: []query.SelectResult{
 					query.ExprResult{Expr: expr.Ref{sql.ID("c")}},
@@ -766,7 +766,7 @@ func TestSelect(t *testing.T) {
 		},
 		{
 			sql: "select c from t group by c having c > 1",
-			stmt: stmt.Select{
+			stmt: query.Select{
 				From: query.FromTableAlias{Table: sql.ID("t")},
 				Results: []query.SelectResult{
 					query.ExprResult{Expr: expr.Ref{sql.ID("c")}},
@@ -789,7 +789,7 @@ func TestSelect(t *testing.T) {
 			var trc string
 			if err != nil {
 				t.Errorf("Parse(%q) failed with %s", c.sql, err)
-			} else if ss, ok := ss.(*stmt.Select); !ok || !testutil.DeepEqual(&c.stmt, ss, &trc) {
+			} else if ss, ok := ss.(*query.Select); !ok || !testutil.DeepEqual(&c.stmt, ss, &trc) {
 				t.Errorf("Parse(%q) got %s want %s\n%s", c.sql, ss.String(), c.stmt.String(), trc)
 			}
 		}
@@ -799,7 +799,7 @@ func TestSelect(t *testing.T) {
 func TestValues(t *testing.T) {
 	cases := []struct {
 		sql  string
-		stmt stmt.Values
+		stmt query.Values
 		fail bool
 	}{
 		{sql: "values", fail: true},
@@ -812,7 +812,7 @@ func TestValues(t *testing.T) {
 		{sql: "values (1, 2, 3), (4, 5), (6, 7, 8)", fail: true},
 		{
 			sql: "values (1, 'abc', true)",
-			stmt: stmt.Values{
+			stmt: query.Values{
 				Expressions: [][]expr.Expr{
 					{expr.Int64Literal(1), expr.StringLiteral("abc"), expr.True()},
 				},
@@ -820,7 +820,7 @@ func TestValues(t *testing.T) {
 		},
 		{
 			sql: "values (1, 'abc', true), (2, 'def', false)",
-			stmt: stmt.Values{
+			stmt: query.Values{
 				Expressions: [][]expr.Expr{
 					{expr.Int64Literal(1), expr.StringLiteral("abc"), expr.True()},
 					{expr.Int64Literal(2), expr.StringLiteral("def"), expr.False()},
@@ -840,7 +840,7 @@ func TestValues(t *testing.T) {
 			var trc string
 			if err != nil {
 				t.Errorf("Parse(%q) failed with %s", c.sql, err)
-			} else if vs, ok := vs.(*stmt.Values); !ok || !testutil.DeepEqual(&c.stmt, vs, &trc) {
+			} else if vs, ok := vs.(*query.Values); !ok || !testutil.DeepEqual(&c.stmt, vs, &trc) {
 				t.Errorf("Parse(%q) got %s want %s: %s\n", c.sql, vs.String(), c.stmt.String(),
 					trc)
 			}
@@ -851,7 +851,7 @@ func TestValues(t *testing.T) {
 func TestDelete(t *testing.T) {
 	cases := []struct {
 		sql  string
-		stmt stmt.Delete
+		stmt query.Delete
 		fail bool
 	}{
 		{sql: "delete", fail: true},
@@ -861,14 +861,14 @@ func TestDelete(t *testing.T) {
 		{sql: "delete from t where", fail: true},
 		{
 			sql: "delete from t",
-			stmt: stmt.Delete{
-				Table: query.TableName{Table: sql.ID("t")},
+			stmt: query.Delete{
+				Table: sql.TableName{Table: sql.ID("t")},
 			},
 		},
 		{
 			sql: "delete from t where c > 1",
-			stmt: stmt.Delete{
-				Table: query.TableName{Table: sql.ID("t")},
+			stmt: query.Delete{
+				Table: sql.TableName{Table: sql.ID("t")},
 				Where: &expr.Binary{expr.GreaterThanOp, expr.Ref{sql.ID("c")},
 					expr.Int64Literal(1)},
 			},
@@ -886,7 +886,7 @@ func TestDelete(t *testing.T) {
 			var trc string
 			if err != nil {
 				t.Errorf("Parse(%q) failed with %s", c.sql, err)
-			} else if ds, ok := ds.(*stmt.Delete); !ok || !testutil.DeepEqual(&c.stmt, ds, &trc) {
+			} else if ds, ok := ds.(*query.Delete); !ok || !testutil.DeepEqual(&c.stmt, ds, &trc) {
 				t.Errorf("Parse(%q) got %s want %s\n%s", c.sql, ds.String(), c.stmt.String(), trc)
 			}
 		}
@@ -896,7 +896,7 @@ func TestDelete(t *testing.T) {
 func TestUpdate(t *testing.T) {
 	cases := []struct {
 		sql  string
-		stmt stmt.Update
+		stmt query.Update
 		fail bool
 	}{
 		{sql: "update", fail: true},
@@ -910,18 +910,18 @@ func TestUpdate(t *testing.T) {
 		{sql: "update t set where c = 6", fail: true},
 		{
 			sql: "update t set c = 5",
-			stmt: stmt.Update{
-				Table: stmt.TableName{Table: sql.ID("t")},
-				ColumnUpdates: []stmt.ColumnUpdate{
+			stmt: query.Update{
+				Table: sql.TableName{Table: sql.ID("t")},
+				ColumnUpdates: []query.ColumnUpdate{
 					{Column: sql.ID("c"), Expr: expr.Int64Literal(5)},
 				},
 			},
 		},
 		{
 			sql: "update t set c = 0 where c > 1",
-			stmt: stmt.Update{
-				Table: stmt.TableName{Table: sql.ID("t")},
-				ColumnUpdates: []stmt.ColumnUpdate{
+			stmt: query.Update{
+				Table: sql.TableName{Table: sql.ID("t")},
+				ColumnUpdates: []query.ColumnUpdate{
 					{Column: sql.ID("c"), Expr: expr.Int64Literal(0)},
 				},
 				Where: &expr.Binary{expr.GreaterThanOp, expr.Ref{sql.ID("c")},
@@ -930,9 +930,9 @@ func TestUpdate(t *testing.T) {
 		},
 		{
 			sql: "update t set c1 = 1, c2 = 2, c3 = 3",
-			stmt: stmt.Update{
-				Table: stmt.TableName{Table: sql.ID("t")},
-				ColumnUpdates: []stmt.ColumnUpdate{
+			stmt: query.Update{
+				Table: sql.TableName{Table: sql.ID("t")},
+				ColumnUpdates: []query.ColumnUpdate{
 					{Column: sql.ID("c1"), Expr: expr.Int64Literal(1)},
 					{Column: sql.ID("c2"), Expr: expr.Int64Literal(2)},
 					{Column: sql.ID("c3"), Expr: expr.Int64Literal(3)},
@@ -952,7 +952,7 @@ func TestUpdate(t *testing.T) {
 			var trc string
 			if err != nil {
 				t.Errorf("Parse(%q) failed with %s", c.sql, err)
-			} else if us, ok := us.(*stmt.Update); !ok || !testutil.DeepEqual(&c.stmt, us, &trc) {
+			} else if us, ok := us.(*query.Update); !ok || !testutil.DeepEqual(&c.stmt, us, &trc) {
 				t.Errorf("Parse(%q) got %s want %s\n%s", c.sql, us.String(), c.stmt.String(), trc)
 			}
 		}

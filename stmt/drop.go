@@ -5,11 +5,12 @@ import (
 
 	"github.com/leftmike/maho/db"
 	"github.com/leftmike/maho/engine"
+	"github.com/leftmike/maho/sql"
 )
 
 type DropTable struct {
 	IfExists bool
-	Tables   []TableName
+	Tables   []sql.TableName
 }
 
 func (stmt *DropTable) String() string {

@@ -10,21 +10,9 @@ import (
 	"github.com/leftmike/maho/sql"
 )
 
-type TableName struct {
-	Database sql.Identifier
-	Table    sql.Identifier
-}
-
 type Delete struct {
-	Table TableName
+	Table sql.TableName
 	Where expr.Expr
-}
-
-func (tn TableName) String() string {
-	if tn.Database == 0 {
-		return tn.Table.String()
-	}
-	return fmt.Sprintf("%s.%s", tn.Database, tn.Table)
 }
 
 func (stmt *Delete) String() string {

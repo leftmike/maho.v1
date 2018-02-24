@@ -9,7 +9,7 @@ import (
 )
 
 type CreateTable struct {
-	Table       TableName
+	Table       sql.TableName
 	Columns     []sql.Identifier
 	ColumnTypes []db.ColumnType
 }

@@ -43,6 +43,10 @@ func (stmt *Values) String() string {
 	return s
 }
 
+func (stmt *Values) Plan(e *engine.Engine) (interface{}, error) {
+	return stmt.Rows(e)
+}
+
 func (stmt *Values) Rows(e *engine.Engine) (db.Rows, error) {
 	columns := make([]sql.Identifier, len(stmt.Expressions[0]))
 	for i := 0; i < len(columns); i++ {

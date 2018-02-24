@@ -14,23 +14,10 @@ type FromItem interface {
 	rows(e *engine.Engine) (db.Rows, *fromContext, error)
 }
 
-type FromTableAlias struct {
-	Database sql.Identifier
-	Table    sql.Identifier
-	Alias    sql.Identifier
-}
+type FromTableAlias sql.TableAlias
 
 func (fta FromTableAlias) String() string {
-	var s string
-	if fta.Database == 0 {
-		s = fta.Table.String()
-	} else {
-		s = fmt.Sprintf("%s.%s", fta.Database, fta.Table)
-	}
-	if fta.Alias != 0 {
-		s += fmt.Sprintf(" AS %s", fta.Alias)
-	}
-	return s
+	return ((sql.TableAlias)(fta)).String()
 }
 
 func (fta FromTableAlias) rows(e *engine.Engine) (db.Rows, *fromContext, error) {

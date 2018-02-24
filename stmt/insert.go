@@ -10,7 +10,7 @@ import (
 )
 
 type InsertValues struct {
-	Table   TableName
+	Table   sql.TableName
 	Columns []sql.Identifier
 	Rows    [][]expr.Expr
 }

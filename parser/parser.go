@@ -6,6 +6,7 @@ import (
 	"runtime"
 
 	"github.com/leftmike/maho/db"
+	"github.com/leftmike/maho/engine"
 	"github.com/leftmike/maho/expr"
 	"github.com/leftmike/maho/parser/scanner"
 	"github.com/leftmike/maho/parser/token"
@@ -14,8 +15,13 @@ import (
 	"github.com/leftmike/maho/stmt"
 )
 
+type Stmt interface {
+	fmt.Stringer
+	Plan(e *engine.Engine) (interface{}, error)
+}
+
 type Parser interface {
-	Parse() (stmt.Stmt, error)
+	Parse() (Stmt, error)
 	ParseExpr() (expr.Expr, error)
 }
 
@@ -40,7 +46,7 @@ func newParser(rr io.RuneReader, fn string) *parser {
 	return &p
 }
 
-func (p *parser) Parse() (stmt stmt.Stmt, err error) {
+func (p *parser) Parse() (stmt Stmt, err error) {
 	if p.scan() == token.EOF {
 		return nil, io.EOF
 	}
@@ -225,7 +231,7 @@ func (p *parser) expectEndOfStatement() {
 	}
 }
 
-func (p *parser) parseStmt() stmt.Stmt {
+func (p *parser) parseStmt() Stmt {
 	switch p.expectReserved(sql.CREATE, sql.DELETE, sql.DROP, sql.INSERT, sql.SELECT, sql.UPDATE,
 		sql.VALUES) {
 	case sql.CREATE:
@@ -272,8 +278,8 @@ func (p *parser) parseStmt() stmt.Stmt {
 	return nil
 }
 
-func (p *parser) parseTableName() stmt.TableName {
-	var tbl stmt.TableName
+func (p *parser) parseTableName() sql.TableName {
+	var tbl sql.TableName
 	id := p.expectIdentifier("expected a database or a table")
 	if p.maybeToken(token.Dot) {
 		tbl.Database = id
@@ -298,11 +304,9 @@ func (p *parser) parseAlias(required bool) sql.Identifier {
 	return 0
 }
 
-func (p *parser) parseTableAlias() stmt.TableAlias {
-	var ta stmt.TableAlias
-	ta.TableName = p.parseTableName()
-	ta.Alias = p.parseAlias(false)
-	return ta
+func (p *parser) parseTableAlias() sql.TableAlias {
+	tn := p.parseTableName()
+	return sql.TableAlias{Database: tn.Database, Table: tn.Table, Alias: p.parseAlias(false)}
 }
 
 func (p *parser) parseColumnAliases() []sql.Identifier {
@@ -321,7 +325,7 @@ func (p *parser) parseColumnAliases() []sql.Identifier {
 	return cols
 }
 
-func (p *parser) parseCreateTable() stmt.Stmt {
+func (p *parser) parseCreateTable() Stmt {
 	// CREATE TABLE ...
 	var s stmt.CreateTable
 	s.Table = p.parseTableName()
@@ -433,10 +437,10 @@ func (p *parser) parseCreateColumns(s *stmt.CreateTable) {
 	}
 }
 
-func (p *parser) parseDelete() stmt.Stmt {
+func (p *parser) parseDelete() Stmt {
 	// DELETE FROM [database '.'] table [WHERE <expr>]
-	var s stmt.Delete
-	s.Table = (query.TableName)(p.parseTableName())
+	var s query.Delete
+	s.Table = p.parseTableName()
 	if p.optionalReserved(sql.WHERE) {
 		s.Where = p.parseExpr()
 	}
@@ -444,7 +448,7 @@ func (p *parser) parseDelete() stmt.Stmt {
 	return &s
 }
 
-func (p *parser) parseDropTable() stmt.Stmt {
+func (p *parser) parseDropTable() Stmt {
 	// DROP TABLE [IF EXISTS] [database '.' ] table [',' ...]
 	var s stmt.DropTable
 	if p.optionalReserved(sql.IF) {
@@ -452,7 +456,7 @@ func (p *parser) parseDropTable() stmt.Stmt {
 		s.IfExists = true
 	}
 
-	s.Tables = []stmt.TableName{p.parseTableName()}
+	s.Tables = []sql.TableName{p.parseTableName()}
 	for p.maybeToken(token.Comma) {
 		s.Tables = append(s.Tables, p.parseTableName())
 	}
@@ -633,7 +637,7 @@ func (p *parser) parseSubExpr() expr.Expr {
 	return &expr.Binary{op, e, p.parseSubExpr()}
 }
 
-func (p *parser) parseInsert() stmt.Stmt {
+func (p *parser) parseInsert() Stmt {
 	/*
 		INSERT INTO [database '.'] table ['(' column [',' ...] ')']
 			VALUES '(' <expr> | DEFAULT [',' ...] ')' [',' ...]
@@ -688,12 +692,12 @@ func (p *parser) parseInsert() stmt.Stmt {
 	return &s
 }
 
-func (p *parser) parseValues() *stmt.Values {
+func (p *parser) parseValues() *query.Values {
 	/*
 	   <values> = VALUES '(' <expr> [',' ...] ')' [',' ...]
 	*/
 
-	var s stmt.Values
+	var s query.Values
 	for {
 		var row []expr.Expr
 
@@ -733,8 +737,8 @@ func (p *parser) parseValues() *stmt.Values {
     | <expr> [[AS] column-alias]
 */
 
-func (p *parser) parseSelect() *stmt.Select {
-	var s stmt.Select
+func (p *parser) parseSelect() *query.Select {
+	var s query.Select
 	if !p.maybeToken(token.Star) {
 		for {
 			t := p.scan()
@@ -823,8 +827,7 @@ func (p *parser) parseFromItem() query.FromItem {
 			p.expectTokens(token.RParen)
 		}
 	} else {
-		ta := p.parseTableAlias()
-		fi = query.FromTableAlias{Database: ta.Database, Table: ta.Table, Alias: ta.Alias}
+		fi = (query.FromTableAlias)(p.parseTableAlias())
 	}
 
 	jt := query.NoJoin
@@ -896,14 +899,14 @@ func (p *parser) parseFromList() query.FromItem {
 	return fi
 }
 
-func (p *parser) parseUpdate() stmt.Stmt {
+func (p *parser) parseUpdate() Stmt {
 	// UPDATE [database '.'] table SET column '=' <expr> [',' ...] [WHERE <expr>]
-	var s stmt.Update
+	var s query.Update
 	s.Table = p.parseTableName()
 	p.expectReserved(sql.SET)
 
 	for {
-		var cu stmt.ColumnUpdate
+		var cu query.ColumnUpdate
 		cu.Column = p.expectIdentifier("expected a column name")
 		p.expectTokens(token.Equal)
 		cu.Expr = p.parseExpr()

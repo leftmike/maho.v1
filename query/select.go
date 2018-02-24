@@ -114,6 +114,10 @@ func (stmt *Select) String() string {
 	return s
 }
 
+func (stmt *Select) Plan(e *engine.Engine) (interface{}, error) {
+	return stmt.Rows(e)
+}
+
 func (stmt *Select) Rows(e *engine.Engine) (db.Rows, error) {
 	var rows db.Rows
 	var fctx *fromContext

@@ -1,14 +1,18 @@
-package stmt
+package sql
 
 import (
 	"fmt"
-
-	"github.com/leftmike/maho/sql"
 )
 
 type TableName struct {
-	Database sql.Identifier
-	Table    sql.Identifier
+	Database Identifier
+	Table    Identifier
+}
+
+type TableAlias struct {
+	Database Identifier
+	Table    Identifier
+	Alias    Identifier
 }
 
 func (tn TableName) String() string {
@@ -18,13 +22,13 @@ func (tn TableName) String() string {
 	return fmt.Sprintf("%s.%s", tn.Database, tn.Table)
 }
 
-type TableAlias struct {
-	TableName
-	Alias sql.Identifier
-}
-
 func (ta TableAlias) String() string {
-	s := ta.TableName.String()
+	var s string
+	if ta.Database == 0 {
+		s = ta.Table.String()
+	} else {
+		s = fmt.Sprintf("%s.%s", ta.Database, ta.Table)
+	}
 	if ta.Alias != 0 {
 		s += fmt.Sprintf(" AS %s", ta.Alias)
 	}
