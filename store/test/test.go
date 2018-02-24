@@ -9,10 +9,13 @@ import (
 	"github.com/leftmike/maho/store"
 )
 
-type testStore struct{}
+type TestStore struct {
+	Typ string
+}
 
 type testDatabase struct {
 	name   sql.Identifier
+	typ    sql.Identifier
 	tables map[sql.Identifier]*testTable
 }
 
@@ -27,17 +30,19 @@ type testRows struct {
 	columns []sql.Identifier
 	rows    [][]sql.Value
 	index   int
+	haveRow bool
 }
 
-func (ts testStore) Open(name string) (db.Database, error) {
+func (ts TestStore) Open(name string) (db.Database, error) {
 	var tdb testDatabase
 	tdb.name = sql.ID(name)
+	tdb.typ = sql.ID(ts.Typ)
 	tdb.tables = make(map[sql.Identifier]*testTable)
 	return &tdb, nil
 }
 
 func init() {
-	store.Register("test", testStore{})
+	store.Register("test", TestStore{"test"})
 }
 
 func (tdb *testDatabase) Name() sql.Identifier {
@@ -45,7 +50,7 @@ func (tdb *testDatabase) Name() sql.Identifier {
 }
 
 func (tdb *testDatabase) Type() sql.Identifier {
-	return sql.ID("test")
+	return tdb.typ
 }
 
 func (tdb *testDatabase) CreateTable(name sql.Identifier, cols []sql.Identifier,
@@ -105,6 +110,10 @@ func (tt *testTable) Rows() (db.Rows, error) {
 	return &testRows{columns: tt.columns, rows: tt.rows}, nil
 }
 
+func (tt *testTable) DeleteRows() (db.DeleteRows, error) {
+	return &testRows{columns: tt.columns, rows: tt.rows}, nil
+}
+
 func (tt *testTable) Insert(row []sql.Value) error {
 	tt.rows = append(tt.rows, row)
 	return nil
@@ -116,14 +125,30 @@ func (tr *testRows) Columns() []sql.Identifier {
 
 func (tr *testRows) Close() error {
 	tr.index = len(tr.rows)
+	tr.haveRow = false
 	return nil
 }
 
 func (tr *testRows) Next(dest []sql.Value) error {
-	if tr.index == len(tr.rows) {
-		return io.EOF
+	for tr.index < len(tr.rows) {
+		if tr.rows[tr.index] != nil {
+			copy(dest, tr.rows[tr.index])
+			tr.index += 1
+			tr.haveRow = true
+			return nil
+		}
+		tr.index += 1
 	}
-	copy(dest, tr.rows[tr.index])
-	tr.index += 1
+
+	tr.haveRow = false
+	return io.EOF
+}
+
+func (tr *testRows) Delete() error {
+	if !tr.haveRow {
+		return fmt.Errorf("test: no row to delete")
+	}
+	tr.haveRow = false
+	tr.rows[tr.index-1] = nil
 	return nil
 }

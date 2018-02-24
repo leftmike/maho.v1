@@ -213,6 +213,18 @@ func where(rows db.Rows, fctx *fromContext, cond expr.Expr) (db.Rows, error) {
 	return &filterRows{rows: rows, cond: ce}, nil
 }
 
+type filterDeleteRows struct {
+	filterRows
+}
+
+func (fdr *filterDeleteRows) Delete() error {
+	rows, ok := fdr.rows.(db.DeleteRows)
+	if !ok {
+		panic("filterDeleteRows.rows is not db.DeleteRows")
+	}
+	return rows.Delete()
+}
+
 type oneEmptyRow struct {
 	one bool
 }

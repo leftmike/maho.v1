@@ -29,21 +29,14 @@ func (stmt *Values) Plan(e *engine.Engine) (interface{}, error) {
 	return (*query.Values)(stmt).Rows(e)
 }
 
-type Delete struct {
-	Table TableName
-	Where expr.Expr
-}
+type Delete query.Delete
 
 func (stmt *Delete) String() string {
-	s := fmt.Sprintf("DELETE FROM %s", stmt.Table)
-	if stmt.Where != nil {
-		s += fmt.Sprintf(" WHERE %s", stmt.Where)
-	}
-	return s
+	return (*query.Delete)(stmt).String()
 }
 
 func (stmt *Delete) Plan(e *engine.Engine) (interface{}, error) {
-	return nil, fmt.Errorf("DELETE: not implemented yet")
+	return (*query.Delete)(stmt).Plan(e)
 }
 
 type ColumnUpdate struct {

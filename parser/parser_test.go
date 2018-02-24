@@ -862,13 +862,13 @@ func TestDelete(t *testing.T) {
 		{
 			sql: "delete from t",
 			stmt: stmt.Delete{
-				Table: stmt.TableName{Table: sql.ID("t")},
+				Table: query.TableName{Table: sql.ID("t")},
 			},
 		},
 		{
 			sql: "delete from t where c > 1",
 			stmt: stmt.Delete{
-				Table: stmt.TableName{Table: sql.ID("t")},
+				Table: query.TableName{Table: sql.ID("t")},
 				Where: &expr.Binary{expr.GreaterThanOp, expr.Ref{sql.ID("c")},
 					expr.Int64Literal(1)},
 			},

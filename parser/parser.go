@@ -436,7 +436,7 @@ func (p *parser) parseCreateColumns(s *stmt.CreateTable) {
 func (p *parser) parseDelete() stmt.Stmt {
 	// DELETE FROM [database '.'] table [WHERE <expr>]
 	var s stmt.Delete
-	s.Table = p.parseTableName()
+	s.Table = (query.TableName)(p.parseTableName())
 	if p.optionalReserved(sql.WHERE) {
 		s.Where = p.parseExpr()
 	}

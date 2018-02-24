@@ -2,6 +2,7 @@ package test_test
 
 import (
 	"flag"
+	"fmt"
 	"testing"
 
 	"github.com/leftmike/sqltest/pkg/sqltest"
@@ -18,6 +19,14 @@ type report struct {
 type reporter []report
 
 func (r *reporter) Report(test string, err error) error {
+	if err == nil {
+		fmt.Printf("%s: passed\n", test)
+	} else if err == sqltest.Skipped {
+		fmt.Printf("%s: skipped\n", test)
+	} else {
+		fmt.Printf("%s: failed: %s\n", test, err)
+	}
+
 	*r = append(*r, report{test, err})
 	return nil
 }

@@ -9,3 +9,8 @@ type Rows interface {
 	Close() error
 	Next(dest []sql.Value) error
 }
+
+type DeleteRows interface {
+	Rows
+	Delete() error
+}
