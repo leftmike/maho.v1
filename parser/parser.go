@@ -5,6 +5,7 @@ import (
 	"io"
 	"runtime"
 
+	"github.com/leftmike/maho/datadef"
 	"github.com/leftmike/maho/db"
 	"github.com/leftmike/maho/engine"
 	"github.com/leftmike/maho/expr"
@@ -12,7 +13,6 @@ import (
 	"github.com/leftmike/maho/parser/token"
 	"github.com/leftmike/maho/query"
 	"github.com/leftmike/maho/sql"
-	"github.com/leftmike/maho/stmt"
 )
 
 type Stmt interface {
@@ -327,7 +327,7 @@ func (p *parser) parseColumnAliases() []sql.Identifier {
 
 func (p *parser) parseCreateTable() Stmt {
 	// CREATE TABLE ...
-	var s stmt.CreateTable
+	var s datadef.CreateTable
 	s.Table = p.parseTableName()
 
 	if p.maybeToken(token.LParen) {
@@ -359,7 +359,7 @@ var types = map[sql.Identifier]db.ColumnType{
 	sql.BIGINT:    {Type: sql.IntegerType, Size: 8},
 }
 
-func (p *parser) parseCreateColumns(s *stmt.CreateTable) {
+func (p *parser) parseCreateColumns(s *datadef.CreateTable) {
 	/*
 		CREATE TABLE [database '.'] table '(' <column> [',' ...] ')'
 		<column> = name <data_type> [(DEFAULT <expr>) | (NOT NULL)]
@@ -450,7 +450,7 @@ func (p *parser) parseDelete() Stmt {
 
 func (p *parser) parseDropTable() Stmt {
 	// DROP TABLE [IF EXISTS] [database '.' ] table [',' ...]
-	var s stmt.DropTable
+	var s datadef.DropTable
 	if p.optionalReserved(sql.IF) {
 		p.expectReserved(sql.EXISTS)
 		s.IfExists = true
@@ -643,7 +643,7 @@ func (p *parser) parseInsert() Stmt {
 			VALUES '(' <expr> | DEFAULT [',' ...] ')' [',' ...]
 	*/
 
-	var s stmt.InsertValues
+	var s query.InsertValues
 	s.Table = p.parseTableName()
 
 	if p.maybeToken(token.LParen) {

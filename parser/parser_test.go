@@ -5,12 +5,12 @@ import (
 	"strings"
 	"testing"
 
+	"github.com/leftmike/maho/datadef"
 	"github.com/leftmike/maho/db"
 	"github.com/leftmike/maho/expr"
 	"github.com/leftmike/maho/parser/token"
 	"github.com/leftmike/maho/query"
 	"github.com/leftmike/maho/sql"
-	"github.com/leftmike/maho/stmt"
 	"github.com/leftmike/maho/testutil"
 )
 
@@ -72,7 +72,7 @@ func TestParse(t *testing.T) {
 func TestCreateTable(t *testing.T) {
 	cases := []struct {
 		sql  string
-		stmt stmt.CreateTable
+		stmt datadef.CreateTable
 		fail bool
 	}{
 		{sql: "create temp table t (c int)", fail: true},
@@ -117,7 +117,7 @@ func TestCreateTable(t *testing.T) {
 		{sql: "create table t (c int default 0 default 1)", fail: true},
 		{
 			sql: "create table t (c1 int2, c2 smallint, c3 int4, c4 integer, c5 bigint, c6 int8)",
-			stmt: stmt.CreateTable{
+			stmt: datadef.CreateTable{
 				Table: sql.TableName{Table: sql.ID("t")},
 				Columns: []sql.Identifier{sql.ID("c1"), sql.ID("c2"), sql.ID("c3"), sql.ID("c4"),
 					sql.ID("c5"), sql.ID("c6")},
@@ -133,7 +133,7 @@ func TestCreateTable(t *testing.T) {
 		},
 		{
 			sql: "create table t (b1 bool, b2 boolean, d1 double, d2 double)",
-			stmt: stmt.CreateTable{
+			stmt: datadef.CreateTable{
 				Table:   sql.TableName{Table: sql.ID("t")},
 				Columns: []sql.Identifier{sql.ID("b1"), sql.ID("b2"), sql.ID("d1"), sql.ID("d2")},
 				ColumnTypes: []db.ColumnType{
@@ -146,7 +146,7 @@ func TestCreateTable(t *testing.T) {
 		},
 		{
 			sql: "create table t (b1 binary, b2 varbinary(123), b3 blob)",
-			stmt: stmt.CreateTable{
+			stmt: datadef.CreateTable{
 				Table:   sql.TableName{Table: sql.ID("t")},
 				Columns: []sql.Identifier{sql.ID("b1"), sql.ID("b2"), sql.ID("b3")},
 				ColumnTypes: []db.ColumnType{
@@ -158,7 +158,7 @@ func TestCreateTable(t *testing.T) {
 		},
 		{
 			sql: "create table t (b1 binary(123), b2 varbinary(456), b3 blob(789))",
-			stmt: stmt.CreateTable{
+			stmt: datadef.CreateTable{
 				Table:   sql.TableName{Table: sql.ID("t")},
 				Columns: []sql.Identifier{sql.ID("b1"), sql.ID("b2"), sql.ID("b3")},
 				ColumnTypes: []db.ColumnType{
@@ -170,7 +170,7 @@ func TestCreateTable(t *testing.T) {
 		},
 		{
 			sql: "create table t (c1 char, c2 varchar(123), c3 text)",
-			stmt: stmt.CreateTable{
+			stmt: datadef.CreateTable{
 				Table:   sql.TableName{Table: sql.ID("t")},
 				Columns: []sql.Identifier{sql.ID("c1"), sql.ID("c2"), sql.ID("c3")},
 				ColumnTypes: []db.ColumnType{
@@ -182,7 +182,7 @@ func TestCreateTable(t *testing.T) {
 		},
 		{
 			sql: "create table t (c1 char(123), c2 varchar(456), c3 text(789))",
-			stmt: stmt.CreateTable{
+			stmt: datadef.CreateTable{
 				Table:   sql.TableName{Table: sql.ID("t")},
 				Columns: []sql.Identifier{sql.ID("c1"), sql.ID("c2"), sql.ID("c3")},
 				ColumnTypes: []db.ColumnType{
@@ -194,7 +194,7 @@ func TestCreateTable(t *testing.T) {
 		},
 		{
 			sql: "create table t (c1 varchar(64) default 'abcd', c2 int default 123)",
-			stmt: stmt.CreateTable{
+			stmt: datadef.CreateTable{
 				Table:   sql.TableName{Table: sql.ID("t")},
 				Columns: []sql.Identifier{sql.ID("c1"), sql.ID("c2")},
 				ColumnTypes: []db.ColumnType{
@@ -206,7 +206,7 @@ func TestCreateTable(t *testing.T) {
 		},
 		{
 			sql: "create table t (c1 boolean default true, c2 boolean not null)",
-			stmt: stmt.CreateTable{
+			stmt: datadef.CreateTable{
 				Table:   sql.TableName{Table: sql.ID("t")},
 				Columns: []sql.Identifier{sql.ID("c1"), sql.ID("c2")},
 				ColumnTypes: []db.ColumnType{
@@ -218,7 +218,7 @@ func TestCreateTable(t *testing.T) {
 		{
 			sql: `create table t (c1 boolean default true not null,
 c2 boolean not null default true)`,
-			stmt: stmt.CreateTable{
+			stmt: datadef.CreateTable{
 				Table:   sql.TableName{Table: sql.ID("t")},
 				Columns: []sql.Identifier{sql.ID("c1"), sql.ID("c2")},
 				ColumnTypes: []db.ColumnType{
@@ -240,7 +240,7 @@ c2 boolean not null default true)`,
 			var trc string
 			if err != nil {
 				t.Errorf("Parse(%q) failed with %s", c.sql, err)
-			} else if cs, ok := cs.(*stmt.CreateTable); !ok ||
+			} else if cs, ok := cs.(*datadef.CreateTable); !ok ||
 				!testutil.DeepEqual(&c.stmt, cs, &trc) {
 				t.Errorf("Parse(%q) got %s want %s\n%s", c.sql, cs.String(), c.stmt.String(), trc)
 			}
@@ -251,7 +251,7 @@ c2 boolean not null default true)`,
 func TestInsertValues(t *testing.T) {
 	cases := []struct {
 		sql  string
-		stmt stmt.InsertValues
+		stmt query.InsertValues
 		fail bool
 	}{
 		{sql: "insert into t", fail: true},
@@ -269,7 +269,7 @@ func TestInsertValues(t *testing.T) {
 		{sql: "insert into t (a, b, a) values (1, 2)", fail: true},
 		{
 			sql: "insert into t values (1, 'abc', true)",
-			stmt: stmt.InsertValues{
+			stmt: query.InsertValues{
 				Table: sql.TableName{Table: sql.ID("t")},
 				Rows: [][]expr.Expr{
 					{expr.Int64Literal(1), expr.StringLiteral("abc"), expr.True()},
@@ -278,7 +278,7 @@ func TestInsertValues(t *testing.T) {
 		},
 		{
 			sql: "insert into t values (1, 'abc', true), (2, 'def', false)",
-			stmt: stmt.InsertValues{
+			stmt: query.InsertValues{
 				Table: sql.TableName{Table: sql.ID("t")},
 				Rows: [][]expr.Expr{
 					{expr.Int64Literal(1), expr.StringLiteral("abc"), expr.True()},
@@ -288,7 +288,7 @@ func TestInsertValues(t *testing.T) {
 		},
 		{
 			sql: "insert into t values (NULL, 'abc', NULL)",
-			stmt: stmt.InsertValues{
+			stmt: query.InsertValues{
 				Table: sql.TableName{Table: sql.ID("t")},
 				Rows: [][]expr.Expr{
 					{expr.Nil(), expr.StringLiteral("abc"), expr.Nil()},
@@ -308,7 +308,7 @@ func TestInsertValues(t *testing.T) {
 			var trc string
 			if err != nil {
 				t.Errorf("Parse(%q) failed with %s", c.sql, err)
-			} else if is, ok := is.(*stmt.InsertValues); !ok ||
+			} else if is, ok := is.(*query.InsertValues); !ok ||
 				!testutil.DeepEqual(&c.stmt, is, &trc) {
 				t.Errorf("Parse(%q) got %s want %s\n%s", c.sql, is.String(), c.stmt.String(), trc)
 			}

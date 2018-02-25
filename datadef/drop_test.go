@@ -1,19 +1,19 @@
-package stmt_test
+package datadef_test
 
 import (
 	"testing"
 
+	"github.com/leftmike/maho/datadef"
 	"github.com/leftmike/maho/sql"
-	"github.com/leftmike/maho/stmt"
 )
 
 func TestDropTable(t *testing.T) {
 	cases := []struct {
-		s stmt.DropTable
+		s datadef.DropTable
 		r string
 	}{
 		{
-			stmt.DropTable{
+			datadef.DropTable{
 				false,
 				[]sql.TableName{
 					{sql.ID("abc"), sql.ID("defghi")},
@@ -22,7 +22,7 @@ func TestDropTable(t *testing.T) {
 			"DROP TABLE abc.defghi",
 		},
 		{
-			stmt.DropTable{
+			datadef.DropTable{
 				true,
 				[]sql.TableName{
 					{sql.ID("abc"), sql.ID("defghi")},

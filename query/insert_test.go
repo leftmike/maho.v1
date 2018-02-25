@@ -1,4 +1,4 @@
-package stmt_test
+package query_test
 
 import (
 	"strings"
@@ -11,7 +11,6 @@ import (
 	"github.com/leftmike/maho/plan"
 	"github.com/leftmike/maho/query"
 	"github.com/leftmike/maho/sql"
-	"github.com/leftmike/maho/stmt"
 	"github.com/leftmike/maho/testutil"
 )
 
@@ -180,7 +179,7 @@ var (
 )
 
 func TestInsert(t *testing.T) {
-	s := stmt.InsertValues{Table: sql.TableName{sql.QuotedID("left"), sql.QuotedID("right")}}
+	s := query.InsertValues{Table: sql.TableName{sql.QuotedID("left"), sql.QuotedID("right")}}
 	r := "INSERT INTO left.right VALUES"
 	if s.String() != r {
 		t.Errorf("InsertValues{}.String() got %s want %s", s.String(), r)
