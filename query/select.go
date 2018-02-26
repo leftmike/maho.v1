@@ -229,6 +229,18 @@ func (fdr *filterDeleteRows) Delete() error {
 	return rows.Delete()
 }
 
+type filterUpdateRows struct {
+	filterRows
+}
+
+func (fur *filterUpdateRows) Update(updates []db.ColumnUpdate) error {
+	rows, ok := fur.rows.(db.UpdateRows)
+	if !ok {
+		panic("filterUpdateRows.rows is not db.UpdateRows")
+	}
+	return rows.Update(updates)
+}
+
 type oneEmptyRow struct {
 	one bool
 }

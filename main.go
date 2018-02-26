@@ -8,8 +8,6 @@ To Do:
 
 - fuzzing: parser.Parse
 
-- execute UPDATE
-
 - SELECT ... ORDER BY ...
 */
 

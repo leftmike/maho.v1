@@ -114,6 +114,10 @@ func (tt *testTable) DeleteRows() (db.DeleteRows, error) {
 	return &testRows{columns: tt.columns, rows: tt.rows}, nil
 }
 
+func (tt *testTable) UpdateRows() (db.UpdateRows, error) {
+	return &testRows{columns: tt.columns, rows: tt.rows}, nil
+}
+
 func (tt *testTable) Insert(row []sql.Value) error {
 	tt.rows = append(tt.rows, row)
 	return nil
@@ -150,5 +154,16 @@ func (tr *testRows) Delete() error {
 	}
 	tr.haveRow = false
 	tr.rows[tr.index-1] = nil
+	return nil
+}
+
+func (tr *testRows) Update(updates []db.ColumnUpdate) error {
+	if !tr.haveRow {
+		return fmt.Errorf("test: no row to update")
+	}
+	row := tr.rows[tr.index-1]
+	for _, up := range updates {
+		row[up.Index] = up.Value
+	}
 	return nil
 }

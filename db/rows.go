@@ -14,3 +14,13 @@ type DeleteRows interface {
 	Rows
 	Delete() error
 }
+
+type ColumnUpdate struct {
+	Index int
+	Value sql.Value
+}
+
+type UpdateRows interface {
+	Rows
+	Update(updates []ColumnUpdate) error
+}

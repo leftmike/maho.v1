@@ -9,10 +9,11 @@ type Table interface {
 	Columns() []sql.Identifier
 	ColumnTypes() []ColumnType
 	Rows() (Rows, error)
-	DeleteRows() (DeleteRows, error)
 }
 
-type TableInsert interface {
+type TableModify interface {
 	Table
 	Insert(row []sql.Value) error
+	DeleteRows() (DeleteRows, error)
+	UpdateRows() (UpdateRows, error)
 }

@@ -200,10 +200,6 @@ func (et *engineTable) Rows() (db.Rows, error) {
 	return &engineRows{columns: et.columns, columnTypes: et.columnTypes, rows: rows}, nil
 }
 
-func (et *engineTable) DeleteRows() (db.DeleteRows, error) {
-	return nil, fmt.Errorf("engine: table \"%s\" can not be modified", et.name)
-}
-
 func (er *engineRows) Columns() []sql.Identifier {
 	return er.columns
 }

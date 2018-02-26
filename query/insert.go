@@ -63,7 +63,7 @@ func (stmt *InsertValues) Execute(e *engine.Engine) (int64, error) {
 	if err != nil {
 		return 0, err
 	}
-	tbl, ok := t.(db.TableInsert)
+	tbl, ok := t.(db.TableModify)
 	if !ok {
 		return 0, fmt.Errorf("engine: table \"%s.%s\" can't be modified", dbase.Name(), t.Name())
 	}

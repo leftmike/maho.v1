@@ -46,14 +46,19 @@ func (dp *deletePlan) Execute(e *engine.Engine) (int64, error) {
 }
 
 func (stmt *Delete) Plan(e *engine.Engine) (interface{}, error) {
-	db, err := e.LookupDatabase(stmt.Table.Database)
+	dbase, err := e.LookupDatabase(stmt.Table.Database)
 	if err != nil {
 		return nil, err
 	}
-	tbl, err := db.Table(stmt.Table.Table)
+	t, err := dbase.Table(stmt.Table.Table)
 	if err != nil {
 		return nil, err
 	}
+	tbl, ok := t.(db.TableModify)
+	if !ok {
+		return nil, fmt.Errorf("engine: table \"%s.%s\" can't be modified", dbase.Name(), t.Name())
+	}
+
 	rows, err := tbl.DeleteRows()
 	if err != nil {
 		return nil, err
