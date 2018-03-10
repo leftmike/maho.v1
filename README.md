@@ -9,7 +9,6 @@ Maho is a partial implementation of a basic SQL server.
 * Parse and execute SQL statements.
 
 # Missing
-* `UPDATE` and `DELETE` are parsed, but not executed.
 * Most SQL statements.
 * An actual server.
 * Persistence.
@@ -64,6 +63,7 @@ SELECT <select-list>
     [WHERE <expr>]
     [GROUP BY <expr> [',' ...]]
     [HAVING <expr>]
+    [ORDER BY column [ASC | DESC] [',' ...]]
 <select-list> = '*'
     | <select-item> [',' ...]
 <select-item> = table '.' '*'

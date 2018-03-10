@@ -7,8 +7,6 @@ To Do:
 - or "Operation(args) failed with %s" or "Operation(args) did not fail"
 
 - fuzzing: parser.Parse
-
-- SELECT ... ORDER BY ...
 */
 
 import (

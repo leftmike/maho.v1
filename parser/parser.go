@@ -730,6 +730,7 @@ func (p *parser) parseValues() *query.Values {
     [WHERE <expr>]
     [GROUP BY <expr> [',' ...]]
     [HAVING <expr>]
+    [ORDER BY column [ASC | DESC] [',' ...]]
 <select-list> = '*'
     | <select-item> [',' ...]
 <select-item> = table '.' '*'
@@ -790,6 +791,24 @@ func (p *parser) parseSelect() *query.Select {
 
 	if p.optionalReserved(sql.HAVING) {
 		s.Having = p.parseExpr()
+	}
+
+	if p.optionalReserved(sql.ORDER) {
+		p.expectReserved(sql.BY)
+
+		for {
+			var by query.OrderBy
+			by.Expr = expr.Ref{p.expectIdentifier("expected a column")}
+			if p.optionalReserved(sql.DESC) {
+				by.Reverse = true
+			} else {
+				p.optionalReserved(sql.ASC)
+			}
+			s.OrderBy = append(s.OrderBy, by)
+			if !p.maybeToken(token.Comma) {
+				break
+			}
+		}
 	}
 
 	return &s

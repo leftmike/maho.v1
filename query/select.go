@@ -3,6 +3,7 @@ package query
 import (
 	"fmt"
 	"io"
+	"sort"
 
 	"github.com/leftmike/maho/db"
 	"github.com/leftmike/maho/engine"
@@ -23,12 +24,18 @@ type ExprResult struct {
 	Alias sql.Identifier
 }
 
+type OrderBy struct {
+	Expr    expr.Expr
+	Reverse bool
+}
+
 type Select struct {
 	Results []SelectResult
 	From    FromItem
 	Where   expr.Expr
 	GroupBy []expr.Expr
 	Having  expr.Expr
+	OrderBy []OrderBy
 }
 
 func (tr TableResult) String() string {
@@ -111,6 +118,20 @@ func (stmt *Select) String() string {
 			s += fmt.Sprintf(" HAVING %s", stmt.Having)
 		}
 	}
+	if stmt.OrderBy != nil {
+		s += " ORDER BY "
+		for i, by := range stmt.OrderBy {
+			if i > 0 {
+				s += ", "
+			}
+			s += by.Expr.String()
+			if by.Reverse {
+				s += " DESC"
+			} else {
+				s += " ASC"
+			}
+		}
+	}
 	return s
 }
 
@@ -138,13 +159,13 @@ func (stmt *Select) Rows(e *engine.Engine) (db.Rows, error) {
 	if stmt.GroupBy == nil && stmt.Having == nil {
 		rrows, err := results(rows, fctx, stmt.Results)
 		if err == nil {
-			return rrows, nil
+			return order(rrows, fctx, stmt.OrderBy)
 		} else if _, ok := err.(*expr.ContextError); !ok {
 			return nil, err
 		}
 		// Aggregrate function used in SELECT results causes an implicit GROUP BY
 	}
-	return group(rows, fctx, stmt.Results, stmt.GroupBy, stmt.Having)
+	return group(rows, fctx, stmt.Results, stmt.GroupBy, stmt.Having, stmt.OrderBy)
 }
 
 func (fs FromSelect) rows(e *engine.Engine) (db.Rows, *fromContext, error) {
@@ -160,6 +181,149 @@ func (fs FromSelect) rows(e *engine.Engine) (db.Rows, *fromContext, error) {
 		cols = fs.ColumnAliases
 	}
 	return rows, makeFromContext(fs.Alias, cols), nil
+}
+
+type orderBy struct {
+	colIndex int
+	reverse  bool
+}
+
+type sortRows struct {
+	rows    db.Rows
+	orderBy []orderBy
+	values  [][]sql.Value
+	index   int
+	sorted  bool
+}
+
+func (sr *sortRows) Columns() []sql.Identifier {
+	return sr.rows.Columns()
+}
+
+func (sr *sortRows) Close() error {
+	sr.index = len(sr.values)
+	return sr.rows.Close()
+}
+
+func (sr *sortRows) sort() error {
+	sr.sorted = true
+
+	for {
+		dest := make([]sql.Value, len(sr.rows.Columns()))
+		err := sr.rows.Next(dest)
+		if err == io.EOF {
+			break
+		} else if err != nil {
+			return err
+		}
+		sr.values = append(sr.values, dest)
+	}
+	sort.Sort(sr)
+
+	return nil
+}
+
+func (sr *sortRows) Next(dest []sql.Value) error {
+	if !sr.sorted {
+		err := sr.sort()
+		if err != nil {
+			return err
+		}
+	}
+
+	if sr.index < len(sr.values) {
+		copy(dest, sr.values[sr.index])
+		sr.index += 1
+		return nil
+	}
+	return io.EOF
+}
+
+func (sr *sortRows) Len() int {
+	return len(sr.values)
+}
+
+func (sr *sortRows) Swap(i, j int) {
+	sr.values[i], sr.values[j] = sr.values[j], sr.values[i]
+}
+
+func (sr *sortRows) Less(i, j int) bool {
+	for _, by := range sr.orderBy {
+		vi := sr.values[i][by.colIndex]
+		vj := sr.values[j][by.colIndex]
+		cmp := sql.Compare(vi, vj)
+		if cmp < 0 {
+			return !by.reverse
+		} else if cmp > 0 {
+			return by.reverse
+		}
+	}
+	return false // Arbitrary
+}
+
+func orderByOutput(order []OrderBy, cols []sql.Identifier) []orderBy {
+	var byOutput []orderBy
+	for odx, by := range order {
+		r, ok := by.Expr.(expr.Ref)
+		if !ok || len(r) != 1 {
+			return nil
+		}
+		for cdx, c := range cols {
+			if c == r[0] {
+				byOutput = append(byOutput, orderBy{cdx, by.Reverse})
+				break
+			}
+		}
+		if len(byOutput) <= odx {
+			return nil
+		}
+	}
+	return byOutput
+}
+
+func orderByInput(order []OrderBy, fctx *fromContext) []orderBy {
+	var byInput []orderBy
+	for _, by := range order {
+		r, ok := by.Expr.(expr.Ref)
+		if !ok || len(r) != 1 {
+			return nil
+		}
+		cdx, err := fctx.colIndex(r[0], "")
+		if err != nil {
+			return nil
+		}
+		byInput = append(byInput, orderBy{cdx, by.Reverse})
+	}
+	return byInput
+}
+
+func order(rows db.Rows, fctx *fromContext, order []OrderBy) (db.Rows, error) {
+	if order == nil {
+		return rows, nil
+	}
+
+	// ORDER BY is based on output columns
+	byCols := orderByOutput(order, rows.Columns())
+	if byCols != nil {
+		return &sortRows{rows: rows, orderBy: byCols}, nil
+	}
+
+	// ORDER BY is based on input columns
+	byCols = orderByInput(order, fctx)
+	if byCols != nil {
+		if rrows, ok := rows.(*resultRows); ok {
+			rrows.rows = &sortRows{rows: rrows.rows, orderBy: byCols}
+			return rrows, nil
+		} else if arows, ok := rows.(*allResultRows); ok {
+			arows.rows = &sortRows{rows: arows.rows, orderBy: byCols}
+			return arows, nil
+		} else {
+			panic("must be resultRows or allResultRows")
+		}
+	}
+
+	// ORDER BY is based on arbitrary input column expressions
+	return rows, fmt.Errorf("ORDER BY arbitrary input column expressions is not supported")
 }
 
 type filterRows struct {

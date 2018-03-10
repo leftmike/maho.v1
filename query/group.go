@@ -33,6 +33,7 @@ func (gr *groupRows) Columns() []sql.Identifier {
 }
 
 func (gr *groupRows) Close() error {
+	gr.index = len(gr.groups)
 	return gr.rows.Close()
 }
 
@@ -197,7 +198,7 @@ func makeGroupContext(fctx *fromContext, group []expr.Expr) (*groupContext, erro
 }
 
 func group(rows db.Rows, fctx *fromContext, results []SelectResult, group []expr.Expr,
-	having expr.Expr) (db.Rows, error) {
+	having expr.Expr, orderBy []OrderBy) (db.Rows, error) {
 
 	gctx, err := makeGroupContext(fctx, group)
 
@@ -233,5 +234,9 @@ func group(rows db.Rows, fctx *fromContext, results []SelectResult, group []expr
 		rows = &filterRows{rows: rows, cond: hce}
 	}
 
-	return makeResultRows(rows, resultCols, destExprs), nil
+	rrows := makeResultRows(rows, resultCols, destExprs)
+	if orderBy == nil {
+		return rrows, nil
+	}
+	return order(rrows, makeFromContext(0, rows.Columns()), orderBy)
 }

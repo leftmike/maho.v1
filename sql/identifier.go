@@ -41,11 +41,13 @@ const (
 const (
 	AND Identifier = -(iota + 1)
 	AS
+	ASC
 	BY
 	CREATE
 	CROSS
 	DEFAULT
 	DELETE
+	DESC
 	DROP
 	EXISTS
 	FALSE
@@ -64,6 +66,7 @@ const (
 	NULL
 	ON
 	OR
+	ORDER
 	OUTER
 	RIGHT
 	SELECT
@@ -95,6 +98,7 @@ var knownKeywords = map[string]struct {
 }{
 	"AND":       {AND, true},
 	"AS":        {AS, true},
+	"ASC":       {ASC, true},
 	"BY":        {BY, true},
 	"BIGINT":    {BIGINT, false},
 	"BINARY":    {BINARY, false},
@@ -106,6 +110,7 @@ var knownKeywords = map[string]struct {
 	"CROSS":     {CROSS, true},
 	"DEFAULT":   {DEFAULT, true},
 	"DELETE":    {DELETE, true},
+	"DESC":      {DESC, true},
 	"DOUBLE":    {DOUBLE, false},
 	"DROP":      {DROP, true},
 	"EXISTS":    {EXISTS, true},
@@ -130,6 +135,7 @@ var knownKeywords = map[string]struct {
 	"NULL":      {NULL, true},
 	"ON":        {ON, true},
 	"OR":        {OR, true},
+	"ORDER":     {ORDER, true},
 	"OUTER":     {OUTER, true},
 	"PRECISION": {PRECISION, false},
 	"REAL":      {REAL, false},
