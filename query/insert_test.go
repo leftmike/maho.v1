@@ -5,8 +5,8 @@ import (
 	"testing"
 
 	"github.com/leftmike/maho/db"
-	"github.com/leftmike/maho/engine"
 	"github.com/leftmike/maho/expr"
+	"github.com/leftmike/maho/oldeng"
 	"github.com/leftmike/maho/parser"
 	"github.com/leftmike/maho/plan"
 	"github.com/leftmike/maho/query"
@@ -198,7 +198,7 @@ func TestInsert(t *testing.T) {
 		insertCases3)
 }
 
-func statement(e *engine.Engine, s string) error {
+func statement(e *oldeng.Engine, s string) error {
 	p := parser.NewParser(strings.NewReader(s), "statement")
 	stmt, err := p.Parse()
 	if err != nil {
@@ -212,7 +212,7 @@ func statement(e *engine.Engine, s string) error {
 	return err
 }
 
-func testInsert(t *testing.T, e *engine.Engine, dbase db.DatabaseModify, nam sql.Identifier,
+func testInsert(t *testing.T, e *oldeng.Engine, dbase db.DatabaseModify, nam sql.Identifier,
 	cols []sql.Identifier, colTypes []db.ColumnType, cases []insertCase) {
 
 	for _, c := range cases {

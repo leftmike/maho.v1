@@ -7,14 +7,14 @@ import (
 
 	"github.com/leftmike/sqltest/pkg/sqltest"
 
-	"github.com/leftmike/maho/engine"
+	"github.com/leftmike/maho/oldeng"
 	"github.com/leftmike/maho/parser"
 	"github.com/leftmike/maho/plan"
 	"github.com/leftmike/maho/sql"
 )
 
 type Runner struct {
-	Engine *engine.Engine
+	Engine *oldeng.Engine
 }
 
 func (run *Runner) RunExec(tst *sqltest.Test) error {

@@ -7,6 +7,40 @@ To Do:
 - or "Operation(args) failed with %s" or "Operation(args) did not fail"
 
 - fuzzing: parser.Parse
+
+- pluggable engine, which is an implementation of a storage engine; only one engine can be
+used at a time
+- database is a separate storage instance; a single engine can support multiple databases at
+the same time
+- some shared infrastructure (that is also pluggable): (fat) lock manager; page cache (manager)
+- each database has tables table (db$tables) which then links to everything else
+- each table has an id and a location; id is fixed at create time; location is physical location
+of the table and it can change
+- Store --> Engine
+- write a tool to dump a database, maybe a page at a time
+
+type Engine interface { // implemented by engine, but not directly used
+    CreateDatabase(name string) (Database, error)
+    OpenDatabase(name string) (Database, error)
+}
+
+type PageNum int64
+
+type Database interface { // implemented by engine, but not directly used
+    GetTablesPageNum() PageNum
+    SetTablesPageNum(pn PageNum) error
+    CreateTable(id int32) (PageNum, error)
+    OpenTable(id int32, pn PageNum) (Table, error)
+}
+
+// Start an engine of typ and use dir as the default data directory.
+func Start(typ, dir string) (db.Database, error)
+
+// Lookup the named database.
+func Lookup(name string) (db.Database, error)
+
+// Create the named database.
+func Create(name string) (db.Database, error)
 */
 
 import (
@@ -17,7 +51,7 @@ import (
 	"strings"
 	"text/tabwriter"
 
-	"github.com/leftmike/maho/engine"
+	"github.com/leftmike/maho/oldeng"
 	"github.com/leftmike/maho/parser"
 	"github.com/leftmike/maho/plan"
 	"github.com/leftmike/maho/sql"
@@ -25,7 +59,7 @@ import (
 	_ "github.com/leftmike/maho/store/basic"
 )
 
-func replSQL(e *engine.Engine, p parser.Parser, w io.Writer) {
+func replSQL(e *oldeng.Engine, p parser.Parser, w io.Writer) {
 	for {
 		stmt, err := p.Parse()
 		if err == io.EOF {
@@ -86,13 +120,13 @@ func replSQL(e *engine.Engine, p parser.Parser, w io.Writer) {
 	}
 }
 
-func start() (*engine.Engine, error) {
+func start() (*oldeng.Engine, error) {
 	db, err := store.Open("basic", "maho")
 	if err != nil {
 		return nil, err
 	}
 
-	return engine.Start(db)
+	return oldeng.Start(db)
 }
 
 func main() {

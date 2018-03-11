@@ -5,8 +5,8 @@ import (
 	"io"
 
 	"github.com/leftmike/maho/db"
-	"github.com/leftmike/maho/engine"
 	"github.com/leftmike/maho/expr"
+	"github.com/leftmike/maho/oldeng"
 	"github.com/leftmike/maho/sql"
 )
 
@@ -27,7 +27,7 @@ type deletePlan struct {
 	rows db.DeleteRows
 }
 
-func (dp *deletePlan) Execute(e *engine.Engine) (int64, error) {
+func (dp *deletePlan) Execute(e *oldeng.Engine) (int64, error) {
 	dest := make([]sql.Value, len(dp.rows.Columns()))
 	cnt := int64(0)
 	for {
@@ -45,7 +45,7 @@ func (dp *deletePlan) Execute(e *engine.Engine) (int64, error) {
 	}
 }
 
-func (stmt *Delete) Plan(e *engine.Engine) (interface{}, error) {
+func (stmt *Delete) Plan(e *oldeng.Engine) (interface{}, error) {
 	dbase, err := e.LookupDatabase(stmt.Table.Database)
 	if err != nil {
 		return nil, err

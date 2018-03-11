@@ -4,7 +4,7 @@ import (
 	"fmt"
 
 	"github.com/leftmike/maho/db"
-	"github.com/leftmike/maho/engine"
+	"github.com/leftmike/maho/oldeng"
 	"github.com/leftmike/maho/sql"
 )
 
@@ -33,11 +33,11 @@ func (stmt *CreateTable) String() string {
 	return s
 }
 
-func (stmt *CreateTable) Plan(e *engine.Engine) (interface{}, error) {
+func (stmt *CreateTable) Plan(e *oldeng.Engine) (interface{}, error) {
 	return stmt, nil
 }
 
-func (stmt *CreateTable) Execute(e *engine.Engine) (int64, error) {
+func (stmt *CreateTable) Execute(e *oldeng.Engine) (int64, error) {
 	d, err := e.LookupDatabase(stmt.Table.Database)
 	if err != nil {
 		return 0, err

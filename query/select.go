@@ -6,8 +6,8 @@ import (
 	"sort"
 
 	"github.com/leftmike/maho/db"
-	"github.com/leftmike/maho/engine"
 	"github.com/leftmike/maho/expr"
+	"github.com/leftmike/maho/oldeng"
 	"github.com/leftmike/maho/sql"
 )
 
@@ -135,11 +135,11 @@ func (stmt *Select) String() string {
 	return s
 }
 
-func (stmt *Select) Plan(e *engine.Engine) (interface{}, error) {
+func (stmt *Select) Plan(e *oldeng.Engine) (interface{}, error) {
 	return stmt.Rows(e)
 }
 
-func (stmt *Select) Rows(e *engine.Engine) (db.Rows, error) {
+func (stmt *Select) Rows(e *oldeng.Engine) (db.Rows, error) {
 	var rows db.Rows
 	var fctx *fromContext
 	var err error
@@ -168,7 +168,7 @@ func (stmt *Select) Rows(e *engine.Engine) (db.Rows, error) {
 	return group(rows, fctx, stmt.Results, stmt.GroupBy, stmt.Having, stmt.OrderBy)
 }
 
-func (fs FromSelect) rows(e *engine.Engine) (db.Rows, *fromContext, error) {
+func (fs FromSelect) rows(e *oldeng.Engine) (db.Rows, *fromContext, error) {
 	rows, err := fs.Select.Rows(e)
 	if err != nil {
 		return nil, nil, err

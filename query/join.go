@@ -5,8 +5,8 @@ import (
 	"io"
 
 	"github.com/leftmike/maho/db"
-	"github.com/leftmike/maho/engine"
 	"github.com/leftmike/maho/expr"
+	"github.com/leftmike/maho/oldeng"
 	"github.com/leftmike/maho/sql"
 )
 
@@ -256,7 +256,7 @@ func (jr *joinRows) Next(dest []sql.Value) error {
 	}
 }
 
-func (fj FromJoin) rows(e *engine.Engine) (db.Rows, *fromContext, error) {
+func (fj FromJoin) rows(e *oldeng.Engine) (db.Rows, *fromContext, error) {
 	leftRows, leftCtx, err := fj.Left.rows(e)
 	if err != nil {
 		return nil, nil, err

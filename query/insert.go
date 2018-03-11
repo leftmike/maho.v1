@@ -4,8 +4,8 @@ import (
 	"fmt"
 
 	"github.com/leftmike/maho/db"
-	"github.com/leftmike/maho/engine"
 	"github.com/leftmike/maho/expr"
+	"github.com/leftmike/maho/oldeng"
 	"github.com/leftmike/maho/sql"
 )
 
@@ -50,11 +50,11 @@ func (stmt *InsertValues) String() string {
 	return s
 }
 
-func (stmt *InsertValues) Plan(e *engine.Engine) (interface{}, error) {
+func (stmt *InsertValues) Plan(e *oldeng.Engine) (interface{}, error) {
 	return stmt, nil
 }
 
-func (stmt *InsertValues) Execute(e *engine.Engine) (int64, error) {
+func (stmt *InsertValues) Execute(e *oldeng.Engine) (int64, error) {
 	dbase, err := e.LookupDatabase(stmt.Table.Database)
 	if err != nil {
 		return 0, err

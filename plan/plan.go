@@ -2,11 +2,11 @@ package plan
 
 import (
 	"github.com/leftmike/maho/db"
-	"github.com/leftmike/maho/engine"
+	"github.com/leftmike/maho/oldeng"
 )
 
 type Rows db.Rows
 
 type Executer interface {
-	Execute(e *engine.Engine) (int64, error)
+	Execute(e *oldeng.Engine) (int64, error)
 }

@@ -4,14 +4,14 @@ import (
 	"fmt"
 
 	"github.com/leftmike/maho/db"
-	"github.com/leftmike/maho/engine"
 	"github.com/leftmike/maho/expr"
+	"github.com/leftmike/maho/oldeng"
 	"github.com/leftmike/maho/sql"
 )
 
 type FromItem interface {
 	fmt.Stringer
-	rows(e *engine.Engine) (db.Rows, *fromContext, error)
+	rows(e *oldeng.Engine) (db.Rows, *fromContext, error)
 }
 
 type FromTableAlias sql.TableAlias
@@ -20,7 +20,7 @@ func (fta FromTableAlias) String() string {
 	return ((sql.TableAlias)(fta)).String()
 }
 
-func (fta FromTableAlias) rows(e *engine.Engine) (db.Rows, *fromContext, error) {
+func (fta FromTableAlias) rows(e *oldeng.Engine) (db.Rows, *fromContext, error) {
 	db, err := e.LookupDatabase(fta.Database)
 	if err != nil {
 		return nil, nil, err

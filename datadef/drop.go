@@ -4,7 +4,7 @@ import (
 	"fmt"
 
 	"github.com/leftmike/maho/db"
-	"github.com/leftmike/maho/engine"
+	"github.com/leftmike/maho/oldeng"
 	"github.com/leftmike/maho/sql"
 )
 
@@ -27,11 +27,11 @@ func (stmt *DropTable) String() string {
 	return s
 }
 
-func (stmt *DropTable) Plan(e *engine.Engine) (interface{}, error) {
+func (stmt *DropTable) Plan(e *oldeng.Engine) (interface{}, error) {
 	return stmt, nil
 }
 
-func (stmt *DropTable) Execute(e *engine.Engine) (int64, error) {
+func (stmt *DropTable) Execute(e *oldeng.Engine) (int64, error) {
 	for _, tbl := range stmt.Tables {
 		d, err := e.LookupDatabase(tbl.Database)
 		if err != nil {
