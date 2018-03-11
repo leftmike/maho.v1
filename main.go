@@ -22,11 +22,8 @@ of the table and it can change
 - combine Rows, DeleteRows, and UpdateRows into a single interface (and fix filterRows)
 - combine Table and TableModify into a single interface
 - remove Table.Name()
-- remove db.Database
 - sql.TABLES --> DB_TABLES (DB$TABLES)
 - sql.COLUMNS --> DB_COLUMNS (DB$COLUMNS)
-- remove sql.BASIC
-- rename engine/neweng.go --> engine/engine.go
 - fix main_test.go
 - add engine tables
 */

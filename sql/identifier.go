@@ -9,8 +9,7 @@ type Identifier int
 const MaxIdentifier = 128
 
 const (
-	BASIC Identifier = iota + 1
-	BIGINT
+	BIGINT Identifier = iota + 1
 	BINARY
 	BLOB
 	BOOL
@@ -81,7 +80,6 @@ const (
 )
 
 var knownIdentifiers = map[string]Identifier{
-	"basic":       BASIC,
 	"columns":     COLUMNS,
 	"count":       COUNT,
 	"count_all":   COUNT_ALL,
