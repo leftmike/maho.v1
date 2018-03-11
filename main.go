@@ -19,28 +19,15 @@ of the table and it can change
 - Store --> Engine
 - write a tool to dump a database, maybe a page at a time
 
-type Engine interface { // implemented by engine, but not directly used
-    CreateDatabase(name string) (Database, error)
-    OpenDatabase(name string) (Database, error)
-}
-
-type PageNum int64
-
-type Database interface { // implemented by engine, but not directly used
-    GetTablesPageNum() PageNum
-    SetTablesPageNum(pn PageNum) error
-    CreateTable(id int32) (PageNum, error)
-    OpenTable(id int32, pn PageNum) (Table, error)
-}
-
-// Start an engine of typ and use dir as the default data directory.
-func Start(typ, dir string) (db.Database, error)
-
-// Lookup the named database.
-func Lookup(name string) (db.Database, error)
-
-// Create the named database.
-func Create(name string) (db.Database, error)
+- combine Rows, DeleteRows, and UpdateRows into a single interface (and fix filterRows)
+- combine Table and TableModify into a single interface
+- remove Table.Name()
+- remove db.Database
+- sql.TABLES --> DB_TABLES (DB$TABLES)
+- sql.COLUMNS --> DB_COLUMNS (DB$COLUMNS)
+- remove sql.BASIC
+- rename engine/neweng.go --> engine/engine.go
+- rm -R store/
 */
 
 import (
@@ -51,6 +38,8 @@ import (
 	"strings"
 	"text/tabwriter"
 
+	"github.com/leftmike/maho/engine"
+	_ "github.com/leftmike/maho/engine/basic"
 	"github.com/leftmike/maho/oldeng"
 	"github.com/leftmike/maho/parser"
 	"github.com/leftmike/maho/plan"
@@ -121,6 +110,11 @@ func replSQL(e *oldeng.Engine, p parser.Parser, w io.Writer) {
 }
 
 func start() (*oldeng.Engine, error) {
+	err := engine.Start("basic", "testdata", "maho")
+	if err != nil {
+		fmt.Printf("engine.Start: %s\n", err)
+	}
+
 	db, err := store.Open("basic", "maho")
 	if err != nil {
 		return nil, err
