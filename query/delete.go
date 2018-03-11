@@ -24,7 +24,7 @@ func (stmt *Delete) String() string {
 }
 
 type deletePlan struct {
-	rows db.DeleteRows
+	rows db.Rows
 }
 
 func (dp *deletePlan) Execute() (int64, error) {
@@ -46,14 +46,9 @@ func (dp *deletePlan) Execute() (int64, error) {
 }
 
 func (stmt *Delete) Plan() (interface{}, error) {
-	t, err := engine.LookupTable(stmt.Table.Database, stmt.Table.Table)
+	tbl, err := engine.LookupTable(stmt.Table.Database, stmt.Table.Table)
 	if err != nil {
 		return nil, err
-	}
-
-	tbl, ok := t.(db.TableModify)
-	if !ok {
-		return nil, fmt.Errorf("engine: table %s can't be modified", stmt.Table)
 	}
 
 	rows, err := tbl.DeleteRows()
@@ -66,7 +61,7 @@ func (stmt *Delete) Plan() (interface{}, error) {
 		if err != nil {
 			return nil, err
 		}
-		rows = &filterDeleteRows{filterRows{rows: rows, cond: ce}}
+		rows = &filterRows{rows: rows, cond: ce}
 	}
 	return &deletePlan{rows: rows}, nil
 }

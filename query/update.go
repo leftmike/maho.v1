@@ -44,7 +44,7 @@ type updatePlan struct {
 	columns []sql.Identifier
 	types   []db.ColumnType
 	dest    []sql.Value
-	rows    db.UpdateRows
+	rows    db.Rows
 	updates []columnUpdate
 }
 
@@ -85,13 +85,9 @@ func (up *updatePlan) Execute() (int64, error) {
 }
 
 func (stmt *Update) Plan() (interface{}, error) {
-	t, err := engine.LookupTable(stmt.Table.Database, stmt.Table.Table)
+	tbl, err := engine.LookupTable(stmt.Table.Database, stmt.Table.Table)
 	if err != nil {
 		return nil, err
-	}
-	tbl, ok := t.(db.TableModify)
-	if !ok {
-		return nil, fmt.Errorf("engine: table %s can't be modified", stmt.Table)
 	}
 
 	rows, err := tbl.UpdateRows()
@@ -104,7 +100,7 @@ func (stmt *Update) Plan() (interface{}, error) {
 		if err != nil {
 			return nil, err
 		}
-		rows = &filterUpdateRows{filterRows{rows: rows, cond: ce}}
+		rows = &filterRows{rows: rows, cond: ce}
 	}
 
 	plan := updatePlan{

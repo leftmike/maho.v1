@@ -5,15 +5,10 @@ import (
 )
 
 type Table interface {
-	Name() sql.Identifier
 	Columns() []sql.Identifier
 	ColumnTypes() []ColumnType
 	Rows() (Rows, error)
-}
-
-type TableModify interface {
-	Table
 	Insert(row []sql.Value) error
-	DeleteRows() (DeleteRows, error)
-	UpdateRows() (UpdateRows, error)
+	DeleteRows() (Rows, error)
+	UpdateRows() (Rows, error)
 }

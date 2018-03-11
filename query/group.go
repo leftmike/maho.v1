@@ -120,6 +120,14 @@ func (gr *groupRows) Next(dest []sql.Value) error {
 	return io.EOF
 }
 
+func (_ *groupRows) Delete() error {
+	return fmt.Errorf("group rows may not be deleted")
+}
+
+func (_ *groupRows) Update(updates []db.ColumnUpdate) error {
+	return fmt.Errorf("group rows may not be updated")
+}
+
 type groupContext struct {
 	group       []expr.Expr
 	groupExprs  []expr2dest

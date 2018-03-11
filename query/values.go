@@ -89,6 +89,14 @@ func (v *values) Next(dest []sql.Value) error {
 	return nil
 }
 
+func (_ *values) Delete() error {
+	return fmt.Errorf("values rows may not be deleted")
+}
+
+func (_ *values) Update(updates []db.ColumnUpdate) error {
+	return fmt.Errorf("values rows may not be updated")
+}
+
 type FromValues struct {
 	Values
 	Alias         sql.Identifier

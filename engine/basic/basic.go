@@ -18,7 +18,6 @@ type basicDatabase struct {
 }
 
 type basicTable struct {
-	name        sql.Identifier
 	columns     []sql.Identifier
 	columnTypes []db.ColumnType
 	rows        [][]sql.Value
@@ -79,7 +78,7 @@ func (be *basicEngine) CreateTable(dbname, tblname sql.Identifier, cols []sql.Id
 		return fmt.Errorf("basic: table %s already exists in database %s", tblname, dbname)
 	}
 
-	bdb.tables[tblname] = &basicTable{tblname, cols, colTypes, nil}
+	bdb.tables[tblname] = &basicTable{cols, colTypes, nil}
 	return nil
 }
 
@@ -98,10 +97,6 @@ func (be *basicEngine) DropTable(dbname, tblname sql.Identifier, exists bool) er
 	return nil
 }
 
-func (tt *basicTable) Name() sql.Identifier {
-	return tt.name
-}
-
 func (tt *basicTable) Columns() []sql.Identifier {
 	return tt.columns
 }
@@ -114,11 +109,11 @@ func (tt *basicTable) Rows() (db.Rows, error) {
 	return &basicRows{columns: tt.columns, rows: tt.rows}, nil
 }
 
-func (tt *basicTable) DeleteRows() (db.DeleteRows, error) {
+func (tt *basicTable) DeleteRows() (db.Rows, error) {
 	return &basicRows{columns: tt.columns, rows: tt.rows}, nil
 }
 
-func (tt *basicTable) UpdateRows() (db.UpdateRows, error) {
+func (tt *basicTable) UpdateRows() (db.Rows, error) {
 	return &basicRows{columns: tt.columns, rows: tt.rows}, nil
 }
 

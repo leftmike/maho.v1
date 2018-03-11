@@ -19,9 +19,6 @@ of the table and it can change
 - Store --> Engine
 - write a tool to dump a database, maybe a page at a time
 
-- combine Rows, DeleteRows, and UpdateRows into a single interface (and fix filterRows)
-- combine Table and TableModify into a single interface
-- remove Table.Name()
 - sql.TABLES --> DB_TABLES (DB$TABLES)
 - sql.COLUMNS --> DB_COLUMNS (DB$COLUMNS)
 - fix main_test.go

@@ -3,7 +3,6 @@ package query
 import (
 	"fmt"
 
-	"github.com/leftmike/maho/db"
 	"github.com/leftmike/maho/engine"
 	"github.com/leftmike/maho/expr"
 	"github.com/leftmike/maho/sql"
@@ -55,13 +54,9 @@ func (stmt *InsertValues) Plan() (interface{}, error) {
 }
 
 func (stmt *InsertValues) Execute() (int64, error) {
-	t, err := engine.LookupTable(stmt.Table.Database, stmt.Table.Table)
+	tbl, err := engine.LookupTable(stmt.Table.Database, stmt.Table.Table)
 	if err != nil {
 		return 0, err
-	}
-	tbl, ok := t.(db.TableModify)
-	if !ok {
-		return 0, fmt.Errorf("engine: table %s can't be modified", stmt.Table)
 	}
 
 	cols := tbl.Columns()
@@ -86,7 +81,7 @@ func (stmt *InsertValues) Execute() (int64, error) {
 		for v, nam := range stmt.Columns {
 			c, ok := cmap[nam]
 			if !ok {
-				return 0, fmt.Errorf("engine: %s: column not found: %s", tbl.Name(), nam)
+				return 0, fmt.Errorf("engine: %s: column not found: %s", stmt.Table, nam)
 			}
 			c2v[c] = v
 		}
@@ -94,7 +89,7 @@ func (stmt *InsertValues) Execute() (int64, error) {
 
 	for _, r := range stmt.Rows {
 		if len(r) > mv {
-			return 0, fmt.Errorf("engine: %s: too many values", tbl.Name())
+			return 0, fmt.Errorf("engine: %s: too many values", stmt.Table)
 		}
 		row := make([]sql.Value, len(cols))
 		for i, c := range colTypes {
@@ -119,7 +114,7 @@ func (stmt *InsertValues) Execute() (int64, error) {
 
 			row[i], err = c.ConvertValue(cols[i], v)
 			if err != nil {
-				return 0, fmt.Errorf("engine: table \"%s\": %s", tbl.Name(), err.Error())
+				return 0, fmt.Errorf("engine: table %s: %s", stmt.Table, err.Error())
 			}
 		}
 

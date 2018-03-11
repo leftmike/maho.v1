@@ -255,6 +255,14 @@ func (jr *joinRows) Next(dest []sql.Value) error {
 	}
 }
 
+func (_ *joinRows) Delete() error {
+	return fmt.Errorf("join rows may not be deleted")
+}
+
+func (_ *joinRows) Update(updates []db.ColumnUpdate) error {
+	return fmt.Errorf("join rows may not be updated")
+}
+
 func (fj FromJoin) rows() (db.Rows, *fromContext, error) {
 	leftRows, leftCtx, err := fj.Left.rows()
 	if err != nil {

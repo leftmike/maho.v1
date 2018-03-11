@@ -238,6 +238,14 @@ func (sr *sortRows) Next(dest []sql.Value) error {
 	return io.EOF
 }
 
+func (_ *sortRows) Delete() error {
+	return fmt.Errorf("sort rows may not be deleted")
+}
+
+func (_ *sortRows) Update(updates []db.ColumnUpdate) error {
+	return fmt.Errorf("sort rows may not be updated")
+}
+
 func (sr *sortRows) Len() int {
 	return len(sr.values)
 }
@@ -369,6 +377,14 @@ func (fr *filterRows) Next(dest []sql.Value) error {
 	return nil
 }
 
+func (fr *filterRows) Delete() error {
+	return fr.rows.Delete()
+}
+
+func (fr *filterRows) Update(updates []db.ColumnUpdate) error {
+	return fr.rows.Update(updates)
+}
+
 func where(rows db.Rows, fctx *fromContext, cond expr.Expr) (db.Rows, error) {
 	if cond == nil {
 		return rows, nil
@@ -378,30 +394,6 @@ func where(rows db.Rows, fctx *fromContext, cond expr.Expr) (db.Rows, error) {
 		return nil, err
 	}
 	return &filterRows{rows: rows, cond: ce}, nil
-}
-
-type filterDeleteRows struct {
-	filterRows
-}
-
-func (fdr *filterDeleteRows) Delete() error {
-	rows, ok := fdr.rows.(db.DeleteRows)
-	if !ok {
-		panic("filterDeleteRows.rows is not db.DeleteRows")
-	}
-	return rows.Delete()
-}
-
-type filterUpdateRows struct {
-	filterRows
-}
-
-func (fur *filterUpdateRows) Update(updates []db.ColumnUpdate) error {
-	rows, ok := fur.rows.(db.UpdateRows)
-	if !ok {
-		panic("filterUpdateRows.rows is not db.UpdateRows")
-	}
-	return rows.Update(updates)
 }
 
 type oneEmptyRow struct {
@@ -425,6 +417,14 @@ func (oer *oneEmptyRow) Next(dest []sql.Value) error {
 	return nil
 }
 
+func (_ *oneEmptyRow) Delete() error {
+	return fmt.Errorf("one empty row may not be deleted")
+}
+
+func (_ *oneEmptyRow) Update(updates []db.ColumnUpdate) error {
+	return fmt.Errorf("one empty row may not be updated")
+}
+
 type allResultRows struct {
 	rows    db.Rows
 	columns []sql.Identifier
@@ -440,6 +440,14 @@ func (arr *allResultRows) Close() error {
 
 func (arr *allResultRows) Next(dest []sql.Value) error {
 	return arr.rows.Next(dest)
+}
+
+func (_ *allResultRows) Delete() error {
+	return fmt.Errorf("all result rows may not be deleted")
+}
+
+func (_ *allResultRows) Update(updates []db.ColumnUpdate) error {
+	return fmt.Errorf("all result rows may not be updated")
 }
 
 type src2dest struct {
@@ -491,6 +499,14 @@ func (rr *resultRows) Next(dest []sql.Value) error {
 		dest[e2d.destColIndex] = val
 	}
 	return nil
+}
+
+func (_ *resultRows) Delete() error {
+	return fmt.Errorf("result rows may not be deleted")
+}
+
+func (_ *resultRows) Update(updates []db.ColumnUpdate) error {
+	return fmt.Errorf("result rows may not be updated")
 }
 
 func results(rows db.Rows, fctx *fromContext, results []SelectResult) (db.Rows, error) {
