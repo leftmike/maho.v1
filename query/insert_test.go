@@ -5,8 +5,8 @@ import (
 	"testing"
 
 	"github.com/leftmike/maho/db"
+	"github.com/leftmike/maho/engine"
 	"github.com/leftmike/maho/expr"
-	"github.com/leftmike/maho/oldeng"
 	"github.com/leftmike/maho/parser"
 	"github.com/leftmike/maho/plan"
 	"github.com/leftmike/maho/query"
@@ -185,44 +185,40 @@ func TestInsert(t *testing.T) {
 		t.Errorf("InsertValues{}.String() got %s want %s", s.String(), r)
 	}
 
-	e, dbase, err := testutil.StartEngine("test_insert")
-	if err != nil {
-		t.Fatal(err)
-	}
-
-	testInsert(t, e, dbase.(db.DatabaseModify), sql.ID("t"), insertColumns1, insertColumnTypes1,
+	startEngine(t)
+	testInsert(t, sql.ID("test"), sql.ID("t"), insertColumns1, insertColumnTypes1,
 		insertCases1)
-	testInsert(t, e, dbase.(db.DatabaseModify), sql.ID("t2"), insertColumns2, insertColumnTypes2,
+	testInsert(t, sql.ID("test"), sql.ID("t2"), insertColumns2, insertColumnTypes2,
 		insertCases2)
-	testInsert(t, e, dbase.(db.DatabaseModify), sql.ID("t3"), insertColumns3, insertColumnTypes3,
+	testInsert(t, sql.ID("test"), sql.ID("t3"), insertColumns3, insertColumnTypes3,
 		insertCases3)
 }
 
-func statement(e *oldeng.Engine, s string) error {
+func statement(s string) error {
 	p := parser.NewParser(strings.NewReader(s), "statement")
 	stmt, err := p.Parse()
 	if err != nil {
 		return err
 	}
-	ret, err := stmt.Plan(e)
+	ret, err := stmt.Plan()
 	if err != nil {
 		return err
 	}
-	_, err = ret.(plan.Executer).Execute(e)
+	_, err = ret.(plan.Executer).Execute()
 	return err
 }
 
-func testInsert(t *testing.T, e *oldeng.Engine, dbase db.DatabaseModify, nam sql.Identifier,
-	cols []sql.Identifier, colTypes []db.ColumnType, cases []insertCase) {
+func testInsert(t *testing.T, dbnam, nam sql.Identifier, cols []sql.Identifier,
+	colTypes []db.ColumnType, cases []insertCase) {
 
 	for _, c := range cases {
-		err := dbase.CreateTable(nam, cols, colTypes)
+		err := engine.CreateTable(dbnam, nam, cols, colTypes)
 		if err != nil {
 			t.Error(err)
 			return
 		}
 
-		err = statement(e, c.stmt)
+		err = statement(c.stmt)
 		if c.fail {
 			if err == nil {
 				t.Errorf("Parse(\"%s\").Execute() did not fail", c.stmt)
@@ -230,7 +226,7 @@ func testInsert(t *testing.T, e *oldeng.Engine, dbase db.DatabaseModify, nam sql
 		} else if err != nil {
 			t.Errorf("Parse(\"%s\").Execute() failed with %s", c.stmt, err.Error())
 		} else {
-			tbl, err := dbase.Table(nam)
+			tbl, err := engine.LookupTable(dbnam, nam)
 			if err != nil {
 				t.Error(err)
 				continue
@@ -251,7 +247,7 @@ func testInsert(t *testing.T, e *oldeng.Engine, dbase db.DatabaseModify, nam sql
 			}
 		}
 
-		err = dbase.DropTable(nam, false)
+		err = engine.DropTable(dbnam, nam, false)
 		if err != nil {
 			t.Error(err)
 			return

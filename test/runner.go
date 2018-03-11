@@ -7,15 +7,12 @@ import (
 
 	"github.com/leftmike/sqltest/pkg/sqltest"
 
-	"github.com/leftmike/maho/oldeng"
 	"github.com/leftmike/maho/parser"
 	"github.com/leftmike/maho/plan"
 	"github.com/leftmike/maho/sql"
 )
 
-type Runner struct {
-	Engine *oldeng.Engine
-}
+type Runner struct{}
 
 func (run *Runner) RunExec(tst *sqltest.Test) error {
 	p := parser.NewParser(strings.NewReader(tst.Test),
@@ -28,11 +25,11 @@ func (run *Runner) RunExec(tst *sqltest.Test) error {
 		if err != nil {
 			return err
 		}
-		ret, err := stmt.Plan(run.Engine)
+		ret, err := stmt.Plan()
 		if err != nil {
 			return err
 		}
-		_, err = ret.(plan.Executer).Execute(run.Engine)
+		_, err = ret.(plan.Executer).Execute()
 		if err != nil {
 			return err
 		}
@@ -47,7 +44,7 @@ func (run *Runner) RunQuery(tst *sqltest.Test) ([]string, [][]string, error) {
 	if err != nil {
 		return nil, nil, err
 	}
-	ret, err := stmt.Plan(run.Engine)
+	ret, err := stmt.Plan()
 	if err != nil {
 		return nil, nil, err
 	}

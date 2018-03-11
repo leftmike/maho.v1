@@ -5,8 +5,8 @@ import (
 	"io"
 
 	"github.com/leftmike/maho/db"
+	"github.com/leftmike/maho/engine"
 	"github.com/leftmike/maho/expr"
-	"github.com/leftmike/maho/oldeng"
 	"github.com/leftmike/maho/sql"
 )
 
@@ -27,7 +27,7 @@ type deletePlan struct {
 	rows db.DeleteRows
 }
 
-func (dp *deletePlan) Execute(e *oldeng.Engine) (int64, error) {
+func (dp *deletePlan) Execute() (int64, error) {
 	dest := make([]sql.Value, len(dp.rows.Columns()))
 	cnt := int64(0)
 	for {
@@ -45,18 +45,15 @@ func (dp *deletePlan) Execute(e *oldeng.Engine) (int64, error) {
 	}
 }
 
-func (stmt *Delete) Plan(e *oldeng.Engine) (interface{}, error) {
-	dbase, err := e.LookupDatabase(stmt.Table.Database)
+func (stmt *Delete) Plan() (interface{}, error) {
+	t, err := engine.LookupTable(stmt.Table.Database, stmt.Table.Table)
 	if err != nil {
 		return nil, err
 	}
-	t, err := dbase.Table(stmt.Table.Table)
-	if err != nil {
-		return nil, err
-	}
+
 	tbl, ok := t.(db.TableModify)
 	if !ok {
-		return nil, fmt.Errorf("engine: table \"%s.%s\" can't be modified", dbase.Name(), t.Name())
+		return nil, fmt.Errorf("engine: table %s can't be modified", stmt.Table)
 	}
 
 	rows, err := tbl.DeleteRows()

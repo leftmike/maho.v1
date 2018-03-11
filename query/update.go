@@ -5,8 +5,8 @@ import (
 	"io"
 
 	"github.com/leftmike/maho/db"
+	"github.com/leftmike/maho/engine"
 	"github.com/leftmike/maho/expr"
-	"github.com/leftmike/maho/oldeng"
 	"github.com/leftmike/maho/sql"
 )
 
@@ -52,7 +52,7 @@ func (up *updatePlan) EvalRef(idx int) sql.Value {
 	return up.dest[idx]
 }
 
-func (up *updatePlan) Execute(e *oldeng.Engine) (int64, error) {
+func (up *updatePlan) Execute() (int64, error) {
 	up.dest = make([]sql.Value, len(up.rows.Columns()))
 	cnt := int64(0)
 	updates := make([]db.ColumnUpdate, len(up.updates))
@@ -84,18 +84,14 @@ func (up *updatePlan) Execute(e *oldeng.Engine) (int64, error) {
 	}
 }
 
-func (stmt *Update) Plan(e *oldeng.Engine) (interface{}, error) {
-	dbase, err := e.LookupDatabase(stmt.Table.Database)
-	if err != nil {
-		return nil, err
-	}
-	t, err := dbase.Table(stmt.Table.Table)
+func (stmt *Update) Plan() (interface{}, error) {
+	t, err := engine.LookupTable(stmt.Table.Database, stmt.Table.Table)
 	if err != nil {
 		return nil, err
 	}
 	tbl, ok := t.(db.TableModify)
 	if !ok {
-		return nil, fmt.Errorf("engine: table \"%s.%s\" can't be modified", dbase.Name(), t.Name())
+		return nil, fmt.Errorf("engine: table %s can't be modified", stmt.Table)
 	}
 
 	rows, err := tbl.UpdateRows()

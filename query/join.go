@@ -6,7 +6,6 @@ import (
 
 	"github.com/leftmike/maho/db"
 	"github.com/leftmike/maho/expr"
-	"github.com/leftmike/maho/oldeng"
 	"github.com/leftmike/maho/sql"
 )
 
@@ -256,12 +255,12 @@ func (jr *joinRows) Next(dest []sql.Value) error {
 	}
 }
 
-func (fj FromJoin) rows(e *oldeng.Engine) (db.Rows, *fromContext, error) {
-	leftRows, leftCtx, err := fj.Left.rows(e)
+func (fj FromJoin) rows() (db.Rows, *fromContext, error) {
+	leftRows, leftCtx, err := fj.Left.rows()
 	if err != nil {
 		return nil, nil, err
 	}
-	rightRows, rightCtx, err := fj.Right.rows(e)
+	rightRows, rightCtx, err := fj.Right.rows()
 	if err != nil {
 		return nil, nil, err
 	}

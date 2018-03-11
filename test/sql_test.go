@@ -7,8 +7,10 @@ import (
 
 	"github.com/leftmike/sqltest/pkg/sqltest"
 
+	"github.com/leftmike/maho/engine"
+	_ "github.com/leftmike/maho/engine/basic"
+	"github.com/leftmike/maho/sql"
 	"github.com/leftmike/maho/test"
-	"github.com/leftmike/maho/testutil"
 )
 
 type report struct {
@@ -44,16 +46,26 @@ func (_ mahoDialect) DriverName() string {
 	return "maho"
 }
 
-func TestSQL(t *testing.T) {
-	e, _, err := testutil.StartEngine("test")
-	if err != nil {
-		t.Errorf("StartEngine() failed with %s", err)
-		return
-	}
+var started bool
 
-	run := test.Runner{Engine: e}
+func startEngine(t *testing.T) {
+	t.Helper()
+
+	if !started {
+		err := engine.Start("basic", "testdata", sql.ID("test"))
+		if err != nil {
+			t.Fatal(err)
+		}
+		started = true
+	}
+}
+
+func TestSQL(t *testing.T) {
+	startEngine(t)
+
+	run := test.Runner{}
 	var reporter reporter
-	err = sqltest.RunTests(*testData, &run, &reporter, mahoDialect{}, *update)
+	err := sqltest.RunTests(*testData, &run, &reporter, mahoDialect{}, *update)
 	if err != nil {
 		t.Errorf("RunTests(%q) failed with %s", testData, err)
 		return

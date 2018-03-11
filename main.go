@@ -27,7 +27,8 @@ of the table and it can change
 - sql.COLUMNS --> DB_COLUMNS (DB$COLUMNS)
 - remove sql.BASIC
 - rename engine/neweng.go --> engine/engine.go
-- rm -R store/
+- fix main_test.go
+- add engine tables
 */
 
 import (
@@ -40,15 +41,12 @@ import (
 
 	"github.com/leftmike/maho/engine"
 	_ "github.com/leftmike/maho/engine/basic"
-	"github.com/leftmike/maho/oldeng"
 	"github.com/leftmike/maho/parser"
 	"github.com/leftmike/maho/plan"
 	"github.com/leftmike/maho/sql"
-	"github.com/leftmike/maho/store"
-	_ "github.com/leftmike/maho/store/basic"
 )
 
-func replSQL(e *oldeng.Engine, p parser.Parser, w io.Writer) {
+func replSQL(p parser.Parser, w io.Writer) {
 	for {
 		stmt, err := p.Parse()
 		if err == io.EOF {
@@ -59,14 +57,14 @@ func replSQL(e *oldeng.Engine, p parser.Parser, w io.Writer) {
 			break
 		}
 
-		ret, err := stmt.Plan(e)
+		ret, err := stmt.Plan()
 		if err != nil {
 			fmt.Println(err)
 			break
 		}
 
 		if exec, ok := ret.(plan.Executer); ok {
-			cnt, err := exec.Execute(e)
+			cnt, err := exec.Execute()
 			if err != nil {
 				fmt.Println(err)
 				break
@@ -109,29 +107,19 @@ func replSQL(e *oldeng.Engine, p parser.Parser, w io.Writer) {
 	}
 }
 
-func start() (*oldeng.Engine, error) {
-	err := engine.Start("basic", "testdata", "maho")
-	if err != nil {
-		fmt.Printf("engine.Start: %s\n", err)
-	}
-
-	db, err := store.Open("basic", "maho")
-	if err != nil {
-		return nil, err
-	}
-
-	return oldeng.Start(db)
+func start() error {
+	return engine.Start("basic", "testdata", sql.ID("maho"))
 }
 
 func main() {
-	e, err := start()
+	err := start()
 	if err != nil {
 		fmt.Println(err)
 		return
 	}
 
 	if len(os.Args) == 1 {
-		replSQL(e, parser.NewParser(bufio.NewReader(os.Stdin), "[Stdin]"), os.Stdout)
+		replSQL(parser.NewParser(bufio.NewReader(os.Stdin), "[Stdin]"), os.Stdout)
 	} else {
 		for idx := 1; idx < len(os.Args); idx++ {
 			/*			f, err := os.Open(os.Args[idx])
@@ -139,7 +127,7 @@ func main() {
 							log.Fatal(err)
 						}
 						replSQL(e, bufio.NewReader(f), os.Args[idx])*/
-			replSQL(e, parser.NewParser(strings.NewReader(os.Args[idx]),
+			replSQL(parser.NewParser(strings.NewReader(os.Args[idx]),
 				fmt.Sprintf("os.Args[%d]", idx)), os.Stdout)
 		}
 	}

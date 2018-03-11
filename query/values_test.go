@@ -1,22 +1,39 @@
-package query
+package query_test
 
 import (
 	"testing"
 
+	"github.com/leftmike/maho/engine"
+	_ "github.com/leftmike/maho/engine/basic"
 	"github.com/leftmike/maho/expr"
+	"github.com/leftmike/maho/query"
 	"github.com/leftmike/maho/sql"
 	"github.com/leftmike/maho/testutil"
 )
 
+var started bool
+
+func startEngine(t *testing.T) {
+	t.Helper()
+
+	if !started {
+		err := engine.Start("basic", "testdata", sql.ID("test"))
+		if err != nil {
+			t.Fatal(err)
+		}
+		started = true
+	}
+}
+
 func TestValues(t *testing.T) {
 	cases := []struct {
-		values Values
+		values query.Values
 		s      string
 		cols   []sql.Identifier
 		rows   [][]sql.Value
 	}{
 		{
-			Values{
+			query.Values{
 				[][]expr.Expr{
 					{expr.Int64Literal(1), expr.StringLiteral("abc"), expr.True(), expr.Nil()},
 				},
@@ -29,7 +46,7 @@ func TestValues(t *testing.T) {
 			},
 		},
 		{
-			Values{
+			query.Values{
 				[][]expr.Expr{
 					{expr.Int64Literal(1), expr.StringLiteral("abc"), expr.True()},
 					{expr.Int64Literal(2), expr.StringLiteral("def"), expr.False()},
@@ -48,17 +65,13 @@ func TestValues(t *testing.T) {
 		},
 	}
 
-	e, _, err := testutil.StartEngine("test")
-	if err != nil {
-		t.Fatal(err)
-	}
-
+	startEngine(t)
 	for _, c := range cases {
 		if c.values.String() != c.s {
 			t.Errorf("(%v).String() got %q want %q", c.values, c.values.String(), c.s)
 			continue
 		}
-		rows, err := c.values.Rows(e)
+		rows, err := c.values.Rows()
 		if err != nil {
 			t.Errorf("(%v).Rows() failed with %s", c.values, err)
 			continue
@@ -68,7 +81,7 @@ func TestValues(t *testing.T) {
 			t.Errorf("(%v).Rows().Columns() got %v want %v", c.values, cols, c.cols)
 			continue
 		}
-		all, err := AllRows(rows)
+		all, err := query.AllRows(rows)
 		if err != nil {
 			t.Errorf("(%v).Rows().Next() failed with %s", c.values, err)
 		}
@@ -81,14 +94,14 @@ func TestValues(t *testing.T) {
 
 func TestFromValues(t *testing.T) {
 	cases := []struct {
-		from FromValues
+		from query.FromValues
 		s    string
 		cols []sql.Identifier
 		rows [][]sql.Value
 	}{
 		{
-			FromValues{
-				Values{
+			query.FromValues{
+				query.Values{
 					[][]expr.Expr{
 						{expr.Int64Literal(1), expr.StringLiteral("abc"), expr.True(), expr.Nil()},
 					},
@@ -103,8 +116,8 @@ func TestFromValues(t *testing.T) {
 			},
 		},
 		{
-			FromValues{
-				Values{
+			query.FromValues{
+				query.Values{
 					[][]expr.Expr{
 						{expr.Int64Literal(1), expr.StringLiteral("abc"), expr.True()},
 						{expr.Int64Literal(2), expr.StringLiteral("def"), expr.False()},
@@ -126,22 +139,17 @@ func TestFromValues(t *testing.T) {
 		},
 	}
 
-	e, _, err := testutil.StartEngine("test")
-	if err != nil {
-		t.Fatal(err)
-	}
-
 	for _, c := range cases {
 		if c.from.String() != c.s {
 			t.Errorf("(%v).String() got %q want %q", c.from, c.from.String(), c.s)
 			continue
 		}
-		rows, fctx, err := c.from.rows(e)
+		rows, fctx, err := c.from.TestRows()
 		if err != nil {
 			t.Errorf("(%v).Rows() failed with %s", c.from, err)
 			continue
 		}
-		cols := fctx.columns()
+		cols := fctx.TestColumns()
 		if !testutil.DeepEqual(cols, c.cols) {
 			t.Errorf("(%v).Rows().Columns() got %v want %v", c.from, cols, c.cols)
 			continue
@@ -151,7 +159,7 @@ func TestFromValues(t *testing.T) {
 				c.from, len(cols), len(rows.Columns()))
 			continue
 		}
-		all, err := AllRows(rows)
+		all, err := query.AllRows(rows)
 		if err != nil {
 			t.Errorf("(%v).Rows().Next() failed with %s", c.from, err)
 		}

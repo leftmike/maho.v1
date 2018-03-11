@@ -11,57 +11,94 @@ import (
 type Engine interface {
 	// Start the engine using dir as the data directory.
 	Start(dir string) error
-	CreateDatabase(dbname string) error
-	OpenDatabase(dbname string) (bool, error)
+	CreateDatabase(dbname sql.Identifier) error
+	OpenDatabase(dbname sql.Identifier) (bool, error)
 
 	// Lookup the named table in the named database.
-	LookupTable(dbname string, tblname sql.Identifier) (db.Table, error)
+	LookupTable(dbname, tblname sql.Identifier) (db.Table, error)
 
 	// Create the named table in the named database.
-	CreateTable(dbname string, tblname sql.Identifier, cols []sql.Identifier,
+	CreateTable(dbname, tblname sql.Identifier, cols []sql.Identifier,
 		colTypes []db.ColumnType) error
 
 	// Drop the named table from the named database.
-	DropTable(dbname string, tblname sql.Identifier, exists bool) error
+	DropTable(dbname, tblname sql.Identifier, exists bool) error
 }
 
 var (
 	enginesMutex sync.Mutex
 	engines      = map[string]Engine{}
-	E            Engine
+	e            Engine
+	defaultName  sql.Identifier
 )
 
 // Start an engine of typ, use dir as the data directory, and open or create the
 // named database.
-func Start(typ, dir, dbname string) error {
+func Start(typ, dir string, dbname sql.Identifier) error {
 	enginesMutex.Lock()
 	defer enginesMutex.Unlock()
 
-	if E != nil {
+	if e != nil {
 		panic("engine already started")
 	}
-	e, ok := engines[typ]
+	ne, ok := engines[typ]
 	if !ok {
 		return fmt.Errorf("engine: type not found: %s", typ)
 	}
-	err := e.Start(dir)
+	err := ne.Start(dir)
 	if err != nil {
 		return err
 	}
 
-	ok, err = e.OpenDatabase(dbname)
+	ok, err = ne.OpenDatabase(dbname)
 	if err != nil {
 		return err
 	}
 	if !ok {
-		err = e.CreateDatabase(dbname)
+		err = ne.CreateDatabase(dbname)
 		if err != nil {
 			return nil
 		}
 	}
 
-	E = e
+	e = ne
+	defaultName = dbname
 	return nil
+}
+
+// Lookup the named table in the named database.
+func LookupTable(dbname, tblname sql.Identifier) (db.Table, error) {
+	if e == nil {
+		panic("start the engine first")
+	}
+	if dbname == 0 {
+		dbname = defaultName
+	}
+	return e.LookupTable(dbname, tblname)
+}
+
+// Create the named table in the named database.
+func CreateTable(dbname, tblname sql.Identifier, cols []sql.Identifier,
+	colTypes []db.ColumnType) error {
+
+	if e == nil {
+		panic("start the engine first")
+	}
+	if dbname == 0 {
+		dbname = defaultName
+	}
+	return e.CreateTable(dbname, tblname, cols, colTypes)
+}
+
+// Drop the named table from the named database.
+func DropTable(dbname, tblname sql.Identifier, exists bool) error {
+	if e == nil {
+		panic("start the engine first")
+	}
+	if dbname == 0 {
+		dbname = defaultName
+	}
+	return e.DropTable(dbname, tblname, exists)
 }
 
 func Register(typ string, e Engine) {

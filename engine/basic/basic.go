@@ -10,7 +10,7 @@ import (
 )
 
 type basicEngine struct {
-	databases map[string]*basicDatabase
+	databases map[sql.Identifier]*basicDatabase
 }
 
 type basicDatabase struct {
@@ -36,11 +36,11 @@ func init() {
 }
 
 func (be *basicEngine) Start(dir string) error {
-	be.databases = map[string]*basicDatabase{}
+	be.databases = map[sql.Identifier]*basicDatabase{}
 	return nil
 }
 
-func (be *basicEngine) CreateDatabase(dbname string) error {
+func (be *basicEngine) CreateDatabase(dbname sql.Identifier) error {
 	if _, dup := be.databases[dbname]; dup {
 		return fmt.Errorf("basic: database %s already exists", dbname)
 	}
@@ -48,7 +48,7 @@ func (be *basicEngine) CreateDatabase(dbname string) error {
 	return nil
 }
 
-func (be *basicEngine) OpenDatabase(dbname string) (bool, error) {
+func (be *basicEngine) OpenDatabase(dbname sql.Identifier) (bool, error) {
 	_, ok := be.databases[dbname]
 	if ok {
 		return true, nil
@@ -56,7 +56,7 @@ func (be *basicEngine) OpenDatabase(dbname string) (bool, error) {
 	return false, nil
 }
 
-func (be *basicEngine) LookupTable(dbname string, tblname sql.Identifier) (db.Table, error) {
+func (be *basicEngine) LookupTable(dbname, tblname sql.Identifier) (db.Table, error) {
 	bdb, ok := be.databases[dbname]
 	if !ok {
 		return nil, fmt.Errorf("basic: database %s not found", dbname)
@@ -68,7 +68,7 @@ func (be *basicEngine) LookupTable(dbname string, tblname sql.Identifier) (db.Ta
 	return tbl, nil
 }
 
-func (be *basicEngine) CreateTable(dbname string, tblname sql.Identifier, cols []sql.Identifier,
+func (be *basicEngine) CreateTable(dbname, tblname sql.Identifier, cols []sql.Identifier,
 	colTypes []db.ColumnType) error {
 
 	bdb, ok := be.databases[dbname]
@@ -83,7 +83,7 @@ func (be *basicEngine) CreateTable(dbname string, tblname sql.Identifier, cols [
 	return nil
 }
 
-func (be *basicEngine) DropTable(dbname string, tblname sql.Identifier, exists bool) error {
+func (be *basicEngine) DropTable(dbname, tblname sql.Identifier, exists bool) error {
 	bdb, ok := be.databases[dbname]
 	if !ok {
 		return fmt.Errorf("basic: database %s not found", dbname)

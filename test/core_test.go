@@ -9,7 +9,6 @@ import (
 	"github.com/leftmike/maho/parser"
 	"github.com/leftmike/maho/plan"
 	"github.com/leftmike/maho/sql"
-	"github.com/leftmike/maho/testutil"
 )
 
 func TestValuesSimple(t *testing.T) {
@@ -32,11 +31,7 @@ func TestValuesSimple(t *testing.T) {
 		},
 	}
 
-	e, _, err := testutil.StartEngine("test_values")
-	if err != nil {
-		t.Fatal(err)
-	}
-
+	startEngine(t)
 	for i, c := range cases {
 		p := parser.NewParser(strings.NewReader(c.sql), fmt.Sprintf("tests[%d]", i))
 		stmt, err := p.Parse()
@@ -44,7 +39,7 @@ func TestValuesSimple(t *testing.T) {
 			t.Errorf("Parse(%q) failed with %s", c.sql, err)
 			continue
 		}
-		ret, err := stmt.Plan(e)
+		ret, err := stmt.Plan()
 		if c.fail {
 			if err == nil {
 				t.Errorf("Plan(%q) did not fail", c.sql)

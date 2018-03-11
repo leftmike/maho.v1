@@ -4,7 +4,7 @@ import (
 	"fmt"
 
 	"github.com/leftmike/maho/db"
-	"github.com/leftmike/maho/oldeng"
+	"github.com/leftmike/maho/engine"
 	"github.com/leftmike/maho/sql"
 )
 
@@ -33,18 +33,11 @@ func (stmt *CreateTable) String() string {
 	return s
 }
 
-func (stmt *CreateTable) Plan(e *oldeng.Engine) (interface{}, error) {
+func (stmt *CreateTable) Plan() (interface{}, error) {
 	return stmt, nil
 }
 
-func (stmt *CreateTable) Execute(e *oldeng.Engine) (int64, error) {
-	d, err := e.LookupDatabase(stmt.Table.Database)
-	if err != nil {
-		return 0, err
-	}
-	dbase, ok := d.(db.DatabaseModify)
-	if !ok {
-		return 0, fmt.Errorf("engine: database \"%s\" can't be modified", d.Name())
-	}
-	return 0, dbase.CreateTable(stmt.Table.Table, stmt.Columns, stmt.ColumnTypes)
+func (stmt *CreateTable) Execute() (int64, error) {
+	return 0, engine.CreateTable(stmt.Table.Database, stmt.Table.Table, stmt.Columns,
+		stmt.ColumnTypes)
 }

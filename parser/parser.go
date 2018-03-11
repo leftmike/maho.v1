@@ -8,7 +8,6 @@ import (
 	"github.com/leftmike/maho/datadef"
 	"github.com/leftmike/maho/db"
 	"github.com/leftmike/maho/expr"
-	"github.com/leftmike/maho/oldeng"
 	"github.com/leftmike/maho/parser/scanner"
 	"github.com/leftmike/maho/parser/token"
 	"github.com/leftmike/maho/query"
@@ -17,7 +16,7 @@ import (
 
 type Stmt interface {
 	fmt.Stringer
-	Plan(e *oldeng.Engine) (interface{}, error)
+	Plan() (interface{}, error)
 }
 
 type Parser interface {

@@ -4,14 +4,14 @@ import (
 	"fmt"
 
 	"github.com/leftmike/maho/db"
+	"github.com/leftmike/maho/engine"
 	"github.com/leftmike/maho/expr"
-	"github.com/leftmike/maho/oldeng"
 	"github.com/leftmike/maho/sql"
 )
 
 type FromItem interface {
 	fmt.Stringer
-	rows(e *oldeng.Engine) (db.Rows, *fromContext, error)
+	rows() (db.Rows, *fromContext, error)
 }
 
 type FromTableAlias sql.TableAlias
@@ -20,12 +20,8 @@ func (fta FromTableAlias) String() string {
 	return ((sql.TableAlias)(fta)).String()
 }
 
-func (fta FromTableAlias) rows(e *oldeng.Engine) (db.Rows, *fromContext, error) {
-	db, err := e.LookupDatabase(fta.Database)
-	if err != nil {
-		return nil, nil, err
-	}
-	tbl, err := db.Table(fta.Table)
+func (fta FromTableAlias) rows() (db.Rows, *fromContext, error) {
+	tbl, err := engine.LookupTable(fta.Database, fta.Table)
 	if err != nil {
 		return nil, nil, err
 	}
@@ -191,4 +187,9 @@ func (fctx *fromContext) columns() []sql.Identifier {
 		cols = append(cols, cr.column)
 	}
 	return cols
+}
+
+// TestColumns is for testing.
+func (fctx *fromContext) TestColumns() []sql.Identifier {
+	return fctx.columns()
 }

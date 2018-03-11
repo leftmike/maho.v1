@@ -6,7 +6,6 @@ import (
 
 	"github.com/leftmike/maho/db"
 	"github.com/leftmike/maho/expr"
-	"github.com/leftmike/maho/oldeng"
 	"github.com/leftmike/maho/sql"
 )
 
@@ -43,11 +42,11 @@ func (stmt *Values) String() string {
 	return s
 }
 
-func (stmt *Values) Plan(e *oldeng.Engine) (interface{}, error) {
-	return stmt.Rows(e)
+func (stmt *Values) Plan() (interface{}, error) {
+	return stmt.Rows()
 }
 
-func (stmt *Values) Rows(e *oldeng.Engine) (db.Rows, error) {
+func (stmt *Values) Rows() (db.Rows, error) {
 	columns := make([]sql.Identifier, len(stmt.Expressions[0]))
 	for i := 0; i < len(columns); i++ {
 		columns[i] = sql.ID(fmt.Sprintf("column%d", i+1))
@@ -111,8 +110,8 @@ func (fv FromValues) String() string {
 	return s
 }
 
-func (fv FromValues) rows(e *oldeng.Engine) (db.Rows, *fromContext, error) {
-	rows, err := fv.Values.Rows(e)
+func (fv FromValues) rows() (db.Rows, *fromContext, error) {
+	rows, err := fv.Values.Rows()
 	if err != nil {
 		return nil, nil, err
 	}
@@ -124,4 +123,9 @@ func (fv FromValues) rows(e *oldeng.Engine) (db.Rows, *fromContext, error) {
 		cols = fv.ColumnAliases
 	}
 	return rows, makeFromContext(fv.Alias, cols), nil
+}
+
+// TestRows is used for testing.
+func (fv FromValues) TestRows() (db.Rows, *fromContext, error) {
+	return fv.rows()
 }

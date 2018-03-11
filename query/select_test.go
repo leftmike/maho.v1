@@ -3,6 +3,7 @@ package query_test
 import (
 	"testing"
 
+	_ "github.com/leftmike/maho/engine/basic"
 	"github.com/leftmike/maho/expr"
 	"github.com/leftmike/maho/query"
 	"github.com/leftmike/maho/sql"
@@ -92,17 +93,13 @@ func TestSelect(t *testing.T) {
 		},
 	}
 
-	e, _, err := testutil.StartEngine("test")
-	if err != nil {
-		t.Fatal(err)
-	}
-
+	startEngine(t)
 	for _, c := range cases {
 		if c.stmt.String() != c.s {
 			t.Errorf("(%v).String() got %q want %q", c.stmt, c.stmt.String(), c.s)
 			continue
 		}
-		rows, err := c.stmt.Rows(e)
+		rows, err := c.stmt.Rows()
 		if err != nil {
 			t.Errorf("(%v).Rows() failed with %s", c.stmt, err)
 			continue

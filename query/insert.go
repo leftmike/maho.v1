@@ -4,8 +4,8 @@ import (
 	"fmt"
 
 	"github.com/leftmike/maho/db"
+	"github.com/leftmike/maho/engine"
 	"github.com/leftmike/maho/expr"
-	"github.com/leftmike/maho/oldeng"
 	"github.com/leftmike/maho/sql"
 )
 
@@ -50,22 +50,18 @@ func (stmt *InsertValues) String() string {
 	return s
 }
 
-func (stmt *InsertValues) Plan(e *oldeng.Engine) (interface{}, error) {
+func (stmt *InsertValues) Plan() (interface{}, error) {
 	return stmt, nil
 }
 
-func (stmt *InsertValues) Execute(e *oldeng.Engine) (int64, error) {
-	dbase, err := e.LookupDatabase(stmt.Table.Database)
-	if err != nil {
-		return 0, err
-	}
-	t, err := dbase.Table(stmt.Table.Table)
+func (stmt *InsertValues) Execute() (int64, error) {
+	t, err := engine.LookupTable(stmt.Table.Database, stmt.Table.Table)
 	if err != nil {
 		return 0, err
 	}
 	tbl, ok := t.(db.TableModify)
 	if !ok {
-		return 0, fmt.Errorf("engine: table \"%s.%s\" can't be modified", dbase.Name(), t.Name())
+		return 0, fmt.Errorf("engine: table %s can't be modified", stmt.Table)
 	}
 
 	cols := tbl.Columns()
