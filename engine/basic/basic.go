@@ -3,6 +3,7 @@ package basic
 import (
 	"fmt"
 	"io"
+	"math/rand"
 
 	"github.com/leftmike/maho/db"
 	"github.com/leftmike/maho/engine"
@@ -14,10 +15,13 @@ type basicEngine struct {
 }
 
 type basicDatabase struct {
+	nextID engine.TableID
 	tables map[sql.Identifier]*basicTable
 }
 
 type basicTable struct {
+	id          engine.TableID
+	pageNum     engine.PageNum
 	columns     []sql.Identifier
 	columnTypes []db.ColumnType
 	rows        [][]sql.Value
@@ -43,7 +47,10 @@ func (be *basicEngine) CreateDatabase(dbname sql.Identifier) error {
 	if _, dup := be.databases[dbname]; dup {
 		return fmt.Errorf("basic: database %s already exists", dbname)
 	}
-	be.databases[dbname] = &basicDatabase{map[sql.Identifier]*basicTable{}}
+	be.databases[dbname] = &basicDatabase{
+		nextID: 1,
+		tables: map[sql.Identifier]*basicTable{},
+	}
 	return nil
 }
 
@@ -53,6 +60,14 @@ func (be *basicEngine) OpenDatabase(dbname sql.Identifier) (bool, error) {
 		return true, nil
 	}
 	return false, nil
+}
+
+func (be *basicEngine) ListDatabases() ([]string, error) {
+	var names []string
+	for id := range be.databases {
+		names = append(names, id.String())
+	}
+	return names, nil
 }
 
 func (be *basicEngine) LookupTable(dbname, tblname sql.Identifier) (db.Table, error) {
@@ -78,7 +93,14 @@ func (be *basicEngine) CreateTable(dbname, tblname sql.Identifier, cols []sql.Id
 		return fmt.Errorf("basic: table %s already exists in database %s", tblname, dbname)
 	}
 
-	bdb.tables[tblname] = &basicTable{cols, colTypes, nil}
+	bdb.tables[tblname] = &basicTable{
+		id:          bdb.nextID,
+		pageNum:     engine.PageNum(rand.Uint64()),
+		columns:     cols,
+		columnTypes: colTypes,
+		rows:        nil,
+	}
+	bdb.nextID += 1
 	return nil
 }
 
@@ -97,70 +119,82 @@ func (be *basicEngine) DropTable(dbname, tblname sql.Identifier, exists bool) er
 	return nil
 }
 
-func (tt *basicTable) Columns() []sql.Identifier {
-	return tt.columns
+func (be *basicEngine) ListTables(dbname sql.Identifier) ([]engine.TableEntry, error) {
+	bdb, ok := be.databases[dbname]
+	if !ok {
+		return nil, fmt.Errorf("basic: database %s not found", dbname)
+	}
+	var tbls []engine.TableEntry
+	for name, tbl := range bdb.tables {
+		tbls = append(tbls, engine.TableEntry{name, tbl.id, tbl.pageNum, engine.VirtualType})
+	}
+	return tbls, nil
 }
 
-func (tt *basicTable) ColumnTypes() []db.ColumnType {
-	return tt.columnTypes
+func (bt *basicTable) Columns() []sql.Identifier {
+	return bt.columns
 }
 
-func (tt *basicTable) Rows() (db.Rows, error) {
-	return &basicRows{columns: tt.columns, rows: tt.rows}, nil
+func (bt *basicTable) ColumnTypes() []db.ColumnType {
+	return bt.columnTypes
 }
 
-func (tt *basicTable) DeleteRows() (db.Rows, error) {
-	return &basicRows{columns: tt.columns, rows: tt.rows}, nil
+func (bt *basicTable) Rows() (db.Rows, error) {
+	return &basicRows{columns: bt.columns, rows: bt.rows}, nil
 }
 
-func (tt *basicTable) UpdateRows() (db.Rows, error) {
-	return &basicRows{columns: tt.columns, rows: tt.rows}, nil
+func (bt *basicTable) DeleteRows() (db.Rows, error) {
+	return &basicRows{columns: bt.columns, rows: bt.rows}, nil
 }
 
-func (tt *basicTable) Insert(row []sql.Value) error {
-	tt.rows = append(tt.rows, row)
+func (bt *basicTable) UpdateRows() (db.Rows, error) {
+	return &basicRows{columns: bt.columns, rows: bt.rows}, nil
+}
+
+func (bt *basicTable) Insert(row []sql.Value) error {
+	bt.rows = append(bt.rows, row)
 	return nil
 }
 
-func (tr *basicRows) Columns() []sql.Identifier {
-	return tr.columns
+func (br *basicRows) Columns() []sql.Identifier {
+	return br.columns
 }
 
-func (tr *basicRows) Close() error {
-	tr.index = len(tr.rows)
-	tr.haveRow = false
+func (br *basicRows) Close() error {
+	br.index = len(br.rows)
+	br.haveRow = false
 	return nil
 }
 
-func (tr *basicRows) Next(dest []sql.Value) error {
-	for tr.index < len(tr.rows) {
-		if tr.rows[tr.index] != nil {
-			copy(dest, tr.rows[tr.index])
-			tr.index += 1
-			tr.haveRow = true
+func (br *basicRows) Next(dest []sql.Value) error {
+	for br.index < len(br.rows) {
+		if br.rows[br.index] != nil {
+			copy(dest, br.rows[br.index])
+			br.index += 1
+			br.haveRow = true
 			return nil
 		}
-		tr.index += 1
+		br.index += 1
 	}
 
-	tr.haveRow = false
+	br.haveRow = false
 	return io.EOF
 }
 
-func (tr *basicRows) Delete() error {
-	if !tr.haveRow {
+func (br *basicRows) Delete() error {
+	if !br.haveRow {
 		return fmt.Errorf("basic: no row to delete")
 	}
-	tr.haveRow = false
-	tr.rows[tr.index-1] = nil
+	br.haveRow = false
+	br.rows[br.index-1] = nil
 	return nil
 }
 
-func (tr *basicRows) Update(updates []db.ColumnUpdate) error {
-	if !tr.haveRow {
+func (br *basicRows) Update(updates []db.ColumnUpdate) error {
+	if !br.haveRow {
 		return fmt.Errorf("basic: no row to update")
 	}
-	row := tr.rows[tr.index-1]
+	row := br.rows[br.index-1]
 	for _, up := range updates {
 		row[up.Index] = up.Value
 	}

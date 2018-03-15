@@ -223,7 +223,7 @@ func (s *Scanner) scanIdentifier(sctx *ScanCtx, r rune) rune {
 		}
 	}
 
-	sctx.Identifier = sql.ID(s.buffer.String())
+	sctx.Identifier = sql.UnquotedID(s.buffer.String())
 	if sctx.Identifier.IsReserved() {
 		return token.Reserved
 	}

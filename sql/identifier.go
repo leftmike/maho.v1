@@ -15,13 +15,9 @@ const (
 	BOOL
 	BOOLEAN
 	CHAR
-	COLUMNS
 	COUNT
 	COUNT_ALL
-	DATABASES
 	DOUBLE
-	ENGINE
-	IDENTIFIERS
 	INT
 	INT2
 	INT4
@@ -30,8 +26,6 @@ const (
 	PRECISION
 	REAL
 	SMALLINT
-	STORES
-	TABLES
 	TEXT
 	VARBINARY
 	VARCHAR
@@ -80,14 +74,8 @@ const (
 )
 
 var knownIdentifiers = map[string]Identifier{
-	"columns":     COLUMNS,
-	"count":       COUNT,
-	"count_all":   COUNT_ALL,
-	"databases":   DATABASES,
-	"engine":      ENGINE,
-	"identifiers": IDENTIFIERS,
-	"stores":      STORES,
-	"tables":      TABLES,
+	"count":     COUNT,
+	"count_all": COUNT_ALL,
 }
 
 var knownKeywords = map[string]struct {
@@ -161,6 +149,21 @@ var (
 )
 
 func ID(s string) Identifier {
+	if len(s) > MaxIdentifier {
+		s = s[:MaxIdentifier]
+	}
+
+	s = strings.ToLower(s)
+	if id, found := identifiers[s]; found {
+		return id
+	}
+	lastIdentifier += 1
+	identifiers[s] = lastIdentifier
+	Names[lastIdentifier] = s
+	return lastIdentifier
+}
+
+func UnquotedID(s string) Identifier {
 	if len(s) > MaxIdentifier {
 		s = s[:MaxIdentifier]
 	}

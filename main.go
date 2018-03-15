@@ -13,16 +13,15 @@ used at a time
 - database is a separate storage instance; a single engine can support multiple databases at
 the same time
 - some shared infrastructure (that is also pluggable): (fat) lock manager; page cache (manager)
-- each database has tables table (db$tables) which then links to everything else
+- each database has directory of tables: name and physical location
+- table metadata is stored with the table and fixed at creation time
 - each table has an id and a location; id is fixed at create time; location is physical location
 of the table and it can change
-- Store --> Engine
 - write a tool to dump a database, maybe a page at a time
 
-- sql.TABLES --> DB_TABLES (DB$TABLES)
-- sql.COLUMNS --> DB_COLUMNS (DB$COLUMNS)
-- fix main_test.go
-- add engine tables
+- Rows.Delete and Rows.Update should not fail as many places: should be able to propogate on
+in most cases
+- get rid of Table.DeleteRows and Table.UpdateRows; just use Table.Rows
 */
 
 import (

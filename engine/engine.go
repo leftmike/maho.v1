@@ -8,21 +8,35 @@ import (
 	"github.com/leftmike/maho/sql"
 )
 
+type TableID uint32
+type PageNum uint64
+
+type TableType int
+
+const (
+	PhysicalType TableType = iota
+	VirtualType
+)
+
+type TableEntry struct {
+	Name    sql.Identifier
+	ID      TableID
+	PageNum PageNum
+	Type    TableType
+}
+
 type Engine interface {
 	// Start the engine using dir as the data directory.
 	Start(dir string) error
 	CreateDatabase(dbname sql.Identifier) error
 	OpenDatabase(dbname sql.Identifier) (bool, error)
+	ListDatabases() ([]string, error)
 
-	// Lookup the named table in the named database.
 	LookupTable(dbname, tblname sql.Identifier) (db.Table, error)
-
-	// Create the named table in the named database.
 	CreateTable(dbname, tblname sql.Identifier, cols []sql.Identifier,
 		colTypes []db.ColumnType) error
-
-	// Drop the named table from the named database.
 	DropTable(dbname, tblname sql.Identifier, exists bool) error
+	ListTables(dbname sql.Identifier) ([]TableEntry, error)
 }
 
 var (
@@ -73,6 +87,10 @@ func LookupTable(dbname, tblname sql.Identifier) (db.Table, error) {
 	}
 	if dbname == 0 {
 		dbname = defaultName
+	}
+	tbl, err := lookupVirtual(dbname, tblname)
+	if tbl != nil || err != nil {
+		return tbl, err
 	}
 	return e.LookupTable(dbname, tblname)
 }
