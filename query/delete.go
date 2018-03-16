@@ -51,7 +51,7 @@ func (stmt *Delete) Plan() (interface{}, error) {
 		return nil, err
 	}
 
-	rows, err := tbl.DeleteRows()
+	rows, err := tbl.Rows()
 	if err != nil {
 		return nil, err
 	}

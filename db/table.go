@@ -9,6 +9,4 @@ type Table interface {
 	ColumnTypes() []ColumnType
 	Rows() (Rows, error)
 	Insert(row []sql.Value) error
-	DeleteRows() (Rows, error)
-	UpdateRows() (Rows, error)
 }

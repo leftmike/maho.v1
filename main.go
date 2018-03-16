@@ -21,7 +21,6 @@ of the table and it can change
 
 - Rows.Delete and Rows.Update should not fail as many places: should be able to propogate on
 in most cases
-- get rid of Table.DeleteRows and Table.UpdateRows; just use Table.Rows
 */
 
 import (

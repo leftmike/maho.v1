@@ -93,14 +93,6 @@ func (vt *VirtualTable) Rows() (db.Rows, error) {
 	return &virtualRows{columns: vt.Cols, rows: vt.Values}, nil
 }
 
-func (vt *VirtualTable) DeleteRows() (db.Rows, error) {
-	return nil, fmt.Errorf("table can not be modified")
-}
-
-func (vt *VirtualTable) UpdateRows() (db.Rows, error) {
-	return nil, fmt.Errorf("table can not be modified")
-}
-
 func (vt *VirtualTable) Insert(row []sql.Value) error {
 	return fmt.Errorf("table can not be modified")
 }

@@ -143,14 +143,6 @@ func (bt *basicTable) Rows() (db.Rows, error) {
 	return &basicRows{columns: bt.columns, rows: bt.rows}, nil
 }
 
-func (bt *basicTable) DeleteRows() (db.Rows, error) {
-	return &basicRows{columns: bt.columns, rows: bt.rows}, nil
-}
-
-func (bt *basicTable) UpdateRows() (db.Rows, error) {
-	return &basicRows{columns: bt.columns, rows: bt.rows}, nil
-}
-
 func (bt *basicTable) Insert(row []sql.Value) error {
 	bt.rows = append(bt.rows, row)
 	return nil
