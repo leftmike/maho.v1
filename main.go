@@ -37,20 +37,21 @@ import (
 )
 
 func replSQL(p parser.Parser, w io.Writer) {
+	var tx engine.Transaction
 	for {
 		stmt, err := p.Parse()
 		if err == io.EOF {
-			break
+			return
 		}
 		if err != nil {
 			fmt.Println(err)
-			break
+			return
 		}
 
-		tx, err := engine.Begin()
+		tx, err = engine.Begin()
 		if err != nil {
 			fmt.Println(err)
-			break
+			return
 		}
 
 		ctx := context.Background()
@@ -98,9 +99,21 @@ func replSQL(p parser.Parser, w io.Writer) {
 			}
 			w.Flush()
 			if err != io.EOF {
-				fmt.Printf("error: %s\n", err)
+				fmt.Println(err)
+				break
 			}
 		}
+
+		err = tx.Commit(ctx)
+		if err != nil {
+			fmt.Println(err)
+			return
+		}
+	}
+
+	err := tx.Rollback()
+	if err != nil {
+		fmt.Println(err)
 	}
 }
 

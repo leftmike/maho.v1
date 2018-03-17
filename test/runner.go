@@ -40,6 +40,10 @@ func (run *Runner) RunExec(tst *sqltest.Test) error {
 		if err != nil {
 			return err
 		}
+		err = tx.Commit(ctx)
+		if err != nil {
+			return err
+		}
 	}
 	return nil
 }
@@ -92,6 +96,10 @@ func (run *Runner) RunQuery(tst *sqltest.Test) ([]string, [][]string, error) {
 			}
 		}
 		results = append(results, row)
+	}
+	err = tx.Commit(ctx)
+	if err != nil {
+		return nil, nil, err
 	}
 	return resultCols, results, nil
 }
