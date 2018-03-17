@@ -49,12 +49,12 @@ func (stmt *InsertValues) String() string {
 	return s
 }
 
-func (stmt *InsertValues) Plan() (interface{}, error) {
+func (stmt *InsertValues) Plan(tx engine.Transaction) (interface{}, error) {
 	return stmt, nil
 }
 
-func (stmt *InsertValues) Execute() (int64, error) {
-	tbl, err := engine.LookupTable(stmt.Table.Database, stmt.Table.Table)
+func (stmt *InsertValues) Execute(tx engine.Transaction) (int64, error) {
+	tbl, err := engine.LookupTable(tx, stmt.Table.Database, stmt.Table.Table)
 	if err != nil {
 		return 0, err
 	}

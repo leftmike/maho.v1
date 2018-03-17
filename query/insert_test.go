@@ -1,6 +1,7 @@
 package query_test
 
 import (
+	"context"
 	"strings"
 	"testing"
 
@@ -194,17 +195,17 @@ func TestInsert(t *testing.T) {
 		insertCases3)
 }
 
-func statement(s string) error {
+func statement(tx engine.Transaction, s string) error {
 	p := parser.NewParser(strings.NewReader(s), "statement")
 	stmt, err := p.Parse()
 	if err != nil {
 		return err
 	}
-	ret, err := stmt.Plan()
+	ret, err := stmt.Plan(tx)
 	if err != nil {
 		return err
 	}
-	_, err = ret.(plan.Executer).Execute()
+	_, err = ret.(plan.Executer).Execute(tx)
 	return err
 }
 
@@ -212,13 +213,18 @@ func testInsert(t *testing.T, dbnam, nam sql.Identifier, cols []sql.Identifier,
 	colTypes []db.ColumnType, cases []insertCase) {
 
 	for _, c := range cases {
-		err := engine.CreateTable(dbnam, nam, cols, colTypes)
+		tx, err := engine.Begin(context.Background())
+		if err != nil {
+			t.Error(err)
+			return
+		}
+		err = engine.CreateTable(tx, dbnam, nam, cols, colTypes)
 		if err != nil {
 			t.Error(err)
 			return
 		}
 
-		err = statement(c.stmt)
+		err = statement(tx, c.stmt)
 		if c.fail {
 			if err == nil {
 				t.Errorf("Parse(\"%s\").Execute() did not fail", c.stmt)
@@ -226,7 +232,7 @@ func testInsert(t *testing.T, dbnam, nam sql.Identifier, cols []sql.Identifier,
 		} else if err != nil {
 			t.Errorf("Parse(\"%s\").Execute() failed with %s", c.stmt, err.Error())
 		} else {
-			tbl, err := engine.LookupTable(dbnam, nam)
+			tbl, err := engine.LookupTable(tx, dbnam, nam)
 			if err != nil {
 				t.Error(err)
 				continue
@@ -247,7 +253,7 @@ func testInsert(t *testing.T, dbnam, nam sql.Identifier, cols []sql.Identifier,
 			}
 		}
 
-		err = engine.DropTable(dbnam, nam, false)
+		err = engine.DropTable(tx, dbnam, nam, false)
 		if err != nil {
 			t.Error(err)
 			return

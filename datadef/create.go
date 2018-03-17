@@ -33,11 +33,11 @@ func (stmt *CreateTable) String() string {
 	return s
 }
 
-func (stmt *CreateTable) Plan() (interface{}, error) {
+func (stmt *CreateTable) Plan(tx engine.Transaction) (interface{}, error) {
 	return stmt, nil
 }
 
-func (stmt *CreateTable) Execute() (int64, error) {
-	return 0, engine.CreateTable(stmt.Table.Database, stmt.Table.Table, stmt.Columns,
+func (stmt *CreateTable) Execute(tx engine.Transaction) (int64, error) {
+	return 0, engine.CreateTable(tx, stmt.Table.Database, stmt.Table.Table, stmt.Columns,
 		stmt.ColumnTypes)
 }

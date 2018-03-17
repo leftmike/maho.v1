@@ -52,7 +52,7 @@ func (up *updatePlan) EvalRef(idx int) sql.Value {
 	return up.dest[idx]
 }
 
-func (up *updatePlan) Execute() (int64, error) {
+func (up *updatePlan) Execute(tx engine.Transaction) (int64, error) {
 	up.dest = make([]sql.Value, len(up.rows.Columns()))
 	cnt := int64(0)
 	updates := make([]db.ColumnUpdate, len(up.updates))
@@ -84,8 +84,8 @@ func (up *updatePlan) Execute() (int64, error) {
 	}
 }
 
-func (stmt *Update) Plan() (interface{}, error) {
-	tbl, err := engine.LookupTable(stmt.Table.Database, stmt.Table.Table)
+func (stmt *Update) Plan(tx engine.Transaction) (interface{}, error) {
+	tbl, err := engine.LookupTable(tx, stmt.Table.Database, stmt.Table.Table)
 	if err != nil {
 		return nil, err
 	}

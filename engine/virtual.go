@@ -8,7 +8,7 @@ import (
 	"github.com/leftmike/maho/sql"
 )
 
-type MakeVirtual func(dbname, tblname sql.Identifier) (db.Table, error)
+type MakeVirtual func(tx Transaction, dbname, tblname sql.Identifier) (db.Table, error)
 
 type tableMap map[sql.Identifier]MakeVirtual
 
@@ -53,17 +53,17 @@ func CreateVirtual(dbname, tblname sql.Identifier, maker MakeVirtual) {
 	tblmap[tblname] = maker
 }
 
-func lookupVirtual(dbname, tblname sql.Identifier) (db.Table, error) {
+func lookupVirtual(tx Transaction, dbname, tblname sql.Identifier) (db.Table, error) {
 	tblmap, ok := virtualDatabases[dbname]
 	if !ok {
 		return nil, nil
 	}
 	if maker, ok := tblmap[tblname]; ok {
-		return maker(dbname, tblname)
+		return maker(tx, dbname, tblname)
 	}
 	if dbname != 0 {
 		if maker, ok := virtualDatabases[0][tblname]; ok {
-			return maker(dbname, tblname)
+			return maker(tx, dbname, tblname)
 		}
 	}
 	return nil, nil
@@ -134,9 +134,9 @@ var (
 	boolColType  = db.ColumnType{Type: sql.BooleanType, NotNull: true}
 )
 
-func listTables(dbname sql.Identifier) ([]TableEntry, error) {
+func listTables(tx Transaction, dbname sql.Identifier) ([]TableEntry, error) {
 	tblmap, ok := virtualDatabases[dbname]
-	tbls, err := e.ListTables(dbname)
+	tbls, err := tx.ListTables(dbname)
 	if !ok && err != nil {
 		return nil, err
 	}
@@ -153,8 +153,8 @@ func listTables(dbname sql.Identifier) ([]TableEntry, error) {
 	return tbls, nil
 }
 
-func MakeTablesVirtual(dbname, tblname sql.Identifier) (db.Table, error) {
-	tbls, err := listTables(dbname)
+func MakeTablesVirtual(tx Transaction, dbname, tblname sql.Identifier) (db.Table, error) {
+	tbls, err := listTables(tx, dbname)
 	if err != nil {
 		return nil, err
 	}
@@ -196,8 +196,8 @@ var (
 		boolColType, boolColType, boolColType, idColType}
 )
 
-func MakeColumnsVirtual(dbname, tblname sql.Identifier) (db.Table, error) {
-	tbls, err := listTables(dbname)
+func MakeColumnsVirtual(tx Transaction, dbname, tblname sql.Identifier) (db.Table, error) {
+	tbls, err := listTables(tx, dbname)
 	if err != nil {
 		return nil, err
 	}
@@ -211,7 +211,7 @@ func MakeColumnsVirtual(dbname, tblname sql.Identifier) (db.Table, error) {
 			cols = columnsColumns
 			colTypes = columnsColumnTypes
 		} else {
-			tbl, err := LookupTable(dbname, te.Name)
+			tbl, err := LookupTable(tx, dbname, te.Name)
 			if err != nil {
 				return nil, err
 			}
@@ -244,7 +244,7 @@ func MakeColumnsVirtual(dbname, tblname sql.Identifier) (db.Table, error) {
 	}, nil
 }
 
-func MakeDatabasesVirtual(dbname, tblname sql.Identifier) (db.Table, error) {
+func MakeDatabasesVirtual(tx Transaction, dbname, tblname sql.Identifier) (db.Table, error) {
 	names, err := e.ListDatabases()
 	if err != nil {
 		return nil, err
@@ -266,7 +266,7 @@ func MakeDatabasesVirtual(dbname, tblname sql.Identifier) (db.Table, error) {
 	}, nil
 }
 
-func MakeIdentifiersVirtual(dbname, tblname sql.Identifier) (db.Table, error) {
+func MakeIdentifiersVirtual(tx Transaction, dbname, tblname sql.Identifier) (db.Table, error) {
 	values := [][]sql.Value{}
 
 	for id, n := range sql.Names {

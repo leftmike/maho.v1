@@ -19,12 +19,17 @@ the same time
 of the table and it can change
 - write a tool to dump a database, maybe a page at a time
 
-- Rows.Delete and Rows.Update should not fail as many places: should be able to propogate on
-in most cases
+Execute(ctx context.Context, tx engine.Transaction)
+Next(ctx context.Context, dest ...)
+Delete(ctx context.Context)
+Update(ctx context.Context)
+Commit(ctx context.Context)
+
 */
 
 import (
 	"bufio"
+	"context"
 	"fmt"
 	"io"
 	"os"
@@ -49,14 +54,20 @@ func replSQL(p parser.Parser, w io.Writer) {
 			break
 		}
 
-		ret, err := stmt.Plan()
+		tx, err := engine.Begin(context.Background())
+		if err != nil {
+			fmt.Println(err)
+			break
+		}
+
+		ret, err := stmt.Plan(tx)
 		if err != nil {
 			fmt.Println(err)
 			break
 		}
 
 		if exec, ok := ret.(plan.Executer); ok {
-			cnt, err := exec.Execute()
+			cnt, err := exec.Execute(tx)
 			if err != nil {
 				fmt.Println(err)
 				break

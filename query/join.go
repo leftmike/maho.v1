@@ -5,6 +5,7 @@ import (
 	"io"
 
 	"github.com/leftmike/maho/db"
+	"github.com/leftmike/maho/engine"
 	"github.com/leftmike/maho/expr"
 	"github.com/leftmike/maho/sql"
 )
@@ -263,12 +264,12 @@ func (_ *joinRows) Update(updates []db.ColumnUpdate) error {
 	return fmt.Errorf("join rows may not be updated")
 }
 
-func (fj FromJoin) rows() (db.Rows, *fromContext, error) {
-	leftRows, leftCtx, err := fj.Left.rows()
+func (fj FromJoin) rows(tx engine.Transaction) (db.Rows, *fromContext, error) {
+	leftRows, leftCtx, err := fj.Left.rows(tx)
 	if err != nil {
 		return nil, nil, err
 	}
-	rightRows, rightCtx, err := fj.Right.rows()
+	rightRows, rightCtx, err := fj.Right.rows(tx)
 	if err != nil {
 		return nil, nil, err
 	}

@@ -1,8 +1,10 @@
 package query_test
 
 import (
+	"context"
 	"testing"
 
+	"github.com/leftmike/maho/engine"
 	_ "github.com/leftmike/maho/engine/basic"
 	"github.com/leftmike/maho/expr"
 	"github.com/leftmike/maho/query"
@@ -94,12 +96,16 @@ func TestSelect(t *testing.T) {
 	}
 
 	startEngine(t)
+	tx, err := engine.Begin(context.Background())
+	if err != nil {
+		t.Fatal(tx)
+	}
 	for _, c := range cases {
 		if c.stmt.String() != c.s {
 			t.Errorf("(%v).String() got %q want %q", c.stmt, c.stmt.String(), c.s)
 			continue
 		}
-		rows, err := c.stmt.Rows()
+		rows, err := c.stmt.Rows(tx)
 		if err != nil {
 			t.Errorf("(%v).Rows() failed with %s", c.stmt, err)
 			continue

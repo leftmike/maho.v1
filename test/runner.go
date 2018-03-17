@@ -1,12 +1,14 @@
 package test
 
 import (
+	"context"
 	"fmt"
 	"io"
 	"strings"
 
 	"github.com/leftmike/sqltest/pkg/sqltest"
 
+	"github.com/leftmike/maho/engine"
 	"github.com/leftmike/maho/parser"
 	"github.com/leftmike/maho/plan"
 	"github.com/leftmike/maho/sql"
@@ -25,11 +27,15 @@ func (run *Runner) RunExec(tst *sqltest.Test) error {
 		if err != nil {
 			return err
 		}
-		ret, err := stmt.Plan()
+		tx, err := engine.Begin(context.Background())
 		if err != nil {
 			return err
 		}
-		_, err = ret.(plan.Executer).Execute()
+		ret, err := stmt.Plan(tx)
+		if err != nil {
+			return err
+		}
+		_, err = ret.(plan.Executer).Execute(tx)
 		if err != nil {
 			return err
 		}
@@ -44,7 +50,11 @@ func (run *Runner) RunQuery(tst *sqltest.Test) ([]string, [][]string, error) {
 	if err != nil {
 		return nil, nil, err
 	}
-	ret, err := stmt.Plan()
+	tx, err := engine.Begin(context.Background())
+	if err != nil {
+		return nil, nil, err
+	}
+	ret, err := stmt.Plan(tx)
 	if err != nil {
 		return nil, nil, err
 	}

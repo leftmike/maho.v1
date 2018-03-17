@@ -6,6 +6,7 @@ import (
 	"sort"
 
 	"github.com/leftmike/maho/db"
+	"github.com/leftmike/maho/engine"
 	"github.com/leftmike/maho/expr"
 	"github.com/leftmike/maho/sql"
 )
@@ -134,11 +135,11 @@ func (stmt *Select) String() string {
 	return s
 }
 
-func (stmt *Select) Plan() (interface{}, error) {
-	return stmt.Rows()
+func (stmt *Select) Plan(tx engine.Transaction) (interface{}, error) {
+	return stmt.Rows(tx)
 }
 
-func (stmt *Select) Rows() (db.Rows, error) {
+func (stmt *Select) Rows(tx engine.Transaction) (db.Rows, error) {
 	var rows db.Rows
 	var fctx *fromContext
 	var err error
@@ -146,7 +147,7 @@ func (stmt *Select) Rows() (db.Rows, error) {
 	if stmt.From == nil {
 		rows = &oneEmptyRow{}
 	} else {
-		rows, fctx, err = stmt.From.rows()
+		rows, fctx, err = stmt.From.rows(tx)
 		if err != nil {
 			return nil, err
 		}
@@ -167,8 +168,8 @@ func (stmt *Select) Rows() (db.Rows, error) {
 	return group(rows, fctx, stmt.Results, stmt.GroupBy, stmt.Having, stmt.OrderBy)
 }
 
-func (fs FromSelect) rows() (db.Rows, *fromContext, error) {
-	rows, err := fs.Select.Rows()
+func (fs FromSelect) rows(tx engine.Transaction) (db.Rows, *fromContext, error) {
+	rows, err := fs.Select.Rows(tx)
 	if err != nil {
 		return nil, nil, err
 	}

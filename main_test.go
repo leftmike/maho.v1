@@ -19,12 +19,13 @@ func TestMain(t *testing.T) {
 		s string
 		r string
 	}{
-		{"select * from system.db$tables", `           table   id page_num      type
+		{"select * from system.db$tables order by [table]",
+			`           table   id page_num      type
            -----   -- --------      ----
  1   'databases' NULL     NULL 'virtual'
- 2 'identifiers' NULL     NULL 'virtual'
+ 2  'db$columns' NULL     NULL 'virtual'
  3   'db$tables' NULL     NULL 'virtual'
- 4  'db$columns' NULL     NULL 'virtual'
+ 4 'identifiers' NULL     NULL 'virtual'
 `},
 	}
 

@@ -7,6 +7,7 @@ import (
 
 	"github.com/leftmike/maho/datadef"
 	"github.com/leftmike/maho/db"
+	"github.com/leftmike/maho/engine"
 	"github.com/leftmike/maho/expr"
 	"github.com/leftmike/maho/parser/scanner"
 	"github.com/leftmike/maho/parser/token"
@@ -16,7 +17,7 @@ import (
 
 type Stmt interface {
 	fmt.Stringer
-	Plan() (interface{}, error)
+	Plan(tx engine.Transaction) (interface{}, error)
 }
 
 type Parser interface {

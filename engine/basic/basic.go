@@ -1,6 +1,7 @@
 package basic
 
 import (
+	"context"
 	"fmt"
 	"io"
 	"math/rand"
@@ -12,6 +13,10 @@ import (
 
 type basicEngine struct {
 	databases map[sql.Identifier]*basicDatabase
+}
+
+type basicTransaction struct {
+	e *basicEngine
 }
 
 type basicDatabase struct {
@@ -70,8 +75,12 @@ func (be *basicEngine) ListDatabases() ([]string, error) {
 	return names, nil
 }
 
-func (be *basicEngine) LookupTable(dbname, tblname sql.Identifier) (db.Table, error) {
-	bdb, ok := be.databases[dbname]
+func (be *basicEngine) Begin(ctx context.Context) (engine.Transaction, error) {
+	return &basicTransaction{be}, nil
+}
+
+func (btx *basicTransaction) LookupTable(dbname, tblname sql.Identifier) (db.Table, error) {
+	bdb, ok := btx.e.databases[dbname]
 	if !ok {
 		return nil, fmt.Errorf("basic: database %s not found", dbname)
 	}
@@ -82,10 +91,10 @@ func (be *basicEngine) LookupTable(dbname, tblname sql.Identifier) (db.Table, er
 	return tbl, nil
 }
 
-func (be *basicEngine) CreateTable(dbname, tblname sql.Identifier, cols []sql.Identifier,
+func (btx *basicTransaction) CreateTable(dbname, tblname sql.Identifier, cols []sql.Identifier,
 	colTypes []db.ColumnType) error {
 
-	bdb, ok := be.databases[dbname]
+	bdb, ok := btx.e.databases[dbname]
 	if !ok {
 		return fmt.Errorf("basic: database %s not found", dbname)
 	}
@@ -104,8 +113,8 @@ func (be *basicEngine) CreateTable(dbname, tblname sql.Identifier, cols []sql.Id
 	return nil
 }
 
-func (be *basicEngine) DropTable(dbname, tblname sql.Identifier, exists bool) error {
-	bdb, ok := be.databases[dbname]
+func (btx *basicTransaction) DropTable(dbname, tblname sql.Identifier, exists bool) error {
+	bdb, ok := btx.e.databases[dbname]
 	if !ok {
 		return fmt.Errorf("basic: database %s not found", dbname)
 	}
@@ -119,8 +128,8 @@ func (be *basicEngine) DropTable(dbname, tblname sql.Identifier, exists bool) er
 	return nil
 }
 
-func (be *basicEngine) ListTables(dbname sql.Identifier) ([]engine.TableEntry, error) {
-	bdb, ok := be.databases[dbname]
+func (btx *basicTransaction) ListTables(dbname sql.Identifier) ([]engine.TableEntry, error) {
+	bdb, ok := btx.e.databases[dbname]
 	if !ok {
 		return nil, fmt.Errorf("basic: database %s not found", dbname)
 	}
@@ -129,6 +138,16 @@ func (be *basicEngine) ListTables(dbname sql.Identifier) ([]engine.TableEntry, e
 		tbls = append(tbls, engine.TableEntry{name, tbl.id, tbl.pageNum, engine.VirtualType})
 	}
 	return tbls, nil
+}
+
+func (btx *basicTransaction) Commit() error {
+	btx.e = nil
+	return nil
+}
+
+func (btx *basicTransaction) Rollback() error {
+	btx.e = nil
+	return nil
 }
 
 func (bt *basicTable) Columns() []sql.Identifier {
