@@ -1,6 +1,7 @@
 package query
 
 import (
+	"context"
 	"fmt"
 
 	"github.com/leftmike/maho/engine"
@@ -49,12 +50,12 @@ func (stmt *InsertValues) String() string {
 	return s
 }
 
-func (stmt *InsertValues) Plan(tx engine.Transaction) (interface{}, error) {
+func (stmt *InsertValues) Plan(ctx context.Context, tx engine.Transaction) (interface{}, error) {
 	return stmt, nil
 }
 
-func (stmt *InsertValues) Execute(tx engine.Transaction) (int64, error) {
-	tbl, err := engine.LookupTable(tx, stmt.Table.Database, stmt.Table.Table)
+func (stmt *InsertValues) Execute(ctx context.Context, tx engine.Transaction) (int64, error) {
+	tbl, err := engine.LookupTable(ctx, tx, stmt.Table.Database, stmt.Table.Table)
 	if err != nil {
 		return 0, err
 	}

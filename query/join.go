@@ -1,6 +1,7 @@
 package query
 
 import (
+	"context"
 	"fmt"
 	"io"
 
@@ -61,12 +62,12 @@ func (fj FromJoin) String() string {
 }
 
 // AllRows returns all of the rows from a db.Rows as slices of values.
-func AllRows(rows db.Rows) ([][]sql.Value, error) {
+func AllRows(ctx context.Context, rows db.Rows) ([][]sql.Value, error) {
 	all := [][]sql.Value{}
 	l := len(rows.Columns())
 	for {
 		dest := make([]sql.Value, l)
-		err := rows.Next(dest)
+		err := rows.Next(ctx, dest)
 		if err == io.EOF {
 			break
 		} else if err != nil {
@@ -170,7 +171,7 @@ func (jr *joinRows) onUsing(dest []sql.Value) (bool, error) {
 	return true, nil
 }
 
-func (jr *joinRows) Next(dest []sql.Value) error {
+func (jr *joinRows) Next(ctx context.Context, dest []sql.Value) error {
 	if jr.state == allDone {
 		return io.EOF
 	} else if jr.state == rightRemaining {
@@ -201,11 +202,11 @@ func (jr *joinRows) Next(dest []sql.Value) error {
 	for {
 		// Make sure that we have a left row.
 		if !jr.haveLeft {
-			err := jr.leftRows.Next(jr.leftDest)
+			err := jr.leftRows.Next(ctx, jr.leftDest)
 			if err == io.EOF && jr.rightUsed != nil {
 				jr.state = rightRemaining
 				jr.rightIndex = 0
-				return jr.Next(dest)
+				return jr.Next(ctx, dest)
 			}
 			if err != nil {
 				jr.state = allDone
@@ -256,25 +257,27 @@ func (jr *joinRows) Next(dest []sql.Value) error {
 	}
 }
 
-func (_ *joinRows) Delete() error {
+func (_ *joinRows) Delete(ctx context.Context) error {
 	return fmt.Errorf("join rows may not be deleted")
 }
 
-func (_ *joinRows) Update(updates []db.ColumnUpdate) error {
+func (_ *joinRows) Update(ctx context.Context, updates []db.ColumnUpdate) error {
 	return fmt.Errorf("join rows may not be updated")
 }
 
-func (fj FromJoin) rows(tx engine.Transaction) (db.Rows, *fromContext, error) {
-	leftRows, leftCtx, err := fj.Left.rows(tx)
+func (fj FromJoin) rows(ctx context.Context, tx engine.Transaction) (db.Rows, *fromContext,
+	error) {
+
+	leftRows, leftCtx, err := fj.Left.rows(ctx, tx)
 	if err != nil {
 		return nil, nil, err
 	}
-	rightRows, rightCtx, err := fj.Right.rows(tx)
+	rightRows, rightCtx, err := fj.Right.rows(ctx, tx)
 	if err != nil {
 		return nil, nil, err
 	}
 
-	rrows, err := AllRows(rightRows)
+	rrows, err := AllRows(ctx, rightRows)
 	if err != nil {
 		return nil, nil, err
 	}

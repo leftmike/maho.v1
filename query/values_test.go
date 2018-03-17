@@ -67,10 +67,11 @@ func TestValues(t *testing.T) {
 	}
 
 	startEngine(t)
-	tx, err := engine.Begin(context.Background())
+	tx, err := engine.Begin()
 	if err != nil {
 		t.Fatal(err)
 	}
+	ctx := context.Background()
 	for _, c := range cases {
 		if c.values.String() != c.s {
 			t.Errorf("(%v).String() got %q want %q", c.values, c.values.String(), c.s)
@@ -86,7 +87,7 @@ func TestValues(t *testing.T) {
 			t.Errorf("(%v).Rows().Columns() got %v want %v", c.values, cols, c.cols)
 			continue
 		}
-		all, err := query.AllRows(rows)
+		all, err := query.AllRows(ctx, rows)
 		if err != nil {
 			t.Errorf("(%v).Rows().Next() failed with %s", c.values, err)
 		}
@@ -144,12 +145,13 @@ func TestFromValues(t *testing.T) {
 		},
 	}
 
+	ctx := context.Background()
 	for _, c := range cases {
 		if c.from.String() != c.s {
 			t.Errorf("(%v).String() got %q want %q", c.from, c.from.String(), c.s)
 			continue
 		}
-		rows, fctx, err := c.from.TestRows(nil)
+		rows, fctx, err := c.from.TestRows(ctx, nil)
 		if err != nil {
 			t.Errorf("(%v).Rows() failed with %s", c.from, err)
 			continue
@@ -164,7 +166,7 @@ func TestFromValues(t *testing.T) {
 				c.from, len(cols), len(rows.Columns()))
 			continue
 		}
-		all, err := query.AllRows(rows)
+		all, err := query.AllRows(ctx, rows)
 		if err != nil {
 			t.Errorf("(%v).Rows().Next() failed with %s", c.from, err)
 		}

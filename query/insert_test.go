@@ -195,36 +195,37 @@ func TestInsert(t *testing.T) {
 		insertCases3)
 }
 
-func statement(tx engine.Transaction, s string) error {
+func statement(ctx context.Context, tx engine.Transaction, s string) error {
 	p := parser.NewParser(strings.NewReader(s), "statement")
 	stmt, err := p.Parse()
 	if err != nil {
 		return err
 	}
-	ret, err := stmt.Plan(tx)
+	ret, err := stmt.Plan(ctx, tx)
 	if err != nil {
 		return err
 	}
-	_, err = ret.(plan.Executer).Execute(tx)
+	_, err = ret.(plan.Executer).Execute(ctx, tx)
 	return err
 }
 
 func testInsert(t *testing.T, dbnam, nam sql.Identifier, cols []sql.Identifier,
 	colTypes []db.ColumnType, cases []insertCase) {
 
+	ctx := context.Background()
 	for _, c := range cases {
-		tx, err := engine.Begin(context.Background())
+		tx, err := engine.Begin()
 		if err != nil {
 			t.Error(err)
 			return
 		}
-		err = engine.CreateTable(tx, dbnam, nam, cols, colTypes)
+		err = engine.CreateTable(ctx, tx, dbnam, nam, cols, colTypes)
 		if err != nil {
 			t.Error(err)
 			return
 		}
 
-		err = statement(tx, c.stmt)
+		err = statement(ctx, tx, c.stmt)
 		if c.fail {
 			if err == nil {
 				t.Errorf("Parse(\"%s\").Execute() did not fail", c.stmt)
@@ -232,7 +233,7 @@ func testInsert(t *testing.T, dbnam, nam sql.Identifier, cols []sql.Identifier,
 		} else if err != nil {
 			t.Errorf("Parse(\"%s\").Execute() failed with %s", c.stmt, err.Error())
 		} else {
-			tbl, err := engine.LookupTable(tx, dbnam, nam)
+			tbl, err := engine.LookupTable(ctx, tx, dbnam, nam)
 			if err != nil {
 				t.Error(err)
 				continue
@@ -242,7 +243,7 @@ func testInsert(t *testing.T, dbnam, nam sql.Identifier, cols []sql.Identifier,
 				t.Errorf("(%s).Rows() failed with %s", nam, err)
 				continue
 			}
-			all, err := query.AllRows(rows)
+			all, err := query.AllRows(ctx, rows)
 			if err != nil {
 				t.Errorf("(%s).Rows().Next() failed with %s", nam, err)
 				continue
@@ -253,7 +254,7 @@ func testInsert(t *testing.T, dbnam, nam sql.Identifier, cols []sql.Identifier,
 			}
 		}
 
-		err = engine.DropTable(tx, dbnam, nam, false)
+		err = engine.DropTable(ctx, tx, dbnam, nam, false)
 		if err != nil {
 			t.Error(err)
 			return

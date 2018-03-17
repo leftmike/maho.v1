@@ -33,17 +33,17 @@ type Engine interface {
 	OpenDatabase(dbname sql.Identifier) (bool, error)
 	ListDatabases() ([]string, error)
 
-	Begin(ctx context.Context) (Transaction, error)
+	Begin() (Transaction, error)
 }
 
 type Transaction interface {
-	LookupTable(dbname, tblname sql.Identifier) (db.Table, error)
-	CreateTable(dbname, tblname sql.Identifier, cols []sql.Identifier,
+	LookupTable(ctx context.Context, dbname, tblname sql.Identifier) (db.Table, error)
+	CreateTable(ctx context.Context, dbname, tblname sql.Identifier, cols []sql.Identifier,
 		colTypes []db.ColumnType) error
-	DropTable(dbname, tblname sql.Identifier, exists bool) error
-	ListTables(dbname sql.Identifier) ([]TableEntry, error)
+	DropTable(ctx context.Context, dbname, tblname sql.Identifier, exists bool) error
+	ListTables(ctx context.Context, dbname sql.Identifier) ([]TableEntry, error)
 
-	Commit() error
+	Commit(ctx context.Context) error
 	Rollback() error
 }
 
@@ -89,31 +89,33 @@ func Start(typ, dir string, dbname sql.Identifier) error {
 }
 
 // Begin a new transaction.
-func Begin(ctx context.Context) (Transaction, error) {
+func Begin() (Transaction, error) {
 	if e == nil {
 		panic("start the engine first")
 	}
-	return e.Begin(ctx)
+	return e.Begin()
 }
 
 // LookupTable looks up the named table in the named database.
-func LookupTable(tx Transaction, dbname, tblname sql.Identifier) (db.Table, error) {
+func LookupTable(ctx context.Context, tx Transaction, dbname, tblname sql.Identifier) (db.Table,
+	error) {
+
 	if e == nil {
 		panic("start the engine first")
 	}
 	if dbname == 0 {
 		dbname = defaultName
 	}
-	tbl, err := lookupVirtual(tx, dbname, tblname)
+	tbl, err := lookupVirtual(ctx, tx, dbname, tblname)
 	if tbl != nil || err != nil {
 		return tbl, err
 	}
-	return tx.LookupTable(dbname, tblname)
+	return tx.LookupTable(ctx, dbname, tblname)
 }
 
 // CreateTable creates the named table in the named database.
-func CreateTable(tx Transaction, dbname, tblname sql.Identifier, cols []sql.Identifier,
-	colTypes []db.ColumnType) error {
+func CreateTable(ctx context.Context, tx Transaction, dbname, tblname sql.Identifier,
+	cols []sql.Identifier, colTypes []db.ColumnType) error {
 
 	if e == nil {
 		panic("start the engine first")
@@ -121,18 +123,20 @@ func CreateTable(tx Transaction, dbname, tblname sql.Identifier, cols []sql.Iden
 	if dbname == 0 {
 		dbname = defaultName
 	}
-	return tx.CreateTable(dbname, tblname, cols, colTypes)
+	return tx.CreateTable(ctx, dbname, tblname, cols, colTypes)
 }
 
 // DropTable drops the named table from the named database.
-func DropTable(tx Transaction, dbname, tblname sql.Identifier, exists bool) error {
+func DropTable(ctx context.Context, tx Transaction, dbname, tblname sql.Identifier,
+	exists bool) error {
+
 	if e == nil {
 		panic("start the engine first")
 	}
 	if dbname == 0 {
 		dbname = defaultName
 	}
-	return tx.DropTable(dbname, tblname, exists)
+	return tx.DropTable(ctx, dbname, tblname, exists)
 }
 
 func Register(typ string, e Engine) {

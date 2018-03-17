@@ -1,6 +1,7 @@
 package parser
 
 import (
+	"context"
 	"fmt"
 	"io"
 	"runtime"
@@ -17,7 +18,7 @@ import (
 
 type Stmt interface {
 	fmt.Stringer
-	Plan(tx engine.Transaction) (interface{}, error)
+	Plan(ctx context.Context, tx engine.Transaction) (interface{}, error)
 }
 
 type Parser interface {

@@ -1,6 +1,7 @@
 package query
 
 import (
+	"context"
 	"fmt"
 	"io"
 
@@ -43,7 +44,7 @@ func (stmt *Values) String() string {
 	return s
 }
 
-func (stmt *Values) Plan(tx engine.Transaction) (interface{}, error) {
+func (stmt *Values) Plan(ctx context.Context, tx engine.Transaction) (interface{}, error) {
 	return stmt.Rows(tx)
 }
 
@@ -81,7 +82,7 @@ func (v *values) Close() error {
 	return nil
 }
 
-func (v *values) Next(dest []sql.Value) error {
+func (v *values) Next(ctx context.Context, dest []sql.Value) error {
 	if v.index == len(v.rows) {
 		return io.EOF
 	}
@@ -90,11 +91,11 @@ func (v *values) Next(dest []sql.Value) error {
 	return nil
 }
 
-func (_ *values) Delete() error {
+func (_ *values) Delete(ctx context.Context) error {
 	return fmt.Errorf("values rows may not be deleted")
 }
 
-func (_ *values) Update(updates []db.ColumnUpdate) error {
+func (_ *values) Update(ctx context.Context, updates []db.ColumnUpdate) error {
 	return fmt.Errorf("values rows may not be updated")
 }
 
@@ -119,7 +120,9 @@ func (fv FromValues) String() string {
 	return s
 }
 
-func (fv FromValues) rows(tx engine.Transaction) (db.Rows, *fromContext, error) {
+func (fv FromValues) rows(ctx context.Context, tx engine.Transaction) (db.Rows, *fromContext,
+	error) {
+
 	rows, err := fv.Values.Rows(tx)
 	if err != nil {
 		return nil, nil, err
@@ -135,6 +138,8 @@ func (fv FromValues) rows(tx engine.Transaction) (db.Rows, *fromContext, error) 
 }
 
 // TestRows is used for testing.
-func (fv FromValues) TestRows(tx engine.Transaction) (db.Rows, *fromContext, error) {
-	return fv.rows(tx)
+func (fv FromValues) TestRows(ctx context.Context, tx engine.Transaction) (db.Rows, *fromContext,
+	error) {
+
+	return fv.rows(ctx, tx)
 }

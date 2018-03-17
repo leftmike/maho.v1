@@ -1,6 +1,7 @@
 package engine
 
 import (
+	"context"
 	"fmt"
 	"io"
 
@@ -8,7 +9,8 @@ import (
 	"github.com/leftmike/maho/sql"
 )
 
-type MakeVirtual func(tx Transaction, dbname, tblname sql.Identifier) (db.Table, error)
+type MakeVirtual func(ctx context.Context, tx Transaction, dbname,
+	tblname sql.Identifier) (db.Table, error)
 
 type tableMap map[sql.Identifier]MakeVirtual
 
@@ -53,17 +55,19 @@ func CreateVirtual(dbname, tblname sql.Identifier, maker MakeVirtual) {
 	tblmap[tblname] = maker
 }
 
-func lookupVirtual(tx Transaction, dbname, tblname sql.Identifier) (db.Table, error) {
+func lookupVirtual(ctx context.Context, tx Transaction, dbname,
+	tblname sql.Identifier) (db.Table, error) {
+
 	tblmap, ok := virtualDatabases[dbname]
 	if !ok {
 		return nil, nil
 	}
 	if maker, ok := tblmap[tblname]; ok {
-		return maker(tx, dbname, tblname)
+		return maker(ctx, tx, dbname, tblname)
 	}
 	if dbname != 0 {
 		if maker, ok := virtualDatabases[0][tblname]; ok {
-			return maker(tx, dbname, tblname)
+			return maker(ctx, tx, dbname, tblname)
 		}
 	}
 	return nil, nil
@@ -106,7 +110,7 @@ func (vr *virtualRows) Close() error {
 	return nil
 }
 
-func (vr *virtualRows) Next(dest []sql.Value) error {
+func (vr *virtualRows) Next(ctx context.Context, dest []sql.Value) error {
 	for vr.index < len(vr.rows) {
 		if vr.rows[vr.index] != nil {
 			copy(dest, vr.rows[vr.index])
@@ -119,11 +123,11 @@ func (vr *virtualRows) Next(dest []sql.Value) error {
 	return io.EOF
 }
 
-func (tr *virtualRows) Delete() error {
+func (tr *virtualRows) Delete(ctx context.Context) error {
 	return fmt.Errorf("table can not be modified")
 }
 
-func (tr *virtualRows) Update(updates []db.ColumnUpdate) error {
+func (tr *virtualRows) Update(ctx context.Context, updates []db.ColumnUpdate) error {
 	return fmt.Errorf("table can not be modified")
 }
 
@@ -134,9 +138,9 @@ var (
 	boolColType  = db.ColumnType{Type: sql.BooleanType, NotNull: true}
 )
 
-func listTables(tx Transaction, dbname sql.Identifier) ([]TableEntry, error) {
+func listTables(ctx context.Context, tx Transaction, dbname sql.Identifier) ([]TableEntry, error) {
 	tblmap, ok := virtualDatabases[dbname]
-	tbls, err := tx.ListTables(dbname)
+	tbls, err := tx.ListTables(ctx, dbname)
 	if !ok && err != nil {
 		return nil, err
 	}
@@ -153,8 +157,10 @@ func listTables(tx Transaction, dbname sql.Identifier) ([]TableEntry, error) {
 	return tbls, nil
 }
 
-func MakeTablesVirtual(tx Transaction, dbname, tblname sql.Identifier) (db.Table, error) {
-	tbls, err := listTables(tx, dbname)
+func MakeTablesVirtual(ctx context.Context, tx Transaction, dbname,
+	tblname sql.Identifier) (db.Table, error) {
+
+	tbls, err := listTables(ctx, tx, dbname)
 	if err != nil {
 		return nil, err
 	}
@@ -196,8 +202,10 @@ var (
 		boolColType, boolColType, boolColType, idColType}
 )
 
-func MakeColumnsVirtual(tx Transaction, dbname, tblname sql.Identifier) (db.Table, error) {
-	tbls, err := listTables(tx, dbname)
+func MakeColumnsVirtual(ctx context.Context, tx Transaction, dbname,
+	tblname sql.Identifier) (db.Table, error) {
+
+	tbls, err := listTables(ctx, tx, dbname)
 	if err != nil {
 		return nil, err
 	}
@@ -211,7 +219,7 @@ func MakeColumnsVirtual(tx Transaction, dbname, tblname sql.Identifier) (db.Tabl
 			cols = columnsColumns
 			colTypes = columnsColumnTypes
 		} else {
-			tbl, err := LookupTable(tx, dbname, te.Name)
+			tbl, err := LookupTable(ctx, tx, dbname, te.Name)
 			if err != nil {
 				return nil, err
 			}
@@ -244,7 +252,9 @@ func MakeColumnsVirtual(tx Transaction, dbname, tblname sql.Identifier) (db.Tabl
 	}, nil
 }
 
-func MakeDatabasesVirtual(tx Transaction, dbname, tblname sql.Identifier) (db.Table, error) {
+func MakeDatabasesVirtual(ctx context.Context, tx Transaction, dbname,
+	tblname sql.Identifier) (db.Table, error) {
+
 	names, err := e.ListDatabases()
 	if err != nil {
 		return nil, err
@@ -266,7 +276,9 @@ func MakeDatabasesVirtual(tx Transaction, dbname, tblname sql.Identifier) (db.Ta
 	}, nil
 }
 
-func MakeIdentifiersVirtual(tx Transaction, dbname, tblname sql.Identifier) (db.Table, error) {
+func MakeIdentifiersVirtual(ctx context.Context, tx Transaction, dbname,
+	tblname sql.Identifier) (db.Table, error) {
+
 	values := [][]sql.Value{}
 
 	for id, n := range sql.Names {

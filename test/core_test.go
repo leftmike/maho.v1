@@ -41,11 +41,12 @@ func TestValuesSimple(t *testing.T) {
 			t.Errorf("Parse(%q) failed with %s", c.sql, err)
 			continue
 		}
-		tx, err := engine.Begin(context.Background())
+		tx, err := engine.Begin()
 		if err != nil {
 			t.Fatal(err)
 		}
-		ret, err := stmt.Plan(tx)
+		ctx := context.Background()
+		ret, err := stmt.Plan(ctx, tx)
 		if c.fail {
 			if err == nil {
 				t.Errorf("Plan(%q) did not fail", c.sql)
@@ -63,7 +64,7 @@ func TestValuesSimple(t *testing.T) {
 		}
 		dest := make([]sql.Value, len(rows.Columns()))
 		for i, r := range c.rows {
-			if rows.Next(dest) != nil {
+			if rows.Next(ctx, dest) != nil {
 				t.Errorf("Plan(%q).Rows() got %d rows; want %d rows", c.sql, i, len(c.rows))
 				break
 			}

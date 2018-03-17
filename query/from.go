@@ -1,6 +1,7 @@
 package query
 
 import (
+	"context"
 	"fmt"
 
 	"github.com/leftmike/maho/db"
@@ -11,7 +12,7 @@ import (
 
 type FromItem interface {
 	fmt.Stringer
-	rows(tx engine.Transaction) (db.Rows, *fromContext, error)
+	rows(ctx context.Context, tx engine.Transaction) (db.Rows, *fromContext, error)
 }
 
 type FromTableAlias sql.TableAlias
@@ -20,8 +21,10 @@ func (fta FromTableAlias) String() string {
 	return ((sql.TableAlias)(fta)).String()
 }
 
-func (fta FromTableAlias) rows(tx engine.Transaction) (db.Rows, *fromContext, error) {
-	tbl, err := engine.LookupTable(tx, fta.Database, fta.Table)
+func (fta FromTableAlias) rows(ctx context.Context, tx engine.Transaction) (db.Rows,
+	*fromContext, error) {
+
+	tbl, err := engine.LookupTable(ctx, tx, fta.Database, fta.Table)
 	if err != nil {
 		return nil, nil, err
 	}

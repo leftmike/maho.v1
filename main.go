@@ -18,13 +18,6 @@ the same time
 - each table has an id and a location; id is fixed at create time; location is physical location
 of the table and it can change
 - write a tool to dump a database, maybe a page at a time
-
-Execute(ctx context.Context, tx engine.Transaction)
-Next(ctx context.Context, dest ...)
-Delete(ctx context.Context)
-Update(ctx context.Context)
-Commit(ctx context.Context)
-
 */
 
 import (
@@ -54,20 +47,21 @@ func replSQL(p parser.Parser, w io.Writer) {
 			break
 		}
 
-		tx, err := engine.Begin(context.Background())
+		tx, err := engine.Begin()
 		if err != nil {
 			fmt.Println(err)
 			break
 		}
 
-		ret, err := stmt.Plan(tx)
+		ctx := context.Background()
+		ret, err := stmt.Plan(ctx, tx)
 		if err != nil {
 			fmt.Println(err)
 			break
 		}
 
 		if exec, ok := ret.(plan.Executer); ok {
-			cnt, err := exec.Execute(tx)
+			cnt, err := exec.Execute(ctx, tx)
 			if err != nil {
 				fmt.Println(err)
 				break
@@ -91,7 +85,7 @@ func replSQL(p parser.Parser, w io.Writer) {
 			dest := make([]sql.Value, len(cols))
 			i := 1
 			for {
-				err = rows.Next(dest)
+				err = rows.Next(ctx, dest)
 				if err != nil {
 					break
 				}

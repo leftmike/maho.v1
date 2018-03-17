@@ -1,6 +1,8 @@
 package datadef
 
 import (
+	"context"
+
 	"github.com/leftmike/maho/engine"
 	"github.com/leftmike/maho/sql"
 )
@@ -24,13 +26,13 @@ func (stmt *DropTable) String() string {
 	return s
 }
 
-func (stmt *DropTable) Plan(tx engine.Transaction) (interface{}, error) {
+func (stmt *DropTable) Plan(ctx context.Context, tx engine.Transaction) (interface{}, error) {
 	return stmt, nil
 }
 
-func (stmt *DropTable) Execute(tx engine.Transaction) (int64, error) {
+func (stmt *DropTable) Execute(ctx context.Context, tx engine.Transaction) (int64, error) {
 	for _, tbl := range stmt.Tables {
-		err := engine.DropTable(tx, tbl.Database, tbl.Table, stmt.IfExists)
+		err := engine.DropTable(ctx, tx, tbl.Database, tbl.Table, stmt.IfExists)
 		if err != nil {
 			return 0, err
 		}

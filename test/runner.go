@@ -27,15 +27,16 @@ func (run *Runner) RunExec(tst *sqltest.Test) error {
 		if err != nil {
 			return err
 		}
-		tx, err := engine.Begin(context.Background())
+		tx, err := engine.Begin()
 		if err != nil {
 			return err
 		}
-		ret, err := stmt.Plan(tx)
+		ctx := context.Background()
+		ret, err := stmt.Plan(ctx, tx)
 		if err != nil {
 			return err
 		}
-		_, err = ret.(plan.Executer).Execute(tx)
+		_, err = ret.(plan.Executer).Execute(ctx, tx)
 		if err != nil {
 			return err
 		}
@@ -50,11 +51,12 @@ func (run *Runner) RunQuery(tst *sqltest.Test) ([]string, [][]string, error) {
 	if err != nil {
 		return nil, nil, err
 	}
-	tx, err := engine.Begin(context.Background())
+	tx, err := engine.Begin()
 	if err != nil {
 		return nil, nil, err
 	}
-	ret, err := stmt.Plan(tx)
+	ctx := context.Background()
+	ret, err := stmt.Plan(ctx, tx)
 	if err != nil {
 		return nil, nil, err
 	}
@@ -73,7 +75,7 @@ func (run *Runner) RunQuery(tst *sqltest.Test) ([]string, [][]string, error) {
 	var results [][]string
 	dest := make([]sql.Value, lenCols)
 	for {
-		err := rows.Next(dest)
+		err := rows.Next(ctx, dest)
 		if err == io.EOF {
 			break
 		} else if err != nil {

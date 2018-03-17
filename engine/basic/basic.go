@@ -75,11 +75,13 @@ func (be *basicEngine) ListDatabases() ([]string, error) {
 	return names, nil
 }
 
-func (be *basicEngine) Begin(ctx context.Context) (engine.Transaction, error) {
+func (be *basicEngine) Begin() (engine.Transaction, error) {
 	return &basicTransaction{be}, nil
 }
 
-func (btx *basicTransaction) LookupTable(dbname, tblname sql.Identifier) (db.Table, error) {
+func (btx *basicTransaction) LookupTable(ctx context.Context, dbname,
+	tblname sql.Identifier) (db.Table, error) {
+
 	bdb, ok := btx.e.databases[dbname]
 	if !ok {
 		return nil, fmt.Errorf("basic: database %s not found", dbname)
@@ -91,8 +93,8 @@ func (btx *basicTransaction) LookupTable(dbname, tblname sql.Identifier) (db.Tab
 	return tbl, nil
 }
 
-func (btx *basicTransaction) CreateTable(dbname, tblname sql.Identifier, cols []sql.Identifier,
-	colTypes []db.ColumnType) error {
+func (btx *basicTransaction) CreateTable(ctx context.Context, dbname, tblname sql.Identifier,
+	cols []sql.Identifier, colTypes []db.ColumnType) error {
 
 	bdb, ok := btx.e.databases[dbname]
 	if !ok {
@@ -113,7 +115,9 @@ func (btx *basicTransaction) CreateTable(dbname, tblname sql.Identifier, cols []
 	return nil
 }
 
-func (btx *basicTransaction) DropTable(dbname, tblname sql.Identifier, exists bool) error {
+func (btx *basicTransaction) DropTable(ctx context.Context, dbname, tblname sql.Identifier,
+	exists bool) error {
+
 	bdb, ok := btx.e.databases[dbname]
 	if !ok {
 		return fmt.Errorf("basic: database %s not found", dbname)
@@ -128,7 +132,9 @@ func (btx *basicTransaction) DropTable(dbname, tblname sql.Identifier, exists bo
 	return nil
 }
 
-func (btx *basicTransaction) ListTables(dbname sql.Identifier) ([]engine.TableEntry, error) {
+func (btx *basicTransaction) ListTables(ctx context.Context,
+	dbname sql.Identifier) ([]engine.TableEntry, error) {
+
 	bdb, ok := btx.e.databases[dbname]
 	if !ok {
 		return nil, fmt.Errorf("basic: database %s not found", dbname)
@@ -140,7 +146,7 @@ func (btx *basicTransaction) ListTables(dbname sql.Identifier) ([]engine.TableEn
 	return tbls, nil
 }
 
-func (btx *basicTransaction) Commit() error {
+func (btx *basicTransaction) Commit(ctx context.Context) error {
 	btx.e = nil
 	return nil
 }
@@ -177,7 +183,7 @@ func (br *basicRows) Close() error {
 	return nil
 }
 
-func (br *basicRows) Next(dest []sql.Value) error {
+func (br *basicRows) Next(ctx context.Context, dest []sql.Value) error {
 	for br.index < len(br.rows) {
 		if br.rows[br.index] != nil {
 			copy(dest, br.rows[br.index])
@@ -192,7 +198,7 @@ func (br *basicRows) Next(dest []sql.Value) error {
 	return io.EOF
 }
 
-func (br *basicRows) Delete() error {
+func (br *basicRows) Delete(ctx context.Context) error {
 	if !br.haveRow {
 		return fmt.Errorf("basic: no row to delete")
 	}
@@ -201,7 +207,7 @@ func (br *basicRows) Delete() error {
 	return nil
 }
 
-func (br *basicRows) Update(updates []db.ColumnUpdate) error {
+func (br *basicRows) Update(ctx context.Context, updates []db.ColumnUpdate) error {
 	if !br.haveRow {
 		return fmt.Errorf("basic: no row to update")
 	}

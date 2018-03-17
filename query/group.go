@@ -1,6 +1,7 @@
 package query
 
 import (
+	"context"
 	"fmt"
 	"io"
 
@@ -42,11 +43,11 @@ type groupRow struct {
 	aggregators []expr.Aggregator
 }
 
-func (gr *groupRows) group() error {
+func (gr *groupRows) group(ctx context.Context) error {
 	gr.dest = make([]sql.Value, len(gr.rows.Columns()))
 	groups := map[string]groupRow{}
 	for {
-		err := gr.rows.Next(gr.dest)
+		err := gr.rows.Next(ctx, gr.dest)
 		if err == io.EOF {
 			break
 		} else if err != nil {
@@ -104,9 +105,9 @@ func (gr *groupRows) group() error {
 	return nil
 }
 
-func (gr *groupRows) Next(dest []sql.Value) error {
+func (gr *groupRows) Next(ctx context.Context, dest []sql.Value) error {
 	if gr.dest == nil {
-		err := gr.group()
+		err := gr.group(ctx)
 		if err != nil {
 			return err
 		}
@@ -120,11 +121,11 @@ func (gr *groupRows) Next(dest []sql.Value) error {
 	return io.EOF
 }
 
-func (_ *groupRows) Delete() error {
+func (_ *groupRows) Delete(ctx context.Context) error {
 	return fmt.Errorf("group rows may not be deleted")
 }
 
-func (_ *groupRows) Update(updates []db.ColumnUpdate) error {
+func (_ *groupRows) Update(ctx context.Context, updates []db.ColumnUpdate) error {
 	return fmt.Errorf("group rows may not be updated")
 }
 
