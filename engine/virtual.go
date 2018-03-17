@@ -59,11 +59,10 @@ func lookupVirtual(ctx context.Context, tx Transaction, dbname,
 	tblname sql.Identifier) (db.Table, error) {
 
 	tblmap, ok := virtualDatabases[dbname]
-	if !ok {
-		return nil, nil
-	}
-	if maker, ok := tblmap[tblname]; ok {
-		return maker(ctx, tx, dbname, tblname)
+	if ok {
+		if maker, ok := tblmap[tblname]; ok {
+			return maker(ctx, tx, dbname, tblname)
+		}
 	}
 	if dbname != 0 {
 		if maker, ok := virtualDatabases[0][tblname]; ok {
