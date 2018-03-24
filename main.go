@@ -9,6 +9,7 @@ To Do:
 - fuzzing: parser.Parse
 
 - SET param { TO | = } value
+- basicEngine --> basic, basicDatabase --> database, etc
 */
 
 import (
@@ -25,6 +26,7 @@ import (
 	"github.com/leftmike/maho/config"
 	"github.com/leftmike/maho/engine"
 	_ "github.com/leftmike/maho/engine/basic"
+	_ "github.com/leftmike/maho/mvcc"
 	"github.com/leftmike/maho/parser"
 	"github.com/leftmike/maho/plan"
 	"github.com/leftmike/maho/sql"
@@ -146,7 +148,7 @@ func main() {
 		return
 	}
 
-	err := start("basic", *dataDir)
+	err = start("mvcc", *dataDir)
 	if err != nil {
 		fmt.Println(err)
 		return

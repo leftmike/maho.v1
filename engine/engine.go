@@ -83,7 +83,7 @@ func Start(typ, dir string, dbname sql.Identifier) error {
 	if !findDatabase(ne.ListDatabases(), dbname) {
 		err = ne.CreateDatabase(dbname)
 		if err != nil {
-			return nil
+			return err
 		}
 	}
 
