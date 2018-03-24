@@ -30,8 +30,7 @@ type Engine interface {
 	// Start the engine using dir as the data directory.
 	Start(dir string) error
 	CreateDatabase(dbname sql.Identifier) error
-	OpenDatabase(dbname sql.Identifier) (bool, error)
-	ListDatabases() ([]string, error)
+	ListDatabases() []sql.Identifier
 
 	Begin() (Transaction, error)
 }
@@ -54,6 +53,15 @@ var (
 	defaultName  sql.Identifier
 )
 
+func findDatabase(ids []sql.Identifier, dbname sql.Identifier) bool {
+	for _, id := range ids {
+		if id == dbname {
+			return true
+		}
+	}
+	return false
+}
+
 // Start an engine of typ, use dir as the data directory, and open or create the
 // named database.
 func Start(typ, dir string, dbname sql.Identifier) error {
@@ -72,11 +80,7 @@ func Start(typ, dir string, dbname sql.Identifier) error {
 		return err
 	}
 
-	ok, err = ne.OpenDatabase(dbname)
-	if err != nil {
-		return err
-	}
-	if !ok {
+	if !findDatabase(ne.ListDatabases(), dbname) {
 		err = ne.CreateDatabase(dbname)
 		if err != nil {
 			return nil

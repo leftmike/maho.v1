@@ -254,14 +254,10 @@ func MakeColumnsVirtual(ctx context.Context, tx Transaction, dbname,
 func MakeDatabasesVirtual(ctx context.Context, tx Transaction, dbname,
 	tblname sql.Identifier) (db.Table, error) {
 
-	names, err := e.ListDatabases()
-	if err != nil {
-		return nil, err
-	}
-
+	ids := e.ListDatabases()
 	values := [][]sql.Value{}
-	for _, n := range names {
-		values = append(values, []sql.Value{sql.StringValue(n)})
+	for _, id := range ids {
+		values = append(values, []sql.Value{sql.StringValue(id.String())})
 	}
 	for id := range virtualDatabases {
 		if id != 0 {

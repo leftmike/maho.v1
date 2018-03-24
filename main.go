@@ -7,17 +7,6 @@ To Do:
 - or "Operation(args) failed with %s" or "Operation(args) did not fail"
 
 - fuzzing: parser.Parse
-
-- pluggable engine, which is an implementation of a storage engine; only one engine can be
-used at a time
-- database is a separate storage instance; a single engine can support multiple databases at
-the same time
-- some shared infrastructure (that is also pluggable): (fat) lock manager; page cache (manager)
-- each database has directory of tables: name and physical location
-- table metadata is stored with the table and fixed at creation time
-- each table has an id and a location; id is fixed at create time; location is physical location
-of the table and it can change
-- write a tool to dump a database, maybe a page at a time
 */
 
 import (

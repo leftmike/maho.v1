@@ -59,20 +59,12 @@ func (be *basicEngine) CreateDatabase(dbname sql.Identifier) error {
 	return nil
 }
 
-func (be *basicEngine) OpenDatabase(dbname sql.Identifier) (bool, error) {
-	_, ok := be.databases[dbname]
-	if ok {
-		return true, nil
-	}
-	return false, nil
-}
-
-func (be *basicEngine) ListDatabases() ([]string, error) {
-	var names []string
+func (be *basicEngine) ListDatabases() []sql.Identifier {
+	var ids []sql.Identifier
 	for id := range be.databases {
-		names = append(names, id.String())
+		ids = append(ids, id)
 	}
-	return names, nil
+	return ids
 }
 
 func (be *basicEngine) Begin() (engine.Transaction, error) {
