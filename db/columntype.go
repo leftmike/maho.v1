@@ -48,7 +48,7 @@ func (ct ColumnType) DataType() string {
 				return fmt.Sprintf("VARCHAR(%d)", ct.Size)
 			}
 		}
-	case sql.DoubleType:
+	case sql.FloatType:
 		return "DOUBLE"
 	case sql.IntegerType:
 		switch ct.Size {
@@ -93,7 +93,7 @@ func (ct ColumnType) ConvertValue(n sql.Identifier, v sql.Value) (sql.Value, err
 		} else if _, ok := v.(sql.StringValue); !ok {
 			return nil, fmt.Errorf("column \"%s\": expected a string value: %v", n, v)
 		}
-	case sql.DoubleType:
+	case sql.FloatType:
 		if i, ok := v.(sql.Int64Value); ok {
 			return sql.Float64Value(i), nil
 		} else if s, ok := v.(sql.StringValue); ok {

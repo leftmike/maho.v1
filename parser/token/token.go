@@ -10,7 +10,7 @@ const (
 	Reserved
 	String
 	Integer
-	Double
+	Float
 
 	BarBar
 	LessLess

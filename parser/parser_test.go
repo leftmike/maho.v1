@@ -18,7 +18,7 @@ func TestScan(t *testing.T) {
 	s := `create foobar * 123 (,) 'string' "identifier" ; 456.789`
 	tokens := []rune{token.Reserved, token.Identifier, token.Star, token.Integer, token.LParen,
 		token.Comma, token.RParen, token.String, token.Identifier, token.EndOfStatement,
-		token.Double, token.EOF}
+		token.Float, token.EOF}
 	p := newParser(strings.NewReader(s), "scan")
 	for _, e := range tokens {
 		r := p.scan()
@@ -139,8 +139,8 @@ func TestCreateTable(t *testing.T) {
 				ColumnTypes: []db.ColumnType{
 					{Type: sql.BooleanType, Size: 1},
 					{Type: sql.BooleanType, Size: 1},
-					{Type: sql.DoubleType, Size: 8},
-					{Type: sql.DoubleType, Size: 8},
+					{Type: sql.FloatType, Size: 8},
+					{Type: sql.FloatType, Size: 8},
 				},
 			},
 		},

@@ -5,7 +5,7 @@ type DataType int
 const (
 	BooleanType DataType = iota + 1
 	CharacterType
-	DoubleType
+	FloatType
 	IntegerType
 )
 
@@ -15,7 +15,7 @@ func (dt DataType) String() string {
 		return "BOOL"
 	case CharacterType:
 		return "CHAR"
-	case DoubleType:
+	case FloatType:
 		return "DOUBLE"
 	case IntegerType:
 		return "INT"

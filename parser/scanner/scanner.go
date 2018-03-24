@@ -23,7 +23,7 @@ type ScanCtx struct {
 	Identifier sql.Identifier // Identifier and Reserved
 	String     string
 	Integer    int64
-	Double     float64
+	Float      float64
 	Position
 }
 
@@ -250,7 +250,7 @@ func (s *Scanner) scanNumber(sctx *ScanCtx, r rune, sign int64) rune {
 
 	var err error
 	if dbl {
-		sctx.Double, err = strconv.ParseFloat(s.buffer.String(), 64)
+		sctx.Float, err = strconv.ParseFloat(s.buffer.String(), 64)
 	} else {
 		sctx.Integer, err = strconv.ParseInt(s.buffer.String(), 10, 64)
 	}
@@ -259,8 +259,8 @@ func (s *Scanner) scanNumber(sctx *ScanCtx, r rune, sign int64) rune {
 		return token.Error
 	}
 	if dbl {
-		sctx.Double *= float64(sign)
-		return token.Double
+		sctx.Float *= float64(sign)
+		return token.Float
 	} else {
 		sctx.Integer *= sign
 		return token.Integer

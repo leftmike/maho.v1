@@ -116,8 +116,8 @@ func (p *parser) got() string {
 		return fmt.Sprintf("string %q", p.sctx.String)
 	case token.Integer:
 		return fmt.Sprintf("integer %d", p.sctx.Integer)
-	case token.Double:
-		return fmt.Sprintf("double %f", p.sctx.Double)
+	case token.Float:
+		return fmt.Sprintf("float %f", p.sctx.Float)
 	}
 
 	return token.Format(p.sctx.Token)
@@ -349,8 +349,8 @@ var types = map[sql.Identifier]db.ColumnType{
 	sql.TEXT:      {Type: sql.CharacterType, Fixed: false, Size: db.MaxColumnSize},
 	sql.BOOL:      {Type: sql.BooleanType, Size: 1},
 	sql.BOOLEAN:   {Type: sql.BooleanType, Size: 1},
-	sql.DOUBLE:    {Type: sql.DoubleType, Size: 8},
-	sql.REAL:      {Type: sql.DoubleType, Size: 4},
+	sql.DOUBLE:    {Type: sql.FloatType, Size: 8},
+	sql.REAL:      {Type: sql.FloatType, Size: 4},
 	sql.SMALLINT:  {Type: sql.IntegerType, Size: 2},
 	sql.INT2:      {Type: sql.IntegerType, Size: 2},
 	sql.INT:       {Type: sql.IntegerType, Size: 4},
@@ -578,8 +578,8 @@ func (p *parser) parseSubExpr() expr.Expr {
 		e = expr.StringLiteral(p.sctx.String)
 	} else if r == token.Integer {
 		e = expr.Int64Literal(p.sctx.Integer)
-	} else if r == token.Double {
-		e = expr.Float64Literal(p.sctx.Double)
+	} else if r == token.Float {
+		e = expr.Float64Literal(p.sctx.Float)
 	} else if r == token.Identifier {
 		id := p.sctx.Identifier
 		if p.maybeToken(token.LParen) {

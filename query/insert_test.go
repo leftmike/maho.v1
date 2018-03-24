@@ -26,7 +26,7 @@ var (
 	insertColumnTypes1 = []db.ColumnType{
 		{Type: sql.BooleanType, Size: 1},
 		{Type: sql.CharacterType, Size: 128},
-		{Type: sql.DoubleType, Size: 8},
+		{Type: sql.FloatType, Size: 8},
 		{Type: sql.IntegerType, Size: 4},
 	}
 	insertCases1 = []insertCase{

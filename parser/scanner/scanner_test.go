@@ -25,7 +25,7 @@ func TestScan(t *testing.T) {
 		{"\"create\"", token.Identifier},
 		{"'isn\\'t go fun?'", token.String},
 		{"12345", token.Integer},
-		{"1234.5678", token.Double},
+		{"1234.5678", token.Float},
 		{", ", token.Comma},
 		{".id", token.Dot},
 		{"(123", token.LParen},
@@ -107,11 +107,11 @@ func TestScan(t *testing.T) {
 		s.Init(strings.NewReader(n.s), fmt.Sprintf("doubles[%d]", i))
 		var sctx ScanCtx
 		s.Scan(&sctx)
-		if sctx.Token != token.Double {
-			t.Errorf("Scan(%q) got %d want Double", n.s, sctx.Token)
+		if sctx.Token != token.Float {
+			t.Errorf("Scan(%q) got %d want Float", n.s, sctx.Token)
 		}
-		if sctx.Double != n.n {
-			t.Errorf("Scan(%q).Double got %f want %f", n.s, sctx.Double, n.n)
+		if sctx.Float != n.n {
+			t.Errorf("Scan(%q).Float got %f want %f", n.s, sctx.Float, n.n)
 		}
 	}
 
