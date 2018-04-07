@@ -7,17 +7,25 @@ To Do:
 - or "Operation(args) failed with %s" or "Operation(args) did not fail"
 
 - fuzzing: parser.Parse
+- go vet
+- go vet -shadow
+
+- SET param { TO | = } value
 */
 
 import (
 	"bufio"
 	"context"
+	"flag"
 	"fmt"
 	"io"
 	"os"
+	"path/filepath"
 	"strings"
 	"text/tabwriter"
+	"time"
 
+	"github.com/leftmike/maho/config"
 	"github.com/leftmike/maho/engine"
 	_ "github.com/leftmike/maho/engine/basic"
 	"github.com/leftmike/maho/parser"
@@ -111,22 +119,56 @@ func start() error {
 }
 
 func main() {
-	err := start()
+	var dataDir string
+	var pageSize int // XXX: move to mvcc
+
+	flag.StringVar(&dataDir, "D", "testdata", "`directory` containing database(s)")
+	config.StringParam(&dataDir, "data-directory", "testdata",
+		config.NoConfigFile|config.NoUpdate)
+	config.IntParam(&pageSize, "page-size", 1024*16, config.NoUpdate)
+
+	var boolParam bool
+	var durationParam time.Duration
+	var float64Param float64
+	var intParam int
+	var int64Param int64
+	var stringParam string
+	var uintParam uint
+	var uint64Param uint64
+	config.BoolParam(&boolParam, "bool-param", false, config.Default)
+	config.DurationParam(&durationParam, "duration-param", 0, config.Default)
+	config.Float64Param(&float64Param, "float64-param", 1.0, config.Default)
+	config.IntParam(&intParam, "int-param", 0, config.Default)
+	config.Int64Param(&int64Param, "int64-param", 0, config.Default)
+	config.StringParam(&stringParam, "string-param", "default", config.Default)
+	config.UintParam(&uintParam, "uint-param", 0, config.Default)
+	config.Uint64Param(&uint64Param, "uint64-param", 0, config.Default)
+
+	config.Flags("c", "no-config", "config-file", "config")
+	flag.Parse()
+	err := config.Load(filepath.Join(dataDir, "maho.cfg"))
 	if err != nil {
 		fmt.Println(err)
 		return
 	}
 
-	if len(os.Args) == 1 {
+	err = start()
+	if err != nil {
+		fmt.Println(err)
+		return
+	}
+
+	args := flag.Args()
+	if len(args) == 0 {
 		replSQL(parser.NewParser(bufio.NewReader(os.Stdin), "[Stdin]"), os.Stdout)
 	} else {
-		for idx := 1; idx < len(os.Args); idx++ {
+		for idx := 0; idx < len(args); idx++ {
 			/*			f, err := os.Open(os.Args[idx])
 						if err != nil {
 							log.Fatal(err)
 						}
 						replSQL(e, bufio.NewReader(f), os.Args[idx])*/
-			replSQL(parser.NewParser(strings.NewReader(os.Args[idx]),
+			replSQL(parser.NewParser(strings.NewReader(args[idx]),
 				fmt.Sprintf("os.Args[%d]", idx)), os.Stdout)
 		}
 	}

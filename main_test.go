@@ -26,6 +26,7 @@ func TestMain(t *testing.T) {
  2  'db$columns' NULL     NULL 'virtual'
  3   'db$tables' NULL     NULL 'virtual'
  4 'identifiers' NULL     NULL 'virtual'
+ 5  'parameters' NULL     NULL 'virtual'
 `},
 	}
 

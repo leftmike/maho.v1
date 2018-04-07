@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"io"
 
+	"github.com/leftmike/maho/config"
 	"github.com/leftmike/maho/db"
 	"github.com/leftmike/maho/sql"
 )
@@ -131,10 +132,11 @@ func (tr *virtualRows) Update(ctx context.Context, updates []db.ColumnUpdate) er
 }
 
 var (
-	idColType    = db.ColumnType{Type: sql.CharacterType, Size: sql.MaxIdentifier, NotNull: true}
-	int32ColType = db.ColumnType{Type: sql.IntegerType, Size: 4, NotNull: true}
-	int64ColType = db.ColumnType{Type: sql.IntegerType, Size: 8, NotNull: true}
-	boolColType  = db.ColumnType{Type: sql.BooleanType, NotNull: true}
+	idColType     = db.ColumnType{Type: sql.CharacterType, Size: sql.MaxIdentifier, NotNull: true}
+	int32ColType  = db.ColumnType{Type: sql.IntegerType, Size: 4, NotNull: true}
+	int64ColType  = db.ColumnType{Type: sql.IntegerType, Size: 8, NotNull: true}
+	boolColType   = db.ColumnType{Type: sql.BooleanType, NotNull: true}
+	stringColType = db.ColumnType{Type: sql.CharacterType, Size: 4096, NotNull: true}
 )
 
 func listTables(ctx context.Context, tx Transaction, dbname sql.Identifier) ([]TableEntry, error) {
@@ -292,9 +294,31 @@ func MakeIdentifiersVirtual(ctx context.Context, tx Transaction, dbname,
 	}, nil
 }
 
+func MakeParametersVirtual(ctx context.Context, tx Transaction, dbname,
+	tblname sql.Identifier) (db.Table, error) {
+
+	values := [][]sql.Value{}
+
+	for _, param := range config.AllParams() {
+		values = append(values,
+			[]sql.Value{
+				sql.StringValue(param.Name),
+				sql.StringValue(param.Options.String()),
+				sql.StringValue(param.Val.String()),
+			})
+	}
+
+	return &VirtualTable{
+		Cols:     []sql.Identifier{sql.ID("name"), sql.ID("options"), sql.ID("value")},
+		ColTypes: []db.ColumnType{idColType, stringColType},
+		Values:   values,
+	}, nil
+}
+
 func init() {
 	CreateVirtual(0, sql.ID("db$tables"), MakeTablesVirtual)
 	CreateVirtual(0, sql.ID("db$columns"), MakeColumnsVirtual)
 	CreateVirtual(sql.ID("system"), sql.ID("databases"), MakeDatabasesVirtual)
 	CreateVirtual(sql.ID("system"), sql.ID("identifiers"), MakeIdentifiersVirtual)
+	CreateVirtual(sql.ID("system"), sql.ID("parameters"), MakeParametersVirtual)
 }
