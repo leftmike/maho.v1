@@ -180,7 +180,7 @@ var (
 )
 
 func TestInsert(t *testing.T) {
-	s := query.InsertValues{Table: sql.TableName{sql.ID("left"), sql.ID("right")}}
+	s := query.InsertValues{Table: sql.TableName{Database: sql.ID("left"), Table: sql.ID("right")}}
 	r := "INSERT INTO left.right VALUES"
 	if s.String() != r {
 		t.Errorf("InsertValues{}.String() got %s want %s", s.String(), r)

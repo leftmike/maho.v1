@@ -34,42 +34,43 @@ func TestSelect(t *testing.T) {
 		rows [][]sql.Value
 	}{
 		{
-			query.Select{
+			stmt: query.Select{
 				From: query.FromValues{
-					query.Values{
-						[][]expr.Expr{
+					Values: query.Values{
+						Expressions: [][]expr.Expr{
 							{expr.Int64Literal(1), expr.StringLiteral("abc"), expr.True(),
 								expr.Nil()},
 						},
 					},
-					sql.ID("vals"),
-					[]sql.Identifier{sql.ID("c1"), sql.ID("c2"), sql.ID("c3"), sql.ID("c4")},
+					Alias: sql.ID("vals"),
+					ColumnAliases: []sql.Identifier{
+						sql.ID("c1"), sql.ID("c2"), sql.ID("c3"), sql.ID("c4")},
 				},
 			},
-			"SELECT * FROM (VALUES (1, 'abc', true, NULL)) AS vals (c1, c2, c3, c4)",
-			[]sql.Identifier{sql.ID("c1"), sql.ID("c2"), sql.ID("c3"), sql.ID("c4")},
-			[][]sql.Value{
+			s:    "SELECT * FROM (VALUES (1, 'abc', true, NULL)) AS vals (c1, c2, c3, c4)",
+			cols: []sql.Identifier{sql.ID("c1"), sql.ID("c2"), sql.ID("c3"), sql.ID("c4")},
+			rows: [][]sql.Value{
 				{sql.Int64Value(1), sql.StringValue("abc"), sql.BoolValue(true), nil},
 			},
 		},
 		{
-			query.Select{
+			stmt: query.Select{
 				From: query.FromValues{
-					query.Values{
-						[][]expr.Expr{
+					Values: query.Values{
+						Expressions: [][]expr.Expr{
 							{expr.Int64Literal(1), expr.StringLiteral("abc"), expr.True()},
 							{expr.Int64Literal(2), expr.StringLiteral("def"), expr.False()},
 							{expr.Int64Literal(3), expr.StringLiteral("ghi"), expr.True()},
 							{expr.Int64Literal(4), expr.StringLiteral("jkl"), expr.False()},
 						},
 					},
-					sql.ID("vals"),
-					[]sql.Identifier{sql.ID("idx"), sql.ID("name"), sql.ID("flag")},
+					Alias:         sql.ID("vals"),
+					ColumnAliases: []sql.Identifier{sql.ID("idx"), sql.ID("name"), sql.ID("flag")},
 				},
 			},
-			"SELECT * FROM (VALUES (1, 'abc', true), (2, 'def', false), (3, 'ghi', true), (4, 'jkl', false)) AS vals (idx, name, flag)",
-			[]sql.Identifier{sql.ID("idx"), sql.ID("name"), sql.ID("flag")},
-			[][]sql.Value{
+			s:    "SELECT * FROM (VALUES (1, 'abc', true), (2, 'def', false), (3, 'ghi', true), (4, 'jkl', false)) AS vals (idx, name, flag)",
+			cols: []sql.Identifier{sql.ID("idx"), sql.ID("name"), sql.ID("flag")},
+			rows: [][]sql.Value{
 				{sql.Int64Value(1), sql.StringValue("abc"), sql.BoolValue(true)},
 				{sql.Int64Value(2), sql.StringValue("def"), sql.BoolValue(false)},
 				{sql.Int64Value(3), sql.StringValue("ghi"), sql.BoolValue(true)},
@@ -77,21 +78,21 @@ func TestSelect(t *testing.T) {
 			},
 		},
 		{
-			query.Select{
+			stmt: query.Select{
 				From: query.FromValues{
-					query.Values{
-						[][]expr.Expr{
+					Values: query.Values{
+						Expressions: [][]expr.Expr{
 							{expr.Nil(), expr.Nil(), expr.Nil()},
 						},
 					},
-					sql.ID("vals"),
-					[]sql.Identifier{sql.ID("c1"), sql.ID("c2"), sql.ID("c3")},
+					Alias:         sql.ID("vals"),
+					ColumnAliases: []sql.Identifier{sql.ID("c1"), sql.ID("c2"), sql.ID("c3")},
 				},
 				Where: expr.False(),
 			},
-			"SELECT * FROM (VALUES (NULL, NULL, NULL)) AS vals (c1, c2, c3) WHERE false",
-			[]sql.Identifier{sql.ID("c1"), sql.ID("c2"), sql.ID("c3")},
-			[][]sql.Value{},
+			s:    "SELECT * FROM (VALUES (NULL, NULL, NULL)) AS vals (c1, c2, c3) WHERE false",
+			cols: []sql.Identifier{sql.ID("c1"), sql.ID("c2"), sql.ID("c3")},
+			rows: [][]sql.Value{},
 		},
 	}
 

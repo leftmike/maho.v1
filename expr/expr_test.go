@@ -13,17 +13,24 @@ func TestExpr(t *testing.T) {
 		s string
 	}{
 		{
-			e: &Binary{DivideOp,
-				&Unary{NegateOp, Int64Literal(123)},
-				Int64Literal(456)},
+			e: &Binary{
+				Op:    DivideOp,
+				Left:  &Unary{Op: NegateOp, Expr: Int64Literal(123)},
+				Right: Int64Literal(456),
+			},
 			s: "((- 123) / 456)"},
 		{
-			e: &Call{sql.ID("abc"), []Expr{
-				&Unary{NegateOp, Int64Literal(123)},
-				Int64Literal(456),
-				&Binary{AddOp,
-					Ref{sql.ID("def"), sql.ID("ghi")},
-					Int64Literal(789)}}},
+			e: &Call{
+				Name: sql.ID("abc"),
+				Args: []Expr{
+					&Unary{Op: NegateOp, Expr: Int64Literal(123)},
+					Int64Literal(456),
+					&Binary{Op: AddOp,
+						Left:  Ref{sql.ID("def"), sql.ID("ghi")},
+						Right: Int64Literal(789),
+					},
+				},
+			},
 			s: "abc((- 123), 456, (def.ghi + 789))",
 		},
 	}

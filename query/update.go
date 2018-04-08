@@ -75,7 +75,7 @@ func (up *updatePlan) Execute(ctx context.Context, tx engine.Transaction) (int64
 			if err != nil {
 				return cnt, err
 			}
-			updates[idx] = db.ColumnUpdate{cdx, val}
+			updates[idx] = db.ColumnUpdate{Index: cdx, Value: val}
 		}
 		err = up.rows.Update(ctx, updates)
 		if err != nil {

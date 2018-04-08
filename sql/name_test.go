@@ -17,7 +17,7 @@ func TestTableName(t *testing.T) {
 	}
 
 	for _, c := range cases {
-		tn := sql.TableName{c.db, c.tbl}
+		tn := sql.TableName{Database: c.db, Table: c.tbl}
 		if tn.String() != c.r {
 			t.Errorf("TableName(%s.%s).String() got %s want %s", c.db, c.tbl, tn.String(), c.r)
 		}

@@ -408,8 +408,8 @@ func TestSelect(t *testing.T) {
 			sql: "select * from t where x > 1",
 			stmt: query.Select{
 				From: query.FromTableAlias{Table: sql.ID("t")},
-				Where: &expr.Binary{expr.GreaterThanOp, expr.Ref{sql.ID("x")},
-					expr.Int64Literal(1)},
+				Where: &expr.Binary{Op: expr.GreaterThanOp, Left: expr.Ref{sql.ID("x")},
+					Right: expr.Int64Literal(1)},
 			},
 		},
 		{
@@ -437,7 +437,7 @@ func TestSelect(t *testing.T) {
 			stmt: query.Select{
 				From: query.FromTableAlias{Table: sql.ID("t")},
 				Results: []query.SelectResult{
-					query.TableResult{sql.ID("t")},
+					query.TableResult{Table: sql.ID("t")},
 					query.ExprResult{Expr: expr.Ref{sql.ID("c1")}},
 					query.ExprResult{Expr: expr.Ref{sql.ID("c2")}},
 				},
@@ -449,7 +449,7 @@ func TestSelect(t *testing.T) {
 				From: query.FromTableAlias{Table: sql.ID("t")},
 				Results: []query.SelectResult{
 					query.ExprResult{Expr: expr.Ref{sql.ID("c1")}},
-					query.TableResult{sql.ID("t")},
+					query.TableResult{Table: sql.ID("t")},
 					query.ExprResult{Expr: expr.Ref{sql.ID("c2")}},
 				},
 			},
@@ -461,7 +461,7 @@ func TestSelect(t *testing.T) {
 				Results: []query.SelectResult{
 					query.ExprResult{Expr: expr.Ref{sql.ID("c1")}},
 					query.ExprResult{Expr: expr.Ref{sql.ID("c2")}},
-					query.TableResult{sql.ID("t")},
+					query.TableResult{Table: sql.ID("t")},
 				},
 			},
 		},
@@ -497,8 +497,8 @@ func TestSelect(t *testing.T) {
 				From: query.FromTableAlias{Table: sql.ID("t")},
 				Results: []query.SelectResult{
 					query.ExprResult{
-						Expr: &expr.Binary{expr.AddOp,
-							expr.Ref{sql.ID("c1")}, expr.Ref{sql.ID("c2")}},
+						Expr: &expr.Binary{Op: expr.AddOp,
+							Left: expr.Ref{sql.ID("c1")}, Right: expr.Ref{sql.ID("c2")}},
 						Alias: sql.ID("a"),
 					},
 				},
@@ -569,8 +569,8 @@ func TestSelect(t *testing.T) {
 					Left:  query.FromTableAlias{Table: sql.ID("t1")},
 					Right: query.FromTableAlias{Table: sql.ID("t2")},
 					Type:  query.Join,
-					On: &expr.Binary{expr.GreaterThanOp,
-						expr.Ref{sql.ID("c1")}, expr.Int64Literal(5)},
+					On: &expr.Binary{Op: expr.GreaterThanOp,
+						Left: expr.Ref{sql.ID("c1")}, Right: expr.Int64Literal(5)},
 				},
 			},
 		},
@@ -760,7 +760,8 @@ func TestSelect(t *testing.T) {
 					query.ExprResult{Expr: expr.Ref{sql.ID("c")}},
 				},
 				GroupBy: []expr.Expr{expr.Ref{sql.ID("c")}, expr.Ref{sql.ID("d")},
-					&expr.Binary{expr.AddOp, expr.Ref{sql.ID("e")}, expr.Ref{sql.ID("f")}},
+					&expr.Binary{Op: expr.AddOp, Left: expr.Ref{sql.ID("e")},
+						Right: expr.Ref{sql.ID("f")}},
 				},
 			},
 		},
@@ -772,8 +773,8 @@ func TestSelect(t *testing.T) {
 					query.ExprResult{Expr: expr.Ref{sql.ID("c")}},
 				},
 				GroupBy: []expr.Expr{expr.Ref{sql.ID("c")}},
-				Having: &expr.Binary{expr.GreaterThanOp, expr.Ref{sql.ID("c")},
-					expr.Int64Literal(1)},
+				Having: &expr.Binary{Op: expr.GreaterThanOp, Left: expr.Ref{sql.ID("c")},
+					Right: expr.Int64Literal(1)},
 			},
 		},
 	}
@@ -869,8 +870,8 @@ func TestDelete(t *testing.T) {
 			sql: "delete from t where c > 1",
 			stmt: query.Delete{
 				Table: sql.TableName{Table: sql.ID("t")},
-				Where: &expr.Binary{expr.GreaterThanOp, expr.Ref{sql.ID("c")},
-					expr.Int64Literal(1)},
+				Where: &expr.Binary{Op: expr.GreaterThanOp, Left: expr.Ref{sql.ID("c")},
+					Right: expr.Int64Literal(1)},
 			},
 		},
 	}
@@ -924,8 +925,8 @@ func TestUpdate(t *testing.T) {
 				ColumnUpdates: []query.ColumnUpdate{
 					{Column: sql.ID("c"), Expr: expr.Int64Literal(0)},
 				},
-				Where: &expr.Binary{expr.GreaterThanOp, expr.Ref{sql.ID("c")},
-					expr.Int64Literal(1)},
+				Where: &expr.Binary{Op: expr.GreaterThanOp, Left: expr.Ref{sql.ID("c")},
+					Right: expr.Int64Literal(1)},
 			},
 		},
 		{

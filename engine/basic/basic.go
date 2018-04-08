@@ -133,7 +133,12 @@ func (btx *basicTransaction) ListTables(ctx context.Context,
 	}
 	var tbls []engine.TableEntry
 	for name, tbl := range bdb.tables {
-		tbls = append(tbls, engine.TableEntry{name, tbl.id, tbl.pageNum, engine.VirtualType})
+		tbls = append(tbls, engine.TableEntry{
+			Name:    name,
+			ID:      tbl.id,
+			PageNum: tbl.pageNum,
+			Type:    engine.VirtualType,
+		})
 	}
 	return tbls, nil
 }

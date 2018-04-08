@@ -570,7 +570,7 @@ func (p *parser) parseSubExpr() expr.Expr {
 		} else if p.sctx.Identifier == sql.NULL {
 			e = expr.Nil()
 		} else if p.sctx.Identifier == sql.NOT {
-			e = &expr.Unary{expr.NotOp, p.parseSubExpr()}
+			e = &expr.Unary{Op: expr.NotOp, Expr: p.parseSubExpr()}
 		} else {
 			p.error(fmt.Sprintf("unexpected identifier %s", p.sctx.Identifier))
 		}
@@ -610,10 +610,10 @@ func (p *parser) parseSubExpr() expr.Expr {
 		}
 	} else if r == token.Minus {
 		// - <expr>
-		e = &expr.Unary{expr.NegateOp, p.parseSubExpr()}
+		e = &expr.Unary{Op: expr.NegateOp, Expr: p.parseSubExpr()}
 	} else if r == token.LParen {
 		// ( <expr> )
-		e = &expr.Unary{expr.NoOp, p.parseSubExpr()}
+		e = &expr.Unary{Op: expr.NoOp, Expr: p.parseSubExpr()}
 		if p.scan() != token.RParen {
 			p.error(fmt.Sprintf("expected closing parenthesis, got %s", p.got()))
 		}
@@ -635,7 +635,7 @@ func (p *parser) parseSubExpr() expr.Expr {
 		}
 	}
 
-	return &expr.Binary{op, e, p.parseSubExpr()}
+	return &expr.Binary{Op: op, Left: e, Right: p.parseSubExpr()}
 }
 
 func (p *parser) parseInsert() Stmt {
@@ -749,7 +749,7 @@ func (p *parser) parseSelect() *query.Select {
 				if p.maybeToken(token.Dot) {
 					if p.maybeToken(token.Star) {
 						// table '.' *
-						s.Results = append(s.Results, query.TableResult{tbl})
+						s.Results = append(s.Results, query.TableResult{Table: tbl})
 
 						if !p.maybeToken(token.Comma) {
 							break
@@ -762,8 +762,10 @@ func (p *parser) parseSelect() *query.Select {
 			p.unscan()
 
 			// <expr> [[ AS ] column-alias]
-			s.Results = append(s.Results, query.ExprResult{p.parseExpr(), p.parseAlias(false)})
-			//}
+			s.Results = append(s.Results, query.ExprResult{
+				Expr:  p.parseExpr(),
+				Alias: p.parseAlias(false),
+			})
 
 			if !p.maybeToken(token.Comma) {
 				break

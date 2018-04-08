@@ -34,30 +34,30 @@ func TestValues(t *testing.T) {
 		rows   [][]sql.Value
 	}{
 		{
-			query.Values{
-				[][]expr.Expr{
+			values: query.Values{
+				Expressions: [][]expr.Expr{
 					{expr.Int64Literal(1), expr.StringLiteral("abc"), expr.True(), expr.Nil()},
 				},
 			},
-			"VALUES (1, 'abc', true, NULL)",
-			[]sql.Identifier{sql.ID("column1"), sql.ID("column2"), sql.ID("column3"),
+			s: "VALUES (1, 'abc', true, NULL)",
+			cols: []sql.Identifier{sql.ID("column1"), sql.ID("column2"), sql.ID("column3"),
 				sql.ID("column4")},
-			[][]sql.Value{
+			rows: [][]sql.Value{
 				{sql.Int64Value(1), sql.StringValue("abc"), sql.BoolValue(true), nil},
 			},
 		},
 		{
-			query.Values{
-				[][]expr.Expr{
+			values: query.Values{
+				Expressions: [][]expr.Expr{
 					{expr.Int64Literal(1), expr.StringLiteral("abc"), expr.True()},
 					{expr.Int64Literal(2), expr.StringLiteral("def"), expr.False()},
 					{expr.Int64Literal(3), expr.StringLiteral("ghi"), expr.True()},
 					{expr.Int64Literal(4), expr.StringLiteral("jkl"), expr.False()},
 				},
 			},
-			"VALUES (1, 'abc', true), (2, 'def', false), (3, 'ghi', true), (4, 'jkl', false)",
-			[]sql.Identifier{sql.ID("column1"), sql.ID("column2"), sql.ID("column3")},
-			[][]sql.Value{
+			s:    "VALUES (1, 'abc', true), (2, 'def', false), (3, 'ghi', true), (4, 'jkl', false)",
+			cols: []sql.Identifier{sql.ID("column1"), sql.ID("column2"), sql.ID("column3")},
+			rows: [][]sql.Value{
 				{sql.Int64Value(1), sql.StringValue("abc"), sql.BoolValue(true)},
 				{sql.Int64Value(2), sql.StringValue("def"), sql.BoolValue(false)},
 				{sql.Int64Value(3), sql.StringValue("ghi"), sql.BoolValue(true)},
@@ -106,37 +106,38 @@ func TestFromValues(t *testing.T) {
 		rows [][]sql.Value
 	}{
 		{
-			query.FromValues{
-				query.Values{
-					[][]expr.Expr{
+			from: query.FromValues{
+				Values: query.Values{
+					Expressions: [][]expr.Expr{
 						{expr.Int64Literal(1), expr.StringLiteral("abc"), expr.True(), expr.Nil()},
 					},
 				},
-				sql.ID("vals"),
-				[]sql.Identifier{sql.ID("c1"), sql.ID("c2"), sql.ID("c3"), sql.ID("c4")},
+				Alias: sql.ID("vals"),
+				ColumnAliases: []sql.Identifier{sql.ID("c1"), sql.ID("c2"), sql.ID("c3"),
+					sql.ID("c4")},
 			},
-			"(VALUES (1, 'abc', true, NULL)) AS vals (c1, c2, c3, c4)",
-			[]sql.Identifier{sql.ID("c1"), sql.ID("c2"), sql.ID("c3"), sql.ID("c4")},
-			[][]sql.Value{
+			s:    "(VALUES (1, 'abc', true, NULL)) AS vals (c1, c2, c3, c4)",
+			cols: []sql.Identifier{sql.ID("c1"), sql.ID("c2"), sql.ID("c3"), sql.ID("c4")},
+			rows: [][]sql.Value{
 				{sql.Int64Value(1), sql.StringValue("abc"), sql.BoolValue(true), nil},
 			},
 		},
 		{
-			query.FromValues{
-				query.Values{
-					[][]expr.Expr{
+			from: query.FromValues{
+				Values: query.Values{
+					Expressions: [][]expr.Expr{
 						{expr.Int64Literal(1), expr.StringLiteral("abc"), expr.True()},
 						{expr.Int64Literal(2), expr.StringLiteral("def"), expr.False()},
 						{expr.Int64Literal(3), expr.StringLiteral("ghi"), expr.True()},
 						{expr.Int64Literal(4), expr.StringLiteral("jkl"), expr.False()},
 					},
 				},
-				sql.ID("vals"),
-				[]sql.Identifier{sql.ID("idx"), sql.ID("name"), sql.ID("flag")},
+				Alias:         sql.ID("vals"),
+				ColumnAliases: []sql.Identifier{sql.ID("idx"), sql.ID("name"), sql.ID("flag")},
 			},
-			"(VALUES (1, 'abc', true), (2, 'def', false), (3, 'ghi', true), (4, 'jkl', false)) AS vals (idx, name, flag)",
-			[]sql.Identifier{sql.ID("idx"), sql.ID("name"), sql.ID("flag")},
-			[][]sql.Value{
+			s:    "(VALUES (1, 'abc', true), (2, 'def', false), (3, 'ghi', true), (4, 'jkl', false)) AS vals (idx, name, flag)",
+			cols: []sql.Identifier{sql.ID("idx"), sql.ID("name"), sql.ID("flag")},
+			rows: [][]sql.Value{
 				{sql.Int64Value(1), sql.StringValue("abc"), sql.BoolValue(true)},
 				{sql.Int64Value(2), sql.StringValue("def"), sql.BoolValue(false)},
 				{sql.Int64Value(3), sql.StringValue("ghi"), sql.BoolValue(true)},
