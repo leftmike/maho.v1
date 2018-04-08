@@ -10,7 +10,7 @@ import (
 )
 
 func TestMain(t *testing.T) {
-	err := start()
+	err := start("basic", "testdata")
 	if err != nil {
 		t.Errorf("start() failed with %s", err)
 		return

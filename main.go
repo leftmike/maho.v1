@@ -114,8 +114,8 @@ func replSQL(p parser.Parser, w io.Writer) {
 	}
 }
 
-func start() error {
-	return engine.Start("basic", "testdata", sql.ID("maho"))
+func start(typ, dataDir string) error {
+	return engine.Start(typ, dataDir, sql.ID("maho"))
 }
 
 func main() {
@@ -152,7 +152,7 @@ func main() {
 		return
 	}
 
-	err = start()
+	err = start("basic", dataDir)
 	if err != nil {
 		fmt.Println(err)
 		return
