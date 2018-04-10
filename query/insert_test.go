@@ -233,17 +233,20 @@ func testInsert(t *testing.T, dbnam, nam sql.Identifier, cols []sql.Identifier,
 		} else if err != nil {
 			t.Errorf("Parse(\"%s\").Execute() failed with %s", c.stmt, err.Error())
 		} else {
-			tbl, err := engine.LookupTable(ctx, tx, dbnam, nam)
+			var tbl db.Table
+			tbl, err = engine.LookupTable(ctx, tx, dbnam, nam)
 			if err != nil {
 				t.Error(err)
 				continue
 			}
-			rows, err := tbl.Rows()
+			var rows db.Rows
+			rows, err = tbl.Rows()
 			if err != nil {
 				t.Errorf("(%s).Rows() failed with %s", nam, err)
 				continue
 			}
-			all, err := query.AllRows(ctx, rows)
+			var all [][]sql.Value
+			all, err = query.AllRows(ctx, rows)
 			if err != nil {
 				t.Errorf("(%s).Rows().Next() failed with %s", nam, err)
 				continue

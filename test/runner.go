@@ -79,7 +79,7 @@ func (run *Runner) RunQuery(tst *sqltest.Test) ([]string, [][]string, error) {
 	var results [][]string
 	dest := make([]sql.Value, lenCols)
 	for {
-		err := rows.Next(ctx, dest)
+		err = rows.Next(ctx, dest)
 		if err == io.EOF {
 			break
 		} else if err != nil {

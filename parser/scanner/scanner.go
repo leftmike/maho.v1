@@ -84,43 +84,43 @@ SkipWhitespace:
 	}
 
 	if r == '-' {
-		if r := s.readRune(sctx); r == '-' {
+		if r2 := s.readRune(sctx); r2 == '-' {
 			for {
-				r = s.readRune(sctx)
-				if r < 0 {
-					return r
+				r2 = s.readRune(sctx)
+				if r2 < 0 {
+					return r2
 				}
 
-				if r == '\n' {
+				if r2 == '\n' {
 					break
 				}
 			}
 
 			goto SkipWhitespace
-		} else if r < 0 {
-			return r
+		} else if r2 < 0 {
+			return r2
 		} else {
 			s.unreadRune()
 		}
 	} else if r == '/' {
-		if r := s.readRune(sctx); r == '*' {
+		if r2 := s.readRune(sctx); r2 == '*' {
 			var p rune
 
 			for {
-				r = s.readRune(sctx)
-				if r < 0 {
-					return r
+				r2 = s.readRune(sctx)
+				if r2 < 0 {
+					return r2
 				}
 
-				if p == '*' && r == '/' {
+				if p == '*' && r2 == '/' {
 					break
 				}
-				p = r
+				p = r2
 			}
 
 			goto SkipWhitespace
-		} else if r < 0 {
-			return r
+		} else if r2 < 0 {
+			return r2
 		} else {
 			s.unreadRune()
 		}
@@ -161,8 +161,8 @@ SkipWhitespace:
 			return r
 		} else if token.IsOpRune(r2) {
 			s.buffer.WriteRune(r2)
-			if r, ok := token.Operators[s.buffer.String()]; ok {
-				return r
+			if r3, ok := token.Operators[s.buffer.String()]; ok {
+				return r3
 			}
 			sctx.Error = fmt.Errorf("scanner: unexpected operator %s", s.buffer.String())
 			return token.Error

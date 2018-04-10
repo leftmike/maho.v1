@@ -103,7 +103,8 @@ func (stmt *InsertValues) Execute(ctx context.Context, tx engine.Transaction) (i
 			}
 			var v sql.Value
 			if e != nil {
-				ce, err := expr.Compile(nil, e, false)
+				var ce expr.CExpr
+				ce, err = expr.Compile(nil, e, false)
 				if err != nil {
 					return 0, err
 				}

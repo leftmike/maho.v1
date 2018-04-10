@@ -67,7 +67,8 @@ func (up *updatePlan) Execute(ctx context.Context, tx engine.Transaction) (int64
 		}
 		for idx := range up.updates {
 			cdx := up.updates[idx].index
-			val, err := up.updates[idx].expr.Eval(up)
+			var val sql.Value
+			val, err = up.updates[idx].expr.Eval(up)
 			if err != nil {
 				return cnt, err
 			}

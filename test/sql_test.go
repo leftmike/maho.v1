@@ -64,13 +64,13 @@ func TestSQL(t *testing.T) {
 	startEngine(t)
 
 	run := test.Runner{}
-	var reporter reporter
-	err := sqltest.RunTests(*testData, &run, &reporter, mahoDialect{}, *update)
+	var rptr reporter
+	err := sqltest.RunTests(*testData, &run, &rptr, mahoDialect{}, *update)
 	if err != nil {
 		t.Errorf("RunTests(%q) failed with %s", testData, err)
 		return
 	}
-	for _, report := range reporter {
+	for _, report := range rptr {
 		if report.err != nil && report.err != sqltest.Skipped {
 			t.Errorf("%s: %s", report.test, report.err)
 		}

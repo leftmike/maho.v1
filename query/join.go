@@ -299,11 +299,12 @@ func (fj FromJoin) rows(ctx context.Context, tx engine.Transaction) (db.Rows, *f
 	if fj.Using != nil {
 		useSet := map[sql.Identifier]struct{}{}
 		for _, col := range fj.Using {
-			lcdx, err := leftCtx.usingIndex(col, "left")
+			var lcdx, rcdx int
+			lcdx, err = leftCtx.usingIndex(col, "left")
 			if err != nil {
 				return nil, nil, err
 			}
-			rcdx, err := rightCtx.usingIndex(col, "right")
+			rcdx, err = rightCtx.usingIndex(col, "right")
 			if err != nil {
 				return nil, nil, err
 			}

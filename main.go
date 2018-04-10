@@ -7,8 +7,6 @@ To Do:
 - or "Operation(args) failed with %s" or "Operation(args) did not fail"
 
 - fuzzing: parser.Parse
-- go vet
-- go vet -shadow
 
 - SET param { TO | = } value
 */
@@ -59,7 +57,8 @@ func replSQL(p parser.Parser, w io.Writer) {
 		}
 
 		if exec, ok := ret.(plan.Executer); ok {
-			cnt, err := exec.Execute(ctx, tx)
+			var cnt int64
+			cnt, err = exec.Execute(ctx, tx)
 			if err != nil {
 				fmt.Println(err)
 				break

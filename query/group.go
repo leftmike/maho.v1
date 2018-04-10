@@ -218,7 +218,8 @@ func group(rows db.Rows, fctx *fromContext, results []SelectResult, group []expr
 		if !ok {
 			panic(fmt.Sprintf("unexpected type for query.SelectResult: %T: %v", sr, sr))
 		}
-		ce, err := expr.Compile(gctx, er.Expr, true)
+		var ce expr.CExpr
+		ce, err = expr.Compile(gctx, er.Expr, true)
 		if err != nil {
 			return nil, err
 		}
