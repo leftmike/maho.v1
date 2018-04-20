@@ -1,352 +1,281 @@
 package config
 
 import (
-	"bufio"
 	"flag"
 	"fmt"
+	"io"
 	"os"
-	"sort"
-	"strings"
-	"text/scanner"
 	"time"
-	"unicode"
 )
 
-type Value interface {
+/*
+// comment
+/* comment * /
+
+${<variable>} = value
+[section] // control which parts of the config file are read
+<name> = <value>
+
+<value> = <string> | true | false | <number> | ${<variable>} | <map> | <array>
+<map> = { <name> : <value> [,] ... }
+<array> = [ <value> [,] ... ]
+<string> = "..." | `...`
+<number> = ...
+*/
+
+type value interface {
 	Set(string) error
 	String() string
 }
 
-type Option int
+type setBy int
 
 const (
-	Default      Option = 0
-	NoUpdate     Option = 1 << iota // can not be updated after startup
-	NoConfigFile                    // can not be specified in a config file
+	byDefault setBy = iota
+	byFlag
+	byEnv
+	byConfig
 )
 
-func addOption(s, opt string) string {
-	if s != "" {
-		s += " | "
+func (b setBy) String() string {
+	switch b {
+	case byDefault:
+		return "default"
+	case byFlag:
+		return "flag"
+	case byEnv:
+		return "environment"
+	case byConfig:
+		return "config-file"
 	}
-	return s + opt
+	panic(fmt.Sprintf("set-by: unexpected value: %d", b))
 }
 
-func (o Option) String() string {
-	var s string
-	if (o & NoUpdate) != 0 {
-		s = addOption(s, "NoUpdate")
-	}
-	if (o & NoConfigFile) != 0 {
-		s = addOption(s, "NoConfigFile")
-	}
-	if s == "" {
-		return "Default"
-	}
-	return s
-}
-
-type Param struct {
-	Name    string
-	Val     Value
-	Options Option
-}
-
-type nameVal struct {
+type Variable struct {
+	cfg  *Config
 	name string
-	val  string
+	val  value
+	flag string
+	env  []string
+	by   setBy
 }
 
-type config struct {
-	params     map[string]*Param
-	args       []nameVal
-	configFile string
-	noConfig   bool
-	list       bool
+var cfg = NewConfig(flag.CommandLine)
+
+type Config struct {
+	vars    map[string]*Variable
+	flags   map[string]*Variable
+	flagSet *flag.FlagSet
 }
 
-var cfg = &config{}
-
-func (cfg *config) Set(s string) error {
-	ss := strings.SplitN(s, "=", 2)
-	if len(ss) != 2 {
-		return fmt.Errorf("config: expected name=value; got %s", s)
-	}
-	cfg.args = append(cfg.args, nameVal{ss[0], ss[1]})
-	return nil
-}
-
-func (_ *config) String() string {
-	return ""
-}
-
-func (cfg *config) flags(fs *flag.FlagSet, param, noConfig, configFile, listConfig string) {
-	fs.Var(cfg, param, "set `param=value`")
-
-	if noConfig != "" {
-		fs.BoolVar(&cfg.noConfig, noConfig, false, "don't load a config file")
-	}
-	if configFile != "" {
-		fs.StringVar(&cfg.configFile, configFile, "", "`file` to load config from")
-	}
-	if listConfig != "" {
-		fs.BoolVar(&cfg.list, listConfig, false, "list the config and then exit")
+func NewConfig(fs *flag.FlagSet) *Config {
+	return &Config{
+		vars:    map[string]*Variable{},
+		flags:   map[string]*Variable{},
+		flagSet: fs,
 	}
 }
 
-func Flags(param, noConfig, configFile, listConfig string) {
-	cfg.flags(flag.CommandLine, param, noConfig, configFile, listConfig)
-}
-
-type paramSlice []*Param
-
-func (ps paramSlice) Len() int {
-	return len(ps)
-}
-
-func (ps paramSlice) Swap(i, j int) {
-	ps[i], ps[j] = ps[j], ps[i]
-}
-
-func (ps paramSlice) Less(i, j int) bool {
-	return strings.Compare(ps[i].Name, ps[j].Name) < 0
-}
-
-func (cfg *config) allParams() []*Param {
-	list := make([]*Param, 0, len(cfg.params))
-	for _, param := range cfg.params {
-		list = append(list, param)
+func (c *Config) Env() error {
+	if !c.flagSet.Parsed() {
+		panic("flags must be parsed before the environment")
 	}
-	sort.Sort(paramSlice(list))
-	return list
-}
+	c.flagVars()
 
-func AllParams() []*Param {
-	return cfg.allParams()
-}
-
-func (cfg *config) listConfig() {
-	for _, param := range cfg.allParams() {
-		fmt.Printf("%s=%s\n", param.Name, param.Val)
-	}
-}
-
-const (
-	lineWhitespace   = (1 << ' ') | (1 << '\t') | (1 << '\n') | (1 << '\r')
-	noLineWhitespace = (1 << ' ') | (1 << '\t')
-)
-
-func (cfg *config) loadConfig(configFile string) error {
-	f, err := os.Open(configFile)
-	if err != nil {
-		return err
-	}
-	defer f.Close()
-	s := scanner.Scanner{
-		Mode: scanner.ScanIdents | scanner.ScanFloats | scanner.ScanStrings |
-			scanner.ScanRawStrings | scanner.ScanComments | scanner.SkipComments,
-		Whitespace: lineWhitespace,
-		IsIdentRune: func(r rune, i int) bool {
-			if i == 0 {
-				return unicode.IsLetter(r)
+	for _, v := range c.vars {
+		if v.by == byDefault && v.env != nil {
+			for _, e := range v.env {
+				if s, ok := os.LookupEnv(e); ok {
+					err := v.val.Set(s)
+					if err != nil {
+						return fmt.Errorf("config: %s environment variable: %s", e, err)
+					}
+					v.by = byEnv
+				}
 			}
-			return unicode.IsLetter(r) || unicode.IsDigit(r) || r == '-' || r == '_'
-		},
-	}
-	s.Init(bufio.NewReader(f))
-
-	for {
-		s.Whitespace = lineWhitespace
-		tok := s.Scan()
-		if tok == scanner.EOF {
-			break
-		}
-		if tok != scanner.Ident && tok != scanner.String {
-			return fmt.Errorf("%s: expected a parameter", s.Pos())
-		}
-		name := s.TokenText()
-
-		s.Whitespace = noLineWhitespace
-		tok = s.Scan()
-		if tok != '=' {
-			return fmt.Errorf("%s: expected '='", s.Pos())
-		}
-		tok = s.Scan()
-		val := s.TokenText()
-		switch tok {
-		case scanner.Ident:
-		case scanner.Int:
-		case scanner.Float:
-		case scanner.String:
-			val = strings.Trim(val, "\"`")
-		case '-':
-			tok = s.Scan()
-			if tok != scanner.Int && tok != scanner.Float {
-				return fmt.Errorf("%s: expected a value", s.Pos())
-			}
-			val = "-" + s.TokenText()
-		default:
-			return fmt.Errorf("%s: expected a value", s.Pos())
-		}
-		err := cfg.setParam(name, val, NoConfigFile)
-		if err != nil {
-			return err
 		}
 	}
 
 	return nil
 }
 
-func (cfg *config) setParam(name, val string, opt Option) error {
-	param, ok := cfg.params[name]
+func Env() error {
+	return cfg.Env()
+}
+
+func (c *Config) flagVars() {
+	c.flagSet.Visit(func(f *flag.Flag) {
+		if v, ok := c.flags[f.Name]; ok {
+			v.by = byFlag
+		}
+	})
+}
+
+func (c *Config) Load(filename string, reader io.Reader) error {
+	if !c.flagSet.Parsed() {
+		panic("flags must be parsed before config is loaded")
+	}
+	c.flagVars()
+
+	// XXX: check file extension to decide how to load the config file
+	return nil
+}
+
+func Load(filename string, reader io.Reader) error {
+	return cfg.Load(filename, reader)
+}
+
+func (c *Config) Vars() []*Variable {
+	var vars []*Variable
+	for _, v := range c.vars {
+		vars = append(vars, v)
+	}
+	return vars
+}
+
+func Vars() []*Variable {
+	return cfg.Vars()
+}
+
+func (c *Config) Var(val interface{}, name string) *Variable {
+	if _, ok := c.vars[name]; ok {
+		panic(fmt.Sprintf("same config variable, %s, defined twice", name))
+	}
+
+	var v value
+	if vi, ok := val.(value); ok {
+		v = vi
+	} else if b, ok := val.(*bool); ok {
+		v = (*boolValue)(b)
+	} else if d, ok := val.(*time.Duration); ok {
+		v = (*durationValue)(d)
+	} else if f, ok := val.(*float64); ok {
+		v = (*float64Value)(f)
+	} else if i, ok := val.(*int); ok {
+		v = (*intValue)(i)
+	} else if i64, ok := val.(*int64); ok {
+		v = (*int64Value)(i64)
+	} else if s, ok := val.(*string); ok {
+		v = (*stringValue)(s)
+	} else if u, ok := val.(*uint); ok {
+		v = (*uintValue)(u)
+	} else if u64, ok := val.(*uint64); ok {
+		v = (*uint64Value)(u64)
+	} else {
+		// XXX: handle structs and slices
+
+		panic(fmt.Sprintf("can't use %T as a config variable", val))
+	}
+
+	nv := &Variable{
+		cfg:  c,
+		name: name,
+		val:  v,
+	}
+	c.vars[name] = nv
+	return nv
+}
+
+func Var(val interface{}, name string) *Variable {
+	return cfg.Var(val, name)
+}
+
+func (v *Variable) Name() string {
+	return v.name
+}
+
+func (v *Variable) Val() string {
+	return v.val.String()
+}
+
+func (v *Variable) By() string {
+	return v.by.String()
+}
+
+func (v *Variable) Flag(name, usage string) *Variable {
+	v.flag = name
+	v.cfg.flags[v.flag] = v
+	v.cfg.flagSet.Var(v.val, v.flag, usage)
+	return v
+}
+
+func (v *Variable) Usage(usage string) *Variable {
+	return v.Flag(v.name, usage)
+}
+
+func (v *Variable) Env(vars ...string) *Variable {
+	v.env = vars
+	return v
+}
+
+func (v *Variable) Bool(def bool) *bool {
+	b, ok := v.val.(*boolValue)
 	if !ok {
-		return fmt.Errorf("%s is not a param", name)
+		panic(fmt.Sprintf("can't convert %T to bool", v.val))
 	}
-	if (param.Options & opt) != 0 {
-		if opt == NoUpdate {
-			return fmt.Errorf("%s may not be updated", name)
-		} else if opt == NoConfigFile {
-			return fmt.Errorf("%s may not be set in a config file", name)
-		}
-		panic("unexpected option")
+	*b = (boolValue)(def)
+	return (*bool)(b)
+}
+
+func (v *Variable) Duration(def time.Duration) *time.Duration {
+	d, ok := v.val.(*durationValue)
+	if !ok {
+		panic(fmt.Sprintf("can't convert %T to duration", v.val))
 	}
+	*d = (durationValue)(def)
+	return (*time.Duration)(d)
+}
 
-	err := param.Val.Set(val)
-	if err != nil {
-		return fmt.Errorf("param %s: %s", name, err)
+func (v *Variable) Float64(def float64) *float64 {
+	f, ok := v.val.(*float64Value)
+	if !ok {
+		panic(fmt.Sprintf("can't convert %T to float64", v.val))
 	}
-	return nil
+	*f = (float64Value)(def)
+	return (*float64)(f)
 }
 
-func (cfg *config) update(name, val string) error {
-	return cfg.setParam(name, val, NoUpdate)
-}
-
-func Update(name, val string) error {
-	return cfg.update(name, val)
-}
-
-func (cfg *config) load(configFile string) error {
-	if !cfg.noConfig {
-		if cfg.configFile != "" {
-			configFile = cfg.configFile
-		}
-		err := cfg.loadConfig(configFile)
-		if err != nil {
-			return err
-		}
+func (v *Variable) Int(def int) *int {
+	i, ok := v.val.(*intValue)
+	if !ok {
+		panic(fmt.Sprintf("can't convert %T to int", v.val))
 	}
+	*i = (intValue)(def)
+	return (*int)(i)
+}
 
-	for _, arg := range cfg.args {
-		err := cfg.setParam(arg.name, arg.val, Default)
-		if err != nil {
-			return err
-		}
+func (v *Variable) Int64(def int64) *int64 {
+	i64, ok := v.val.(*int64Value)
+	if !ok {
+		panic(fmt.Sprintf("can't convert %T to int64", v.val))
 	}
+	*i64 = (int64Value)(def)
+	return (*int64)(i64)
+}
 
-	if cfg.list {
-		cfg.listConfig()
-		os.Exit(0)
+func (v *Variable) String(def string) *string {
+	s, ok := v.val.(*stringValue)
+	if !ok {
+		panic(fmt.Sprintf("can't convert %T to string", v.val))
 	}
-	return nil
+	*s = (stringValue)(def)
+	return (*string)(s)
 }
 
-func Load(configFile string) error {
-	return cfg.load(configFile)
-}
-
-func (cfg *config) boolParam(p *bool, name string, b bool, opts Option) *bool {
-	*p = b
-	cfg.param((*boolValue)(p), name, opts)
-	return p
-}
-
-func BoolParam(p *bool, name string, b bool, opts Option) *bool {
-	return cfg.boolParam(p, name, b, opts)
-}
-
-func (cfg *config) durationParam(p *time.Duration, name string, d time.Duration,
-	opts Option) *time.Duration {
-
-	*p = d
-	cfg.param((*durationValue)(p), name, opts)
-	return p
-}
-
-func DurationParam(p *time.Duration, name string, d time.Duration, opts Option) *time.Duration {
-	return cfg.durationParam(p, name, d, opts)
-}
-
-func (cfg *config) float64Param(p *float64, name string, f float64, opts Option) *float64 {
-	*p = f
-	cfg.param((*float64Value)(p), name, opts)
-	return p
-}
-
-func Float64Param(p *float64, name string, f float64, opts Option) *float64 {
-	return cfg.float64Param(p, name, f, opts)
-}
-
-func (cfg *config) intParam(p *int, name string, i int, opts Option) *int {
-	*p = i
-	cfg.param((*intValue)(p), name, opts)
-	return p
-}
-
-func IntParam(p *int, name string, i int, opts Option) *int {
-	return cfg.intParam(p, name, i, opts)
-}
-
-func (cfg *config) int64Param(p *int64, name string, i int64, opts Option) *int64 {
-	*p = i
-	cfg.param((*int64Value)(p), name, opts)
-	return p
-}
-
-func Int64Param(p *int64, name string, i int64, opts Option) *int64 {
-	return cfg.int64Param(p, name, i, opts)
-}
-
-func (cfg *config) stringParam(p *string, name string, s string, opts Option) *string {
-	*p = s
-	cfg.param((*stringValue)(p), name, opts)
-	return p
-}
-
-func StringParam(p *string, name string, s string, opts Option) *string {
-	return cfg.stringParam(p, name, s, opts)
-}
-
-func (cfg *config) uintParam(p *uint, name string, u uint, opts Option) *uint {
-	*p = u
-	cfg.param((*uintValue)(p), name, opts)
-	return p
-}
-
-func UintParam(p *uint, name string, u uint, opts Option) *uint {
-	return cfg.uintParam(p, name, u, opts)
-}
-
-func (cfg *config) uint64Param(p *uint64, name string, u uint64, opts Option) *uint64 {
-	*p = u
-	cfg.param((*uint64Value)(p), name, opts)
-	return p
-}
-
-func Uint64Param(p *uint64, name string, u uint64, opts Option) *uint64 {
-	return cfg.uint64Param(p, name, u, opts)
-}
-
-func (cfg *config) param(val Value, name string, opts Option) {
-	if _, ok := cfg.params[name]; ok {
-		panic(fmt.Sprintf("config: param redefined: %s", name))
+func (v *Variable) Uint(def uint) *uint {
+	u, ok := v.val.(*uintValue)
+	if !ok {
+		panic(fmt.Sprintf("can't convert %T to uint", v.val))
 	}
-	if cfg.params == nil {
-		cfg.params = make(map[string]*Param)
-	}
-	cfg.params[name] = &Param{name, val, opts}
+	*u = (uintValue)(def)
+	return (*uint)(u)
 }
 
-func Parameter(val Value, name string, opts Option) {
-	cfg.param(val, name, opts)
+func (v *Variable) Uint64(def uint64) *uint64 {
+	u64, ok := v.val.(*uint64Value)
+	if !ok {
+		panic(fmt.Sprintf("can't convert %T to uint64", v.val))
+	}
+	*u64 = (uint64Value)(def)
+	return (*uint64)(u64)
 }

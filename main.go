@@ -21,7 +21,6 @@ import (
 	"path/filepath"
 	"strings"
 	"text/tabwriter"
-	"time"
 
 	"github.com/leftmike/maho/config"
 	"github.com/leftmike/maho/engine"
@@ -113,45 +112,41 @@ func replSQL(p parser.Parser, w io.Writer) {
 	}
 }
 
+var (
+	dataDir = config.Var(new(string), "data-directory").
+		Usage("`directory` containing databases").String("testdata")
+	configFile = flag.String("config-file", "", "`file` to load config from")
+	noConfig   = flag.Bool("no-config", false, "don't load config file")
+	listConfig = flag.Bool("list-config", false, "list config and exit")
+)
+
 func start(typ, dataDir string) error {
 	return engine.Start(typ, dataDir, sql.ID("maho"))
 }
 
 func main() {
-	var dataDir string
-	var pageSize int // XXX: move to mvcc
-
-	flag.StringVar(&dataDir, "D", "testdata", "`directory` containing database(s)")
-	config.StringParam(&dataDir, "data-directory", "testdata",
-		config.NoConfigFile|config.NoUpdate)
-	config.IntParam(&pageSize, "page-size", 1024*16, config.NoUpdate)
-
-	var boolParam bool
-	var durationParam time.Duration
-	var float64Param float64
-	var intParam int
-	var int64Param int64
-	var stringParam string
-	var uintParam uint
-	var uint64Param uint64
-	config.BoolParam(&boolParam, "bool-param", false, config.Default)
-	config.DurationParam(&durationParam, "duration-param", 0, config.Default)
-	config.Float64Param(&float64Param, "float64-param", 1.0, config.Default)
-	config.IntParam(&intParam, "int-param", 0, config.Default)
-	config.Int64Param(&int64Param, "int64-param", 0, config.Default)
-	config.StringParam(&stringParam, "string-param", "default", config.Default)
-	config.UintParam(&uintParam, "uint-param", 0, config.Default)
-	config.Uint64Param(&uint64Param, "uint64-param", 0, config.Default)
-
-	config.Flags("c", "no-config", "config-file", "config")
 	flag.Parse()
-	err := config.Load(filepath.Join(dataDir, "maho.cfg"))
-	if err != nil {
-		fmt.Println(err)
+	config.Env()
+
+	if *noConfig == false {
+		filename := filepath.Join(*dataDir, "maho.cfg")
+		if *configFile != "" {
+			filename = *configFile
+		}
+		err := config.Load(filename, nil)
+		if err != nil {
+			fmt.Println(err)
+			return
+		}
+	}
+	if *listConfig {
+		for _, v := range config.Vars() {
+			fmt.Printf("[%s] %s = %s\n", v.By(), v.Name(), v.Val())
+		}
 		return
 	}
 
-	err = start("basic", dataDir)
+	err := start("basic", *dataDir)
 	if err != nil {
 		fmt.Println(err)
 		return

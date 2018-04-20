@@ -294,23 +294,23 @@ func MakeIdentifiersVirtual(ctx context.Context, tx Transaction, dbname,
 	}, nil
 }
 
-func MakeParametersVirtual(ctx context.Context, tx Transaction, dbname,
+func MakeConfigVirtual(ctx context.Context, tx Transaction, dbname,
 	tblname sql.Identifier) (db.Table, error) {
 
 	values := [][]sql.Value{}
 
-	for _, param := range config.AllParams() {
+	for _, v := range config.Vars() {
 		values = append(values,
 			[]sql.Value{
-				sql.StringValue(param.Name),
-				sql.StringValue(param.Options.String()),
-				sql.StringValue(param.Val.String()),
+				sql.StringValue(v.Name()),
+				sql.StringValue(v.By()),
+				sql.StringValue(v.Val()),
 			})
 	}
 
 	return &VirtualTable{
-		Cols:     []sql.Identifier{sql.ID("name"), sql.ID("options"), sql.ID("value")},
-		ColTypes: []db.ColumnType{idColType, stringColType},
+		Cols:     []sql.Identifier{sql.ID("name"), sql.ID("by"), sql.ID("value")},
+		ColTypes: []db.ColumnType{idColType, idColType, stringColType},
 		Values:   values,
 	}, nil
 }
@@ -320,5 +320,5 @@ func init() {
 	CreateVirtual(0, sql.ID("db$columns"), MakeColumnsVirtual)
 	CreateVirtual(sql.ID("system"), sql.ID("databases"), MakeDatabasesVirtual)
 	CreateVirtual(sql.ID("system"), sql.ID("identifiers"), MakeIdentifiersVirtual)
-	CreateVirtual(sql.ID("system"), sql.ID("parameters"), MakeParametersVirtual)
+	CreateVirtual(sql.ID("system"), sql.ID("config"), MakeConfigVirtual)
 }
