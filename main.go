@@ -148,7 +148,7 @@ func main() {
 		return
 	}
 
-	err = start("mvcc", *dataDir)
+	err := start("mvcc", *dataDir)
 	if err != nil {
 		fmt.Println(err)
 		return

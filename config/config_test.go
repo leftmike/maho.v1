@@ -5,7 +5,7 @@ import (
 	"os"
 	"testing"
 
-	"github.com/leftmike/config"
+	"github.com/leftmike/maho/config"
 )
 
 func TestFlags(t *testing.T) {

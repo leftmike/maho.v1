@@ -22,11 +22,11 @@ func TestMain(t *testing.T) {
 		{"select * from system.db$tables order by [table]",
 			`           table   id page_num      type
            -----   -- --------      ----
- 1   'databases' NULL     NULL 'virtual'
- 2  'db$columns' NULL     NULL 'virtual'
- 3   'db$tables' NULL     NULL 'virtual'
- 4 'identifiers' NULL     NULL 'virtual'
- 5  'parameters' NULL     NULL 'virtual'
+ 1      'config' NULL     NULL 'virtual'
+ 2   'databases' NULL     NULL 'virtual'
+ 3  'db$columns' NULL     NULL 'virtual'
+ 4   'db$tables' NULL     NULL 'virtual'
+ 5 'identifiers' NULL     NULL 'virtual'
 `},
 	}
 
