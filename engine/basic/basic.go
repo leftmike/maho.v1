@@ -11,20 +11,20 @@ import (
 	"github.com/leftmike/maho/sql"
 )
 
-type basicEngine struct {
-	databases map[sql.Identifier]*basicDatabase
+type basic struct {
+	databases map[sql.Identifier]*database
 }
 
-type basicTransaction struct {
-	e *basicEngine
+type transaction struct {
+	e *basic
 }
 
-type basicDatabase struct {
+type database struct {
 	nextID engine.TableID
-	tables map[sql.Identifier]*basicTable
+	tables map[sql.Identifier]*table
 }
 
-type basicTable struct {
+type table struct {
 	id          engine.TableID
 	pageNum     engine.PageNum
 	columns     []sql.Identifier
@@ -32,7 +32,7 @@ type basicTable struct {
 	rows        [][]sql.Value
 }
 
-type basicRows struct {
+type rows struct {
 	columns []sql.Identifier
 	rows    [][]sql.Value
 	index   int
@@ -40,26 +40,26 @@ type basicRows struct {
 }
 
 func init() {
-	engine.Register("basic", &basicEngine{})
+	engine.Register("basic", &basic{})
 }
 
-func (be *basicEngine) Start(dir string) error {
-	be.databases = map[sql.Identifier]*basicDatabase{}
+func (be *basic) Start(dir string) error {
+	be.databases = map[sql.Identifier]*database{}
 	return nil
 }
 
-func (be *basicEngine) CreateDatabase(dbname sql.Identifier) error {
+func (be *basic) CreateDatabase(dbname sql.Identifier) error {
 	if _, dup := be.databases[dbname]; dup {
 		return fmt.Errorf("basic: database %s already exists", dbname)
 	}
-	be.databases[dbname] = &basicDatabase{
+	be.databases[dbname] = &database{
 		nextID: 1,
-		tables: map[sql.Identifier]*basicTable{},
+		tables: map[sql.Identifier]*table{},
 	}
 	return nil
 }
 
-func (be *basicEngine) ListDatabases() []sql.Identifier {
+func (be *basic) ListDatabases() []sql.Identifier {
 	var ids []sql.Identifier
 	for id := range be.databases {
 		ids = append(ids, id)
@@ -67,11 +67,11 @@ func (be *basicEngine) ListDatabases() []sql.Identifier {
 	return ids
 }
 
-func (be *basicEngine) Begin() (engine.Transaction, error) {
-	return &basicTransaction{be}, nil
+func (be *basic) Begin() (engine.Transaction, error) {
+	return &transaction{be}, nil
 }
 
-func (btx *basicTransaction) LookupTable(ctx context.Context, dbname,
+func (btx *transaction) LookupTable(ctx context.Context, dbname,
 	tblname sql.Identifier) (db.Table, error) {
 
 	bdb, ok := btx.e.databases[dbname]
@@ -85,7 +85,7 @@ func (btx *basicTransaction) LookupTable(ctx context.Context, dbname,
 	return tbl, nil
 }
 
-func (btx *basicTransaction) CreateTable(ctx context.Context, dbname, tblname sql.Identifier,
+func (btx *transaction) CreateTable(ctx context.Context, dbname, tblname sql.Identifier,
 	cols []sql.Identifier, colTypes []db.ColumnType) error {
 
 	bdb, ok := btx.e.databases[dbname]
@@ -96,7 +96,7 @@ func (btx *basicTransaction) CreateTable(ctx context.Context, dbname, tblname sq
 		return fmt.Errorf("basic: table %s already exists in database %s", tblname, dbname)
 	}
 
-	bdb.tables[tblname] = &basicTable{
+	bdb.tables[tblname] = &table{
 		id:          bdb.nextID,
 		pageNum:     engine.PageNum(rand.Uint64()),
 		columns:     cols,
@@ -107,7 +107,7 @@ func (btx *basicTransaction) CreateTable(ctx context.Context, dbname, tblname sq
 	return nil
 }
 
-func (btx *basicTransaction) DropTable(ctx context.Context, dbname, tblname sql.Identifier,
+func (btx *transaction) DropTable(ctx context.Context, dbname, tblname sql.Identifier,
 	exists bool) error {
 
 	bdb, ok := btx.e.databases[dbname]
@@ -124,7 +124,7 @@ func (btx *basicTransaction) DropTable(ctx context.Context, dbname, tblname sql.
 	return nil
 }
 
-func (btx *basicTransaction) ListTables(ctx context.Context,
+func (btx *transaction) ListTables(ctx context.Context,
 	dbname sql.Identifier) ([]engine.TableEntry, error) {
 
 	bdb, ok := btx.e.databases[dbname]
@@ -143,44 +143,44 @@ func (btx *basicTransaction) ListTables(ctx context.Context,
 	return tbls, nil
 }
 
-func (btx *basicTransaction) Commit(ctx context.Context) error {
+func (btx *transaction) Commit(ctx context.Context) error {
 	btx.e = nil
 	return nil
 }
 
-func (btx *basicTransaction) Rollback() error {
+func (btx *transaction) Rollback() error {
 	btx.e = nil
 	return nil
 }
 
-func (bt *basicTable) Columns() []sql.Identifier {
+func (bt *table) Columns() []sql.Identifier {
 	return bt.columns
 }
 
-func (bt *basicTable) ColumnTypes() []db.ColumnType {
+func (bt *table) ColumnTypes() []db.ColumnType {
 	return bt.columnTypes
 }
 
-func (bt *basicTable) Rows() (db.Rows, error) {
-	return &basicRows{columns: bt.columns, rows: bt.rows}, nil
+func (bt *table) Rows() (db.Rows, error) {
+	return &rows{columns: bt.columns, rows: bt.rows}, nil
 }
 
-func (bt *basicTable) Insert(row []sql.Value) error {
+func (bt *table) Insert(row []sql.Value) error {
 	bt.rows = append(bt.rows, row)
 	return nil
 }
 
-func (br *basicRows) Columns() []sql.Identifier {
+func (br *rows) Columns() []sql.Identifier {
 	return br.columns
 }
 
-func (br *basicRows) Close() error {
+func (br *rows) Close() error {
 	br.index = len(br.rows)
 	br.haveRow = false
 	return nil
 }
 
-func (br *basicRows) Next(ctx context.Context, dest []sql.Value) error {
+func (br *rows) Next(ctx context.Context, dest []sql.Value) error {
 	for br.index < len(br.rows) {
 		if br.rows[br.index] != nil {
 			copy(dest, br.rows[br.index])
@@ -195,7 +195,7 @@ func (br *basicRows) Next(ctx context.Context, dest []sql.Value) error {
 	return io.EOF
 }
 
-func (br *basicRows) Delete(ctx context.Context) error {
+func (br *rows) Delete(ctx context.Context) error {
 	if !br.haveRow {
 		return fmt.Errorf("basic: no row to delete")
 	}
@@ -204,7 +204,7 @@ func (br *basicRows) Delete(ctx context.Context) error {
 	return nil
 }
 
-func (br *basicRows) Update(ctx context.Context, updates []db.ColumnUpdate) error {
+func (br *rows) Update(ctx context.Context, updates []db.ColumnUpdate) error {
 	if !br.haveRow {
 		return fmt.Errorf("basic: no row to update")
 	}
