@@ -3,6 +3,7 @@ package config_test
 import (
 	"flag"
 	"os"
+	"reflect"
 	"testing"
 
 	"github.com/leftmike/maho/config"
@@ -67,7 +68,7 @@ func TestEnv(t *testing.T) {
 	}
 	err = cfg.Env()
 	if err != nil {
-		t.Errorf("cfg.Load() failed with %s", err)
+		t.Errorf("cfg.Env() failed with %s", err)
 	}
 	if *b != false {
 		t.Errorf("*b != false")
@@ -77,5 +78,18 @@ func TestEnv(t *testing.T) {
 	}
 	if *s != "from environment" {
 		t.Errorf("*s != \"from environment\"")
+	}
+}
+
+func TestArray(t *testing.T) {
+	fs := flag.NewFlagSet("test_flags", flag.ContinueOnError)
+	cfg := config.NewConfig(fs)
+	a := cfg.Var(new(config.Array), "array").Usage("array variable").Array()
+	err := fs.Parse([]string{"-array=abc", "-array=def"})
+	if err != nil {
+		t.Fatalf("fs.Parse() failed with %s", err)
+	}
+	if !reflect.DeepEqual(*a, config.Array{"abc", "def"}) {
+		t.Errorf("*a != Array{\"abc\", \"def\"}")
 	}
 }

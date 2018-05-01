@@ -9,6 +9,13 @@ To Do:
 - fuzzing: parser.Parse
 
 - SET param { TO | = } value
+- load config: structs and slices
+- session object
+
+- memory engine (w/ mvcc)
+- distributed memory engine, using raft
+- boltdb engine
+- badger engine
 */
 
 import (
@@ -133,7 +140,7 @@ func main() {
 		if *configFile != "" {
 			filename = *configFile
 		}
-		err := config.Load(filename, nil)
+		err := config.Load(filename)
 		if err != nil {
 			fmt.Println(err)
 			return

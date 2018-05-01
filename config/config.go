@@ -1,30 +1,16 @@
 package config
 
 import (
+	"bufio"
 	"flag"
 	"fmt"
-	"io"
 	"os"
 	"time"
 )
 
-/*
-// comment
-/* comment * /
-
-${<variable>} = value
-[section] // control which parts of the config file are read
-<name> = <value>
-
-<value> = <string> | true | false | <number> | ${<variable>} | <map> | <array>
-<map> = { <name> : <value> [,] ... }
-<array> = [ <value> [,] ... ]
-<string> = "..." | `...`
-<number> = ...
-*/
-
 type value interface {
 	Set(string) error
+	SetValue(interface{}) error
 	String() string
 }
 
@@ -111,18 +97,22 @@ func (c *Config) flagVars() {
 	})
 }
 
-func (c *Config) Load(filename string, reader io.Reader) error {
+func (c *Config) Load(filename string) error {
 	if !c.flagSet.Parsed() {
 		panic("flags must be parsed before config is loaded")
 	}
 	c.flagVars()
 
-	// XXX: check file extension to decide how to load the config file
-	return nil
+	f, err := os.Open(filename)
+	if err != nil {
+		return err
+	}
+	defer f.Close()
+	return c.load(bufio.NewReader(f))
 }
 
-func Load(filename string, reader io.Reader) error {
-	return cfg.Load(filename, reader)
+func Load(filename string) error {
+	return cfg.Load(filename)
 }
 
 func (c *Config) Vars() []*Variable {
@@ -278,4 +268,20 @@ func (v *Variable) Uint64(def uint64) *uint64 {
 	}
 	*u64 = (uint64Value)(def)
 	return (*uint64)(u64)
+}
+
+func (v *Variable) Array() *Array {
+	a, ok := v.val.(*Array)
+	if !ok {
+		panic(fmt.Sprintf("can't convert %T to *config.Array", v.val))
+	}
+	return a
+}
+
+func (v *Variable) Map() Map {
+	m, ok := v.val.(Map)
+	if !ok {
+		panic(fmt.Sprintf("can't convert %T to config.Map", v.val))
+	}
+	return m
 }
