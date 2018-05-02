@@ -93,3 +93,25 @@ func TestArray(t *testing.T) {
 		t.Errorf("*a != Array{\"abc\", \"def\"}")
 	}
 }
+
+func TestMapFlag(t *testing.T) {
+	defer func() {
+		if r := recover(); r == nil {
+			t.Errorf("c.Var(make(config.Map)).Flag() did not fail")
+		}
+	}()
+
+	c := config.NewConfig(flag.NewFlagSet("test", flag.ContinueOnError))
+	c.Var(make(config.Map), "map").Flag("map", "map")
+}
+
+func TestMapEnv(t *testing.T) {
+	defer func() {
+		if r := recover(); r == nil {
+			t.Errorf("c.Var(make(config.Map)).Env() did not fail")
+		}
+	}()
+
+	c := config.NewConfig(flag.NewFlagSet("test", flag.ContinueOnError))
+	c.Var(make(config.Map), "map").Env("X-MAP")
+}

@@ -8,8 +8,7 @@ import (
 	"time"
 )
 
-type value interface {
-	Set(string) error
+type valueSetter interface {
 	SetValue(interface{}) error
 	String() string
 }
@@ -40,7 +39,7 @@ func (b setBy) String() string {
 type Variable struct {
 	cfg  *Config
 	name string
-	val  value
+	val  valueSetter
 	flag string
 	env  []string
 	by   setBy
@@ -72,7 +71,8 @@ func (c *Config) Env() error {
 		if v.by == byDefault && v.env != nil {
 			for _, e := range v.env {
 				if s, ok := os.LookupEnv(e); ok {
-					err := v.val.Set(s)
+					fv := v.val.(flag.Value)
+					err := fv.Set(s)
 					if err != nil {
 						return fmt.Errorf("config: %s environment variable: %s", e, err)
 					}
@@ -132,8 +132,8 @@ func (c *Config) Var(val interface{}, name string) *Variable {
 		panic(fmt.Sprintf("same config variable, %s, defined twice", name))
 	}
 
-	var v value
-	if vi, ok := val.(value); ok {
+	var v valueSetter
+	if vi, ok := val.(valueSetter); ok {
 		v = vi
 	} else if b, ok := val.(*bool); ok {
 		v = (*boolValue)(b)
@@ -183,9 +183,13 @@ func (v *Variable) By() string {
 }
 
 func (v *Variable) Flag(name, usage string) *Variable {
+	fv, ok := v.val.(flag.Value)
+	if !ok {
+		panic(fmt.Sprintf("%T does not implement Set", v.val))
+	}
 	v.flag = name
 	v.cfg.flags[v.flag] = v
-	v.cfg.flagSet.Var(v.val, v.flag, usage)
+	v.cfg.flagSet.Var(fv, v.flag, usage)
 	return v
 }
 
@@ -194,6 +198,10 @@ func (v *Variable) Usage(usage string) *Variable {
 }
 
 func (v *Variable) Env(vars ...string) *Variable {
+	_, ok := v.val.(flag.Value)
+	if !ok {
+		panic(fmt.Sprintf("%T does not implement Set", v.val))
+	}
 	v.env = vars
 	return v
 }

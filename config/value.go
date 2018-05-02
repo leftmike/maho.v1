@@ -189,10 +189,6 @@ func (a *Array) String() string {
 
 type Map map[string]interface{} // string, Map, or Array
 
-func (m Map) Set(s string) error {
-	return fmt.Errorf("parsing %q: invalid syntax", s)
-}
-
 func (m Map) SetValue(v interface{}) error {
 	mv, ok := v.(Map)
 	if !ok {
