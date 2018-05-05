@@ -143,6 +143,9 @@ func (c *Config) load(reader io.Reader) error {
 		if !ok {
 			return fmt.Errorf("%s: %s is not a config variable", npos, name)
 		}
+		if cvar.noConfig {
+			return fmt.Errorf("%s: %s can't be set in config file", npos, name)
+		}
 
 		vpos := s.Pos()
 		val, err := scanValue(s, s.Scan())
@@ -155,6 +158,7 @@ func (c *Config) load(reader io.Reader) error {
 			if err != nil {
 				return fmt.Errorf("%s: %s: %s", vpos, cvar.name, err)
 			}
+			cvar.by = byConfig
 		}
 	}
 

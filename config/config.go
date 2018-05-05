@@ -40,12 +40,14 @@ func (b setBy) String() string {
 }
 
 type Variable struct {
-	cfg  *Config
-	name string
-	val  valueSetter
-	flag string
-	env  []string
-	by   setBy
+	cfg      *Config
+	name     string
+	val      valueSetter
+	flag     string
+	env      []string
+	by       setBy
+	noConfig bool
+	noSet    bool
 }
 
 var cfg = NewConfig(flag.CommandLine)
@@ -178,6 +180,9 @@ func (c *Config) Set(name, val string) error {
 	if !ok {
 		return fmt.Errorf("config variable %s not found", name)
 	}
+	if v.noSet {
+		return fmt.Errorf("config variable %s can not be set", name)
+	}
 	fv, ok := v.val.(flag.Value)
 	if !ok {
 		return fmt.Errorf("config variable %s can not be set", name)
@@ -227,6 +232,17 @@ func (v *Variable) Env(vars ...string) *Variable {
 		panic(fmt.Sprintf("%T does not implement Set", v.val))
 	}
 	v.env = vars
+	return v
+}
+
+func (v *Variable) NoConfig() *Variable {
+	v.noConfig = true
+	v.noSet = true
+	return v
+}
+
+func (v *Variable) NoSet() *Variable {
+	v.noSet = true
 	return v
 }
 

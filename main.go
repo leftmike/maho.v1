@@ -10,11 +10,6 @@ To Do:
 
 - support multiple engines concurrently
 
-- default-database
-- default-engine
-- load config: structs and slices
-- session object
-
 - memory engine (w/ mvcc)
 - distributed memory engine, using raft
 - boltdb engine
@@ -123,8 +118,13 @@ func replSQL(p parser.Parser, w io.Writer) {
 }
 
 var (
-	dataDir = config.Var(new(string), "data-directory").
-		Usage("`directory` containing databases").String("testdata")
+	dataDir = config.Var(new(string), "data_directory").
+		Flag("data", "`directory` containing databases").NoConfig().String("testdata")
+	defaultDatabase = config.Var(new(string), "default_database").
+			Flag("database", "default `database`").String("maho")
+	defaultEngine = config.Var(new(string), "default_engine").
+			Flag("engine", "default `engine`").String("basic")
+
 	configFile = flag.String("config-file", "", "`file` to load config from")
 	noConfig   = flag.Bool("no-config", false, "don't load config file")
 	listConfig = flag.Bool("list-config", false, "list config and exit")
