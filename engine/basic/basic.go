@@ -11,13 +11,7 @@ import (
 	"github.com/leftmike/maho/sql"
 )
 
-type basic struct {
-	databases map[sql.Identifier]*database
-}
-
-type transaction struct {
-	e *basic
-}
+type basic struct{}
 
 type database struct {
 	nextID engine.TableID
@@ -43,57 +37,32 @@ func init() {
 	engine.Register("basic", &basic{})
 }
 
-func (be *basic) Start(dir string) error {
-	be.databases = map[sql.Identifier]*database{}
-	return nil
-}
-
-func (be *basic) CreateDatabase(dbname sql.Identifier) error {
-	if _, dup := be.databases[dbname]; dup {
-		return fmt.Errorf("basic: database %s already exists", dbname)
-	}
-	be.databases[dbname] = &database{
+func (be *basic) CreateDatabase(path string) (engine.Database, error) {
+	return &database{
 		nextID: 1,
 		tables: map[sql.Identifier]*table{},
-	}
-	return nil
+	}, nil
 }
 
-func (be *basic) ListDatabases() []sql.Identifier {
-	var ids []sql.Identifier
-	for id := range be.databases {
-		ids = append(ids, id)
-	}
-	return ids
+func (be *basic) AttachDatabase(path string) (engine.Database, error) {
+	return nil, fmt.Errorf("basic: attach database not supported")
 }
 
-func (be *basic) Begin() (engine.Transaction, error) {
-	return &transaction{be}, nil
-}
-
-func (btx *transaction) LookupTable(ctx context.Context, dbname,
+func (bdb *database) LookupTable(ctx context.Context, tx engine.Transaction,
 	tblname sql.Identifier) (db.Table, error) {
 
-	bdb, ok := btx.e.databases[dbname]
-	if !ok {
-		return nil, fmt.Errorf("basic: database %s not found", dbname)
-	}
 	tbl, ok := bdb.tables[tblname]
 	if !ok {
-		return nil, fmt.Errorf("basic: table %s not found in database %s", tblname, dbname)
+		return nil, fmt.Errorf("basic: table %s not found in database", tblname)
 	}
 	return tbl, nil
 }
 
-func (btx *transaction) CreateTable(ctx context.Context, dbname, tblname sql.Identifier,
-	cols []sql.Identifier, colTypes []db.ColumnType) error {
+func (bdb *database) CreateTable(ctx context.Context, tx engine.Transaction,
+	tblname sql.Identifier, cols []sql.Identifier, colTypes []db.ColumnType) error {
 
-	bdb, ok := btx.e.databases[dbname]
-	if !ok {
-		return fmt.Errorf("basic: database %s not found", dbname)
-	}
 	if _, dup := bdb.tables[tblname]; dup {
-		return fmt.Errorf("basic: table %s already exists in database %s", tblname, dbname)
+		return fmt.Errorf("basic: table %s already exists in database", tblname)
 	}
 
 	bdb.tables[tblname] = &table{
@@ -107,30 +76,22 @@ func (btx *transaction) CreateTable(ctx context.Context, dbname, tblname sql.Ide
 	return nil
 }
 
-func (btx *transaction) DropTable(ctx context.Context, dbname, tblname sql.Identifier,
+func (bdb *database) DropTable(ctx context.Context, tx engine.Transaction, tblname sql.Identifier,
 	exists bool) error {
 
-	bdb, ok := btx.e.databases[dbname]
-	if !ok {
-		return fmt.Errorf("basic: database %s not found", dbname)
-	}
 	if _, ok := bdb.tables[tblname]; !ok {
 		if exists {
 			return nil
 		}
-		return fmt.Errorf("basic: table %s does not exist in database %s", tblname, dbname)
+		return fmt.Errorf("basic: table %s does not exist in database", tblname)
 	}
 	delete(bdb.tables, tblname)
 	return nil
 }
 
-func (btx *transaction) ListTables(ctx context.Context,
-	dbname sql.Identifier) ([]engine.TableEntry, error) {
+func (bdb *database) ListTables(ctx context.Context,
+	tx engine.Transaction) ([]engine.TableEntry, error) {
 
-	bdb, ok := btx.e.databases[dbname]
-	if !ok {
-		return nil, fmt.Errorf("basic: database %s not found", dbname)
-	}
 	var tbls []engine.TableEntry
 	for name, tbl := range bdb.tables {
 		tbls = append(tbls, engine.TableEntry{
@@ -141,16 +102,6 @@ func (btx *transaction) ListTables(ctx context.Context,
 		})
 	}
 	return tbls, nil
-}
-
-func (btx *transaction) Commit(ctx context.Context) error {
-	btx.e = nil
-	return nil
-}
-
-func (btx *transaction) Rollback() error {
-	btx.e = nil
-	return nil
 }
 
 func (bt *table) Columns() []sql.Identifier {

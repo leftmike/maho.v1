@@ -8,7 +8,10 @@ To Do:
 
 - fuzzing: parser.Parse
 
-- support multiple engines concurrently
+- ATTACH DATABASE database [ [ WITH ] [ PATH [ '=' ] path ] [ ENGINE [ '=' ] engine ] ]
+- DETACH DATABASE database
+- CREATE DATABASE database [ [ WITH ] [ PATH [ '=' ] path ] [ ENGINE [ '=' ] engine ] ]
+- attached databases are written into a  .sql that is loaded at startup
 
 - memory engine (w/ mvcc)
 - distributed memory engine, using raft
@@ -131,7 +134,7 @@ var (
 )
 
 func start(typ, dataDir string) error {
-	return engine.Start(typ, dataDir, sql.ID("maho"))
+	return engine.Start(typ, dataDir, sql.ID(*defDb))
 }
 
 func main() {

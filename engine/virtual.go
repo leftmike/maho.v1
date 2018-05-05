@@ -47,6 +47,9 @@ func duplicateCheck(dbname, tblname sql.Identifier) {
 }
 
 func CreateVirtual(dbname, tblname sql.Identifier, maker MakeVirtual) {
+	mutex.Lock()
+	defer mutex.Unlock()
+
 	duplicateCheck(dbname, tblname)
 	tblmap, ok := virtualDatabases[dbname]
 	if !ok {
@@ -68,6 +71,8 @@ func lookupVirtual(ctx context.Context, tx Transaction, dbname,
 	if dbname != 0 {
 		if maker, ok := virtualDatabases[0][tblname]; ok {
 			return maker(ctx, tx, dbname, tblname)
+		} else if tblmap != nil {
+			return nil, fmt.Errorf("engine: table %s not found in database", tblname)
 		}
 	}
 	return nil, nil
@@ -139,9 +144,20 @@ var (
 	stringColType = db.ColumnType{Type: sql.CharacterType, Size: 4096, NotNull: true}
 )
 
-func listTables(ctx context.Context, tx Transaction, dbname sql.Identifier) ([]TableEntry, error) {
+func databaseTables(ctx context.Context, tx Transaction, dbname sql.Identifier) ([]TableEntry,
+	error) {
+	d, ok := databases[dbname]
+	if !ok {
+		return nil, fmt.Errorf("engine: database %s not found", dbname)
+	}
+	return d.ListTables(ctx, tx)
+}
+
+func listTables(ctx context.Context, tx Transaction, dbname sql.Identifier) ([]TableEntry,
+	error) {
+
 	tblmap, ok := virtualDatabases[dbname]
-	tbls, err := tx.ListTables(ctx, dbname)
+	tbls, err := databaseTables(ctx, tx, dbname)
 	if !ok && err != nil {
 		return nil, err
 	}
@@ -158,8 +174,11 @@ func listTables(ctx context.Context, tx Transaction, dbname sql.Identifier) ([]T
 	return tbls, nil
 }
 
-func MakeTablesVirtual(ctx context.Context, tx Transaction, dbname,
+func makeTablesVirtual(ctx context.Context, tx Transaction, dbname,
 	tblname sql.Identifier) (db.Table, error) {
+
+	mutex.RLock()
+	defer mutex.RUnlock()
 
 	tbls, err := listTables(ctx, tx, dbname)
 	if err != nil {
@@ -203,8 +222,11 @@ var (
 		boolColType, boolColType, boolColType, idColType}
 )
 
-func MakeColumnsVirtual(ctx context.Context, tx Transaction, dbname,
+func makeColumnsVirtual(ctx context.Context, tx Transaction, dbname,
 	tblname sql.Identifier) (db.Table, error) {
+
+	mutex.RLock()
+	defer mutex.RUnlock()
 
 	tbls, err := listTables(ctx, tx, dbname)
 	if err != nil {
@@ -253,10 +275,17 @@ func MakeColumnsVirtual(ctx context.Context, tx Transaction, dbname,
 	}, nil
 }
 
-func MakeDatabasesVirtual(ctx context.Context, tx Transaction, dbname,
+func makeDatabasesVirtual(ctx context.Context, tx Transaction, dbname,
 	tblname sql.Identifier) (db.Table, error) {
 
-	ids := e.ListDatabases()
+	mutex.RLock()
+	defer mutex.RUnlock()
+
+	var ids []sql.Identifier
+	for id := range databases {
+		ids = append(ids, id)
+	}
+
 	values := [][]sql.Value{}
 	for _, id := range ids {
 		values = append(values, []sql.Value{sql.StringValue(id.String())})
@@ -273,7 +302,7 @@ func MakeDatabasesVirtual(ctx context.Context, tx Transaction, dbname,
 	}, nil
 }
 
-func MakeIdentifiersVirtual(ctx context.Context, tx Transaction, dbname,
+func makeIdentifiersVirtual(ctx context.Context, tx Transaction, dbname,
 	tblname sql.Identifier) (db.Table, error) {
 
 	values := [][]sql.Value{}
@@ -294,7 +323,7 @@ func MakeIdentifiersVirtual(ctx context.Context, tx Transaction, dbname,
 	}, nil
 }
 
-func MakeConfigVirtual(ctx context.Context, tx Transaction, dbname,
+func makeConfigVirtual(ctx context.Context, tx Transaction, dbname,
 	tblname sql.Identifier) (db.Table, error) {
 
 	values := [][]sql.Value{}
@@ -316,9 +345,9 @@ func MakeConfigVirtual(ctx context.Context, tx Transaction, dbname,
 }
 
 func init() {
-	CreateVirtual(0, sql.ID("db$tables"), MakeTablesVirtual)
-	CreateVirtual(0, sql.ID("db$columns"), MakeColumnsVirtual)
-	CreateVirtual(sql.ID("system"), sql.ID("databases"), MakeDatabasesVirtual)
-	CreateVirtual(sql.ID("system"), sql.ID("identifiers"), MakeIdentifiersVirtual)
-	CreateVirtual(sql.ID("system"), sql.ID("config"), MakeConfigVirtual)
+	CreateVirtual(0, sql.ID("db$tables"), makeTablesVirtual)
+	CreateVirtual(0, sql.ID("db$columns"), makeColumnsVirtual)
+	CreateVirtual(sql.ID("system"), sql.ID("databases"), makeDatabasesVirtual)
+	CreateVirtual(sql.ID("system"), sql.ID("identifiers"), makeIdentifiersVirtual)
+	CreateVirtual(sql.ID("system"), sql.ID("config"), makeConfigVirtual)
 }

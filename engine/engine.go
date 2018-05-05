@@ -3,6 +3,7 @@ package engine
 import (
 	"context"
 	"fmt"
+	"path/filepath"
 	"sync"
 
 	"github.com/leftmike/maho/db"
@@ -27,125 +28,125 @@ type TableEntry struct {
 }
 
 type Engine interface {
-	// Start the engine using dir as the data directory.
-	Start(dir string) error
-	CreateDatabase(dbname sql.Identifier) error
-	ListDatabases() []sql.Identifier
+	CreateDatabase(path string) (Database, error)
+	AttachDatabase(path string) (Database, error)
+}
 
-	Begin() (Transaction, error)
+type Database interface {
+	LookupTable(ctx context.Context, tx Transaction, tblname sql.Identifier) (db.Table, error)
+	CreateTable(ctx context.Context, tx Transaction, tblname sql.Identifier,
+		cols []sql.Identifier, colTypes []db.ColumnType) error
+	DropTable(ctx context.Context, tx Transaction, tblname sql.Identifier, exists bool) error
+	ListTables(ctx context.Context, tx Transaction) ([]TableEntry, error)
 }
 
 type Transaction interface {
-	LookupTable(ctx context.Context, dbname, tblname sql.Identifier) (db.Table, error)
-	CreateTable(ctx context.Context, dbname, tblname sql.Identifier, cols []sql.Identifier,
-		colTypes []db.ColumnType) error
-	DropTable(ctx context.Context, dbname, tblname sql.Identifier, exists bool) error
-	ListTables(ctx context.Context, dbname sql.Identifier) ([]TableEntry, error)
-
 	Commit(ctx context.Context) error
 	Rollback() error
 }
 
 var (
-	enginesMutex sync.Mutex
-	engines      = map[string]Engine{}
-	e            Engine
-	defaultName  sql.Identifier
+	mutex     sync.RWMutex
+	engines   = map[string]Engine{}
+	databases = map[sql.Identifier]Database{}
+	defaultDb sql.Identifier
 )
 
-func findDatabase(ids []sql.Identifier, dbname sql.Identifier) bool {
-	for _, id := range ids {
-		if id == dbname {
-			return true
-		}
-	}
-	return false
-}
-
-// Start an engine of typ, use dir as the data directory, and open or create the
+// Start an engine of typ, use dir as the data directory, and attach or create the
 // named database.
 func Start(typ, dir string, dbname sql.Identifier) error {
-	enginesMutex.Lock()
-	defer enginesMutex.Unlock()
+	mutex.Lock()
+	defer mutex.Unlock()
 
-	if e != nil {
-		panic("engine already started")
-	}
-	ne, ok := engines[typ]
+	e, ok := engines[typ]
 	if !ok {
 		return fmt.Errorf("engine: type not found: %s", typ)
 	}
-	err := ne.Start(dir)
+	d, err := e.AttachDatabase(filepath.Join(dir, dbname.String()))
 	if err != nil {
-		return err
-	}
-
-	if !findDatabase(ne.ListDatabases(), dbname) {
-		err = ne.CreateDatabase(dbname)
+		d, err = e.CreateDatabase(filepath.Join(dir, dbname.String()))
 		if err != nil {
-			return nil
+			return err
 		}
 	}
-
-	e = ne
-	defaultName = dbname
+	databases[dbname] = d
+	defaultDb = dbname
 	return nil
 }
 
+type transaction struct{}
+
 // Begin a new transaction.
 func Begin() (Transaction, error) {
-	if e == nil {
-		panic("start the engine first")
-	}
-	return e.Begin()
+	return &transaction{}, nil
+}
+
+func (tx *transaction) Commit(ctx context.Context) error {
+	return nil
+}
+
+func (tx *transaction) Rollback() error {
+	return nil
 }
 
 // LookupTable looks up the named table in the named database.
 func LookupTable(ctx context.Context, tx Transaction, dbname, tblname sql.Identifier) (db.Table,
 	error) {
 
-	if e == nil {
-		panic("start the engine first")
-	}
+	mutex.RLock()
+	defer mutex.RUnlock()
+
 	if dbname == 0 {
-		dbname = defaultName
+		dbname = defaultDb
 	}
 	tbl, err := lookupVirtual(ctx, tx, dbname, tblname)
 	if tbl != nil || err != nil {
 		return tbl, err
 	}
-	return tx.LookupTable(ctx, dbname, tblname)
+	d, ok := databases[dbname]
+	if !ok {
+		return nil, fmt.Errorf("engine: database %s not found", dbname)
+	}
+	return d.LookupTable(ctx, tx, tblname)
 }
 
 // CreateTable creates the named table in the named database.
 func CreateTable(ctx context.Context, tx Transaction, dbname, tblname sql.Identifier,
 	cols []sql.Identifier, colTypes []db.ColumnType) error {
 
-	if e == nil {
-		panic("start the engine first")
-	}
+	mutex.RLock()
+	defer mutex.RUnlock()
+
 	if dbname == 0 {
-		dbname = defaultName
+		dbname = defaultDb
 	}
-	return tx.CreateTable(ctx, dbname, tblname, cols, colTypes)
+	d, ok := databases[dbname]
+	if !ok {
+		return fmt.Errorf("engine: database %s not found", dbname)
+	}
+	return d.CreateTable(ctx, tx, tblname, cols, colTypes)
 }
 
 // DropTable drops the named table from the named database.
 func DropTable(ctx context.Context, tx Transaction, dbname, tblname sql.Identifier,
 	exists bool) error {
 
-	if e == nil {
-		panic("start the engine first")
-	}
+	mutex.RLock()
+	defer mutex.RUnlock()
+
 	if dbname == 0 {
-		dbname = defaultName
+		dbname = defaultDb
 	}
-	return tx.DropTable(ctx, dbname, tblname, exists)
+	d, ok := databases[dbname]
+	if !ok {
+		return fmt.Errorf("engine: database %s not found", dbname)
+	}
+	return d.DropTable(ctx, tx, tblname, exists)
 }
 
 func Register(typ string, e Engine) {
-	enginesMutex.Lock()
-	defer enginesMutex.Unlock()
+	mutex.Lock()
+	defer mutex.Unlock()
 
 	if _, dup := engines[typ]; dup {
 		panic(fmt.Sprintf("engine already registered: %s", typ))
