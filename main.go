@@ -120,10 +120,10 @@ func replSQL(p parser.Parser, w io.Writer) {
 var (
 	dataDir = config.Var(new(string), "data_directory").
 		Flag("data", "`directory` containing databases").NoConfig().String("testdata")
-	defaultDatabase = config.Var(new(string), "default_database").
-			Flag("database", "default `database`").String("maho")
-	defaultEngine = config.Var(new(string), "default_engine").
-			Flag("engine", "default `engine`").String("basic")
+	defDb = config.Var(new(string), "default_database").
+		Flag("database", "default `database`").String("maho")
+	defEng = config.Var(new(string), "default_engine").
+		Flag("engine", "default `engine`").String("basic")
 
 	configFile = flag.String("config-file", "", "`file` to load config from")
 	noConfig   = flag.Bool("no-config", false, "don't load config file")
@@ -156,7 +156,7 @@ func main() {
 		return
 	}
 
-	err := start("basic", *dataDir)
+	err := start(*defEng, *dataDir)
 	if err != nil {
 		fmt.Println(err)
 		return
