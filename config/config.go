@@ -20,6 +20,7 @@ const (
 	byFlag
 	byEnv
 	byConfig
+	bySet
 )
 
 func (b setBy) String() string {
@@ -32,6 +33,8 @@ func (b setBy) String() string {
 		return "environment"
 	case byConfig:
 		return "config-file"
+	case bySet:
+		return "set"
 	}
 	panic(fmt.Sprintf("set-by: unexpected value: %d", b))
 }
@@ -168,6 +171,27 @@ func (c *Config) Var(val interface{}, name string) *Variable {
 
 func Var(val interface{}, name string) *Variable {
 	return cfg.Var(val, name)
+}
+
+func (c *Config) Set(name, val string) error {
+	v, ok := c.vars[name]
+	if !ok {
+		return fmt.Errorf("config variable %s not found", name)
+	}
+	fv, ok := v.val.(flag.Value)
+	if !ok {
+		return fmt.Errorf("config variable %s can not be set", name)
+	}
+	err := fv.Set(val)
+	if err != nil {
+		return err
+	}
+	v.by = bySet
+	return nil
+}
+
+func Set(name, val string) error {
+	return cfg.Set(name, val)
 }
 
 func (v *Variable) Name() string {

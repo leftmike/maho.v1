@@ -10,6 +10,7 @@ import (
 	"github.com/leftmike/maho/db"
 	"github.com/leftmike/maho/engine"
 	"github.com/leftmike/maho/expr"
+	"github.com/leftmike/maho/misc"
 	"github.com/leftmike/maho/parser/scanner"
 	"github.com/leftmike/maho/parser/token"
 	"github.com/leftmike/maho/query"
@@ -234,7 +235,7 @@ func (p *parser) expectEndOfStatement() {
 
 func (p *parser) parseStmt() Stmt {
 	switch p.expectReserved(sql.CREATE, sql.DELETE, sql.DROP, sql.INSERT, sql.SELECT, sql.UPDATE,
-		sql.VALUES) {
+		sql.VALUES, sql.SET) {
 	case sql.CREATE:
 		/*
 			CREATE TABLE ...
@@ -274,6 +275,11 @@ func (p *parser) parseStmt() Stmt {
 			UPDATE
 		*/
 		return p.parseUpdate()
+	case sql.SET:
+		/*
+			SET
+		*/
+		return p.parseSet()
 	}
 
 	return nil
@@ -940,6 +946,28 @@ func (p *parser) parseUpdate() Stmt {
 
 	if p.optionalReserved(sql.WHERE) {
 		s.Where = p.parseExpr()
+	}
+
+	return &s
+}
+
+func (p *parser) parseSet() Stmt {
+	// SET variable ( TO | '=' ) ( <literal> | DEFAULT )
+	var s misc.Set
+
+	s.Variable = p.expectIdentifier("expected a config variable")
+	if !p.maybeToken(token.Equal) {
+		p.expectReserved(sql.TO)
+	}
+	e := p.parseExpr()
+	l, ok := e.(*expr.Literal)
+	if !ok {
+		p.error(fmt.Sprintf("expected a literal value, got %s", e.String()))
+	}
+	if sv, ok := l.Value.(sql.StringValue); ok {
+		s.Value = string(sv)
+	} else {
+		s.Value = l.Value.String()
 	}
 
 	return &s

@@ -65,6 +65,7 @@ const (
 	SELECT
 	SET
 	TABLE
+	TO
 	TRUE
 	UNIQUE
 	UPDATE
@@ -131,6 +132,7 @@ var knownKeywords = map[string]struct {
 	"SMALLINT":  {SMALLINT, false},
 	"TABLE":     {TABLE, true},
 	"TEXT":      {TEXT, false},
+	"TO":        {TO, true},
 	"TRUE":      {TRUE, true},
 	"UNIQUE":    {UNIQUE, true},
 	"UPDATE":    {UPDATE, true},

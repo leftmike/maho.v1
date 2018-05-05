@@ -8,7 +8,10 @@ To Do:
 
 - fuzzing: parser.Parse
 
-- SET param { TO | = } value
+- support multiple engines concurrently
+
+- default-database
+- default-engine
 - load config: structs and slices
 - session object
 
