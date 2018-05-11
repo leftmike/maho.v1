@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"io"
 	"runtime"
+	"strconv"
 
 	"github.com/leftmike/maho/datadef"
 	"github.com/leftmike/maho/db"
@@ -234,52 +235,52 @@ func (p *parser) expectEndOfStatement() {
 }
 
 func (p *parser) parseStmt() Stmt {
-	switch p.expectReserved(sql.CREATE, sql.DELETE, sql.DROP, sql.INSERT, sql.SELECT, sql.UPDATE,
-		sql.VALUES, sql.SET) {
+	switch p.expectReserved(sql.ATTACH, sql.CREATE, sql.DELETE, sql.DETACH, sql.DROP, sql.INSERT,
+		sql.SELECT, sql.SET, sql.UPDATE, sql.USE, sql.VALUES) {
+	case sql.ATTACH:
+		// ATTACH DATABASE ...
+		p.expectReserved(sql.DATABASE)
+		return p.parseAttachDatabase()
 	case sql.CREATE:
-		/*
-			CREATE TABLE ...
-		*/
-		p.expectReserved(sql.TABLE)
-		return p.parseCreateTable()
+		switch p.expectReserved(sql.DATABASE, sql.TABLE) {
+		case sql.DATABASE:
+			// CREATE DATABASE ...
+			return p.parseCreateDatabase()
+		case sql.TABLE:
+			// CREATE TABLE ...
+			return p.parseCreateTable()
+		}
 	case sql.DELETE:
-		/*
-		   DELETE FROM
-		*/
+		// DELETE FROM ...
 		p.expectReserved(sql.FROM)
 		return p.parseDelete()
+	case sql.DETACH:
+		// DETACH DATABASE ...
+		p.expectReserved(sql.DATABASE)
+		return p.parseDetachDatabase()
 	case sql.DROP:
-		/*
-			DROP TABLE [database.]table [,...]
-		*/
+		// DROP TABLE ...
 		p.expectReserved(sql.TABLE)
 		return p.parseDropTable()
 	case sql.INSERT:
-		/*
-		   INSERT INTO
-		*/
+		// INSERT INTO ...
 		p.expectReserved(sql.INTO)
 		return p.parseInsert()
-	case sql.VALUES:
-		/*
-			VALUES
-		*/
-		return p.parseValues()
 	case sql.SELECT:
-		/*
-			SELECT
-		*/
+		// SELECT ...
 		return p.parseSelect()
-	case sql.UPDATE:
-		/*
-			UPDATE
-		*/
-		return p.parseUpdate()
 	case sql.SET:
-		/*
-			SET
-		*/
+		// SET ...
 		return p.parseSet()
+	case sql.UPDATE:
+		// UPDATE ...
+		return p.parseUpdate()
+	case sql.USE:
+		// USE ...
+		return p.parseUse()
+	case sql.VALUES:
+		// VALUES ...
+		return p.parseValues()
 	}
 
 	return nil
@@ -952,7 +953,7 @@ func (p *parser) parseUpdate() Stmt {
 }
 
 func (p *parser) parseSet() Stmt {
-	// SET variable ( TO | '=' ) ( <literal> | DEFAULT )
+	// SET variable ( TO | '=' ) <literal>
 	var s misc.Set
 
 	s.Variable = p.expectIdentifier("expected a config variable")
@@ -970,5 +971,77 @@ func (p *parser) parseSet() Stmt {
 		s.Value = l.Value.String()
 	}
 
+	return &s
+}
+
+func (p *parser) parseOptions() map[sql.Identifier]string {
+	options := map[sql.Identifier]string{}
+	for {
+		if p.scan() != token.Identifier {
+			p.unscan()
+			break
+		}
+
+		opt := p.sctx.Identifier
+
+		p.maybeToken(token.Equal)
+
+		var val string
+		switch p.scan() {
+		case token.Identifier:
+			val = p.sctx.Identifier.String()
+		case token.String:
+			val = p.sctx.String
+		case token.Integer:
+			val = strconv.FormatInt(p.sctx.Integer, 10)
+		case token.Float:
+			val = strconv.FormatFloat(p.sctx.Float, 'g', -1, 64)
+		default:
+			p.error("expected a value")
+		}
+
+		options[opt] = val
+	}
+	if len(options) == 0 {
+		p.error("expected options")
+	}
+	return options
+}
+
+func (p *parser) parseAttachDatabase() Stmt {
+	// ATTACH DATABASE database [ [ WITH ] [ PATH [ '=' ] path ] [ ENGINE [ '=' ] engine ] ]
+	var s datadef.AttachDatabase
+
+	s.Database = p.expectIdentifier("expected a database")
+	if p.optionalReserved(sql.WITH) {
+		s.Options = p.parseOptions()
+	}
+	return &s
+}
+
+func (p *parser) parseCreateDatabase() Stmt {
+	// CREATE DATABASE database [ [ WITH ] [ PATH [ '=' ] path ] [ ENGINE [ '=' ] engine ] ]
+	var s datadef.CreateDatabase
+
+	s.Database = p.expectIdentifier("expected a database")
+	if p.optionalReserved(sql.WITH) {
+		s.Options = p.parseOptions()
+	}
+	return &s
+}
+
+func (p *parser) parseDetachDatabase() Stmt {
+	// DETACH DATABASE database
+	var s datadef.DetachDatabase
+
+	s.Database = p.expectIdentifier("expected a database")
+	return &s
+}
+
+func (p *parser) parseUse() Stmt {
+	// USE database
+	var s misc.Use
+
+	s.Database = p.expectIdentifier("expected a database")
 	return &s
 }

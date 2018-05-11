@@ -18,11 +18,13 @@ const (
 	COUNT
 	COUNT_ALL
 	DOUBLE
+	ENGINE
 	INT
 	INT2
 	INT4
 	INT8
 	INTEGER
+	PATH
 	PRECISION
 	REAL
 	SMALLINT
@@ -35,12 +37,15 @@ const (
 	AND Identifier = -(iota + 1)
 	AS
 	ASC
+	ATTACH
 	BY
 	CREATE
 	CROSS
+	DATABASE
 	DEFAULT
 	DELETE
 	DESC
+	DETACH
 	DROP
 	EXISTS
 	FALSE
@@ -69,9 +74,11 @@ const (
 	TRUE
 	UNIQUE
 	UPDATE
+	USE
 	USING
 	VALUES
 	WHERE
+	WITH
 )
 
 var knownIdentifiers = map[string]Identifier{
@@ -86,6 +93,7 @@ var knownKeywords = map[string]struct {
 	"AND":       {AND, true},
 	"AS":        {AS, true},
 	"ASC":       {ASC, true},
+	"ATTACH":    {ATTACH, true},
 	"BY":        {BY, true},
 	"BIGINT":    {BIGINT, false},
 	"BINARY":    {BINARY, false},
@@ -95,11 +103,14 @@ var knownKeywords = map[string]struct {
 	"CHAR":      {CHAR, false},
 	"CREATE":    {CREATE, true},
 	"CROSS":     {CROSS, true},
+	"DATABASE":  {DATABASE, true},
 	"DEFAULT":   {DEFAULT, true},
 	"DELETE":    {DELETE, true},
 	"DESC":      {DESC, true},
+	"DETACH":    {DETACH, true},
 	"DOUBLE":    {DOUBLE, false},
 	"DROP":      {DROP, true},
+	"ENGINE":    {ENGINE, false},
 	"EXISTS":    {EXISTS, true},
 	"FALSE":     {FALSE, true},
 	"FROM":      {FROM, true},
@@ -124,6 +135,7 @@ var knownKeywords = map[string]struct {
 	"OR":        {OR, true},
 	"ORDER":     {ORDER, true},
 	"OUTER":     {OUTER, true},
+	"PATH":      {PATH, false},
 	"PRECISION": {PRECISION, false},
 	"REAL":      {REAL, false},
 	"RIGHT":     {RIGHT, true},
@@ -136,11 +148,13 @@ var knownKeywords = map[string]struct {
 	"TRUE":      {TRUE, true},
 	"UNIQUE":    {UNIQUE, true},
 	"UPDATE":    {UPDATE, true},
+	"USE":       {USE, true},
 	"USING":     {USING, true},
 	"VALUES":    {VALUES, true},
 	"VARBINARY": {VARBINARY, false},
 	"VARCHAR":   {VARCHAR, false},
 	"WHERE":     {WHERE, true},
+	"WITH":      {WITH, true},
 }
 
 var (

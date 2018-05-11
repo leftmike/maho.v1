@@ -11,6 +11,7 @@ To Do:
 - ATTACH DATABASE database [ [ WITH ] [ PATH [ '=' ] path ] [ ENGINE [ '=' ] engine ] ]
 - DETACH DATABASE database
 - CREATE DATABASE database [ [ WITH ] [ PATH [ '=' ] path ] [ ENGINE [ '=' ] engine ] ]
+- USE database
 - attached databases are written into a  .sql that is loaded at startup
 
 - memory engine (w/ mvcc)
@@ -123,10 +124,9 @@ func replSQL(p parser.Parser, w io.Writer) {
 var (
 	dataDir = config.Var(new(string), "data_directory").
 		Flag("data", "`directory` containing databases").NoConfig().String("testdata")
-	defDb = config.Var(new(string), "default_database").
-		Flag("database", "default `database`").String("maho")
-	defEng = config.Var(new(string), "default_engine").
-		Flag("engine", "default `engine`").String("basic")
+	database = config.Var(new(string), "database").Flag("database", "default `database`").
+			String("maho")
+	eng = config.Var(new(string), "engine").Flag("engine", "default `engine`").String("basic")
 
 	configFile = flag.String("config-file", "", "`file` to load config from")
 	noConfig   = flag.Bool("no-config", false, "don't load config file")
@@ -134,7 +134,7 @@ var (
 )
 
 func start(typ, dataDir string) error {
-	return engine.Start(typ, dataDir, sql.ID(*defDb))
+	return engine.Start(typ, dataDir, sql.ID(*database))
 }
 
 func main() {
@@ -159,7 +159,7 @@ func main() {
 		return
 	}
 
-	err := start(*defEng, *dataDir)
+	err := start(*eng, *dataDir)
 	if err != nil {
 		fmt.Println(err)
 		return

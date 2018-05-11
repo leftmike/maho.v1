@@ -959,3 +959,56 @@ func TestUpdate(t *testing.T) {
 		}
 	}
 }
+
+func TestCreateDatabase(t *testing.T) {
+	cases := []struct {
+		sql  string
+		stmt datadef.CreateDatabase
+		fail bool
+	}{
+		{sql: "create database", fail: true},
+		{
+			sql: "create database test",
+			stmt: datadef.CreateDatabase{
+				Database: sql.ID("test"),
+			},
+		},
+		{sql: "create database test with", fail: true},
+		{sql: "create database test with path", fail: true},
+		{sql: "create database test with path = ", fail: true},
+		{sql: "create database test with 'path' = value", fail: true},
+		{sql: "create database test with create = value", fail: true},
+		{sql: "create database test with path = 'string' engine", fail: true},
+		{
+			sql: "create database test with path = 'string' engine 'fast'",
+			stmt: datadef.CreateDatabase{
+				Database: sql.ID("test"),
+				Options: map[sql.Identifier]string{
+					sql.UnquotedID("path"):   "string",
+					sql.UnquotedID("engine"): "fast",
+				},
+			},
+		},
+	}
+
+	for i, c := range cases {
+		p := NewParser(strings.NewReader(c.sql), fmt.Sprintf("tests[%d]", i))
+		cd, err := p.Parse()
+		if c.fail {
+			if err == nil {
+				t.Errorf("Parse(%q) did not fail", c.sql)
+			}
+		} else {
+			var trc string
+			if err != nil {
+				t.Errorf("Parse(%q) failed with %s", c.sql, err)
+			} else {
+				cd, ok := cd.(*datadef.CreateDatabase)
+				if !ok || !testutil.DeepEqual(&c.stmt, cd, &trc) {
+					t.Errorf("Parse(%q) got %s want %s\n%s", c.sql, cd.String(), c.stmt.String(),
+						trc)
+				}
+			}
+		}
+	}
+}

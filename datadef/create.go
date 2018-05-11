@@ -42,3 +42,27 @@ func (stmt *CreateTable) Execute(ctx context.Context, tx engine.Transaction) (in
 	return 0, engine.CreateTable(ctx, tx, stmt.Table.Database, stmt.Table.Table, stmt.Columns,
 		stmt.ColumnTypes)
 }
+
+type CreateDatabase struct {
+	Database sql.Identifier
+	Options  map[sql.Identifier]string
+}
+
+func (stmt *CreateDatabase) String() string {
+	s := fmt.Sprintf("CREATE DATABASE %s", stmt.Database)
+	if len(stmt.Options) > 0 {
+		s += " WITH"
+		for opt, val := range stmt.Options {
+			s = fmt.Sprintf("%s %s = %s", s, opt, val)
+		}
+	}
+	return s
+}
+
+func (stmt *CreateDatabase) Plan(ctx context.Context, tx engine.Transaction) (interface{}, error) {
+	return stmt, nil
+}
+
+func (stmt *CreateDatabase) Execute(ctx context.Context, tx engine.Transaction) (int64, error) {
+	return 0, nil // XXX
+}
