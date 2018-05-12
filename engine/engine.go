@@ -35,27 +35,27 @@ type Engine interface {
 	CreateDatabase(name sql.Identifier, path string, options Options) (Database, error)
 }
 
-type DatabaseState int
+type databaseState int
 
 const (
-	Attaching DatabaseState = iota
-	Creating
-	Detaching
-	Dropping
-	Running
+	attaching databaseState = iota
+	creating
+	detaching
+	dropping
+	running
 )
 
-func (ds DatabaseState) String() string {
+func (ds databaseState) String() string {
 	switch ds {
-	case Attaching:
+	case attaching:
 		return "attaching"
-	case Creating:
+	case creating:
 		return "creating"
-	case Detaching:
+	case detaching:
 		return "detaching"
-	case Dropping:
+	case dropping:
 		return "dropping"
-	case Running:
+	case running:
 		return "running"
 	default:
 		panic(fmt.Sprintf("unexpected value for database state: %d", ds))
@@ -63,15 +63,19 @@ func (ds DatabaseState) String() string {
 }
 
 type Database interface {
-	Type() string
-	State() DatabaseState
-	Path() string
 	Message() string
 	LookupTable(ctx context.Context, tx Transaction, tblname sql.Identifier) (db.Table, error)
 	CreateTable(ctx context.Context, tx Transaction, tblname sql.Identifier,
 		cols []sql.Identifier, colTypes []db.ColumnType) error
 	DropTable(ctx context.Context, tx Transaction, tblname sql.Identifier, exists bool) error
 	ListTables(ctx context.Context, tx Transaction) ([]TableEntry, error)
+}
+
+type databaseEntry struct {
+	database Database
+	state    databaseState
+	path     string
+	typ      string
 }
 
 type Transaction interface {
@@ -84,7 +88,7 @@ type Transaction interface {
 var (
 	mutex     sync.RWMutex
 	engines   = map[string]Engine{}
-	databases = map[sql.Identifier]Database{}
+	databases = map[sql.Identifier]*databaseEntry{}
 
 	dataDir = config.Var(new(string), "data_directory").
 		Flag("data", "`directory` containing databases").NoConfig().String("testdata")
@@ -120,7 +124,12 @@ func newDatabase(eng string, name sql.Identifier, options Options, fn newDbFunc)
 	if err != nil {
 		return err
 	}
-	databases[name] = d
+	databases[name] = &databaseEntry{
+		database: d,
+		state:    running,
+		path:     path,
+		typ:      typ,
+	}
 	return nil
 }
 
@@ -185,11 +194,11 @@ func LookupTable(ctx context.Context, tx Transaction, dbname, tblname sql.Identi
 	if tbl != nil || err != nil {
 		return tbl, err
 	}
-	d, ok := databases[dbname]
+	de, ok := databases[dbname]
 	if !ok {
 		return nil, fmt.Errorf("engine: database %s not found", dbname)
 	}
-	return d.LookupTable(ctx, tx, tblname)
+	return de.database.LookupTable(ctx, tx, tblname)
 }
 
 // CreateTable creates the named table in the named database.
@@ -202,11 +211,11 @@ func CreateTable(ctx context.Context, tx Transaction, dbname, tblname sql.Identi
 	if dbname == 0 {
 		dbname = tx.DefaultDatabase()
 	}
-	d, ok := databases[dbname]
+	de, ok := databases[dbname]
 	if !ok {
 		return fmt.Errorf("engine: database %s not found", dbname)
 	}
-	return d.CreateTable(ctx, tx, tblname, cols, colTypes)
+	return de.database.CreateTable(ctx, tx, tblname, cols, colTypes)
 }
 
 // DropTable drops the named table from the named database.
@@ -219,11 +228,11 @@ func DropTable(ctx context.Context, tx Transaction, dbname, tblname sql.Identifi
 	if dbname == 0 {
 		dbname = tx.DefaultDatabase()
 	}
-	d, ok := databases[dbname]
+	de, ok := databases[dbname]
 	if !ok {
 		return fmt.Errorf("engine: database %s not found", dbname)
 	}
-	return d.DropTable(ctx, tx, tblname, exists)
+	return de.database.DropTable(ctx, tx, tblname, exists)
 }
 
 func Register(typ string, e Engine) {

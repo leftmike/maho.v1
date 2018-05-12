@@ -37,9 +37,13 @@ func CreateVirtualDatabase(name sql.Identifier, tables TableMap) {
 	if ok {
 		panic(fmt.Sprintf("virtual database already created: %s", name))
 	}
-	databases[name] = &virtualDatabase{
-		name:   name,
-		tables: tables,
+	databases[name] = &databaseEntry{
+		database: &virtualDatabase{
+			name:   name,
+			tables: tables,
+		},
+		state: running,
+		typ:   "virtual",
 	}
 }
 
@@ -55,18 +59,6 @@ func lookupVirtual(ctx context.Context, tx Transaction, dbname,
 type virtualDatabase struct {
 	name   sql.Identifier
 	tables TableMap
-}
-
-func (vdb *virtualDatabase) Type() string {
-	return "virtual"
-}
-
-func (vdb *virtualDatabase) State() DatabaseState {
-	return Running
-}
-
-func (vdb *virtualDatabase) Path() string {
-	return ""
 }
 
 func (vdb *virtualDatabase) Message() string {
@@ -173,11 +165,11 @@ var (
 
 func databaseTables(ctx context.Context, tx Transaction, dbname sql.Identifier) ([]TableEntry,
 	error) {
-	d, ok := databases[dbname]
+	de, ok := databases[dbname]
 	if !ok {
 		return nil, fmt.Errorf("engine: database %s not found", dbname)
 	}
-	return d.ListTables(ctx, tx)
+	return de.database.ListTables(ctx, tx)
 }
 
 func listTables(ctx context.Context, tx Transaction, dbname sql.Identifier) ([]TableEntry,
@@ -302,20 +294,19 @@ func makeDatabasesVirtual(ctx context.Context, tx Transaction, dbname,
 	defer mutex.RUnlock()
 
 	values := [][]sql.Value{}
-	for id, d := range databases {
+	for id, de := range databases {
 		var msg, path sql.Value
-		p := d.Path()
-		if p != "" {
-			path = sql.StringValue(p)
+		if de.path != "" {
+			path = sql.StringValue(de.path)
 		}
-		m := d.Message()
+		m := de.database.Message()
 		if m != "" {
 			msg = sql.StringValue(m)
 		}
 		values = append(values, []sql.Value{
 			sql.StringValue(id.String()),
-			sql.StringValue(d.Type()),
-			sql.StringValue(d.State().String()),
+			sql.StringValue(de.typ),
+			sql.StringValue(de.state.String()),
 			path,
 			msg,
 		})

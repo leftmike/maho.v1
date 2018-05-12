@@ -15,7 +15,6 @@ type basic struct{}
 
 type database struct {
 	name   sql.Identifier
-	path   string
 	nextID engine.TableID
 	tables map[sql.Identifier]*table
 }
@@ -50,22 +49,9 @@ func (be *basic) CreateDatabase(name sql.Identifier, path string,
 
 	return &database{
 		name:   name,
-		path:   path,
 		nextID: 1,
 		tables: map[sql.Identifier]*table{},
 	}, nil
-}
-
-func (bdb *database) Type() string {
-	return "basic"
-}
-
-func (bdb *database) State() engine.DatabaseState {
-	return engine.Running
-}
-
-func (bdb *database) Path() string {
-	return bdb.path
 }
 
 func (bdb *database) Message() string {
