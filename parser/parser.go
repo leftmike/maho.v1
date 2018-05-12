@@ -236,7 +236,7 @@ func (p *parser) expectEndOfStatement() {
 
 func (p *parser) parseStmt() Stmt {
 	switch p.expectReserved(sql.ATTACH, sql.CREATE, sql.DELETE, sql.DETACH, sql.DROP, sql.INSERT,
-		sql.SELECT, sql.SET, sql.UPDATE, sql.USE, sql.VALUES) {
+		sql.SELECT, sql.SET, sql.UPDATE, sql.VALUES) {
 	case sql.ATTACH:
 		// ATTACH DATABASE ...
 		p.expectReserved(sql.DATABASE)
@@ -275,9 +275,6 @@ func (p *parser) parseStmt() Stmt {
 	case sql.UPDATE:
 		// UPDATE ...
 		return p.parseUpdate()
-	case sql.USE:
-		// USE ...
-		return p.parseUse()
 	case sql.VALUES:
 		// VALUES ...
 		return p.parseValues()
@@ -1033,14 +1030,6 @@ func (p *parser) parseCreateDatabase() Stmt {
 func (p *parser) parseDetachDatabase() Stmt {
 	// DETACH DATABASE database
 	var s datadef.DetachDatabase
-
-	s.Database = p.expectIdentifier("expected a database")
-	return &s
-}
-
-func (p *parser) parseUse() Stmt {
-	// USE database
-	var s misc.Use
 
 	s.Database = p.expectIdentifier("expected a database")
 	return &s

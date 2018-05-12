@@ -74,7 +74,6 @@ const (
 	TRUE
 	UNIQUE
 	UPDATE
-	USE
 	USING
 	VALUES
 	WHERE
@@ -148,7 +147,6 @@ var knownKeywords = map[string]struct {
 	"TRUE":      {TRUE, true},
 	"UNIQUE":    {UNIQUE, true},
 	"UPDATE":    {UPDATE, true},
-	"USE":       {USE, true},
 	"USING":     {USING, true},
 	"VALUES":    {VALUES, true},
 	"VARBINARY": {VARBINARY, false},

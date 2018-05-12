@@ -142,10 +142,6 @@ func DetachDatabase(name sql.Identifier) error {
 	return nil // XXX
 }
 
-func Use(name sql.Identifier) error {
-	return nil // XXX
-}
-
 type transaction struct {
 	eng  string
 	name sql.Identifier
