@@ -21,5 +21,5 @@ func (stmt *DetachDatabase) Plan(ctx context.Context, tx engine.Transaction) (in
 }
 
 func (stmt *DetachDatabase) Execute(ctx context.Context, tx engine.Transaction) (int64, error) {
-	return 0, nil // XXX
+	return 0, engine.DetachDatabase(stmt.Database)
 }

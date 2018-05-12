@@ -29,5 +29,5 @@ func (stmt *AttachDatabase) Plan(ctx context.Context, tx engine.Transaction) (in
 }
 
 func (stmt *AttachDatabase) Execute(ctx context.Context, tx engine.Transaction) (int64, error) {
-	return 0, nil // XXX
+	return 0, engine.AttachDatabase(tx.DefaultEngine(), stmt.Database, stmt.Options)
 }

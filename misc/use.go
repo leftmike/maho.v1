@@ -21,5 +21,5 @@ func (stmt *Use) Plan(ctx context.Context, tx engine.Transaction) (interface{}, 
 }
 
 func (stmt *Use) Execute(ctx context.Context, tx engine.Transaction) (int64, error) {
-	return 0, nil // XXX
+	return 0, engine.Use(stmt.Database)
 }

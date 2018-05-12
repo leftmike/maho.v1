@@ -41,7 +41,7 @@ func TestValuesSimple(t *testing.T) {
 			t.Errorf("Parse(%q) failed with %s", c.sql, err)
 			continue
 		}
-		tx, err := engine.Begin()
+		tx, err := engine.Begin("basic", sql.ID("test"))
 		if err != nil {
 			t.Fatal(err)
 		}

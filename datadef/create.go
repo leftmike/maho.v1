@@ -64,5 +64,5 @@ func (stmt *CreateDatabase) Plan(ctx context.Context, tx engine.Transaction) (in
 }
 
 func (stmt *CreateDatabase) Execute(ctx context.Context, tx engine.Transaction) (int64, error) {
-	return 0, nil // XXX
+	return 0, engine.CreateDatabase(tx.DefaultEngine(), stmt.Database, stmt.Options)
 }

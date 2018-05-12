@@ -11,8 +11,10 @@ To Do:
 - ATTACH DATABASE database [ [ WITH ] [ PATH [ '=' ] path ] [ ENGINE [ '=' ] engine ] ]
 - DETACH DATABASE database
 - CREATE DATABASE database [ [ WITH ] [ PATH [ '=' ] path ] [ ENGINE [ '=' ] engine ] ]
-- USE database
-- attached databases are written into a  .sql that is loaded at startup
+- USE database ==> move out of engine.go
+- attached databases are written into a (sql?) file (system/maho.sql?) that is loaded at startup
+- async database attach, create, detach, (and drop)
+- database: path needs to be unique: needs to be tracked by the engine
 
 - memory engine (w/ mvcc)
 - distributed memory engine, using raft
@@ -51,7 +53,7 @@ func replSQL(p parser.Parser, w io.Writer) {
 			return
 		}
 
-		tx, err = engine.Begin()
+		tx, err = engine.Begin(*eng, sql.ID(*database))
 		if err != nil {
 			fmt.Println(err)
 			return
@@ -122,8 +124,6 @@ func replSQL(p parser.Parser, w io.Writer) {
 }
 
 var (
-	dataDir = config.Var(new(string), "data_directory").
-		Flag("data", "`directory` containing databases").NoConfig().String("testdata")
 	database = config.Var(new(string), "database").Flag("database", "default `database`").
 			String("maho")
 	eng = config.Var(new(string), "engine").Flag("engine", "default `engine`").String("basic")
@@ -133,16 +133,12 @@ var (
 	listConfig = flag.Bool("list-config", false, "list config and exit")
 )
 
-func start(typ, dataDir string) error {
-	return engine.Start(typ, dataDir, sql.ID(*database))
-}
-
 func main() {
 	flag.Parse()
 	config.Env()
 
 	if *noConfig == false {
-		filename := filepath.Join(*dataDir, "maho.cfg")
+		filename := filepath.Join(".", "maho.cfg")
 		if *configFile != "" {
 			filename = *configFile
 		}
@@ -159,7 +155,7 @@ func main() {
 		return
 	}
 
-	err := start(*eng, *dataDir)
+	err := engine.CreateDatabase(*eng, sql.ID(*database), nil)
 	if err != nil {
 		fmt.Println(err)
 		return

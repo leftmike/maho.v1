@@ -6,6 +6,7 @@ import (
 	"path/filepath"
 	"sync"
 
+	"github.com/leftmike/maho/config"
 	"github.com/leftmike/maho/db"
 	"github.com/leftmike/maho/sql"
 )
@@ -27,12 +28,45 @@ type TableEntry struct {
 	Type    TableType
 }
 
+type Options map[sql.Identifier]string
+
 type Engine interface {
-	CreateDatabase(path string) (Database, error)
-	AttachDatabase(path string) (Database, error)
+	AttachDatabase(path string, options Options) (Database, error)
+	CreateDatabase(path string, options Options) (Database, error)
+}
+
+type DatabaseState int
+
+const (
+	Attaching DatabaseState = iota
+	Creating
+	Detaching
+	Dropping
+	Running
+)
+
+func (ds DatabaseState) String() string {
+	switch ds {
+	case Attaching:
+		return "attaching"
+	case Creating:
+		return "creating"
+	case Detaching:
+		return "detaching"
+	case Dropping:
+		return "dropping"
+	case Running:
+		return "running"
+	default:
+		panic(fmt.Sprintf("unexpected value for database state: %d", ds))
+	}
 }
 
 type Database interface {
+	Type() string
+	State() DatabaseState
+	Path() string
+	Error() error
 	LookupTable(ctx context.Context, tx Transaction, tblname sql.Identifier) (db.Table, error)
 	CreateTable(ctx context.Context, tx Transaction, tblname sql.Identifier,
 		cols []sql.Identifier, colTypes []db.ColumnType) error
@@ -41,6 +75,8 @@ type Database interface {
 }
 
 type Transaction interface {
+	DefaultEngine() string
+	DefaultDatabase() sql.Identifier
 	Commit(ctx context.Context) error
 	Rollback() error
 }
@@ -49,36 +85,85 @@ var (
 	mutex     sync.RWMutex
 	engines   = map[string]Engine{}
 	databases = map[sql.Identifier]Database{}
-	defaultDb sql.Identifier
+
+	dataDir = config.Var(new(string), "data_directory").
+		Flag("data", "`directory` containing databases").NoConfig().String("testdata")
 )
 
-// Start an engine of typ, use dir as the data directory, and attach or create the
-// named database.
-func Start(typ, dir string, dbname sql.Identifier) error {
+type newDbFunc func(e Engine, path string, options Options) (Database, error)
+
+func newDatabase(eng string, dbname sql.Identifier, options Options, fn newDbFunc) error {
 	mutex.Lock()
 	defer mutex.Unlock()
 
+	if _, ok := databases[dbname]; ok {
+		return fmt.Errorf("engine: database already exists: %s", dbname)
+	}
+
+	typ, ok := options[sql.ENGINE]
+	if !ok {
+		typ = eng
+	} else {
+		delete(options, sql.ENGINE)
+	}
 	e, ok := engines[typ]
 	if !ok {
 		return fmt.Errorf("engine: type not found: %s", typ)
 	}
-	d, err := e.AttachDatabase(filepath.Join(dir, dbname.String()))
+	path, ok := options[sql.PATH]
+	if !ok {
+		path = filepath.Join(*dataDir, dbname.String())
+	} else {
+		delete(options, sql.PATH)
+	}
+	d, err := fn(e, path, options)
 	if err != nil {
-		d, err = e.CreateDatabase(filepath.Join(dir, dbname.String()))
-		if err != nil {
-			return err
-		}
+		return err
 	}
 	databases[dbname] = d
-	defaultDb = dbname
 	return nil
 }
 
-type transaction struct{}
+func AttachDatabase(eng string, dbname sql.Identifier, options Options) error {
+	return newDatabase(eng, dbname, options,
+		func(e Engine, path string, options Options) (Database, error) {
+			return e.AttachDatabase(path, options)
+		})
+}
+
+func CreateDatabase(eng string, dbname sql.Identifier, options Options) error {
+	return newDatabase(eng, dbname, options,
+		func(e Engine, path string, options Options) (Database, error) {
+			return e.CreateDatabase(path, options)
+		})
+}
+
+func DetachDatabase(dbname sql.Identifier) error {
+	return nil // XXX
+}
+
+func Use(dbname sql.Identifier) error {
+	return nil // XXX
+}
+
+type transaction struct {
+	eng    string
+	dbname sql.Identifier
+}
 
 // Begin a new transaction.
-func Begin() (Transaction, error) {
-	return &transaction{}, nil
+func Begin(eng string, dbname sql.Identifier) (Transaction, error) {
+	return &transaction{
+		dbname: dbname,
+	}, nil
+}
+
+func (tx *transaction) DefaultEngine() string {
+	return tx.eng
+}
+
+func (tx *transaction) DefaultDatabase() sql.Identifier {
+	return tx.dbname
 }
 
 func (tx *transaction) Commit(ctx context.Context) error {
@@ -97,7 +182,7 @@ func LookupTable(ctx context.Context, tx Transaction, dbname, tblname sql.Identi
 	defer mutex.RUnlock()
 
 	if dbname == 0 {
-		dbname = defaultDb
+		dbname = tx.DefaultDatabase()
 	}
 	tbl, err := lookupVirtual(ctx, tx, dbname, tblname)
 	if tbl != nil || err != nil {
@@ -118,7 +203,7 @@ func CreateTable(ctx context.Context, tx Transaction, dbname, tblname sql.Identi
 	defer mutex.RUnlock()
 
 	if dbname == 0 {
-		dbname = defaultDb
+		dbname = tx.DefaultDatabase()
 	}
 	d, ok := databases[dbname]
 	if !ok {
@@ -135,7 +220,7 @@ func DropTable(ctx context.Context, tx Transaction, dbname, tblname sql.Identifi
 	defer mutex.RUnlock()
 
 	if dbname == 0 {
-		dbname = defaultDb
+		dbname = tx.DefaultDatabase()
 	}
 	d, ok := databases[dbname]
 	if !ok {

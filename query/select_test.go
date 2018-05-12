@@ -97,7 +97,7 @@ func TestSelect(t *testing.T) {
 	}
 
 	startEngine(t)
-	tx, err := engine.Begin()
+	tx, err := engine.Begin("basic", sql.ID("test"))
 	if err != nil {
 		t.Fatal(tx)
 	}

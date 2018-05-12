@@ -13,69 +13,96 @@ import (
 type MakeVirtual func(ctx context.Context, tx Transaction, dbname,
 	tblname sql.Identifier) (db.Table, error)
 
-type tableMap map[sql.Identifier]MakeVirtual
+type TableMap map[sql.Identifier]MakeVirtual
 
 var (
-	virtualDatabases = map[sql.Identifier]tableMap{
-		0: tableMap{},
-	}
+	virtualTables = TableMap{}
 )
 
-func duplicatePanic(dbname, tblname sql.Identifier) {
-	if dbname == 0 {
-		panic(fmt.Sprintf("virtual table already created: *.%s", tblname))
-	} else {
-		panic(fmt.Sprintf("virtual table already created: %s.%s", dbname, tblname))
-	}
-}
-
-func duplicateCheck(dbname, tblname sql.Identifier) {
-	tblmap, ok := virtualDatabases[dbname]
-	if ok {
-		if _, dup := tblmap[tblname]; dup {
-			duplicatePanic(dbname, tblname)
-		} else if dbname == 0 {
-			for dbname, tblmap := range virtualDatabases {
-				if dbname != 0 {
-					if _, dup := tblmap[tblname]; dup {
-						duplicatePanic(dbname, tblname)
-					}
-				}
-			}
-		}
-	}
-}
-
-func CreateVirtual(dbname, tblname sql.Identifier, maker MakeVirtual) {
+func CreateVirtualTable(tblname sql.Identifier, maker MakeVirtual) {
 	mutex.Lock()
 	defer mutex.Unlock()
 
-	duplicateCheck(dbname, tblname)
-	tblmap, ok := virtualDatabases[dbname]
-	if !ok {
-		tblmap = tableMap{}
-		virtualDatabases[dbname] = tblmap
+	if _, ok := virtualTables[tblname]; ok {
+		panic(fmt.Sprintf("virtual table already created: *.%s", tblname))
 	}
-	tblmap[tblname] = maker
+	virtualTables[tblname] = maker
+}
+
+func CreateVirtualDatabase(name sql.Identifier, tables TableMap) {
+	mutex.Lock()
+	defer mutex.Unlock()
+
+	_, ok := databases[name]
+	if ok {
+		panic(fmt.Sprintf("virtual database already created: %s", name))
+	}
+	databases[name] = &virtualDatabase{
+		name:   name,
+		tables: tables,
+	}
 }
 
 func lookupVirtual(ctx context.Context, tx Transaction, dbname,
 	tblname sql.Identifier) (db.Table, error) {
 
-	tblmap, ok := virtualDatabases[dbname]
-	if ok {
-		if maker, ok := tblmap[tblname]; ok {
-			return maker(ctx, tx, dbname, tblname)
-		}
-	}
-	if dbname != 0 {
-		if maker, ok := virtualDatabases[0][tblname]; ok {
-			return maker(ctx, tx, dbname, tblname)
-		} else if tblmap != nil {
-			return nil, fmt.Errorf("engine: table %s not found in database", tblname)
-		}
+	if maker, ok := virtualTables[tblname]; ok {
+		return maker(ctx, tx, dbname, tblname)
 	}
 	return nil, nil
+}
+
+type virtualDatabase struct {
+	name   sql.Identifier
+	tables TableMap
+}
+
+func (vdb *virtualDatabase) Type() string {
+	return "virtual"
+}
+
+func (vdb *virtualDatabase) State() DatabaseState {
+	return Running
+}
+
+func (vdb *virtualDatabase) Path() string {
+	return vdb.name.String()
+}
+
+func (vdb *virtualDatabase) Error() error {
+	return nil
+}
+
+func (vdb *virtualDatabase) LookupTable(ctx context.Context, tx Transaction,
+	tblname sql.Identifier) (db.Table, error) {
+
+	maker, ok := vdb.tables[tblname]
+	if !ok {
+		return nil, fmt.Errorf("virtual: table %s not found in database", tblname)
+	}
+	return maker(ctx, tx, vdb.name, tblname)
+}
+
+func (vdb *virtualDatabase) CreateTable(ctx context.Context, tx Transaction,
+	tblname sql.Identifier, cols []sql.Identifier, colTypes []db.ColumnType) error {
+
+	return fmt.Errorf("virtual: database may not be modified")
+}
+
+func (vdb *virtualDatabase) DropTable(ctx context.Context, tx Transaction, tblname sql.Identifier,
+	exists bool) error {
+
+	return fmt.Errorf("virtual: database may not be modified")
+}
+
+func (vdb *virtualDatabase) ListTables(ctx context.Context, tx Transaction) ([]TableEntry,
+	error) {
+
+	var tbls []TableEntry
+	for nam := range vdb.tables {
+		tbls = append(tbls, TableEntry{nam, 0, 0, VirtualType})
+	}
+	return tbls, nil
 }
 
 type VirtualTable struct {
@@ -156,19 +183,12 @@ func databaseTables(ctx context.Context, tx Transaction, dbname sql.Identifier) 
 func listTables(ctx context.Context, tx Transaction, dbname sql.Identifier) ([]TableEntry,
 	error) {
 
-	tblmap, ok := virtualDatabases[dbname]
 	tbls, err := databaseTables(ctx, tx, dbname)
-	if !ok && err != nil {
+	if err != nil {
 		return nil, err
 	}
 
-	if ok {
-		for nam := range tblmap {
-			tbls = append(tbls, TableEntry{nam, 0, 0, VirtualType})
-		}
-	}
-
-	for nam := range virtualDatabases[0] {
+	for nam := range virtualTables {
 		tbls = append(tbls, TableEntry{nam, 0, 0, VirtualType})
 	}
 	return tbls, nil
@@ -281,23 +301,25 @@ func makeDatabasesVirtual(ctx context.Context, tx Transaction, dbname,
 	mutex.RLock()
 	defer mutex.RUnlock()
 
-	var ids []sql.Identifier
-	for id := range databases {
-		ids = append(ids, id)
-	}
-
 	values := [][]sql.Value{}
-	for _, id := range ids {
-		values = append(values, []sql.Value{sql.StringValue(id.String())})
-	}
-	for id := range virtualDatabases {
-		if id != 0 {
-			values = append(values, []sql.Value{sql.StringValue(id.String())})
+	for id, d := range databases {
+		var val sql.Value
+		err := d.Error()
+		if err != nil {
+			val = sql.StringValue(err.Error())
 		}
+		values = append(values, []sql.Value{
+			sql.StringValue(id.String()),
+			sql.StringValue(d.Type()),
+			sql.StringValue(d.State().String()),
+			sql.StringValue(d.Path()),
+			val,
+		})
 	}
 	return &VirtualTable{
-		Cols:     []sql.Identifier{sql.ID("database")},
-		ColTypes: []db.ColumnType{idColType},
+		Cols: []sql.Identifier{sql.ID("database"), sql.ID("engine"), sql.ID("state"),
+			sql.ID("path"), sql.ID("error")},
+		ColTypes: []db.ColumnType{idColType, idColType, idColType, idColType, idColType},
 		Values:   values,
 	}, nil
 }
@@ -344,10 +366,29 @@ func makeConfigVirtual(ctx context.Context, tx Transaction, dbname,
 	}, nil
 }
 
+func makeEnginesVirtual(ctx context.Context, tx Transaction, dbname,
+	tblname sql.Identifier) (db.Table, error) {
+
+	values := [][]sql.Value{}
+
+	for nam := range engines {
+		values = append(values, []sql.Value{sql.StringValue(nam)})
+	}
+
+	return &VirtualTable{
+		Cols:     []sql.Identifier{sql.ID("name")},
+		ColTypes: []db.ColumnType{idColType},
+		Values:   values,
+	}, nil
+}
+
 func init() {
-	CreateVirtual(0, sql.ID("db$tables"), makeTablesVirtual)
-	CreateVirtual(0, sql.ID("db$columns"), makeColumnsVirtual)
-	CreateVirtual(sql.ID("system"), sql.ID("databases"), makeDatabasesVirtual)
-	CreateVirtual(sql.ID("system"), sql.ID("identifiers"), makeIdentifiersVirtual)
-	CreateVirtual(sql.ID("system"), sql.ID("config"), makeConfigVirtual)
+	CreateVirtualTable(sql.ID("db$tables"), makeTablesVirtual)
+	CreateVirtualTable(sql.ID("db$columns"), makeColumnsVirtual)
+	CreateVirtualDatabase(sql.ID("system"), TableMap{
+		sql.ID("databases"):   makeDatabasesVirtual,
+		sql.ID("identifiers"): makeIdentifiersVirtual,
+		sql.ID("config"):      makeConfigVirtual,
+		sql.ID("engines"):     makeEnginesVirtual,
+	})
 }

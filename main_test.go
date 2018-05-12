@@ -10,11 +10,6 @@ import (
 )
 
 func TestMain(t *testing.T) {
-	err := start("basic", "testdata")
-	if err != nil {
-		t.Errorf("start() failed with %s", err)
-		return
-	}
 	cases := []struct {
 		s string
 		r string
@@ -26,7 +21,8 @@ func TestMain(t *testing.T) {
  2   'databases' NULL     NULL 'virtual'
  3  'db$columns' NULL     NULL 'virtual'
  4   'db$tables' NULL     NULL 'virtual'
- 5 'identifiers' NULL     NULL 'virtual'
+ 5     'engines' NULL     NULL 'virtual'
+ 6 'identifiers' NULL     NULL 'virtual'
 `},
 	}
 

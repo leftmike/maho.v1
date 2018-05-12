@@ -14,6 +14,7 @@ import (
 type basic struct{}
 
 type database struct {
+	path   string
 	nextID engine.TableID
 	tables map[sql.Identifier]*table
 }
@@ -37,15 +38,32 @@ func init() {
 	engine.Register("basic", &basic{})
 }
 
-func (be *basic) CreateDatabase(path string) (engine.Database, error) {
+func (be *basic) CreateDatabase(path string, options engine.Options) (engine.Database, error) {
 	return &database{
+		path:   path,
 		nextID: 1,
 		tables: map[sql.Identifier]*table{},
 	}, nil
 }
 
-func (be *basic) AttachDatabase(path string) (engine.Database, error) {
+func (be *basic) AttachDatabase(path string, options engine.Options) (engine.Database, error) {
 	return nil, fmt.Errorf("basic: attach database not supported")
+}
+
+func (bdb *database) Type() string {
+	return "basic"
+}
+
+func (bdb *database) State() engine.DatabaseState {
+	return engine.Running
+}
+
+func (bdb *database) Path() string {
+	return bdb.path
+}
+
+func (bdb *database) Error() error {
+	return nil
 }
 
 func (bdb *database) LookupTable(ctx context.Context, tx engine.Transaction,

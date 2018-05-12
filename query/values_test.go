@@ -18,7 +18,7 @@ func startEngine(t *testing.T) {
 	t.Helper()
 
 	if !started {
-		err := engine.Start("basic", "testdata", sql.ID("test"))
+		err := engine.CreateDatabase("basic", sql.ID("test"), nil)
 		if err != nil {
 			t.Fatal(err)
 		}
@@ -67,7 +67,7 @@ func TestValues(t *testing.T) {
 	}
 
 	startEngine(t)
-	tx, err := engine.Begin()
+	tx, err := engine.Begin("basic", sql.ID("test"))
 	if err != nil {
 		t.Fatal(err)
 	}

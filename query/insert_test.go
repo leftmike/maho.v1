@@ -214,7 +214,7 @@ func testInsert(t *testing.T, dbnam, nam sql.Identifier, cols []sql.Identifier,
 
 	ctx := context.Background()
 	for _, c := range cases {
-		tx, err := engine.Begin()
+		tx, err := engine.Begin("basic", sql.ID("test"))
 		if err != nil {
 			t.Error(err)
 			return
