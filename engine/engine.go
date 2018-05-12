@@ -31,8 +31,8 @@ type TableEntry struct {
 type Options map[sql.Identifier]string
 
 type Engine interface {
-	AttachDatabase(path string, options Options) (Database, error)
-	CreateDatabase(path string, options Options) (Database, error)
+	AttachDatabase(name sql.Identifier, path string, options Options) (Database, error)
+	CreateDatabase(name sql.Identifier, path string, options Options) (Database, error)
 }
 
 type DatabaseState int
@@ -66,7 +66,7 @@ type Database interface {
 	Type() string
 	State() DatabaseState
 	Path() string
-	Error() error
+	Message() string
 	LookupTable(ctx context.Context, tx Transaction, tblname sql.Identifier) (db.Table, error)
 	CreateTable(ctx context.Context, tx Transaction, tblname sql.Identifier,
 		cols []sql.Identifier, colTypes []db.ColumnType) error
@@ -90,14 +90,14 @@ var (
 		Flag("data", "`directory` containing databases").NoConfig().String("testdata")
 )
 
-type newDbFunc func(e Engine, path string, options Options) (Database, error)
+type newDbFunc func(e Engine, name sql.Identifier, path string, options Options) (Database, error)
 
-func newDatabase(eng string, dbname sql.Identifier, options Options, fn newDbFunc) error {
+func newDatabase(eng string, name sql.Identifier, options Options, fn newDbFunc) error {
 	mutex.Lock()
 	defer mutex.Unlock()
 
-	if _, ok := databases[dbname]; ok {
-		return fmt.Errorf("engine: database already exists: %s", dbname)
+	if _, ok := databases[name]; ok {
+		return fmt.Errorf("engine: database already exists: %s", name)
 	}
 
 	typ, ok := options[sql.ENGINE]
@@ -112,49 +112,50 @@ func newDatabase(eng string, dbname sql.Identifier, options Options, fn newDbFun
 	}
 	path, ok := options[sql.PATH]
 	if !ok {
-		path = filepath.Join(*dataDir, dbname.String())
+		path = filepath.Join(*dataDir, name.String())
 	} else {
 		delete(options, sql.PATH)
 	}
-	d, err := fn(e, path, options)
+	d, err := fn(e, name, path, options)
 	if err != nil {
 		return err
 	}
-	databases[dbname] = d
+	databases[name] = d
 	return nil
 }
 
-func AttachDatabase(eng string, dbname sql.Identifier, options Options) error {
-	return newDatabase(eng, dbname, options,
-		func(e Engine, path string, options Options) (Database, error) {
-			return e.AttachDatabase(path, options)
+func AttachDatabase(eng string, name sql.Identifier, options Options) error {
+	return newDatabase(eng, name, options,
+		func(e Engine, name sql.Identifier, path string, options Options) (Database, error) {
+			return e.AttachDatabase(name, path, options)
 		})
 }
 
-func CreateDatabase(eng string, dbname sql.Identifier, options Options) error {
-	return newDatabase(eng, dbname, options,
-		func(e Engine, path string, options Options) (Database, error) {
-			return e.CreateDatabase(path, options)
+func CreateDatabase(eng string, name sql.Identifier, options Options) error {
+	return newDatabase(eng, name, options,
+		func(e Engine, name sql.Identifier, path string, options Options) (Database, error) {
+			return e.CreateDatabase(name, path, options)
 		})
 }
 
-func DetachDatabase(dbname sql.Identifier) error {
+func DetachDatabase(name sql.Identifier) error {
 	return nil // XXX
 }
 
-func Use(dbname sql.Identifier) error {
+func Use(name sql.Identifier) error {
 	return nil // XXX
 }
 
 type transaction struct {
-	eng    string
-	dbname sql.Identifier
+	eng  string
+	name sql.Identifier
 }
 
 // Begin a new transaction.
-func Begin(eng string, dbname sql.Identifier) (Transaction, error) {
+func Begin(eng string, name sql.Identifier) (Transaction, error) {
 	return &transaction{
-		dbname: dbname,
+		eng:  eng,
+		name: name,
 	}, nil
 }
 
@@ -163,7 +164,7 @@ func (tx *transaction) DefaultEngine() string {
 }
 
 func (tx *transaction) DefaultDatabase() sql.Identifier {
-	return tx.dbname
+	return tx.name
 }
 
 func (tx *transaction) Commit(ctx context.Context) error {

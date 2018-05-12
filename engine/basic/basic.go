@@ -14,6 +14,7 @@ import (
 type basic struct{}
 
 type database struct {
+	name   sql.Identifier
 	path   string
 	nextID engine.TableID
 	tables map[sql.Identifier]*table
@@ -38,16 +39,21 @@ func init() {
 	engine.Register("basic", &basic{})
 }
 
-func (be *basic) CreateDatabase(path string, options engine.Options) (engine.Database, error) {
+func (be *basic) AttachDatabase(name sql.Identifier, path string,
+	options engine.Options) (engine.Database, error) {
+
+	return nil, fmt.Errorf("basic: attach database not supported")
+}
+
+func (be *basic) CreateDatabase(name sql.Identifier, path string,
+	options engine.Options) (engine.Database, error) {
+
 	return &database{
+		name:   name,
 		path:   path,
 		nextID: 1,
 		tables: map[sql.Identifier]*table{},
 	}, nil
-}
-
-func (be *basic) AttachDatabase(path string, options engine.Options) (engine.Database, error) {
-	return nil, fmt.Errorf("basic: attach database not supported")
 }
 
 func (bdb *database) Type() string {
@@ -62,8 +68,8 @@ func (bdb *database) Path() string {
 	return bdb.path
 }
 
-func (bdb *database) Error() error {
-	return nil
+func (bdb *database) Message() string {
+	return ""
 }
 
 func (bdb *database) LookupTable(ctx context.Context, tx engine.Transaction,
@@ -71,7 +77,7 @@ func (bdb *database) LookupTable(ctx context.Context, tx engine.Transaction,
 
 	tbl, ok := bdb.tables[tblname]
 	if !ok {
-		return nil, fmt.Errorf("basic: table %s not found in database", tblname)
+		return nil, fmt.Errorf("basic: table %s not found in database %s", tblname, bdb.name)
 	}
 	return tbl, nil
 }
@@ -80,7 +86,7 @@ func (bdb *database) CreateTable(ctx context.Context, tx engine.Transaction,
 	tblname sql.Identifier, cols []sql.Identifier, colTypes []db.ColumnType) error {
 
 	if _, dup := bdb.tables[tblname]; dup {
-		return fmt.Errorf("basic: table %s already exists in database", tblname)
+		return fmt.Errorf("basic: table %s already exists in database %s", tblname, bdb.name)
 	}
 
 	bdb.tables[tblname] = &table{
@@ -101,7 +107,7 @@ func (bdb *database) DropTable(ctx context.Context, tx engine.Transaction, tblna
 		if exists {
 			return nil
 		}
-		return fmt.Errorf("basic: table %s does not exist in database", tblname)
+		return fmt.Errorf("basic: table %s does not exist in database %s", tblname, bdb.name)
 	}
 	delete(bdb.tables, tblname)
 	return nil

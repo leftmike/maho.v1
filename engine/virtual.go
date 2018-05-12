@@ -66,11 +66,11 @@ func (vdb *virtualDatabase) State() DatabaseState {
 }
 
 func (vdb *virtualDatabase) Path() string {
-	return vdb.name.String()
+	return ""
 }
 
-func (vdb *virtualDatabase) Error() error {
-	return nil
+func (vdb *virtualDatabase) Message() string {
+	return ""
 }
 
 func (vdb *virtualDatabase) LookupTable(ctx context.Context, tx Transaction,
@@ -78,7 +78,7 @@ func (vdb *virtualDatabase) LookupTable(ctx context.Context, tx Transaction,
 
 	maker, ok := vdb.tables[tblname]
 	if !ok {
-		return nil, fmt.Errorf("virtual: table %s not found in database", tblname)
+		return nil, fmt.Errorf("virtual: table %s not found in database %s", tblname, vdb.name)
 	}
 	return maker(ctx, tx, vdb.name, tblname)
 }
@@ -86,13 +86,13 @@ func (vdb *virtualDatabase) LookupTable(ctx context.Context, tx Transaction,
 func (vdb *virtualDatabase) CreateTable(ctx context.Context, tx Transaction,
 	tblname sql.Identifier, cols []sql.Identifier, colTypes []db.ColumnType) error {
 
-	return fmt.Errorf("virtual: database may not be modified")
+	return fmt.Errorf("virtual: database %s may not be modified", vdb.name)
 }
 
 func (vdb *virtualDatabase) DropTable(ctx context.Context, tx Transaction, tblname sql.Identifier,
 	exists bool) error {
 
-	return fmt.Errorf("virtual: database may not be modified")
+	return fmt.Errorf("virtual: database %s may not be modified", vdb.name)
 }
 
 func (vdb *virtualDatabase) ListTables(ctx context.Context, tx Transaction) ([]TableEntry,
@@ -130,7 +130,7 @@ func (vt *VirtualTable) Rows() (db.Rows, error) {
 }
 
 func (vt *VirtualTable) Insert(row []sql.Value) error {
-	return fmt.Errorf("table can not be modified")
+	return fmt.Errorf("virtual: table can not be modified")
 }
 
 func (vr *virtualRows) Columns() []sql.Identifier {
@@ -156,11 +156,11 @@ func (vr *virtualRows) Next(ctx context.Context, dest []sql.Value) error {
 }
 
 func (tr *virtualRows) Delete(ctx context.Context) error {
-	return fmt.Errorf("table can not be modified")
+	return fmt.Errorf("virtual: table can not be modified")
 }
 
 func (tr *virtualRows) Update(ctx context.Context, updates []db.ColumnUpdate) error {
-	return fmt.Errorf("table can not be modified")
+	return fmt.Errorf("virtual: table can not be modified")
 }
 
 var (
@@ -303,22 +303,26 @@ func makeDatabasesVirtual(ctx context.Context, tx Transaction, dbname,
 
 	values := [][]sql.Value{}
 	for id, d := range databases {
-		var val sql.Value
-		err := d.Error()
-		if err != nil {
-			val = sql.StringValue(err.Error())
+		var msg, path sql.Value
+		p := d.Path()
+		if p != "" {
+			path = sql.StringValue(p)
+		}
+		m := d.Message()
+		if m != "" {
+			msg = sql.StringValue(m)
 		}
 		values = append(values, []sql.Value{
 			sql.StringValue(id.String()),
 			sql.StringValue(d.Type()),
 			sql.StringValue(d.State().String()),
-			sql.StringValue(d.Path()),
-			val,
+			path,
+			msg,
 		})
 	}
 	return &VirtualTable{
 		Cols: []sql.Identifier{sql.ID("database"), sql.ID("engine"), sql.ID("state"),
-			sql.ID("path"), sql.ID("error")},
+			sql.ID("path"), sql.ID("message")},
 		ColTypes: []db.ColumnType{idColType, idColType, idColType, idColType, idColType},
 		Values:   values,
 	}, nil

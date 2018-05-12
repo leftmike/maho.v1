@@ -11,10 +11,8 @@ To Do:
 - ATTACH DATABASE database [ [ WITH ] [ PATH [ '=' ] path ] [ ENGINE [ '=' ] engine ] ]
 - DETACH DATABASE database
 - CREATE DATABASE database [ [ WITH ] [ PATH [ '=' ] path ] [ ENGINE [ '=' ] engine ] ]
-- USE database ==> move out of engine.go
 - attached databases are written into a (sql?) file (system/maho.sql?) that is loaded at startup
 - async database attach, create, detach, (and drop)
-- database: path needs to be unique: needs to be tracked by the engine
 
 - memory engine (w/ mvcc)
 - distributed memory engine, using raft
