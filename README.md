@@ -18,6 +18,24 @@ Maho is a partial implementation of a basic SQL server.
 
 # Supported SQL
 ```
+ATTACH DATABASE database
+    [WITH
+        [PATH ['='] path]
+        [ENGINE ['='] engine]
+        [WAIT ['='] (true | false)]
+    ]
+```
+
+```
+CREATE DATABASE database
+    [WITH
+        [PATH ['='] path]
+        [ENGINE ['='] engine]
+        [WAIT ['='] (true | false)]
+    ]
+```
+
+```
 CREATE TABLE [database '.'] table '(' <column> [',' ...] ')'
 <column> = name <data_type> [(DEFAULT <expr>) | (NOT NULL)]
 <data_type> =
@@ -42,6 +60,10 @@ CREATE TABLE [database '.'] table '(' <column> [',' ...] ')'
 
 ```
 DELETE FROM [database '.'] table [WHERE <expr>]
+```
+
+```
+DETACH DATABASE database
 ```
 
 ```

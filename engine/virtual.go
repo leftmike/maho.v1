@@ -42,7 +42,8 @@ func CreateVirtualDatabase(name sql.Identifier, tables TableMap) {
 			name:   name,
 			tables: tables,
 		},
-		state: running,
+		state: Running,
+		name:  name,
 		typ:   "virtual",
 	}
 }
@@ -165,9 +166,13 @@ var (
 
 func databaseTables(ctx context.Context, tx Transaction, dbname sql.Identifier) ([]TableEntry,
 	error) {
+
 	de, ok := databases[dbname]
 	if !ok {
 		return nil, fmt.Errorf("engine: database %s not found", dbname)
+	}
+	if de.state != Running {
+		return nil, fmt.Errorf("engine: database %s not running", dbname)
 	}
 	return de.database.ListTables(ctx, tx)
 }
@@ -299,9 +304,13 @@ func makeDatabasesVirtual(ctx context.Context, tx Transaction, dbname,
 		if de.path != "" {
 			path = sql.StringValue(de.path)
 		}
-		m := de.database.Message()
-		if m != "" {
-			msg = sql.StringValue(m)
+		if de.err != nil {
+			msg = sql.StringValue(de.err.Error())
+		} else if de.database != nil {
+			m := de.database.Message()
+			if m != "" {
+				msg = sql.StringValue(m)
+			}
 		}
 		values = append(values, []sql.Value{
 			sql.StringValue(id.String()),

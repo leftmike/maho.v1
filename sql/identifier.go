@@ -31,6 +31,7 @@ const (
 	TEXT
 	VARBINARY
 	VARCHAR
+	WAIT
 )
 
 const (
@@ -151,6 +152,7 @@ var knownKeywords = map[string]struct {
 	"VALUES":    {VALUES, true},
 	"VARBINARY": {VARBINARY, false},
 	"VARCHAR":   {VARCHAR, false},
+	"WAIT":      {WAIT, false},
 	"WHERE":     {WHERE, true},
 	"WITH":      {WITH, true},
 }

@@ -35,27 +35,31 @@ type Engine interface {
 	CreateDatabase(name sql.Identifier, path string, options Options) (Database, error)
 }
 
-type databaseState int
+type DatabaseState int
 
 const (
-	attaching databaseState = iota
-	creating
-	detaching
-	dropping
-	running
+	Attaching DatabaseState = iota
+	Creating
+	Detaching
+	ErrorAttaching
+	ErrorCreating
+	ErrorDetaching
+	Running
 )
 
-func (ds databaseState) String() string {
+func (ds DatabaseState) String() string {
 	switch ds {
-	case attaching:
+	case Attaching:
 		return "attaching"
-	case creating:
+	case Creating:
 		return "creating"
-	case detaching:
+	case Detaching:
 		return "detaching"
-	case dropping:
-		return "dropping"
-	case running:
+	case ErrorAttaching:
+		return "error attaching"
+	case ErrorCreating:
+		return "error creating"
+	case Running:
 		return "running"
 	default:
 		panic(fmt.Sprintf("unexpected value for database state: %d", ds))
@@ -73,9 +77,11 @@ type Database interface {
 
 type databaseEntry struct {
 	database Database
-	state    databaseState
+	state    DatabaseState
+	name     sql.Identifier
 	path     string
 	typ      string
+	err      error
 }
 
 type Transaction interface {
@@ -94,14 +100,14 @@ var (
 		Flag("data", "`directory` containing databases").NoConfig().String("testdata")
 )
 
-type newDbFunc func(e Engine, name sql.Identifier, path string, options Options) (Database, error)
+func newDatabaseEntry(eng string, name sql.Identifier, options Options,
+	state DatabaseState) (Engine, *databaseEntry, error) {
 
-func newDatabase(eng string, name sql.Identifier, options Options, fn newDbFunc) error {
 	mutex.Lock()
 	defer mutex.Unlock()
 
 	if _, ok := databases[name]; ok {
-		return fmt.Errorf("engine: database already exists: %s", name)
+		return nil, nil, fmt.Errorf("engine: database already exists: %s", name)
 	}
 
 	typ, ok := options[sql.ENGINE]
@@ -112,7 +118,7 @@ func newDatabase(eng string, name sql.Identifier, options Options, fn newDbFunc)
 	}
 	e, ok := engines[typ]
 	if !ok {
-		return fmt.Errorf("engine: type not found: %s", typ)
+		return nil, nil, fmt.Errorf("engine: type not found: %s", typ)
 	}
 	path, ok := options[sql.PATH]
 	if !ok {
@@ -120,31 +126,63 @@ func newDatabase(eng string, name sql.Identifier, options Options, fn newDbFunc)
 	} else {
 		delete(options, sql.PATH)
 	}
-	d, err := fn(e, name, path, options)
+	de := &databaseEntry{
+		state: state,
+		name:  name,
+		path:  path,
+		typ:   typ,
+	}
+	databases[name] = de
+	return e, de, nil
+}
+
+func setupDatabase(e Engine, de *databaseEntry, options Options) {
+	var d Database
+	if de.state == Attaching {
+		d, de.err = e.AttachDatabase(de.name, de.path, options)
+	} else {
+		// de.state == creating
+		d, de.err = e.CreateDatabase(de.name, de.path, options)
+	}
+
+	mutex.Lock()
+	defer mutex.Unlock()
+
+	if de.err == nil {
+		de.state = Running
+		de.database = d
+	} else {
+		if de.state == Attaching {
+			de.state = ErrorAttaching
+		} else {
+			de.state = ErrorCreating
+		}
+	}
+}
+
+func prepareDatabase(eng string, name sql.Identifier, options Options, state DatabaseState) error {
+	e, de, err := newDatabaseEntry(eng, name, options, state)
 	if err != nil {
 		return err
 	}
-	databases[name] = &databaseEntry{
-		database: d,
-		state:    running,
-		path:     path,
-		typ:      typ,
+
+	_, ok := options[sql.WAIT]
+	if ok {
+		delete(options, sql.WAIT)
+		setupDatabase(e, de, options)
+		return de.err
 	}
+
+	go setupDatabase(e, de, options)
 	return nil
 }
 
 func AttachDatabase(eng string, name sql.Identifier, options Options) error {
-	return newDatabase(eng, name, options,
-		func(e Engine, name sql.Identifier, path string, options Options) (Database, error) {
-			return e.AttachDatabase(name, path, options)
-		})
+	return prepareDatabase(eng, name, options, Attaching)
 }
 
 func CreateDatabase(eng string, name sql.Identifier, options Options) error {
-	return newDatabase(eng, name, options,
-		func(e Engine, name sql.Identifier, path string, options Options) (Database, error) {
-			return e.CreateDatabase(name, path, options)
-		})
+	return prepareDatabase(eng, name, options, Creating)
 }
 
 func DetachDatabase(name sql.Identifier) error {
@@ -198,6 +236,9 @@ func LookupTable(ctx context.Context, tx Transaction, dbname, tblname sql.Identi
 	if !ok {
 		return nil, fmt.Errorf("engine: database %s not found", dbname)
 	}
+	if de.state != Running {
+		return nil, fmt.Errorf("engine: database %s not running", dbname)
+	}
 	return de.database.LookupTable(ctx, tx, tblname)
 }
 
@@ -215,6 +256,9 @@ func CreateTable(ctx context.Context, tx Transaction, dbname, tblname sql.Identi
 	if !ok {
 		return fmt.Errorf("engine: database %s not found", dbname)
 	}
+	if de.state != Running {
+		return fmt.Errorf("engine: database %s not running", dbname)
+	}
 	return de.database.CreateTable(ctx, tx, tblname, cols, colTypes)
 }
 
@@ -231,6 +275,9 @@ func DropTable(ctx context.Context, tx Transaction, dbname, tblname sql.Identifi
 	de, ok := databases[dbname]
 	if !ok {
 		return fmt.Errorf("engine: database %s not found", dbname)
+	}
+	if de.state != Running {
+		return fmt.Errorf("engine: database %s not running", dbname)
 	}
 	return de.database.DropTable(ctx, tx, tblname, exists)
 }

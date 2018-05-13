@@ -8,12 +8,6 @@ To Do:
 
 - fuzzing: parser.Parse
 
-- ATTACH DATABASE database [ [ WITH ] [ PATH [ '=' ] path ] [ ENGINE [ '=' ] engine ] ]
-- DETACH DATABASE database
-- CREATE DATABASE database [ [ WITH ] [ PATH [ '=' ] path ] [ ENGINE [ '=' ] engine ] ]
-- attached databases are written into a (sql?) file (system/maho.sql?) that is loaded at startup
-- async database attach, create, detach, (and drop)
-
 - memory engine (w/ mvcc)
 - distributed memory engine, using raft
 - boltdb engine
@@ -153,7 +147,7 @@ func main() {
 		return
 	}
 
-	err := engine.CreateDatabase(*eng, sql.ID(*database), nil)
+	err := engine.CreateDatabase(*eng, sql.ID(*database), engine.Options{sql.WAIT: "true"})
 	if err != nil {
 		fmt.Println(err)
 		return
