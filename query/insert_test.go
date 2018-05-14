@@ -1,7 +1,6 @@
 package query_test
 
 import (
-	"context"
 	"strings"
 	"testing"
 
@@ -11,6 +10,7 @@ import (
 	"github.com/leftmike/maho/parser"
 	"github.com/leftmike/maho/plan"
 	"github.com/leftmike/maho/query"
+	"github.com/leftmike/maho/session"
 	"github.com/leftmike/maho/sql"
 	"github.com/leftmike/maho/testutil"
 )
@@ -195,7 +195,7 @@ func TestInsert(t *testing.T) {
 		insertCases3)
 }
 
-func statement(ctx context.Context, tx engine.Transaction, s string) error {
+func statement(ctx session.Context, tx engine.Transaction, s string) error {
 	p := parser.NewParser(strings.NewReader(s), "statement")
 	stmt, err := p.Parse()
 	if err != nil {
@@ -212,9 +212,9 @@ func statement(ctx context.Context, tx engine.Transaction, s string) error {
 func testInsert(t *testing.T, dbnam, nam sql.Identifier, cols []sql.Identifier,
 	colTypes []db.ColumnType, cases []insertCase) {
 
-	ctx := context.Background()
+	ctx := session.NewContext("basic", sql.ID("test"))
 	for _, c := range cases {
-		tx, err := engine.Begin("basic", sql.ID("test"))
+		tx, err := engine.Begin()
 		if err != nil {
 			t.Error(err)
 			return

@@ -1,13 +1,13 @@
 package basic
 
 import (
-	"context"
 	"fmt"
 	"io"
 	"math/rand"
 
 	"github.com/leftmike/maho/db"
 	"github.com/leftmike/maho/engine"
+	"github.com/leftmike/maho/session"
 	"github.com/leftmike/maho/sql"
 )
 
@@ -58,7 +58,7 @@ func (bdb *database) Message() string {
 	return ""
 }
 
-func (bdb *database) LookupTable(ctx context.Context, tx engine.Transaction,
+func (bdb *database) LookupTable(ctx session.Context, tx engine.Transaction,
 	tblname sql.Identifier) (db.Table, error) {
 
 	tbl, ok := bdb.tables[tblname]
@@ -68,7 +68,7 @@ func (bdb *database) LookupTable(ctx context.Context, tx engine.Transaction,
 	return tbl, nil
 }
 
-func (bdb *database) CreateTable(ctx context.Context, tx engine.Transaction,
+func (bdb *database) CreateTable(ctx session.Context, tx engine.Transaction,
 	tblname sql.Identifier, cols []sql.Identifier, colTypes []db.ColumnType) error {
 
 	if _, dup := bdb.tables[tblname]; dup {
@@ -86,7 +86,7 @@ func (bdb *database) CreateTable(ctx context.Context, tx engine.Transaction,
 	return nil
 }
 
-func (bdb *database) DropTable(ctx context.Context, tx engine.Transaction, tblname sql.Identifier,
+func (bdb *database) DropTable(ctx session.Context, tx engine.Transaction, tblname sql.Identifier,
 	exists bool) error {
 
 	if _, ok := bdb.tables[tblname]; !ok {
@@ -99,7 +99,7 @@ func (bdb *database) DropTable(ctx context.Context, tx engine.Transaction, tblna
 	return nil
 }
 
-func (bdb *database) ListTables(ctx context.Context,
+func (bdb *database) ListTables(ctx session.Context,
 	tx engine.Transaction) ([]engine.TableEntry, error) {
 
 	var tbls []engine.TableEntry
@@ -141,7 +141,7 @@ func (br *rows) Close() error {
 	return nil
 }
 
-func (br *rows) Next(ctx context.Context, dest []sql.Value) error {
+func (br *rows) Next(ctx session.Context, dest []sql.Value) error {
 	for br.index < len(br.rows) {
 		if br.rows[br.index] != nil {
 			copy(dest, br.rows[br.index])
@@ -156,7 +156,7 @@ func (br *rows) Next(ctx context.Context, dest []sql.Value) error {
 	return io.EOF
 }
 
-func (br *rows) Delete(ctx context.Context) error {
+func (br *rows) Delete(ctx session.Context) error {
 	if !br.haveRow {
 		return fmt.Errorf("basic: no row to delete")
 	}
@@ -165,7 +165,7 @@ func (br *rows) Delete(ctx context.Context) error {
 	return nil
 }
 
-func (br *rows) Update(ctx context.Context, updates []db.ColumnUpdate) error {
+func (br *rows) Update(ctx session.Context, updates []db.ColumnUpdate) error {
 	if !br.haveRow {
 		return fmt.Errorf("basic: no row to update")
 	}

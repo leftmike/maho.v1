@@ -1,13 +1,13 @@
 package query_test
 
 import (
-	"context"
 	"testing"
 
 	"github.com/leftmike/maho/engine"
 	_ "github.com/leftmike/maho/engine/basic"
 	"github.com/leftmike/maho/expr"
 	"github.com/leftmike/maho/query"
+	"github.com/leftmike/maho/session"
 	"github.com/leftmike/maho/sql"
 	"github.com/leftmike/maho/testutil"
 )
@@ -67,11 +67,11 @@ func TestValues(t *testing.T) {
 	}
 
 	startEngine(t)
-	tx, err := engine.Begin("basic", sql.ID("test"))
+	tx, err := engine.Begin()
 	if err != nil {
 		t.Fatal(err)
 	}
-	ctx := context.Background()
+	ctx := session.NewContext("basic", sql.ID("test"))
 	for _, c := range cases {
 		if c.values.String() != c.s {
 			t.Errorf("(%v).String() got %q want %q", c.values, c.values.String(), c.s)
@@ -146,13 +146,17 @@ func TestFromValues(t *testing.T) {
 		},
 	}
 
-	ctx := context.Background()
+	ctx := session.NewContext("basic", sql.ID("test"))
 	for _, c := range cases {
 		if c.from.String() != c.s {
 			t.Errorf("(%v).String() got %q want %q", c.from, c.from.String(), c.s)
 			continue
 		}
-		rows, fctx, err := c.from.TestRows(ctx, nil)
+		tx, err := engine.Begin()
+		if err != nil {
+			t.Fatalf("Begin() failed with %s", err)
+		}
+		rows, fctx, err := c.from.TestRows(ctx, tx)
 		if err != nil {
 			t.Errorf("(%v).Rows() failed with %s", c.from, err)
 			continue

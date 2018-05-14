@@ -1,7 +1,6 @@
 package parser
 
 import (
-	"context"
 	"fmt"
 	"io"
 	"runtime"
@@ -15,12 +14,13 @@ import (
 	"github.com/leftmike/maho/parser/scanner"
 	"github.com/leftmike/maho/parser/token"
 	"github.com/leftmike/maho/query"
+	"github.com/leftmike/maho/session"
 	"github.com/leftmike/maho/sql"
 )
 
 type Stmt interface {
 	fmt.Stringer
-	Plan(ctx context.Context, tx engine.Transaction) (interface{}, error)
+	Plan(ctx session.Context, tx engine.Transaction) (interface{}, error)
 }
 
 type Parser interface {

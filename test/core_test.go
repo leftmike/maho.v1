@@ -1,7 +1,6 @@
 package test_test
 
 import (
-	"context"
 	"fmt"
 	"reflect"
 	"strings"
@@ -10,6 +9,7 @@ import (
 	"github.com/leftmike/maho/engine"
 	"github.com/leftmike/maho/parser"
 	"github.com/leftmike/maho/plan"
+	"github.com/leftmike/maho/session"
 	"github.com/leftmike/maho/sql"
 )
 
@@ -41,11 +41,11 @@ func TestValuesSimple(t *testing.T) {
 			t.Errorf("Parse(%q) failed with %s", c.sql, err)
 			continue
 		}
-		tx, err := engine.Begin("basic", sql.ID("test"))
+		tx, err := engine.Begin()
 		if err != nil {
 			t.Fatal(err)
 		}
-		ctx := context.Background()
+		ctx := session.NewContext("basic", sql.ID("test"))
 		ret, err := stmt.Plan(ctx, tx)
 		if c.fail {
 			if err == nil {

@@ -1,18 +1,18 @@
 package query
 
 import (
-	"context"
 	"fmt"
 
 	"github.com/leftmike/maho/db"
 	"github.com/leftmike/maho/engine"
 	"github.com/leftmike/maho/expr"
+	"github.com/leftmike/maho/session"
 	"github.com/leftmike/maho/sql"
 )
 
 type FromItem interface {
 	fmt.Stringer
-	rows(ctx context.Context, tx engine.Transaction) (db.Rows, *fromContext, error)
+	rows(ctx session.Context, tx engine.Transaction) (db.Rows, *fromContext, error)
 }
 
 type FromTableAlias sql.TableAlias
@@ -21,7 +21,7 @@ func (fta FromTableAlias) String() string {
 	return ((sql.TableAlias)(fta)).String()
 }
 
-func (fta FromTableAlias) rows(ctx context.Context, tx engine.Transaction) (db.Rows,
+func (fta FromTableAlias) rows(ctx session.Context, tx engine.Transaction) (db.Rows,
 	*fromContext, error) {
 
 	tbl, err := engine.LookupTable(ctx, tx, fta.Database, fta.Table)

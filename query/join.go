@@ -1,13 +1,13 @@
 package query
 
 import (
-	"context"
 	"fmt"
 	"io"
 
 	"github.com/leftmike/maho/db"
 	"github.com/leftmike/maho/engine"
 	"github.com/leftmike/maho/expr"
+	"github.com/leftmike/maho/session"
 	"github.com/leftmike/maho/sql"
 )
 
@@ -62,7 +62,7 @@ func (fj FromJoin) String() string {
 }
 
 // AllRows returns all of the rows from a db.Rows as slices of values.
-func AllRows(ctx context.Context, rows db.Rows) ([][]sql.Value, error) {
+func AllRows(ctx session.Context, rows db.Rows) ([][]sql.Value, error) {
 	all := [][]sql.Value{}
 	l := len(rows.Columns())
 	for {
@@ -171,7 +171,7 @@ func (jr *joinRows) onUsing(dest []sql.Value) (bool, error) {
 	return true, nil
 }
 
-func (jr *joinRows) Next(ctx context.Context, dest []sql.Value) error {
+func (jr *joinRows) Next(ctx session.Context, dest []sql.Value) error {
 	if jr.state == allDone {
 		return io.EOF
 	} else if jr.state == rightRemaining {
@@ -257,15 +257,15 @@ func (jr *joinRows) Next(ctx context.Context, dest []sql.Value) error {
 	}
 }
 
-func (_ *joinRows) Delete(ctx context.Context) error {
+func (_ *joinRows) Delete(ctx session.Context) error {
 	return fmt.Errorf("join rows may not be deleted")
 }
 
-func (_ *joinRows) Update(ctx context.Context, updates []db.ColumnUpdate) error {
+func (_ *joinRows) Update(ctx session.Context, updates []db.ColumnUpdate) error {
 	return fmt.Errorf("join rows may not be updated")
 }
 
-func (fj FromJoin) rows(ctx context.Context, tx engine.Transaction) (db.Rows, *fromContext,
+func (fj FromJoin) rows(ctx session.Context, tx engine.Transaction) (db.Rows, *fromContext,
 	error) {
 
 	leftRows, leftCtx, err := fj.Left.rows(ctx, tx)

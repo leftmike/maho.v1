@@ -16,7 +16,6 @@ To Do:
 
 import (
 	"bufio"
-	"context"
 	"flag"
 	"fmt"
 	"io"
@@ -28,6 +27,8 @@ import (
 	"github.com/leftmike/maho/config"
 	"github.com/leftmike/maho/engine"
 	_ "github.com/leftmike/maho/engine/basic"
+	"github.com/leftmike/maho/session"
+	//_ "github.com/leftmike/maho/engine/memory"
 	"github.com/leftmike/maho/parser"
 	"github.com/leftmike/maho/plan"
 	"github.com/leftmike/maho/sql"
@@ -45,13 +46,13 @@ func replSQL(p parser.Parser, w io.Writer) {
 			return
 		}
 
-		tx, err = engine.Begin(*eng, sql.ID(*database))
+		tx, err = engine.Begin()
 		if err != nil {
 			fmt.Println(err)
 			return
 		}
 
-		ctx := context.Background()
+		ctx := session.NewContext(*eng, sql.ID(*database))
 		ret, err := stmt.Plan(ctx, tx)
 		if err != nil {
 			fmt.Println(err)

@@ -1,16 +1,16 @@
 package engine
 
 import (
-	"context"
 	"fmt"
 	"io"
 
 	"github.com/leftmike/maho/config"
 	"github.com/leftmike/maho/db"
+	"github.com/leftmike/maho/session"
 	"github.com/leftmike/maho/sql"
 )
 
-type MakeVirtual func(ctx context.Context, tx Transaction, dbname,
+type MakeVirtual func(ctx session.Context, tx Transaction, dbname,
 	tblname sql.Identifier) (db.Table, error)
 
 type TableMap map[sql.Identifier]MakeVirtual
@@ -48,7 +48,7 @@ func CreateVirtualDatabase(name sql.Identifier, tables TableMap) {
 	}
 }
 
-func lookupVirtual(ctx context.Context, tx Transaction, dbname,
+func lookupVirtual(ctx session.Context, tx Transaction, dbname,
 	tblname sql.Identifier) (db.Table, error) {
 
 	if maker, ok := virtualTables[tblname]; ok {
@@ -66,7 +66,7 @@ func (vdb *virtualDatabase) Message() string {
 	return ""
 }
 
-func (vdb *virtualDatabase) LookupTable(ctx context.Context, tx Transaction,
+func (vdb *virtualDatabase) LookupTable(ctx session.Context, tx Transaction,
 	tblname sql.Identifier) (db.Table, error) {
 
 	maker, ok := vdb.tables[tblname]
@@ -76,19 +76,19 @@ func (vdb *virtualDatabase) LookupTable(ctx context.Context, tx Transaction,
 	return maker(ctx, tx, vdb.name, tblname)
 }
 
-func (vdb *virtualDatabase) CreateTable(ctx context.Context, tx Transaction,
+func (vdb *virtualDatabase) CreateTable(ctx session.Context, tx Transaction,
 	tblname sql.Identifier, cols []sql.Identifier, colTypes []db.ColumnType) error {
 
 	return fmt.Errorf("virtual: database %s may not be modified", vdb.name)
 }
 
-func (vdb *virtualDatabase) DropTable(ctx context.Context, tx Transaction, tblname sql.Identifier,
+func (vdb *virtualDatabase) DropTable(ctx session.Context, tx Transaction, tblname sql.Identifier,
 	exists bool) error {
 
 	return fmt.Errorf("virtual: database %s may not be modified", vdb.name)
 }
 
-func (vdb *virtualDatabase) ListTables(ctx context.Context, tx Transaction) ([]TableEntry,
+func (vdb *virtualDatabase) ListTables(ctx session.Context, tx Transaction) ([]TableEntry,
 	error) {
 
 	var tbls []TableEntry
@@ -135,7 +135,7 @@ func (vr *virtualRows) Close() error {
 	return nil
 }
 
-func (vr *virtualRows) Next(ctx context.Context, dest []sql.Value) error {
+func (vr *virtualRows) Next(ctx session.Context, dest []sql.Value) error {
 	for vr.index < len(vr.rows) {
 		if vr.rows[vr.index] != nil {
 			copy(dest, vr.rows[vr.index])
@@ -148,11 +148,11 @@ func (vr *virtualRows) Next(ctx context.Context, dest []sql.Value) error {
 	return io.EOF
 }
 
-func (tr *virtualRows) Delete(ctx context.Context) error {
+func (tr *virtualRows) Delete(ctx session.Context) error {
 	return fmt.Errorf("virtual: table can not be modified")
 }
 
-func (tr *virtualRows) Update(ctx context.Context, updates []db.ColumnUpdate) error {
+func (tr *virtualRows) Update(ctx session.Context, updates []db.ColumnUpdate) error {
 	return fmt.Errorf("virtual: table can not be modified")
 }
 
@@ -164,7 +164,7 @@ var (
 	stringColType = db.ColumnType{Type: sql.CharacterType, Size: 4096, NotNull: true}
 )
 
-func databaseTables(ctx context.Context, tx Transaction, dbname sql.Identifier) ([]TableEntry,
+func databaseTables(ctx session.Context, tx Transaction, dbname sql.Identifier) ([]TableEntry,
 	error) {
 
 	de, ok := databases[dbname]
@@ -177,7 +177,7 @@ func databaseTables(ctx context.Context, tx Transaction, dbname sql.Identifier) 
 	return de.database.ListTables(ctx, tx)
 }
 
-func listTables(ctx context.Context, tx Transaction, dbname sql.Identifier) ([]TableEntry,
+func listTables(ctx session.Context, tx Transaction, dbname sql.Identifier) ([]TableEntry,
 	error) {
 
 	tbls, err := databaseTables(ctx, tx, dbname)
@@ -191,7 +191,7 @@ func listTables(ctx context.Context, tx Transaction, dbname sql.Identifier) ([]T
 	return tbls, nil
 }
 
-func makeTablesVirtual(ctx context.Context, tx Transaction, dbname,
+func makeTablesVirtual(ctx session.Context, tx Transaction, dbname,
 	tblname sql.Identifier) (db.Table, error) {
 
 	mutex.RLock()
@@ -239,7 +239,7 @@ var (
 		boolColType, boolColType, boolColType, idColType}
 )
 
-func makeColumnsVirtual(ctx context.Context, tx Transaction, dbname,
+func makeColumnsVirtual(ctx session.Context, tx Transaction, dbname,
 	tblname sql.Identifier) (db.Table, error) {
 
 	mutex.RLock()
@@ -292,7 +292,7 @@ func makeColumnsVirtual(ctx context.Context, tx Transaction, dbname,
 	}, nil
 }
 
-func makeDatabasesVirtual(ctx context.Context, tx Transaction, dbname,
+func makeDatabasesVirtual(ctx session.Context, tx Transaction, dbname,
 	tblname sql.Identifier) (db.Table, error) {
 
 	mutex.RLock()
@@ -328,7 +328,7 @@ func makeDatabasesVirtual(ctx context.Context, tx Transaction, dbname,
 	}, nil
 }
 
-func makeIdentifiersVirtual(ctx context.Context, tx Transaction, dbname,
+func makeIdentifiersVirtual(ctx session.Context, tx Transaction, dbname,
 	tblname sql.Identifier) (db.Table, error) {
 
 	values := [][]sql.Value{}
@@ -349,7 +349,7 @@ func makeIdentifiersVirtual(ctx context.Context, tx Transaction, dbname,
 	}, nil
 }
 
-func makeConfigVirtual(ctx context.Context, tx Transaction, dbname,
+func makeConfigVirtual(ctx session.Context, tx Transaction, dbname,
 	tblname sql.Identifier) (db.Table, error) {
 
 	values := [][]sql.Value{}
@@ -370,7 +370,7 @@ func makeConfigVirtual(ctx context.Context, tx Transaction, dbname,
 	}, nil
 }
 
-func makeEnginesVirtual(ctx context.Context, tx Transaction, dbname,
+func makeEnginesVirtual(ctx session.Context, tx Transaction, dbname,
 	tblname sql.Identifier) (db.Table, error) {
 
 	values := [][]sql.Value{}

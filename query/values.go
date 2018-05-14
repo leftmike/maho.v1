@@ -1,13 +1,13 @@
 package query
 
 import (
-	"context"
 	"fmt"
 	"io"
 
 	"github.com/leftmike/maho/db"
 	"github.com/leftmike/maho/engine"
 	"github.com/leftmike/maho/expr"
+	"github.com/leftmike/maho/session"
 	"github.com/leftmike/maho/sql"
 )
 
@@ -44,7 +44,7 @@ func (stmt *Values) String() string {
 	return s
 }
 
-func (stmt *Values) Plan(ctx context.Context, tx engine.Transaction) (interface{}, error) {
+func (stmt *Values) Plan(ctx session.Context, tx engine.Transaction) (interface{}, error) {
 	return stmt.Rows(tx)
 }
 
@@ -82,7 +82,7 @@ func (v *values) Close() error {
 	return nil
 }
 
-func (v *values) Next(ctx context.Context, dest []sql.Value) error {
+func (v *values) Next(ctx session.Context, dest []sql.Value) error {
 	if v.index == len(v.rows) {
 		return io.EOF
 	}
@@ -91,11 +91,11 @@ func (v *values) Next(ctx context.Context, dest []sql.Value) error {
 	return nil
 }
 
-func (_ *values) Delete(ctx context.Context) error {
+func (_ *values) Delete(ctx session.Context) error {
 	return fmt.Errorf("values rows may not be deleted")
 }
 
-func (_ *values) Update(ctx context.Context, updates []db.ColumnUpdate) error {
+func (_ *values) Update(ctx session.Context, updates []db.ColumnUpdate) error {
 	return fmt.Errorf("values rows may not be updated")
 }
 
@@ -120,7 +120,7 @@ func (fv FromValues) String() string {
 	return s
 }
 
-func (fv FromValues) rows(ctx context.Context, tx engine.Transaction) (db.Rows, *fromContext,
+func (fv FromValues) rows(ctx session.Context, tx engine.Transaction) (db.Rows, *fromContext,
 	error) {
 
 	rows, err := fv.Values.Rows(tx)
@@ -138,7 +138,7 @@ func (fv FromValues) rows(ctx context.Context, tx engine.Transaction) (db.Rows, 
 }
 
 // TestRows is used for testing.
-func (fv FromValues) TestRows(ctx context.Context, tx engine.Transaction) (db.Rows, *fromContext,
+func (fv FromValues) TestRows(ctx session.Context, tx engine.Transaction) (db.Rows, *fromContext,
 	error) {
 
 	return fv.rows(ctx, tx)

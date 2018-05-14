@@ -1,10 +1,10 @@
 package datadef
 
 import (
-	"context"
 	"fmt"
 
 	"github.com/leftmike/maho/engine"
+	"github.com/leftmike/maho/session"
 	"github.com/leftmike/maho/sql"
 )
 
@@ -24,10 +24,10 @@ func (stmt *AttachDatabase) String() string {
 	return s
 }
 
-func (stmt *AttachDatabase) Plan(ctx context.Context, tx engine.Transaction) (interface{}, error) {
+func (stmt *AttachDatabase) Plan(ctx session.Context, tx engine.Transaction) (interface{}, error) {
 	return stmt, nil
 }
 
-func (stmt *AttachDatabase) Execute(ctx context.Context, tx engine.Transaction) (int64, error) {
-	return 0, engine.AttachDatabase(tx.DefaultEngine(), stmt.Database, stmt.Options)
+func (stmt *AttachDatabase) Execute(ctx session.Context, tx engine.Transaction) (int64, error) {
+	return 0, engine.AttachDatabase(ctx.DefaultEngine(), stmt.Database, stmt.Options)
 }

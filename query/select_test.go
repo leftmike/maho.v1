@@ -1,13 +1,13 @@
 package query_test
 
 import (
-	"context"
 	"testing"
 
 	"github.com/leftmike/maho/engine"
 	_ "github.com/leftmike/maho/engine/basic"
 	"github.com/leftmike/maho/expr"
 	"github.com/leftmike/maho/query"
+	"github.com/leftmike/maho/session"
 	"github.com/leftmike/maho/sql"
 	"github.com/leftmike/maho/testutil"
 )
@@ -97,11 +97,11 @@ func TestSelect(t *testing.T) {
 	}
 
 	startEngine(t)
-	tx, err := engine.Begin("basic", sql.ID("test"))
+	tx, err := engine.Begin()
 	if err != nil {
 		t.Fatal(tx)
 	}
-	ctx := context.Background()
+	ctx := session.NewContext("basic", sql.ID("test"))
 	for _, c := range cases {
 		if c.stmt.String() != c.s {
 			t.Errorf("(%v).String() got %q want %q", c.stmt, c.stmt.String(), c.s)

@@ -1,12 +1,12 @@
 package query
 
 import (
-	"context"
 	"fmt"
 	"io"
 
 	"github.com/leftmike/maho/db"
 	"github.com/leftmike/maho/expr"
+	"github.com/leftmike/maho/session"
 	"github.com/leftmike/maho/sql"
 )
 
@@ -43,7 +43,7 @@ type groupRow struct {
 	aggregators []expr.Aggregator
 }
 
-func (gr *groupRows) group(ctx context.Context) error {
+func (gr *groupRows) group(ctx session.Context) error {
 	gr.dest = make([]sql.Value, len(gr.rows.Columns()))
 	groups := map[string]groupRow{}
 	for {
@@ -105,7 +105,7 @@ func (gr *groupRows) group(ctx context.Context) error {
 	return nil
 }
 
-func (gr *groupRows) Next(ctx context.Context, dest []sql.Value) error {
+func (gr *groupRows) Next(ctx session.Context, dest []sql.Value) error {
 	if gr.dest == nil {
 		err := gr.group(ctx)
 		if err != nil {
@@ -121,11 +121,11 @@ func (gr *groupRows) Next(ctx context.Context, dest []sql.Value) error {
 	return io.EOF
 }
 
-func (_ *groupRows) Delete(ctx context.Context) error {
+func (_ *groupRows) Delete(ctx session.Context) error {
 	return fmt.Errorf("group rows may not be deleted")
 }
 
-func (_ *groupRows) Update(ctx context.Context, updates []db.ColumnUpdate) error {
+func (_ *groupRows) Update(ctx session.Context, updates []db.ColumnUpdate) error {
 	return fmt.Errorf("group rows may not be updated")
 }
 

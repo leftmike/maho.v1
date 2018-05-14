@@ -1,11 +1,11 @@
 package query
 
 import (
-	"context"
 	"fmt"
 
 	"github.com/leftmike/maho/engine"
 	"github.com/leftmike/maho/expr"
+	"github.com/leftmike/maho/session"
 	"github.com/leftmike/maho/sql"
 )
 
@@ -50,11 +50,11 @@ func (stmt *InsertValues) String() string {
 	return s
 }
 
-func (stmt *InsertValues) Plan(ctx context.Context, tx engine.Transaction) (interface{}, error) {
+func (stmt *InsertValues) Plan(ctx session.Context, tx engine.Transaction) (interface{}, error) {
 	return stmt, nil
 }
 
-func (stmt *InsertValues) Execute(ctx context.Context, tx engine.Transaction) (int64, error) {
+func (stmt *InsertValues) Execute(ctx session.Context, tx engine.Transaction) (int64, error) {
 	tbl, err := engine.LookupTable(ctx, tx, stmt.Table.Database, stmt.Table.Table)
 	if err != nil {
 		return 0, err

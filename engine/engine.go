@@ -1,13 +1,13 @@
 package engine
 
 import (
-	"context"
 	"fmt"
 	"path/filepath"
 	"sync"
 
 	"github.com/leftmike/maho/config"
 	"github.com/leftmike/maho/db"
+	"github.com/leftmike/maho/session"
 	"github.com/leftmike/maho/sql"
 )
 
@@ -68,11 +68,11 @@ func (ds DatabaseState) String() string {
 
 type Database interface {
 	Message() string
-	LookupTable(ctx context.Context, tx Transaction, tblname sql.Identifier) (db.Table, error)
-	CreateTable(ctx context.Context, tx Transaction, tblname sql.Identifier,
+	LookupTable(ctx session.Context, tx Transaction, tblname sql.Identifier) (db.Table, error)
+	CreateTable(ctx session.Context, tx Transaction, tblname sql.Identifier,
 		cols []sql.Identifier, colTypes []db.ColumnType) error
-	DropTable(ctx context.Context, tx Transaction, tblname sql.Identifier, exists bool) error
-	ListTables(ctx context.Context, tx Transaction) ([]TableEntry, error)
+	DropTable(ctx session.Context, tx Transaction, tblname sql.Identifier, exists bool) error
+	ListTables(ctx session.Context, tx Transaction) ([]TableEntry, error)
 }
 
 type databaseEntry struct {
@@ -85,9 +85,7 @@ type databaseEntry struct {
 }
 
 type Transaction interface {
-	DefaultEngine() string
-	DefaultDatabase() sql.Identifier
-	Commit(ctx context.Context) error
+	Commit(ctx session.Context) error
 	Rollback() error
 }
 
@@ -190,27 +188,14 @@ func DetachDatabase(name sql.Identifier) error {
 }
 
 type transaction struct {
-	eng  string
-	name sql.Identifier
 }
 
 // Begin a new transaction.
-func Begin(eng string, name sql.Identifier) (Transaction, error) {
-	return &transaction{
-		eng:  eng,
-		name: name,
-	}, nil
+func Begin() (Transaction, error) {
+	return &transaction{}, nil
 }
 
-func (tx *transaction) DefaultEngine() string {
-	return tx.eng
-}
-
-func (tx *transaction) DefaultDatabase() sql.Identifier {
-	return tx.name
-}
-
-func (tx *transaction) Commit(ctx context.Context) error {
+func (tx *transaction) Commit(ctx session.Context) error {
 	return nil
 }
 
@@ -219,14 +204,14 @@ func (tx *transaction) Rollback() error {
 }
 
 // LookupTable looks up the named table in the named database.
-func LookupTable(ctx context.Context, tx Transaction, dbname, tblname sql.Identifier) (db.Table,
+func LookupTable(ctx session.Context, tx Transaction, dbname, tblname sql.Identifier) (db.Table,
 	error) {
 
 	mutex.RLock()
 	defer mutex.RUnlock()
 
 	if dbname == 0 {
-		dbname = tx.DefaultDatabase()
+		dbname = ctx.DefaultDatabase()
 	}
 	tbl, err := lookupVirtual(ctx, tx, dbname, tblname)
 	if tbl != nil || err != nil {
@@ -243,14 +228,14 @@ func LookupTable(ctx context.Context, tx Transaction, dbname, tblname sql.Identi
 }
 
 // CreateTable creates the named table in the named database.
-func CreateTable(ctx context.Context, tx Transaction, dbname, tblname sql.Identifier,
+func CreateTable(ctx session.Context, tx Transaction, dbname, tblname sql.Identifier,
 	cols []sql.Identifier, colTypes []db.ColumnType) error {
 
 	mutex.RLock()
 	defer mutex.RUnlock()
 
 	if dbname == 0 {
-		dbname = tx.DefaultDatabase()
+		dbname = ctx.DefaultDatabase()
 	}
 	de, ok := databases[dbname]
 	if !ok {
@@ -263,14 +248,14 @@ func CreateTable(ctx context.Context, tx Transaction, dbname, tblname sql.Identi
 }
 
 // DropTable drops the named table from the named database.
-func DropTable(ctx context.Context, tx Transaction, dbname, tblname sql.Identifier,
+func DropTable(ctx session.Context, tx Transaction, dbname, tblname sql.Identifier,
 	exists bool) error {
 
 	mutex.RLock()
 	defer mutex.RUnlock()
 
 	if dbname == 0 {
-		dbname = tx.DefaultDatabase()
+		dbname = ctx.DefaultDatabase()
 	}
 	de, ok := databases[dbname]
 	if !ok {

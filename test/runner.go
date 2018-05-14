@@ -1,7 +1,6 @@
 package test
 
 import (
-	"context"
 	"fmt"
 	"io"
 	"strings"
@@ -11,6 +10,7 @@ import (
 	"github.com/leftmike/maho/engine"
 	"github.com/leftmike/maho/parser"
 	"github.com/leftmike/maho/plan"
+	"github.com/leftmike/maho/session"
 	"github.com/leftmike/maho/sql"
 )
 
@@ -27,11 +27,11 @@ func (run *Runner) RunExec(tst *sqltest.Test) error {
 		if err != nil {
 			return err
 		}
-		tx, err := engine.Begin("basic", sql.ID("test"))
+		tx, err := engine.Begin()
 		if err != nil {
 			return err
 		}
-		ctx := context.Background()
+		ctx := session.NewContext("basic", sql.ID("test"))
 		ret, err := stmt.Plan(ctx, tx)
 		if err != nil {
 			return err
@@ -55,11 +55,11 @@ func (run *Runner) RunQuery(tst *sqltest.Test) ([]string, [][]string, error) {
 	if err != nil {
 		return nil, nil, err
 	}
-	tx, err := engine.Begin("basic", sql.ID("test"))
+	tx, err := engine.Begin()
 	if err != nil {
 		return nil, nil, err
 	}
-	ctx := context.Background()
+	ctx := session.NewContext("basic", sql.ID("test"))
 	ret, err := stmt.Plan(ctx, tx)
 	if err != nil {
 		return nil, nil, err
