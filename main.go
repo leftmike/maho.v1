@@ -27,10 +27,10 @@ import (
 	"github.com/leftmike/maho/config"
 	"github.com/leftmike/maho/engine"
 	_ "github.com/leftmike/maho/engine/basic"
-	"github.com/leftmike/maho/session"
-	//_ "github.com/leftmike/maho/engine/memory"
+	_ "github.com/leftmike/maho/engine/memory"
 	"github.com/leftmike/maho/parser"
 	"github.com/leftmike/maho/plan"
+	"github.com/leftmike/maho/session"
 	"github.com/leftmike/maho/sql"
 )
 
