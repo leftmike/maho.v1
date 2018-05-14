@@ -265,7 +265,7 @@ func (_ *joinRows) Update(ctx session.Context, updates []db.ColumnUpdate) error 
 	return fmt.Errorf("join rows may not be updated")
 }
 
-func (fj FromJoin) rows(ctx session.Context, tx engine.Transaction) (db.Rows, *fromContext,
+func (fj FromJoin) rows(ctx session.Context, tx *engine.Transaction) (db.Rows, *fromContext,
 	error) {
 
 	leftRows, leftCtx, err := fj.Left.rows(ctx, tx)

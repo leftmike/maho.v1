@@ -44,11 +44,11 @@ func (stmt *Values) String() string {
 	return s
 }
 
-func (stmt *Values) Plan(ctx session.Context, tx engine.Transaction) (interface{}, error) {
+func (stmt *Values) Plan(ctx session.Context, tx *engine.Transaction) (interface{}, error) {
 	return stmt.Rows(tx)
 }
 
-func (stmt *Values) Rows(tx engine.Transaction) (db.Rows, error) {
+func (stmt *Values) Rows(tx *engine.Transaction) (db.Rows, error) {
 	columns := make([]sql.Identifier, len(stmt.Expressions[0]))
 	for i := 0; i < len(columns); i++ {
 		columns[i] = sql.ID(fmt.Sprintf("column%d", i+1))
@@ -120,7 +120,7 @@ func (fv FromValues) String() string {
 	return s
 }
 
-func (fv FromValues) rows(ctx session.Context, tx engine.Transaction) (db.Rows, *fromContext,
+func (fv FromValues) rows(ctx session.Context, tx *engine.Transaction) (db.Rows, *fromContext,
 	error) {
 
 	rows, err := fv.Values.Rows(tx)
@@ -138,7 +138,7 @@ func (fv FromValues) rows(ctx session.Context, tx engine.Transaction) (db.Rows, 
 }
 
 // TestRows is used for testing.
-func (fv FromValues) TestRows(ctx session.Context, tx engine.Transaction) (db.Rows, *fromContext,
+func (fv FromValues) TestRows(ctx session.Context, tx *engine.Transaction) (db.Rows, *fromContext,
 	error) {
 
 	return fv.rows(ctx, tx)

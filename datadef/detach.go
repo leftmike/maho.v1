@@ -16,10 +16,12 @@ func (stmt *DetachDatabase) String() string {
 	return fmt.Sprintf("DETACH DATABASE %s", stmt.Database)
 }
 
-func (stmt *DetachDatabase) Plan(ctx session.Context, tx engine.Transaction) (interface{}, error) {
+func (stmt *DetachDatabase) Plan(ctx session.Context, tx *engine.Transaction) (interface{},
+	error) {
+
 	return stmt, nil
 }
 
-func (stmt *DetachDatabase) Execute(ctx session.Context, tx engine.Transaction) (int64, error) {
+func (stmt *DetachDatabase) Execute(ctx session.Context, tx *engine.Transaction) (int64, error) {
 	return 0, engine.DetachDatabase(stmt.Database)
 }

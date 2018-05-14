@@ -12,7 +12,7 @@ import (
 
 type FromItem interface {
 	fmt.Stringer
-	rows(ctx session.Context, tx engine.Transaction) (db.Rows, *fromContext, error)
+	rows(ctx session.Context, tx *engine.Transaction) (db.Rows, *fromContext, error)
 }
 
 type FromTableAlias sql.TableAlias
@@ -21,7 +21,7 @@ func (fta FromTableAlias) String() string {
 	return ((sql.TableAlias)(fta)).String()
 }
 
-func (fta FromTableAlias) rows(ctx session.Context, tx engine.Transaction) (db.Rows,
+func (fta FromTableAlias) rows(ctx session.Context, tx *engine.Transaction) (db.Rows,
 	*fromContext, error) {
 
 	tbl, err := engine.LookupTable(ctx, tx, fta.Database, fta.Table)

@@ -41,10 +41,7 @@ func TestValuesSimple(t *testing.T) {
 			t.Errorf("Parse(%q) failed with %s", c.sql, err)
 			continue
 		}
-		tx, err := engine.Begin()
-		if err != nil {
-			t.Fatal(err)
-		}
+		tx := engine.Begin()
 		ctx := session.NewContext("basic", sql.ID("test"))
 		ret, err := stmt.Plan(ctx, tx)
 		if c.fail {

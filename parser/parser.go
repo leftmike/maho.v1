@@ -20,7 +20,7 @@ import (
 
 type Stmt interface {
 	fmt.Stringer
-	Plan(ctx session.Context, tx engine.Transaction) (interface{}, error)
+	Plan(ctx session.Context, tx *engine.Transaction) (interface{}, error)
 }
 
 type Parser interface {

@@ -27,7 +27,7 @@ import (
 	"github.com/leftmike/maho/config"
 	"github.com/leftmike/maho/engine"
 	_ "github.com/leftmike/maho/engine/basic"
-	_ "github.com/leftmike/maho/engine/memory"
+	//_ "github.com/leftmike/maho/engine/memory"
 	"github.com/leftmike/maho/parser"
 	"github.com/leftmike/maho/plan"
 	"github.com/leftmike/maho/session"
@@ -35,7 +35,7 @@ import (
 )
 
 func replSQL(p parser.Parser, w io.Writer) {
-	var tx engine.Transaction
+	var tx *engine.Transaction
 	for {
 		stmt, err := p.Parse()
 		if err == io.EOF {
@@ -46,12 +46,7 @@ func replSQL(p parser.Parser, w io.Writer) {
 			return
 		}
 
-		tx, err = engine.Begin()
-		if err != nil {
-			fmt.Println(err)
-			return
-		}
-
+		tx = engine.Begin()
 		ctx := session.NewContext(*eng, sql.ID(*database))
 		ret, err := stmt.Plan(ctx, tx)
 		if err != nil {

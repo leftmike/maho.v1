@@ -195,7 +195,7 @@ func TestInsert(t *testing.T) {
 		insertCases3)
 }
 
-func statement(ctx session.Context, tx engine.Transaction, s string) error {
+func statement(ctx session.Context, tx *engine.Transaction, s string) error {
 	p := parser.NewParser(strings.NewReader(s), "statement")
 	stmt, err := p.Parse()
 	if err != nil {
@@ -214,12 +214,8 @@ func testInsert(t *testing.T, dbnam, nam sql.Identifier, cols []sql.Identifier,
 
 	ctx := session.NewContext("basic", sql.ID("test"))
 	for _, c := range cases {
-		tx, err := engine.Begin()
-		if err != nil {
-			t.Error(err)
-			return
-		}
-		err = engine.CreateTable(ctx, tx, dbnam, nam, cols, colTypes)
+		tx := engine.Begin()
+		err := engine.CreateTable(ctx, tx, dbnam, nam, cols, colTypes)
 		if err != nil {
 			t.Error(err)
 			return

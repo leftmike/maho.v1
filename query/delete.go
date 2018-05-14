@@ -28,7 +28,7 @@ type deletePlan struct {
 	rows db.Rows
 }
 
-func (dp *deletePlan) Execute(ctx session.Context, tx engine.Transaction) (int64, error) {
+func (dp *deletePlan) Execute(ctx session.Context, tx *engine.Transaction) (int64, error) {
 	dest := make([]sql.Value, len(dp.rows.Columns()))
 	cnt := int64(0)
 	for {
@@ -46,7 +46,7 @@ func (dp *deletePlan) Execute(ctx session.Context, tx engine.Transaction) (int64
 	}
 }
 
-func (stmt *Delete) Plan(ctx session.Context, tx engine.Transaction) (interface{}, error) {
+func (stmt *Delete) Plan(ctx session.Context, tx *engine.Transaction) (interface{}, error) {
 	tbl, err := engine.LookupTable(ctx, tx, stmt.Table.Database, stmt.Table.Table)
 	if err != nil {
 		return nil, err

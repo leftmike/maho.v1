@@ -9,5 +9,5 @@ import (
 type Rows db.Rows
 
 type Executer interface {
-	Execute(ctx session.Context, tx engine.Transaction) (int64, error)
+	Execute(ctx session.Context, tx *engine.Transaction) (int64, error)
 }

@@ -67,10 +67,7 @@ func TestValues(t *testing.T) {
 	}
 
 	startEngine(t)
-	tx, err := engine.Begin()
-	if err != nil {
-		t.Fatal(err)
-	}
+	tx := engine.Begin()
 	ctx := session.NewContext("basic", sql.ID("test"))
 	for _, c := range cases {
 		if c.values.String() != c.s {
@@ -152,10 +149,7 @@ func TestFromValues(t *testing.T) {
 			t.Errorf("(%v).String() got %q want %q", c.from, c.from.String(), c.s)
 			continue
 		}
-		tx, err := engine.Begin()
-		if err != nil {
-			t.Fatalf("Begin() failed with %s", err)
-		}
+		tx := engine.Begin()
 		rows, fctx, err := c.from.TestRows(ctx, tx)
 		if err != nil {
 			t.Errorf("(%v).Rows() failed with %s", c.from, err)

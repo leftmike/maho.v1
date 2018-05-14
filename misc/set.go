@@ -18,10 +18,10 @@ func (stmt *Set) String() string {
 	return fmt.Sprintf("SET %s TO %s", stmt.Variable, stmt.Value)
 }
 
-func (stmt *Set) Plan(ctx session.Context, tx engine.Transaction) (interface{}, error) {
+func (stmt *Set) Plan(ctx session.Context, tx *engine.Transaction) (interface{}, error) {
 	return stmt, nil
 }
 
-func (stmt *Set) Execute(ctx session.Context, tx engine.Transaction) (int64, error) {
+func (stmt *Set) Execute(ctx session.Context, tx *engine.Transaction) (int64, error) {
 	return 0, config.Set(stmt.Variable.String(), stmt.Value)
 }

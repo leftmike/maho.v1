@@ -24,10 +24,12 @@ func (stmt *AttachDatabase) String() string {
 	return s
 }
 
-func (stmt *AttachDatabase) Plan(ctx session.Context, tx engine.Transaction) (interface{}, error) {
+func (stmt *AttachDatabase) Plan(ctx session.Context, tx *engine.Transaction) (interface{},
+	error) {
+
 	return stmt, nil
 }
 
-func (stmt *AttachDatabase) Execute(ctx session.Context, tx engine.Transaction) (int64, error) {
+func (stmt *AttachDatabase) Execute(ctx session.Context, tx *engine.Transaction) (int64, error) {
 	return 0, engine.AttachDatabase(ctx.DefaultEngine(), stmt.Database, stmt.Options)
 }

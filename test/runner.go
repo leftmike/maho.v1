@@ -27,10 +27,7 @@ func (run *Runner) RunExec(tst *sqltest.Test) error {
 		if err != nil {
 			return err
 		}
-		tx, err := engine.Begin()
-		if err != nil {
-			return err
-		}
+		tx := engine.Begin()
 		ctx := session.NewContext("basic", sql.ID("test"))
 		ret, err := stmt.Plan(ctx, tx)
 		if err != nil {
@@ -55,10 +52,7 @@ func (run *Runner) RunQuery(tst *sqltest.Test) ([]string, [][]string, error) {
 	if err != nil {
 		return nil, nil, err
 	}
-	tx, err := engine.Begin()
-	if err != nil {
-		return nil, nil, err
-	}
+	tx := engine.Begin()
 	ctx := session.NewContext("basic", sql.ID("test"))
 	ret, err := stmt.Plan(ctx, tx)
 	if err != nil {

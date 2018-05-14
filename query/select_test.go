@@ -97,10 +97,7 @@ func TestSelect(t *testing.T) {
 	}
 
 	startEngine(t)
-	tx, err := engine.Begin()
-	if err != nil {
-		t.Fatal(tx)
-	}
+	tx := engine.Begin()
 	ctx := session.NewContext("basic", sql.ID("test"))
 	for _, c := range cases {
 		if c.stmt.String() != c.s {
