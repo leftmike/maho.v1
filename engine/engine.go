@@ -68,12 +68,12 @@ func (ds DatabaseState) String() string {
 
 type Database interface {
 	Message() string
-	LookupTable(ctx session.Context, tx TransImpl, tblname sql.Identifier) (db.Table, error)
-	CreateTable(ctx session.Context, tx TransImpl, tblname sql.Identifier,
+	LookupTable(ctx session.Context, tx TransContext, tblname sql.Identifier) (db.Table, error)
+	CreateTable(ctx session.Context, tx TransContext, tblname sql.Identifier,
 		cols []sql.Identifier, colTypes []db.ColumnType) error
-	DropTable(ctx session.Context, tx TransImpl, tblname sql.Identifier, exists bool) error
-	ListTables(ctx session.Context, tx TransImpl) ([]TableEntry, error)
-	Begin() TransImpl
+	DropTable(ctx session.Context, tx TransContext, tblname sql.Identifier, exists bool) error
+	ListTables(ctx session.Context, tx TransContext) ([]TableEntry, error)
+	Begin() TransContext
 }
 
 type databaseEntry struct {
@@ -85,7 +85,7 @@ type databaseEntry struct {
 	err      error
 }
 
-type TransImpl interface {
+type TransContext interface {
 	Commit(ctx session.Context) error
 	Rollback() error
 }
@@ -189,13 +189,13 @@ func DetachDatabase(name sql.Identifier) error {
 }
 
 type Transaction struct {
-	transImpls map[Database]TransImpl
+	contexts map[Database]TransContext
 }
 
 // Begin a new transaction.
 func Begin() *Transaction {
 	return &Transaction{
-		transImpls: map[Database]TransImpl{},
+		contexts: map[Database]TransContext{},
 	}
 }
 
@@ -207,11 +207,11 @@ func (tx *Transaction) Rollback() error {
 	return nil
 }
 
-func (tx *Transaction) getTransImpl(d Database) TransImpl {
-	ti, ok := tx.transImpls[d]
+func (tx *Transaction) getTransContext(d Database) TransContext {
+	ti, ok := tx.contexts[d]
 	if !ok {
 		ti = d.Begin()
-		tx.transImpls[d] = ti
+		tx.contexts[d] = ti
 	}
 	return ti
 }
@@ -233,7 +233,7 @@ func LookupTable(ctx session.Context, tx *Transaction, dbname, tblname sql.Ident
 	if de.state != Running {
 		return nil, fmt.Errorf("engine: database %s not running", dbname)
 	}
-	ti := tx.getTransImpl(de.database)
+	ti := tx.getTransContext(de.database)
 	tbl, err := lookupVirtual(ctx, ti, de.database, tblname)
 	if tbl != nil || err != nil {
 		return tbl, err
@@ -258,7 +258,7 @@ func CreateTable(ctx session.Context, tx *Transaction, dbname, tblname sql.Ident
 	if de.state != Running {
 		return fmt.Errorf("engine: database %s not running", dbname)
 	}
-	return de.database.CreateTable(ctx, tx.getTransImpl(de.database), tblname, cols, colTypes)
+	return de.database.CreateTable(ctx, tx.getTransContext(de.database), tblname, cols, colTypes)
 }
 
 // DropTable drops the named table from the named database.
@@ -278,7 +278,7 @@ func DropTable(ctx session.Context, tx *Transaction, dbname, tblname sql.Identif
 	if de.state != Running {
 		return fmt.Errorf("engine: database %s not running", dbname)
 	}
-	return de.database.DropTable(ctx, tx.getTransImpl(de.database), tblname, exists)
+	return de.database.DropTable(ctx, tx.getTransContext(de.database), tblname, exists)
 }
 
 func Register(typ string, e Engine) {

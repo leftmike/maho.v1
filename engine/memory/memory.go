@@ -58,7 +58,7 @@ func (mdb *database) Message() string {
 	return ""
 }
 
-func (mdb *database) LookupTable(ctx session.Context, tx engine.TransImpl,
+func (mdb *database) LookupTable(ctx session.Context, tx engine.TransContext,
 	tblname sql.Identifier) (db.Table, error) {
 
 	tbl, ok := mdb.tables[tblname]
@@ -68,7 +68,7 @@ func (mdb *database) LookupTable(ctx session.Context, tx engine.TransImpl,
 	return tbl, nil
 }
 
-func (mdb *database) CreateTable(ctx session.Context, tx engine.TransImpl,
+func (mdb *database) CreateTable(ctx session.Context, tx engine.TransContext,
 	tblname sql.Identifier, cols []sql.Identifier, colTypes []db.ColumnType) error {
 
 	if _, dup := mdb.tables[tblname]; dup {
@@ -86,7 +86,7 @@ func (mdb *database) CreateTable(ctx session.Context, tx engine.TransImpl,
 	return nil
 }
 
-func (mdb *database) DropTable(ctx session.Context, tx engine.TransImpl, tblname sql.Identifier,
+func (mdb *database) DropTable(ctx session.Context, tx engine.TransContext, tblname sql.Identifier,
 	exists bool) error {
 
 	if _, ok := mdb.tables[tblname]; !ok {
@@ -100,7 +100,7 @@ func (mdb *database) DropTable(ctx session.Context, tx engine.TransImpl, tblname
 }
 
 func (mdb *database) ListTables(ctx session.Context,
-	tx engine.TransImpl) ([]engine.TableEntry, error) {
+	tx engine.TransContext) ([]engine.TableEntry, error) {
 
 	var tbls []engine.TableEntry
 	for name, tbl := range mdb.tables {
@@ -114,7 +114,7 @@ func (mdb *database) ListTables(ctx session.Context,
 	return tbls, nil
 }
 
-func (mdb *database) Begin() engine.TransImpl {
+func (mdb *database) Begin() engine.TransContext {
 	return nil // XXX
 }
 
