@@ -98,7 +98,7 @@ func (vdb *virtualDatabase) ListTables(ctx session.Context, tx TransContext) ([]
 	return tbls, nil
 }
 
-func (vdb *virtualDatabase) Begin() TransContext {
+func (vdb *virtualDatabase) NewTransContext() TransContext {
 	return nil
 }
 

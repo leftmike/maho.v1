@@ -114,7 +114,7 @@ func (bdb *database) ListTables(ctx session.Context,
 	return tbls, nil
 }
 
-func (bdb *database) Begin() engine.TransContext {
+func (bdb *database) NewTransContext() engine.TransContext {
 	return nil
 }
 

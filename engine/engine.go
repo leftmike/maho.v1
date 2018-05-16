@@ -73,7 +73,7 @@ type Database interface {
 		cols []sql.Identifier, colTypes []db.ColumnType) error
 	DropTable(ctx session.Context, tx TransContext, tblname sql.Identifier, exists bool) error
 	ListTables(ctx session.Context, tx TransContext) ([]TableEntry, error)
-	Begin() TransContext
+	NewTransContext() TransContext
 }
 
 type databaseEntry struct {
@@ -199,21 +199,42 @@ func Begin() *Transaction {
 	}
 }
 
+func (tx *Transaction) forContexts(fn func(tc TransContext) error) error {
+	var err error
+	for _, tc := range tx.contexts {
+		if tc != nil {
+			cerr := fn(tc)
+			if cerr != nil {
+				if err == nil {
+					err = cerr
+				} else {
+					err = fmt.Errorf("%s; %s", err, cerr)
+				}
+			}
+		}
+	}
+	return err
+}
+
 func (tx *Transaction) Commit(ctx session.Context) error {
-	return nil
+	return tx.forContexts(func(tc TransContext) error {
+		return tc.Commit(ctx)
+	})
 }
 
 func (tx *Transaction) Rollback() error {
-	return nil
+	return tx.forContexts(func(tc TransContext) error {
+		return tc.Rollback()
+	})
 }
 
 func (tx *Transaction) getTransContext(d Database) TransContext {
-	ti, ok := tx.contexts[d]
+	tc, ok := tx.contexts[d]
 	if !ok {
-		ti = d.Begin()
-		tx.contexts[d] = ti
+		tc = d.NewTransContext()
+		tx.contexts[d] = tc
 	}
-	return ti
+	return tc
 }
 
 // LookupTable looks up the named table in the named database.

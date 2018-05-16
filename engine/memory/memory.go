@@ -114,7 +114,7 @@ func (mdb *database) ListTables(ctx session.Context,
 	return tbls, nil
 }
 
-func (mdb *database) Begin() engine.TransContext {
+func (mdb *database) NewTransContext() engine.TransContext {
 	return nil // XXX
 }
 
