@@ -93,7 +93,7 @@ func (vdb *virtualDatabase) ListTables(ctx session.Context, tx TransContext) ([]
 
 	var tbls []TableEntry
 	for nam := range vdb.tables {
-		tbls = append(tbls, TableEntry{nam, 0, 0, VirtualType})
+		tbls = append(tbls, TableEntry{nam, VirtualType})
 	}
 	return tbls, nil
 }
@@ -177,7 +177,7 @@ func listTables(ctx session.Context, tx TransContext, d Database) ([]TableEntry,
 	}
 
 	for nam := range virtualTables {
-		tbls = append(tbls, TableEntry{nam, 0, 0, VirtualType})
+		tbls = append(tbls, TableEntry{nam, VirtualType})
 	}
 	return tbls, nil
 }
@@ -195,14 +195,7 @@ func makeTablesVirtual(ctx session.Context, tx TransContext, d Database,
 
 	values := [][]sql.Value{}
 	for _, te := range tbls {
-		var tid, pn, ttype sql.Value
-
-		if te.ID != 0 {
-			tid = sql.Int64Value(te.ID)
-		}
-		if te.PageNum != 0 {
-			pn = sql.Int64Value(te.PageNum)
-		}
+		var ttype sql.Value
 
 		switch te.Type {
 		case PhysicalType:
@@ -212,13 +205,12 @@ func makeTablesVirtual(ctx session.Context, tx TransContext, d Database,
 		default:
 			panic(fmt.Sprintf("missing case for table entry type: %v", te))
 		}
-		values = append(values, []sql.Value{sql.StringValue(te.Name.String()), tid, pn, ttype})
+		values = append(values, []sql.Value{sql.StringValue(te.Name.String()), ttype})
 	}
 
 	return &VirtualTable{
-		Cols: []sql.Identifier{sql.ID("table"), sql.ID("id"), sql.ID("page_num"),
-			sql.ID("type")},
-		ColTypes: []db.ColumnType{idColType, int32ColType, int64ColType, idColType},
+		Cols:     []sql.Identifier{sql.ID("table"), sql.ID("type")},
+		ColTypes: []db.ColumnType{idColType, idColType},
 		Values:   values,
 	}, nil
 }

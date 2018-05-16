@@ -11,9 +11,6 @@ import (
 	"github.com/leftmike/maho/sql"
 )
 
-type TableID uint32
-type PageNum uint64
-
 type TableType int
 
 const (
@@ -22,10 +19,8 @@ const (
 )
 
 type TableEntry struct {
-	Name    sql.Identifier
-	ID      TableID
-	PageNum PageNum
-	Type    TableType
+	Name sql.Identifier
+	Type TableType
 }
 
 type Options map[sql.Identifier]string

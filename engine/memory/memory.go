@@ -3,7 +3,6 @@ package memory
 import (
 	"fmt"
 	"io"
-	"math/rand"
 
 	"github.com/leftmike/maho/db"
 	"github.com/leftmike/maho/engine"
@@ -15,13 +14,10 @@ type eng struct{}
 
 type database struct {
 	name   sql.Identifier
-	nextID engine.TableID
 	tables map[sql.Identifier]*table
 }
 
 type table struct {
-	id          engine.TableID
-	pageNum     engine.PageNum
 	columns     []sql.Identifier
 	columnTypes []db.ColumnType
 	rows        [][]sql.Value
@@ -49,7 +45,6 @@ func (me *eng) CreateDatabase(name sql.Identifier, path string,
 
 	return &database{
 		name:   name,
-		nextID: 1,
 		tables: map[sql.Identifier]*table{},
 	}, nil
 }
@@ -76,13 +71,10 @@ func (mdb *database) CreateTable(ctx session.Context, tx engine.TransContext,
 	}
 
 	mdb.tables[tblname] = &table{
-		id:          mdb.nextID,
-		pageNum:     engine.PageNum(rand.Uint64()),
 		columns:     cols,
 		columnTypes: colTypes,
 		rows:        nil,
 	}
-	mdb.nextID += 1
 	return nil
 }
 
@@ -103,12 +95,10 @@ func (mdb *database) ListTables(ctx session.Context,
 	tx engine.TransContext) ([]engine.TableEntry, error) {
 
 	var tbls []engine.TableEntry
-	for name, tbl := range mdb.tables {
+	for name, _ := range mdb.tables {
 		tbls = append(tbls, engine.TableEntry{
-			Name:    name,
-			ID:      tbl.id,
-			PageNum: tbl.pageNum,
-			Type:    engine.VirtualType,
+			Name: name,
+			Type: engine.VirtualType,
 		})
 	}
 	return tbls, nil
