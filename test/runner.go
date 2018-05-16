@@ -14,7 +14,10 @@ import (
 	"github.com/leftmike/maho/sql"
 )
 
-type Runner struct{}
+type Runner struct {
+	Type     string
+	Database sql.Identifier
+}
 
 func (run *Runner) RunExec(tst *sqltest.Test) error {
 	p := parser.NewParser(strings.NewReader(tst.Test),
@@ -28,7 +31,7 @@ func (run *Runner) RunExec(tst *sqltest.Test) error {
 			return err
 		}
 		tx := engine.Begin()
-		ctx := session.NewContext("basic", sql.ID("test"))
+		ctx := session.NewContext(run.Type, run.Database)
 		ret, err := stmt.Plan(ctx, tx)
 		if err != nil {
 			return err
@@ -53,7 +56,7 @@ func (run *Runner) RunQuery(tst *sqltest.Test) ([]string, [][]string, error) {
 		return nil, nil, err
 	}
 	tx := engine.Begin()
-	ctx := session.NewContext("basic", sql.ID("test"))
+	ctx := session.NewContext(run.Type, run.Database)
 	ret, err := stmt.Plan(ctx, tx)
 	if err != nil {
 		return nil, nil, err

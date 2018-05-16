@@ -9,6 +9,7 @@ import (
 
 	"github.com/leftmike/maho/engine"
 	_ "github.com/leftmike/maho/engine/basic"
+	_ "github.com/leftmike/maho/engine/memory"
 	"github.com/leftmike/maho/sql"
 	"github.com/leftmike/maho/test"
 )
@@ -46,26 +47,17 @@ func (_ mahoDialect) DriverName() string {
 	return "maho"
 }
 
-var started bool
-
-func startEngine(t *testing.T) {
+func testSQL(t *testing.T, typ string, dbname sql.Identifier) {
 	t.Helper()
 
-	if !started {
-		err := engine.CreateDatabase("basic", sql.ID("test"), engine.Options{sql.WAIT: "true"})
-		if err != nil {
-			t.Fatal(err)
-		}
-		started = true
+	err := engine.CreateDatabase(typ, dbname, engine.Options{sql.WAIT: "true"})
+	if err != nil {
+		t.Fatal(err)
 	}
-}
 
-func TestSQL(t *testing.T) {
-	startEngine(t)
-
-	run := test.Runner{}
+	run := test.Runner{typ, dbname}
 	var rptr reporter
-	err := sqltest.RunTests(*testData, &run, &rptr, mahoDialect{}, *update)
+	err = sqltest.RunTests(*testData, &run, &rptr, mahoDialect{}, *update)
 	if err != nil {
 		t.Errorf("RunTests(%q) failed with %s", testData, err)
 		return
@@ -75,4 +67,12 @@ func TestSQL(t *testing.T) {
 			t.Errorf("%s: %s", report.test, report.err)
 		}
 	}
+}
+
+func TestSQLBasic(t *testing.T) {
+	testSQL(t, "basic", sql.ID("test_basic"))
+}
+
+func TestSQLMemory(t *testing.T) {
+	testSQL(t, "memory", sql.ID("test_memory"))
 }

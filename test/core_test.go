@@ -33,7 +33,11 @@ func TestValuesSimple(t *testing.T) {
 		},
 	}
 
-	startEngine(t)
+	err := engine.CreateDatabase("basic", sql.ID("core_test"), engine.Options{sql.WAIT: "true"})
+	if err != nil {
+		t.Fatal(err)
+	}
+
 	for i, c := range cases {
 		p := parser.NewParser(strings.NewReader(c.sql), fmt.Sprintf("tests[%d]", i))
 		stmt, err := p.Parse()
@@ -42,7 +46,7 @@ func TestValuesSimple(t *testing.T) {
 			continue
 		}
 		tx := engine.Begin()
-		ctx := session.NewContext("basic", sql.ID("test"))
+		ctx := session.NewContext("basic", sql.ID("core_test"))
 		ret, err := stmt.Plan(ctx, tx)
 		if c.fail {
 			if err == nil {
