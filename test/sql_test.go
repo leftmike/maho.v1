@@ -55,7 +55,10 @@ func testSQL(t *testing.T, typ string, dbname sql.Identifier) {
 		t.Fatal(err)
 	}
 
-	run := test.Runner{typ, dbname}
+	run := test.Runner{
+		Type:     typ,
+		Database: dbname,
+	}
 	var rptr reporter
 	err = sqltest.RunTests(*testData, &run, &rptr, mahoDialect{}, *update)
 	if err != nil {
