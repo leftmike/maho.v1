@@ -22,15 +22,15 @@ type rowImpl struct {
 	previous *rowImpl
 }
 
-func (mt *tableImpl) Columns(tctx *tcontext) []sql.Identifier {
+func (mt *tableImpl) getColumns(tctx *tcontext) []sql.Identifier {
 	return mt.columns
 }
 
-func (mt *tableImpl) ColumnTypes(tctx *tcontext) []db.ColumnType {
+func (mt *tableImpl) getColumnTypes(tctx *tcontext) []db.ColumnType {
 	return mt.columnTypes
 }
 
-func (mt *tableImpl) Insert(tctx *tcontext, values []sql.Value) (int, error) {
+func (mt *tableImpl) insert(tctx *tcontext, values []sql.Value) (int, error) {
 	mt.mutex.Lock()
 	defer mt.mutex.Unlock()
 
@@ -42,7 +42,7 @@ func (mt *tableImpl) Insert(tctx *tcontext, values []sql.Value) (int, error) {
 	return len(mt.rows) - 1, nil
 }
 
-func (mt *tableImpl) Next(tctx *tcontext, dest []sql.Value, idx int) (int, error) {
+func (mt *tableImpl) next(tctx *tcontext, dest []sql.Value, idx int) (int, error) {
 	mt.mutex.RLock()
 	defer mt.mutex.RUnlock()
 
@@ -59,7 +59,7 @@ func (mt *tableImpl) Next(tctx *tcontext, dest []sql.Value, idx int) (int, error
 	return idx, io.EOF
 }
 
-func (mt *tableImpl) Delete(tctx *tcontext, idx int) error {
+func (mt *tableImpl) delete(tctx *tcontext, idx int) error {
 	mt.mutex.Lock()
 	defer mt.mutex.Unlock()
 
@@ -71,7 +71,7 @@ func (mt *tableImpl) Delete(tctx *tcontext, idx int) error {
 	return nil
 }
 
-func (mt *tableImpl) Update(tctx *tcontext, updates []db.ColumnUpdate, idx int) error {
+func (mt *tableImpl) update(tctx *tcontext, updates []db.ColumnUpdate, idx int) error {
 	mt.mutex.Lock()
 	defer mt.mutex.Unlock()
 
@@ -86,7 +86,7 @@ func (mt *tableImpl) Update(tctx *tcontext, updates []db.ColumnUpdate, idx int) 
 	return nil
 }
 
-func (mt *tableImpl) CheckRows(s string, tid tid, rows []int) error {
+func (mt *tableImpl) checkRows(s string, tid tid, rows []int) error {
 	mt.mutex.RLock()
 	defer mt.mutex.RUnlock()
 
@@ -102,7 +102,7 @@ func (mt *tableImpl) CheckRows(s string, tid tid, rows []int) error {
 	return nil
 }
 
-func (mt *tableImpl) CommitRows(v version, rows []int) {
+func (mt *tableImpl) commitRows(v version, rows []int) {
 	mt.mutex.Lock()
 	defer mt.mutex.Unlock()
 
@@ -111,7 +111,7 @@ func (mt *tableImpl) CommitRows(v version, rows []int) {
 	}
 }
 
-func (mt *tableImpl) RollbackRows(rows []int) {
+func (mt *tableImpl) rollbackRows(rows []int) {
 	mt.mutex.Lock()
 	defer mt.mutex.Unlock()
 

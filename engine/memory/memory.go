@@ -2,8 +2,8 @@ package memory
 
 /*
 - row index is fixed and never changes for the life of a row
-- methods in tableimpl.go should not be exported
 - keep track of deleted rows and reuse them
+- cleanup old versions and old rows
 */
 
 import (
@@ -156,7 +156,7 @@ func (mdb *database) Commit(ctx session.Context, tx interface{}) error {
 	tctx := tx.(*tcontext)
 
 	for _, tbl := range tctx.tables {
-		err := tbl.table.CheckRows("commit", tctx.tid, tbl.modifiedRows)
+		err := tbl.table.checkRows("commit", tctx.tid, tbl.modifiedRows)
 		if err != nil {
 			return err
 		}
@@ -165,7 +165,7 @@ func (mdb *database) Commit(ctx session.Context, tx interface{}) error {
 	mdb.version += 1
 	v := mdb.version
 	for _, tbl := range tctx.tables {
-		tbl.table.CommitRows(v, tbl.modifiedRows)
+		tbl.table.commitRows(v, tbl.modifiedRows)
 	}
 	return nil
 }
@@ -173,14 +173,14 @@ func (mdb *database) Commit(ctx session.Context, tx interface{}) error {
 func (mdb *database) Rollback(tx interface{}) error {
 	tctx := tx.(*tcontext)
 	for _, tbl := range tctx.tables {
-		err := tbl.table.CheckRows("rollback", tctx.tid, tbl.modifiedRows)
+		err := tbl.table.checkRows("rollback", tctx.tid, tbl.modifiedRows)
 		if err != nil {
 			return err
 		}
 	}
 
 	for _, tbl := range tctx.tables {
-		tbl.table.RollbackRows(tbl.modifiedRows)
+		tbl.table.rollbackRows(tbl.modifiedRows)
 	}
 	return nil
 }
@@ -191,11 +191,11 @@ func (mdb *database) NextCommand(tx interface{}) {
 }
 
 func (mt *table) Columns() []sql.Identifier {
-	return mt.table.Columns(mt.tctx)
+	return mt.table.getColumns(mt.tctx)
 }
 
 func (mt *table) ColumnTypes() []db.ColumnType {
-	return mt.table.ColumnTypes(mt.tctx)
+	return mt.table.getColumnTypes(mt.tctx)
 }
 
 func (mt *table) Rows() (db.Rows, error) {
@@ -203,7 +203,7 @@ func (mt *table) Rows() (db.Rows, error) {
 }
 
 func (mt *table) Insert(row []sql.Value) error {
-	idx, err := mt.table.Insert(mt.tctx, row)
+	idx, err := mt.table.insert(mt.tctx, row)
 	if err != nil {
 		return err
 	}
@@ -223,7 +223,7 @@ func (mr *rows) Close() error {
 
 func (mr *rows) Next(ctx session.Context, dest []sql.Value) error {
 	var err error
-	mr.index, err = mr.table.table.Next(mr.table.tctx, dest, mr.index)
+	mr.index, err = mr.table.table.next(mr.table.tctx, dest, mr.index)
 	if err != nil {
 		mr.haveRow = false
 		return err
@@ -237,7 +237,7 @@ func (mr *rows) Delete(ctx session.Context) error {
 		return fmt.Errorf("memory: no row to delete")
 	}
 	mr.haveRow = false
-	err := mr.table.table.Delete(mr.table.tctx, mr.index-1)
+	err := mr.table.table.delete(mr.table.tctx, mr.index-1)
 	if err != nil {
 		return err
 	}
@@ -249,7 +249,7 @@ func (mr *rows) Update(ctx session.Context, updates []db.ColumnUpdate) error {
 	if !mr.haveRow {
 		return fmt.Errorf("memory: no row to update")
 	}
-	err := mr.table.table.Update(mr.table.tctx, updates, mr.index-1)
+	err := mr.table.table.update(mr.table.tctx, updates, mr.index-1)
 	if err != nil {
 		return err
 	}
