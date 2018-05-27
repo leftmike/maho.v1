@@ -10,7 +10,7 @@ import (
 	"github.com/leftmike/maho/sql"
 )
 
-type MakeVirtual func(ctx session.Context, tx TransContext, d Database,
+type MakeVirtual func(ctx session.Context, tctx interface{}, d Database,
 	tblname sql.Identifier) (db.Table, error)
 
 type TableMap map[sql.Identifier]MakeVirtual
@@ -48,11 +48,11 @@ func CreateVirtualDatabase(name sql.Identifier, tables TableMap) {
 	}
 }
 
-func lookupVirtual(ctx session.Context, tx TransContext, d Database,
+func lookupVirtual(ctx session.Context, tctx interface{}, d Database,
 	tblname sql.Identifier) (db.Table, error) {
 
 	if maker, ok := virtualTables[tblname]; ok {
-		return maker(ctx, tx, d, tblname)
+		return maker(ctx, tctx, d, tblname)
 	}
 	return nil, nil
 }
@@ -66,29 +66,29 @@ func (vdb *virtualDatabase) Message() string {
 	return ""
 }
 
-func (vdb *virtualDatabase) LookupTable(ctx session.Context, tx TransContext,
+func (vdb *virtualDatabase) LookupTable(ctx session.Context, tctx interface{},
 	tblname sql.Identifier) (db.Table, error) {
 
 	maker, ok := vdb.tables[tblname]
 	if !ok {
 		return nil, fmt.Errorf("virtual: table %s not found in database %s", tblname, vdb.name)
 	}
-	return maker(ctx, tx, vdb, tblname)
+	return maker(ctx, tctx, vdb, tblname)
 }
 
-func (vdb *virtualDatabase) CreateTable(ctx session.Context, tx TransContext,
+func (vdb *virtualDatabase) CreateTable(ctx session.Context, tctx interface{},
 	tblname sql.Identifier, cols []sql.Identifier, colTypes []db.ColumnType) error {
 
 	return fmt.Errorf("virtual: database %s may not be modified", vdb.name)
 }
 
-func (vdb *virtualDatabase) DropTable(ctx session.Context, tx TransContext, tblname sql.Identifier,
-	exists bool) error {
+func (vdb *virtualDatabase) DropTable(ctx session.Context, tctx interface{},
+	tblname sql.Identifier, exists bool) error {
 
 	return fmt.Errorf("virtual: database %s may not be modified", vdb.name)
 }
 
-func (vdb *virtualDatabase) ListTables(ctx session.Context, tx TransContext) ([]TableEntry,
+func (vdb *virtualDatabase) ListTables(ctx session.Context, tctx interface{}) ([]TableEntry,
 	error) {
 
 	var tbls []TableEntry
@@ -98,7 +98,15 @@ func (vdb *virtualDatabase) ListTables(ctx session.Context, tx TransContext) ([]
 	return tbls, nil
 }
 
-func (vdb *virtualDatabase) NewTransContext() TransContext {
+func (vdb *virtualDatabase) Begin() interface{} {
+	return nil
+}
+
+func (vdb *virtualDatabase) Commit(ctx session.Context, tctx interface{}) error {
+	return nil
+}
+
+func (vdb *virtualDatabase) Rollback(tctx interface{}) error {
 	return nil
 }
 
@@ -168,10 +176,8 @@ var (
 	stringColType = db.ColumnType{Type: sql.CharacterType, Size: 4096, NotNull: true}
 )
 
-func listTables(ctx session.Context, tx TransContext, d Database) ([]TableEntry,
-	error) {
-
-	tbls, err := d.ListTables(ctx, tx)
+func listTables(ctx session.Context, tctx interface{}, d Database) ([]TableEntry, error) {
+	tbls, err := d.ListTables(ctx, tctx)
 	if err != nil {
 		return nil, err
 	}
@@ -182,13 +188,13 @@ func listTables(ctx session.Context, tx TransContext, d Database) ([]TableEntry,
 	return tbls, nil
 }
 
-func makeTablesVirtual(ctx session.Context, tx TransContext, d Database,
+func makeTablesVirtual(ctx session.Context, tctx interface{}, d Database,
 	tblname sql.Identifier) (db.Table, error) {
 
 	mutex.RLock()
 	defer mutex.RUnlock()
 
-	tbls, err := listTables(ctx, tx, d)
+	tbls, err := listTables(ctx, tctx, d)
 	if err != nil {
 		return nil, err
 	}
@@ -222,13 +228,13 @@ var (
 		boolColType, boolColType, boolColType, idColType}
 )
 
-func makeColumnsVirtual(ctx session.Context, tx TransContext, d Database,
+func makeColumnsVirtual(ctx session.Context, tctx interface{}, d Database,
 	tblname sql.Identifier) (db.Table, error) {
 
 	mutex.RLock()
 	defer mutex.RUnlock()
 
-	tbls, err := listTables(ctx, tx, d)
+	tbls, err := listTables(ctx, tctx, d)
 	if err != nil {
 		return nil, err
 	}
@@ -242,11 +248,11 @@ func makeColumnsVirtual(ctx session.Context, tx TransContext, d Database,
 			cols = columnsColumns
 			colTypes = columnsColumnTypes
 		} else {
-			tbl, err := lookupVirtual(ctx, tx, d, te.Name)
+			tbl, err := lookupVirtual(ctx, tctx, d, te.Name)
 			if err != nil {
 				return nil, err
 			} else if tbl == nil {
-				tbl, err = d.LookupTable(ctx, tx, te.Name)
+				tbl, err = d.LookupTable(ctx, tctx, te.Name)
 				if err != nil {
 					return nil, err
 				}
@@ -280,7 +286,7 @@ func makeColumnsVirtual(ctx session.Context, tx TransContext, d Database,
 	}, nil
 }
 
-func makeDatabasesVirtual(ctx session.Context, tx TransContext, d Database,
+func makeDatabasesVirtual(ctx session.Context, tctx interface{}, d Database,
 	tblname sql.Identifier) (db.Table, error) {
 
 	mutex.RLock()
@@ -316,7 +322,7 @@ func makeDatabasesVirtual(ctx session.Context, tx TransContext, d Database,
 	}, nil
 }
 
-func makeIdentifiersVirtual(ctx session.Context, tx TransContext, d Database,
+func makeIdentifiersVirtual(ctx session.Context, tctx interface{}, d Database,
 	tblname sql.Identifier) (db.Table, error) {
 
 	values := [][]sql.Value{}
@@ -337,7 +343,7 @@ func makeIdentifiersVirtual(ctx session.Context, tx TransContext, d Database,
 	}, nil
 }
 
-func makeConfigVirtual(ctx session.Context, tx TransContext, d Database,
+func makeConfigVirtual(ctx session.Context, tctx interface{}, d Database,
 	tblname sql.Identifier) (db.Table, error) {
 
 	values := [][]sql.Value{}
@@ -358,7 +364,7 @@ func makeConfigVirtual(ctx session.Context, tx TransContext, d Database,
 	}, nil
 }
 
-func makeEnginesVirtual(ctx session.Context, tx TransContext, d Database,
+func makeEnginesVirtual(ctx session.Context, tctx interface{}, d Database,
 	tblname sql.Identifier) (db.Table, error) {
 
 	values := [][]sql.Value{}

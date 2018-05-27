@@ -1,8 +1,16 @@
 package memory
 
+/*
+- row index is fixed and never changes for the life of a row
+- methods in tableimpl.go should not be exported
+- use cid: increment after each command
+- use mutexes to protect syncronization
+*/
+
 import (
 	"fmt"
-	"io"
+	"math"
+	"sync"
 
 	"github.com/leftmike/maho/db"
 	"github.com/leftmike/maho/engine"
@@ -13,19 +21,28 @@ import (
 type eng struct{}
 
 type database struct {
-	name   sql.Identifier
-	tables map[sql.Identifier]*table
+	mutex   sync.RWMutex
+	name    sql.Identifier
+	tables  map[sql.Identifier]*tableImpl
+	version version // current version of the database
+	nextTID tid
+}
+
+type tcontext struct {
+	version version
+	tid     tid
+	cid     cid
+	tables  map[sql.Identifier]*table
 }
 
 type table struct {
-	columns     []sql.Identifier
-	columnTypes []db.ColumnType
-	rows        [][]sql.Value
+	tctx         *tcontext
+	table        *tableImpl
+	modifiedRows []int // indexes of modified rows
 }
 
 type rows struct {
-	columns []sql.Identifier
-	rows    [][]sql.Value
+	table   *table
 	index   int
 	haveRow bool
 }
@@ -45,7 +62,7 @@ func (me *eng) CreateDatabase(name sql.Identifier, path string,
 
 	return &database{
 		name:   name,
-		tables: map[sql.Identifier]*table{},
+		tables: map[sql.Identifier]*tableImpl{},
 	}, nil
 }
 
@@ -53,24 +70,38 @@ func (mdb *database) Message() string {
 	return ""
 }
 
-func (mdb *database) LookupTable(ctx session.Context, tx engine.TransContext,
+func (mdb *database) LookupTable(ctx session.Context, tx interface{},
 	tblname sql.Identifier) (db.Table, error) {
 
-	tbl, ok := mdb.tables[tblname]
+	tctx := tx.(*tcontext)
+	tbl, ok := tctx.tables[tblname]
+	if ok {
+		return tbl, nil
+	}
+
+	mdb.mutex.RLock()
+	defer mdb.mutex.RUnlock()
+
+	ti, ok := mdb.tables[tblname]
 	if !ok {
 		return nil, fmt.Errorf("memory: table %s not found in database %s", tblname, mdb.name)
 	}
+	tbl = &table{tctx: tctx, table: ti}
+	tctx.tables[tblname] = tbl
 	return tbl, nil
 }
 
-func (mdb *database) CreateTable(ctx session.Context, tx engine.TransContext,
-	tblname sql.Identifier, cols []sql.Identifier, colTypes []db.ColumnType) error {
+func (mdb *database) CreateTable(ctx session.Context, tx interface{}, tblname sql.Identifier,
+	cols []sql.Identifier, colTypes []db.ColumnType) error {
+
+	mdb.mutex.Lock()
+	defer mdb.mutex.Unlock()
 
 	if _, dup := mdb.tables[tblname]; dup {
 		return fmt.Errorf("memory: table %s already exists in database %s", tblname, mdb.name)
 	}
 
-	mdb.tables[tblname] = &table{
+	mdb.tables[tblname] = &tableImpl{
 		columns:     cols,
 		columnTypes: colTypes,
 		rows:        nil,
@@ -78,8 +109,11 @@ func (mdb *database) CreateTable(ctx session.Context, tx engine.TransContext,
 	return nil
 }
 
-func (mdb *database) DropTable(ctx session.Context, tx engine.TransContext, tblname sql.Identifier,
+func (mdb *database) DropTable(ctx session.Context, tx interface{}, tblname sql.Identifier,
 	exists bool) error {
+
+	mdb.mutex.Lock()
+	defer mdb.mutex.Unlock()
 
 	if _, ok := mdb.tables[tblname]; !ok {
 		if exists {
@@ -91,63 +125,115 @@ func (mdb *database) DropTable(ctx session.Context, tx engine.TransContext, tbln
 	return nil
 }
 
-func (mdb *database) ListTables(ctx session.Context,
-	tx engine.TransContext) ([]engine.TableEntry, error) {
+func (mdb *database) ListTables(ctx session.Context, tx interface{}) ([]engine.TableEntry,
+	error) {
+
+	mdb.mutex.RLock()
+	defer mdb.mutex.RUnlock()
 
 	var tbls []engine.TableEntry
 	for name, _ := range mdb.tables {
 		tbls = append(tbls, engine.TableEntry{
 			Name: name,
-			Type: engine.VirtualType,
+			Type: engine.PhysicalType,
 		})
 	}
 	return tbls, nil
 }
 
-func (mdb *database) NewTransContext() engine.TransContext {
-	return nil // XXX
+func (mdb *database) Begin() interface{} {
+	mdb.mutex.Lock()
+	defer mdb.mutex.Unlock()
+
+	mdb.nextTID += 1
+	return &tcontext{
+		version: mdb.version,
+		tid:     mdb.nextTID - 1,
+		tables:  map[sql.Identifier]*table{},
+	}
+}
+
+func (mdb *database) Commit(ctx session.Context, tx interface{}) error {
+	tctx := tx.(*tcontext)
+
+	for _, tbl := range tctx.tables {
+		for _, idx := range tbl.modifiedRows {
+			err := tbl.table.CheckRow("commit", idx, tctx.tid)
+			if err != nil {
+				return err
+			}
+		}
+	}
+
+	mdb.version += 1
+	v := mdb.version
+	for _, tbl := range tctx.tables {
+		for _, idx := range tbl.modifiedRows {
+			tbl.table.CommitRow(idx, v)
+		}
+	}
+	return nil
+}
+
+func (mdb *database) Rollback(tx interface{}) error {
+	tctx := tx.(*tcontext)
+	for _, tbl := range tctx.tables {
+		for _, idx := range tbl.modifiedRows {
+			err := tbl.table.CheckRow("rollback", idx, tctx.tid)
+			if err != nil {
+				return err
+			}
+		}
+	}
+
+	for _, tbl := range tctx.tables {
+		for _, idx := range tbl.modifiedRows {
+			tbl.table.RollbackRow(idx)
+		}
+	}
+	return nil
 }
 
 func (mt *table) Columns() []sql.Identifier {
-	return mt.columns
+	return mt.table.Columns(mt.tctx)
 }
 
 func (mt *table) ColumnTypes() []db.ColumnType {
-	return mt.columnTypes
+	return mt.table.ColumnTypes(mt.tctx)
 }
 
 func (mt *table) Rows() (db.Rows, error) {
-	return &rows{columns: mt.columns, rows: mt.rows}, nil
+	return &rows{table: mt}, nil
 }
 
 func (mt *table) Insert(row []sql.Value) error {
-	mt.rows = append(mt.rows, row)
+	idx, err := mt.table.Insert(mt.tctx, row)
+	if err != nil {
+		return err
+	}
+	mt.modifiedRows = append(mt.modifiedRows, idx)
 	return nil
 }
 
 func (mr *rows) Columns() []sql.Identifier {
-	return mr.columns
+	return mr.table.Columns()
 }
 
 func (mr *rows) Close() error {
-	mr.index = len(mr.rows)
+	mr.index = math.MaxInt64
 	mr.haveRow = false
 	return nil
 }
 
 func (mr *rows) Next(ctx session.Context, dest []sql.Value) error {
-	for mr.index < len(mr.rows) {
-		if mr.rows[mr.index] != nil {
-			copy(dest, mr.rows[mr.index])
-			mr.index += 1
-			mr.haveRow = true
-			return nil
-		}
-		mr.index += 1
+	var err error
+	mr.index, err = mr.table.table.Next(mr.table.tctx, dest, mr.index)
+	if err != nil {
+		mr.haveRow = false
+		return err
 	}
-
-	mr.haveRow = false
-	return io.EOF
+	mr.haveRow = true
+	return nil
 }
 
 func (mr *rows) Delete(ctx session.Context) error {
@@ -155,7 +241,11 @@ func (mr *rows) Delete(ctx session.Context) error {
 		return fmt.Errorf("memory: no row to delete")
 	}
 	mr.haveRow = false
-	mr.rows[mr.index-1] = nil
+	err := mr.table.table.Delete(mr.table.tctx, mr.index-1)
+	if err != nil {
+		return err
+	}
+	mr.table.modifiedRows = append(mr.table.modifiedRows, mr.index-1)
 	return nil
 }
 
@@ -163,9 +253,10 @@ func (mr *rows) Update(ctx session.Context, updates []db.ColumnUpdate) error {
 	if !mr.haveRow {
 		return fmt.Errorf("memory: no row to update")
 	}
-	row := mr.rows[mr.index-1]
-	for _, up := range updates {
-		row[up.Index] = up.Value
+	err := mr.table.table.Update(mr.table.tctx, updates, mr.index-1)
+	if err != nil {
+		return err
 	}
+	mr.table.modifiedRows = append(mr.table.modifiedRows, mr.index-1)
 	return nil
 }

@@ -53,7 +53,7 @@ func (bdb *database) Message() string {
 	return ""
 }
 
-func (bdb *database) LookupTable(ctx session.Context, tx engine.TransContext,
+func (bdb *database) LookupTable(ctx session.Context, tctx interface{},
 	tblname sql.Identifier) (db.Table, error) {
 
 	tbl, ok := bdb.tables[tblname]
@@ -63,8 +63,8 @@ func (bdb *database) LookupTable(ctx session.Context, tx engine.TransContext,
 	return tbl, nil
 }
 
-func (bdb *database) CreateTable(ctx session.Context, tx engine.TransContext,
-	tblname sql.Identifier, cols []sql.Identifier, colTypes []db.ColumnType) error {
+func (bdb *database) CreateTable(ctx session.Context, tctx interface{}, tblname sql.Identifier,
+	cols []sql.Identifier, colTypes []db.ColumnType) error {
 
 	if _, dup := bdb.tables[tblname]; dup {
 		return fmt.Errorf("basic: table %s already exists in database %s", tblname, bdb.name)
@@ -78,7 +78,7 @@ func (bdb *database) CreateTable(ctx session.Context, tx engine.TransContext,
 	return nil
 }
 
-func (bdb *database) DropTable(ctx session.Context, tx engine.TransContext, tblname sql.Identifier,
+func (bdb *database) DropTable(ctx session.Context, tctx interface{}, tblname sql.Identifier,
 	exists bool) error {
 
 	if _, ok := bdb.tables[tblname]; !ok {
@@ -91,20 +91,28 @@ func (bdb *database) DropTable(ctx session.Context, tx engine.TransContext, tbln
 	return nil
 }
 
-func (bdb *database) ListTables(ctx session.Context,
-	tx engine.TransContext) ([]engine.TableEntry, error) {
+func (bdb *database) ListTables(ctx session.Context, tctx interface{}) ([]engine.TableEntry,
+	error) {
 
 	var tbls []engine.TableEntry
 	for name, _ := range bdb.tables {
 		tbls = append(tbls, engine.TableEntry{
 			Name: name,
-			Type: engine.VirtualType,
+			Type: engine.PhysicalType,
 		})
 	}
 	return tbls, nil
 }
 
-func (bdb *database) NewTransContext() engine.TransContext {
+func (bdb *database) Begin() interface{} {
+	return nil
+}
+
+func (bdb *database) Commit(ctx session.Context, tctx interface{}) error {
+	return nil
+}
+
+func (bdb *database) Rollback(tctx interface{}) error {
 	return nil
 }
 
