@@ -3,7 +3,7 @@ package memory
 /*
 - row index is fixed and never changes for the life of a row
 - methods in tableimpl.go should not be exported
-- use mutexes to protect syncronization
+- keep track of deleted rows and reuse them
 */
 
 import (
@@ -156,20 +156,16 @@ func (mdb *database) Commit(ctx session.Context, tx interface{}) error {
 	tctx := tx.(*tcontext)
 
 	for _, tbl := range tctx.tables {
-		for _, idx := range tbl.modifiedRows {
-			err := tbl.table.CheckRow("commit", idx, tctx.tid)
-			if err != nil {
-				return err
-			}
+		err := tbl.table.CheckRows("commit", tctx.tid, tbl.modifiedRows)
+		if err != nil {
+			return err
 		}
 	}
 
 	mdb.version += 1
 	v := mdb.version
 	for _, tbl := range tctx.tables {
-		for _, idx := range tbl.modifiedRows {
-			tbl.table.CommitRow(idx, v)
-		}
+		tbl.table.CommitRows(v, tbl.modifiedRows)
 	}
 	return nil
 }
@@ -177,18 +173,14 @@ func (mdb *database) Commit(ctx session.Context, tx interface{}) error {
 func (mdb *database) Rollback(tx interface{}) error {
 	tctx := tx.(*tcontext)
 	for _, tbl := range tctx.tables {
-		for _, idx := range tbl.modifiedRows {
-			err := tbl.table.CheckRow("rollback", idx, tctx.tid)
-			if err != nil {
-				return err
-			}
+		err := tbl.table.CheckRows("rollback", tctx.tid, tbl.modifiedRows)
+		if err != nil {
+			return err
 		}
 	}
 
 	for _, tbl := range tctx.tables {
-		for _, idx := range tbl.modifiedRows {
-			tbl.table.RollbackRow(idx)
-		}
+		tbl.table.RollbackRows(tbl.modifiedRows)
 	}
 	return nil
 }

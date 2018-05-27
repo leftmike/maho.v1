@@ -3,13 +3,14 @@ package memory
 import (
 	"fmt"
 	"io"
+	"sync"
 
 	"github.com/leftmike/maho/db"
 	"github.com/leftmike/maho/sql"
 )
 
 type tableImpl struct {
-	// mutex sync.RWMutex
+	mutex       sync.RWMutex
 	columns     []sql.Identifier
 	columnTypes []db.ColumnType
 	rows        []*rowImpl
@@ -30,6 +31,9 @@ func (mt *tableImpl) ColumnTypes(tctx *tcontext) []db.ColumnType {
 }
 
 func (mt *tableImpl) Insert(tctx *tcontext, values []sql.Value) (int, error) {
+	mt.mutex.Lock()
+	defer mt.mutex.Unlock()
+
 	mt.rows = append(mt.rows, &rowImpl{
 		version:  makeVersion(tctx.tid, tctx.cid),
 		values:   values,
@@ -39,6 +43,9 @@ func (mt *tableImpl) Insert(tctx *tcontext, values []sql.Value) (int, error) {
 }
 
 func (mt *tableImpl) Next(tctx *tcontext, dest []sql.Value, idx int) (int, error) {
+	mt.mutex.RLock()
+	defer mt.mutex.RUnlock()
+
 	for idx < len(mt.rows) {
 		values := mt.rows[idx].getValues(tctx)
 		if values != nil {
@@ -53,6 +60,9 @@ func (mt *tableImpl) Next(tctx *tcontext, dest []sql.Value, idx int) (int, error
 }
 
 func (mt *tableImpl) Delete(tctx *tcontext, idx int) error {
+	mt.mutex.Lock()
+	defer mt.mutex.Unlock()
+
 	row := mt.rows[idx].modifyValues(tctx, false)
 	if row == nil {
 		return fmt.Errorf("memory: update row: %d conflicting changes", idx)
@@ -62,6 +72,9 @@ func (mt *tableImpl) Delete(tctx *tcontext, idx int) error {
 }
 
 func (mt *tableImpl) Update(tctx *tcontext, updates []db.ColumnUpdate, idx int) error {
+	mt.mutex.Lock()
+	defer mt.mutex.Unlock()
+
 	row := mt.rows[idx].modifyValues(tctx, true)
 	if row == nil {
 		return fmt.Errorf("memory: update row: %d conflicting changes", idx)
@@ -73,23 +86,38 @@ func (mt *tableImpl) Update(tctx *tcontext, updates []db.ColumnUpdate, idx int) 
 	return nil
 }
 
-func (mt *tableImpl) CheckRow(s string, idx int, tid tid) error {
-	if idx >= len(mt.rows) || mt.rows[idx] == nil {
-		return fmt.Errorf("memory: %s: row: %d does not exist", s, idx)
-	}
-	row := mt.rows[idx]
-	if !row.version.isTransaction() || row.version.getTID() != tid {
-		return fmt.Errorf("memory: %s: row: %d not part of transaction: %d", s, idx, tid)
+func (mt *tableImpl) CheckRows(s string, tid tid, rows []int) error {
+	mt.mutex.RLock()
+	defer mt.mutex.RUnlock()
+
+	for _, idx := range rows {
+		if idx >= len(mt.rows) || mt.rows[idx] == nil {
+			return fmt.Errorf("memory: %s: row: %d does not exist", s, idx)
+		}
+		row := mt.rows[idx]
+		if !row.version.isTransaction() || row.version.getTID() != tid {
+			return fmt.Errorf("memory: %s: row: %d not part of transaction: %d", s, idx, tid)
+		}
 	}
 	return nil
 }
 
-func (mt *tableImpl) CommitRow(idx int, v version) {
-	mt.rows[idx].version = v
+func (mt *tableImpl) CommitRows(v version, rows []int) {
+	mt.mutex.Lock()
+	defer mt.mutex.Unlock()
+
+	for _, idx := range rows {
+		mt.rows[idx].version = v
+	}
 }
 
-func (mt *tableImpl) RollbackRow(idx int) {
-	mt.rows[idx] = mt.rows[idx].previous
+func (mt *tableImpl) RollbackRows(rows []int) {
+	mt.mutex.Lock()
+	defer mt.mutex.Unlock()
+
+	for _, idx := range rows {
+		mt.rows[idx] = mt.rows[idx].previous
+	}
 }
 
 func (mr *rowImpl) getValues(tctx *tcontext) []sql.Value {
