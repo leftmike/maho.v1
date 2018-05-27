@@ -98,6 +98,9 @@ func (mr *rowImpl) getValues(tctx *tcontext) []sql.Value {
 	}
 	if mr.version.isTransaction() {
 		if mr.version.getTID() == tctx.tid {
+			if mr.version.getCID() == tctx.cid {
+				return nil // The current command in this transaction has already seen this row.
+			}
 			return mr.values
 		}
 		return mr.previous.getValues(tctx)
@@ -125,5 +128,6 @@ func (mr *rowImpl) modifyValues(tctx *tcontext, update bool) *rowImpl {
 		}
 		return row
 	}
+	mr.version = makeVersion(tctx.tid, tctx.cid)
 	return mr
 }

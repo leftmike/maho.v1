@@ -71,6 +71,7 @@ type Database interface {
 	Begin() interface{}
 	Commit(ctx session.Context, tctx interface{}) error
 	Rollback(tctx interface{}) error
+	NextCommand(tctx interface{})
 }
 
 type databaseEntry struct {
@@ -215,6 +216,13 @@ func (tx *Transaction) Commit(ctx session.Context) error {
 func (tx *Transaction) Rollback() error {
 	return tx.forContexts(func(d Database, tctx interface{}) error {
 		return d.Rollback(tctx)
+	})
+}
+
+func (tx *Transaction) NextCommand() {
+	tx.forContexts(func(d Database, tctx interface{}) error {
+		d.NextCommand(tctx)
+		return nil
 	})
 }
 

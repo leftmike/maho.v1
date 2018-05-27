@@ -3,7 +3,6 @@ package memory
 /*
 - row index is fixed and never changes for the life of a row
 - methods in tableimpl.go should not be exported
-- use cid: increment after each command
 - use mutexes to protect syncronization
 */
 
@@ -192,6 +191,11 @@ func (mdb *database) Rollback(tx interface{}) error {
 		}
 	}
 	return nil
+}
+
+func (mdb *database) NextCommand(tx interface{}) {
+	tctx := tx.(*tcontext)
+	tctx.cid += 1
 }
 
 func (mt *table) Columns() []sql.Identifier {
