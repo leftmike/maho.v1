@@ -6,6 +6,7 @@ import (
 
 	"github.com/leftmike/maho/db"
 	"github.com/leftmike/maho/engine"
+	"github.com/leftmike/maho/execute"
 	"github.com/leftmike/maho/expr"
 	"github.com/leftmike/maho/session"
 	"github.com/leftmike/maho/sql"
@@ -46,7 +47,7 @@ func (dp *deletePlan) Execute(ctx session.Context, tx *engine.Transaction) (int6
 	}
 }
 
-func (stmt *Delete) Plan(ctx session.Context, tx *engine.Transaction) (interface{}, error) {
+func (stmt *Delete) Plan(ctx session.Context, tx *engine.Transaction) (execute.Plan, error) {
 	tbl, err := engine.LookupTable(ctx, tx, stmt.Table.Database, stmt.Table.Table)
 	if err != nil {
 		return nil, err

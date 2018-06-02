@@ -5,6 +5,7 @@ import (
 
 	"github.com/leftmike/maho/db"
 	"github.com/leftmike/maho/engine"
+	"github.com/leftmike/maho/execute"
 	"github.com/leftmike/maho/session"
 	"github.com/leftmike/maho/sql"
 )
@@ -34,7 +35,7 @@ func (stmt *CreateTable) String() string {
 	return s
 }
 
-func (stmt *CreateTable) Plan(ctx session.Context, tx *engine.Transaction) (interface{}, error) {
+func (stmt *CreateTable) Plan(ctx session.Context, tx *engine.Transaction) (execute.Plan, error) {
 	return stmt, nil
 }
 
@@ -59,7 +60,7 @@ func (stmt *CreateDatabase) String() string {
 	return s
 }
 
-func (stmt *CreateDatabase) Plan(ctx session.Context, tx *engine.Transaction) (interface{},
+func (stmt *CreateDatabase) Plan(ctx session.Context, tx *engine.Transaction) (execute.Plan,
 	error) {
 
 	return stmt, nil

@@ -4,6 +4,7 @@ import (
 	"fmt"
 
 	"github.com/leftmike/maho/engine"
+	"github.com/leftmike/maho/execute"
 	"github.com/leftmike/maho/expr"
 	"github.com/leftmike/maho/session"
 	"github.com/leftmike/maho/sql"
@@ -50,7 +51,7 @@ func (stmt *InsertValues) String() string {
 	return s
 }
 
-func (stmt *InsertValues) Plan(ctx session.Context, tx *engine.Transaction) (interface{}, error) {
+func (stmt *InsertValues) Plan(ctx session.Context, tx *engine.Transaction) (execute.Plan, error) {
 	return stmt, nil
 }
 

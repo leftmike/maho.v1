@@ -17,13 +17,9 @@ To Do:
 
 - session.Context --> ...; execute.NewSession()
 - different Session for different places: db.Session, engine.Session, execute.Session
-- engine.Rows and engine.Executer should be moved to execute
-type db.Session interface{Cancel} --> look at context in standard packages
-type engine.Session interface {Cancel, DefaultEngine, DefaultDatabase}
-type execute.Session interface {Cancel, DefaultEngine, DefaultDatabase, Transaction, SetTransaction}
-tye execute.Rows db.Rows
-type execute.Executor interface{Execute}
-type execute.Plan interface{}; parser.Stmt.Plan should return execute.Plan
+type db.Session interface{Done} --> look at context in standard packages
+type engine.Session interface {Done, DefaultEngine, DefaultDatabase}
+type execute.Session interface {Done, DefaultEngine, DefaultDatabase, Transaction, SetTransaction}
 
 - memory engine (w/ mvcc)
 - distributed memory engine, using raft
@@ -45,6 +41,7 @@ import (
 	"github.com/leftmike/maho/engine"
 	_ "github.com/leftmike/maho/engine/basic"
 	_ "github.com/leftmike/maho/engine/memory"
+	"github.com/leftmike/maho/execute"
 	"github.com/leftmike/maho/parser"
 	"github.com/leftmike/maho/session"
 	"github.com/leftmike/maho/sql"
@@ -70,7 +67,7 @@ func replSQL(p parser.Parser, w io.Writer) {
 			break
 		}
 
-		if exec, ok := ret.(engine.Executer); ok {
+		if exec, ok := ret.(execute.Executor); ok {
 			var cnt int64
 			cnt, err = exec.Execute(ctx, tx)
 			if err != nil {
@@ -78,7 +75,7 @@ func replSQL(p parser.Parser, w io.Writer) {
 				break
 			}
 			fmt.Printf("%d rows updated\n", cnt)
-		} else if rows, ok := ret.(engine.Rows); ok {
+		} else if rows, ok := ret.(execute.Rows); ok {
 			w := tabwriter.NewWriter(w, 0, 0, 1, ' ', tabwriter.AlignRight)
 
 			cols := rows.Columns()

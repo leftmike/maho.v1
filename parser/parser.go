@@ -9,6 +9,7 @@ import (
 	"github.com/leftmike/maho/datadef"
 	"github.com/leftmike/maho/db"
 	"github.com/leftmike/maho/engine"
+	"github.com/leftmike/maho/execute"
 	"github.com/leftmike/maho/expr"
 	"github.com/leftmike/maho/misc"
 	"github.com/leftmike/maho/parser/scanner"
@@ -20,7 +21,7 @@ import (
 
 type Stmt interface {
 	fmt.Stringer
-	Plan(ctx session.Context, tx *engine.Transaction) (interface{}, error)
+	Plan(ctx session.Context, tx *engine.Transaction) (execute.Plan, error)
 }
 
 type Parser interface {

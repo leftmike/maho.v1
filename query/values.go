@@ -6,6 +6,7 @@ import (
 
 	"github.com/leftmike/maho/db"
 	"github.com/leftmike/maho/engine"
+	"github.com/leftmike/maho/execute"
 	"github.com/leftmike/maho/expr"
 	"github.com/leftmike/maho/session"
 	"github.com/leftmike/maho/sql"
@@ -44,7 +45,7 @@ func (stmt *Values) String() string {
 	return s
 }
 
-func (stmt *Values) Plan(ctx session.Context, tx *engine.Transaction) (interface{}, error) {
+func (stmt *Values) Plan(ctx session.Context, tx *engine.Transaction) (execute.Plan, error) {
 	return stmt.Rows(tx)
 }
 

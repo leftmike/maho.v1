@@ -2,6 +2,7 @@ package misc
 
 import (
 	"github.com/leftmike/maho/engine"
+	"github.com/leftmike/maho/execute"
 	"github.com/leftmike/maho/session"
 )
 
@@ -11,7 +12,7 @@ func (stmt *Begin) String() string {
 	return "BEGIN"
 }
 
-func (stmt *Begin) Plan(ctx session.Context, tx *engine.Transaction) (interface{}, error) {
+func (stmt *Begin) Plan(ctx session.Context, tx *engine.Transaction) (execute.Plan, error) {
 	return stmt, nil
 }
 

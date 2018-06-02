@@ -6,6 +6,7 @@ import (
 
 	"github.com/leftmike/maho/db"
 	"github.com/leftmike/maho/engine"
+	"github.com/leftmike/maho/execute"
 	"github.com/leftmike/maho/expr"
 	"github.com/leftmike/maho/parser"
 	"github.com/leftmike/maho/query"
@@ -204,7 +205,7 @@ func statement(ctx session.Context, tx *engine.Transaction, s string) error {
 	if err != nil {
 		return err
 	}
-	_, err = ret.(engine.Executer).Execute(ctx, tx)
+	_, err = ret.(execute.Executor).Execute(ctx, tx)
 	return err
 }
 

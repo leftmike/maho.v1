@@ -2,6 +2,7 @@ package datadef
 
 import (
 	"github.com/leftmike/maho/engine"
+	"github.com/leftmike/maho/execute"
 	"github.com/leftmike/maho/session"
 	"github.com/leftmike/maho/sql"
 )
@@ -25,7 +26,7 @@ func (stmt *DropTable) String() string {
 	return s
 }
 
-func (stmt *DropTable) Plan(ctx session.Context, tx *engine.Transaction) (interface{}, error) {
+func (stmt *DropTable) Plan(ctx session.Context, tx *engine.Transaction) (execute.Plan, error) {
 	return stmt, nil
 }
 
