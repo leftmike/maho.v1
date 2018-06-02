@@ -27,6 +27,14 @@ ATTACH DATABASE database
 ```
 
 ```
+BEGIN
+```
+
+```
+COMMIT
+```
+
+```
 CREATE DATABASE database
     [WITH
         [PATH ['='] path]
@@ -76,7 +84,7 @@ INSERT INTO [database '.'] table ['(' column [',' ...] ')']
 ```
 
 ```
-VALUES '(' <expr> [',' ...] ')' [',' ...]
+ROLLBACK
 ```
 
 ```
@@ -104,6 +112,10 @@ SELECT <select-list>
 
 ```
 UPDATE [database '.'] table SET column '=' <expr> [',' ...] [WHERE <expr>]
+```
+
+```
+VALUES '(' <expr> [',' ...] ')' [',' ...]
 ```
 
 ```

@@ -235,12 +235,32 @@ func (p *parser) expectEndOfStatement() {
 }
 
 func (p *parser) parseStmt() Stmt {
-	switch p.expectReserved(sql.ATTACH, sql.CREATE, sql.DELETE, sql.DETACH, sql.DROP, sql.INSERT,
-		sql.SELECT, sql.SET, sql.UPDATE, sql.VALUES) {
+	switch p.expectReserved(
+		sql.ATTACH,
+		sql.BEGIN,
+		sql.COMMIT,
+		sql.CREATE,
+		sql.DELETE,
+		sql.DETACH,
+		sql.DROP,
+		sql.INSERT,
+		sql.ROLLBACK,
+		sql.SELECT,
+		sql.SET,
+		sql.START,
+		sql.UPDATE,
+		sql.VALUES,
+	) {
 	case sql.ATTACH:
 		// ATTACH DATABASE ...
 		p.expectReserved(sql.DATABASE)
 		return p.parseAttachDatabase()
+	case sql.BEGIN:
+		// BEGIN
+		return &misc.Begin{}
+	case sql.COMMIT:
+		// COMMIT
+		return &misc.Commit{}
 	case sql.CREATE:
 		switch p.expectReserved(sql.DATABASE, sql.TABLE) {
 		case sql.DATABASE:
@@ -266,12 +286,19 @@ func (p *parser) parseStmt() Stmt {
 		// INSERT INTO ...
 		p.expectReserved(sql.INTO)
 		return p.parseInsert()
+	case sql.ROLLBACK:
+		// ROLLBACK
+		return &misc.Rollback{}
 	case sql.SELECT:
 		// SELECT ...
 		return p.parseSelect()
 	case sql.SET:
 		// SET ...
 		return p.parseSet()
+	case sql.START:
+		// START TRANSACTION
+		p.expectReserved(sql.TRANSACTION)
+		return &misc.Begin{}
 	case sql.UPDATE:
 		// UPDATE ...
 		return p.parseUpdate()

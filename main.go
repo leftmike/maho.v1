@@ -8,6 +8,23 @@ To Do:
 
 - fuzzing: parser.Parse
 
+- BEGIN, START TRANSACTION
+- COMMIT
+- ROLLBACK
+- improve interactive execution
+- utility code for executing SQL
+- (rows #) after displaying rows
+
+- session.Context --> ...; execute.NewSession()
+- different Session for different places: db.Session, engine.Session, execute.Session
+- engine.Rows and engine.Executer should be moved to execute
+type db.Session interface{Cancel} --> look at context in standard packages
+type engine.Session interface {Cancel, DefaultEngine, DefaultDatabase}
+type execute.Session interface {Cancel, DefaultEngine, DefaultDatabase, Transaction, SetTransaction}
+tye execute.Rows db.Rows
+type execute.Executor interface{Execute}
+type execute.Plan interface{}; parser.Stmt.Plan should return execute.Plan
+
 - memory engine (w/ mvcc)
 - distributed memory engine, using raft
 - boltdb engine
