@@ -30,10 +30,10 @@ type Engine interface {
 	CreateDatabase(name sql.Identifier, path string, options Options) (Database, error)
 }
 
-type DatabaseState int
+type databaseState int
 
 const (
-	Attaching DatabaseState = iota
+	Attaching databaseState = iota
 	Creating
 	Detaching
 	ErrorAttaching
@@ -42,7 +42,7 @@ const (
 	Running
 )
 
-func (ds DatabaseState) String() string {
+func (ds databaseState) String() string {
 	switch ds {
 	case Attaching:
 		return "attaching"
@@ -76,7 +76,7 @@ type Database interface {
 
 type databaseEntry struct {
 	database Database
-	state    DatabaseState
+	state    databaseState
 	name     sql.Identifier
 	path     string
 	typ      string
@@ -93,7 +93,7 @@ var (
 )
 
 func newDatabaseEntry(eng string, name sql.Identifier, options Options,
-	state DatabaseState) (Engine, *databaseEntry, error) {
+	state databaseState) (Engine, *databaseEntry, error) {
 
 	mutex.Lock()
 	defer mutex.Unlock()
@@ -133,7 +133,7 @@ func setupDatabase(e Engine, de *databaseEntry, options Options) {
 	if de.state == Attaching {
 		d, de.err = e.AttachDatabase(de.name, de.path, options)
 	} else {
-		// de.state == creating
+		// de.state == Creating
 		d, de.err = e.CreateDatabase(de.name, de.path, options)
 	}
 
@@ -152,7 +152,7 @@ func setupDatabase(e Engine, de *databaseEntry, options Options) {
 	}
 }
 
-func prepareDatabase(eng string, name sql.Identifier, options Options, state DatabaseState) error {
+func prepareDatabase(eng string, name sql.Identifier, options Options, state databaseState) error {
 	e, de, err := newDatabaseEntry(eng, name, options, state)
 	if err != nil {
 		return err

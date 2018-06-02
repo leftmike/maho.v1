@@ -30,7 +30,6 @@ import (
 	_ "github.com/leftmike/maho/engine/basic"
 	_ "github.com/leftmike/maho/engine/memory"
 	"github.com/leftmike/maho/parser"
-	"github.com/leftmike/maho/plan"
 	"github.com/leftmike/maho/session"
 	"github.com/leftmike/maho/sql"
 )
@@ -55,7 +54,7 @@ func replSQL(p parser.Parser, w io.Writer) {
 			break
 		}
 
-		if exec, ok := ret.(plan.Executer); ok {
+		if exec, ok := ret.(engine.Executer); ok {
 			var cnt int64
 			cnt, err = exec.Execute(ctx, tx)
 			if err != nil {
@@ -63,7 +62,7 @@ func replSQL(p parser.Parser, w io.Writer) {
 				break
 			}
 			fmt.Printf("%d rows updated\n", cnt)
-		} else if rows, ok := ret.(plan.Rows); ok {
+		} else if rows, ok := ret.(engine.Rows); ok {
 			w := tabwriter.NewWriter(w, 0, 0, 1, ' ', tabwriter.AlignRight)
 
 			cols := rows.Columns()

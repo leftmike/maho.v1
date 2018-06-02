@@ -142,10 +142,10 @@ func (mr *rowImpl) getValues(tctx *tcontext) []sql.Value {
 func (mr *rowImpl) modifyValues(tctx *tcontext, update bool) *rowImpl {
 	if mr.version.isTransaction() {
 		if mr.version.getTID() != tctx.tid {
-			return nil
+			return nil // A different transaction has a pending modification.
 		}
 	} else if mr.version > tctx.version {
-		return nil
+		return nil // A newer version (than that of this transaction) of this row exists.
 	} else {
 		row := &rowImpl{
 			version:  makeVersion(tctx.tid, tctx.cid),

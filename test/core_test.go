@@ -8,7 +8,6 @@ import (
 
 	"github.com/leftmike/maho/engine"
 	"github.com/leftmike/maho/parser"
-	"github.com/leftmike/maho/plan"
 	"github.com/leftmike/maho/session"
 	"github.com/leftmike/maho/sql"
 )
@@ -58,9 +57,9 @@ func TestValuesSimple(t *testing.T) {
 			t.Errorf("Plan(%q) failed with %s", c.sql, err)
 			continue
 		}
-		rows, ok := ret.(plan.Rows)
+		rows, ok := ret.(engine.Rows)
 		if !ok {
-			t.Errorf("Plan(%q).(plan.Rows) failed", c.sql)
+			t.Errorf("Plan(%q).(engine.Rows) failed", c.sql)
 			continue
 		}
 		dest := make([]sql.Value, len(rows.Columns()))
