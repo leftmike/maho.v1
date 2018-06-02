@@ -147,6 +147,7 @@ func (stmt *Select) Rows(ctx session.Context, tx *engine.Transaction) (db.Rows, 
 
 	if stmt.From == nil {
 		rows = &oneEmptyRow{}
+		fctx = &fromContext{}
 	} else {
 		rows, fctx, err = stmt.From.rows(ctx, tx)
 		if err != nil {

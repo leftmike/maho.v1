@@ -7,7 +7,6 @@ To Do:
 - or "Operation(args) failed with %s" or "Operation(args) did not fail"
 
 - fuzzing: parser.Parse
-- get tests working on Windows
 
 - memory engine (w/ mvcc)
 - distributed memory engine, using raft

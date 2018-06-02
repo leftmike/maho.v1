@@ -149,7 +149,7 @@ func (p *parser) expectReserved(ids ...sql.Identifier) sql.Identifier {
 		}
 	}
 
-	p.error(fmt.Sprintf("expected keyword %s, got %s", msg, p.got()))
+	p.error(fmt.Sprintf("expected keyword %s; got %s", msg, p.got()))
 	return 0
 }
 
