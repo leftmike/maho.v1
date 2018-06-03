@@ -15,8 +15,6 @@ To Do:
 - utility code for executing SQL
 - (rows #) after displaying rows
 
-- add db.Session to Table methods
-
 - memory engine (w/ mvcc)
 - distributed memory engine, using raft
 - boltdb engine

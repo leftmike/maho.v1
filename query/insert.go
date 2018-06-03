@@ -60,8 +60,8 @@ func (stmt *InsertValues) Execute(ses execute.Session, tx *engine.Transaction) (
 		return 0, err
 	}
 
-	cols := tbl.Columns()
-	colTypes := tbl.ColumnTypes()
+	cols := tbl.Columns(ses)
+	colTypes := tbl.ColumnTypes(ses)
 	mv := len(cols)
 	c2v := make([]int, mv) // column number to value number
 	if stmt.Columns == nil {
@@ -120,7 +120,7 @@ func (stmt *InsertValues) Execute(ses execute.Session, tx *engine.Transaction) (
 			}
 		}
 
-		err := tbl.Insert(row)
+		err := tbl.Insert(ses, row)
 		if err != nil {
 			return 0, err
 		}

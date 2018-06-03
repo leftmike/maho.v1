@@ -5,8 +5,8 @@ import (
 )
 
 type Table interface {
-	Columns() []sql.Identifier
-	ColumnTypes() []ColumnType
-	Rows() (Rows, error)
-	Insert(row []sql.Value) error
+	Columns(ses Session) []sql.Identifier
+	ColumnTypes(ses Session) []ColumnType
+	Rows(ses Session) (Rows, error)
+	Insert(ses Session, row []sql.Value) error
 }

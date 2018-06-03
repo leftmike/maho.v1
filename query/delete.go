@@ -52,7 +52,7 @@ func (stmt *Delete) Plan(ses execute.Session, tx *engine.Transaction) (execute.P
 		return nil, err
 	}
 
-	rows, err := tbl.Rows()
+	rows, err := tbl.Rows(ses)
 	if err != nil {
 		return nil, err
 	}

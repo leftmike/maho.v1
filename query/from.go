@@ -27,7 +27,7 @@ func (fta FromTableAlias) rows(ses db.Session, tx *engine.Transaction) (db.Rows,
 	if err != nil {
 		return nil, nil, err
 	}
-	rows, err := tbl.Rows()
+	rows, err := tbl.Rows(ses)
 	if err != nil {
 		return nil, nil, err
 	}

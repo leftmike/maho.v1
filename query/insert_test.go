@@ -235,7 +235,7 @@ func testInsert(t *testing.T, dbnam, nam sql.Identifier, cols []sql.Identifier,
 				continue
 			}
 			var rows db.Rows
-			rows, err = tbl.Rows()
+			rows, err = tbl.Rows(ses)
 			if err != nil {
 				t.Errorf("(%s).Rows() failed with %s", nam, err)
 				continue

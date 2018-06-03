@@ -188,19 +188,19 @@ func (mdb *database) NextCommand(tx interface{}) {
 	tctx.cid += 1
 }
 
-func (mt *table) Columns() []sql.Identifier {
+func (mt *table) Columns(ses db.Session) []sql.Identifier {
 	return mt.table.getColumns(mt.tctx)
 }
 
-func (mt *table) ColumnTypes() []db.ColumnType {
+func (mt *table) ColumnTypes(ses db.Session) []db.ColumnType {
 	return mt.table.getColumnTypes(mt.tctx)
 }
 
-func (mt *table) Rows() (db.Rows, error) {
+func (mt *table) Rows(ses db.Session) (db.Rows, error) {
 	return &rows{table: mt}, nil
 }
 
-func (mt *table) Insert(row []sql.Value) error {
+func (mt *table) Insert(ses db.Session, row []sql.Value) error {
 	idx, err := mt.table.insert(mt.tctx, row)
 	if err != nil {
 		return err
@@ -210,7 +210,7 @@ func (mt *table) Insert(row []sql.Value) error {
 }
 
 func (mr *rows) Columns() []sql.Identifier {
-	return mr.table.Columns()
+	return mr.table.table.getColumns(mr.table.tctx)
 }
 
 func (mr *rows) Close() error {

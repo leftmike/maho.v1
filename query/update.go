@@ -92,7 +92,7 @@ func (stmt *Update) Plan(ses execute.Session, tx *engine.Transaction) (execute.P
 		return nil, err
 	}
 
-	rows, err := tbl.Rows()
+	rows, err := tbl.Rows(ses)
 	if err != nil {
 		return nil, err
 	}
@@ -106,8 +106,8 @@ func (stmt *Update) Plan(ses execute.Session, tx *engine.Transaction) (execute.P
 	}
 
 	plan := updatePlan{
-		columns: tbl.Columns(),
-		types:   tbl.ColumnTypes(),
+		columns: tbl.Columns(ses),
+		types:   tbl.ColumnTypes(ses),
 		rows:    rows,
 		updates: make([]columnUpdate, 0, len(stmt.ColumnUpdates)),
 	}

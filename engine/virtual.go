@@ -122,19 +122,19 @@ type virtualRows struct {
 	index   int
 }
 
-func (vt *VirtualTable) Columns() []sql.Identifier {
+func (vt *VirtualTable) Columns(ses db.Session) []sql.Identifier {
 	return vt.Cols
 }
 
-func (vt *VirtualTable) ColumnTypes() []db.ColumnType {
+func (vt *VirtualTable) ColumnTypes(ses db.Session) []db.ColumnType {
 	return vt.ColTypes
 }
 
-func (vt *VirtualTable) Rows() (db.Rows, error) {
+func (vt *VirtualTable) Rows(ses db.Session) (db.Rows, error) {
 	return &virtualRows{columns: vt.Cols, rows: vt.Values}, nil
 }
 
-func (vt *VirtualTable) Insert(row []sql.Value) error {
+func (vt *VirtualTable) Insert(ses db.Session, row []sql.Value) error {
 	return fmt.Errorf("virtual: table can not be modified")
 }
 
@@ -257,8 +257,8 @@ func makeColumnsVirtual(ses db.Session, tctx interface{}, d Database,
 					return nil, err
 				}
 			}
-			cols = tbl.Columns()
-			colTypes = tbl.ColumnTypes()
+			cols = tbl.Columns(ses)
+			colTypes = tbl.ColumnTypes(ses)
 		}
 		for i, ct := range colTypes {
 			var def sql.Value

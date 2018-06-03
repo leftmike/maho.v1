@@ -116,19 +116,19 @@ func (bdb *database) Rollback(tctx interface{}) error {
 
 func (bdb *database) NextCommand(tctx interface{}) {}
 
-func (bt *table) Columns() []sql.Identifier {
+func (bt *table) Columns(ses db.Session) []sql.Identifier {
 	return bt.columns
 }
 
-func (bt *table) ColumnTypes() []db.ColumnType {
+func (bt *table) ColumnTypes(ses db.Session) []db.ColumnType {
 	return bt.columnTypes
 }
 
-func (bt *table) Rows() (db.Rows, error) {
+func (bt *table) Rows(ses db.Session) (db.Rows, error) {
 	return &rows{columns: bt.columns, rows: bt.rows}, nil
 }
 
-func (bt *table) Insert(row []sql.Value) error {
+func (bt *table) Insert(ses db.Session, row []sql.Value) error {
 	bt.rows = append(bt.rows, row)
 	return nil
 }
