@@ -6,7 +6,6 @@ import (
 	"github.com/leftmike/maho/db"
 	"github.com/leftmike/maho/engine"
 	"github.com/leftmike/maho/execute"
-	"github.com/leftmike/maho/session"
 	"github.com/leftmike/maho/sql"
 )
 
@@ -35,12 +34,12 @@ func (stmt *CreateTable) String() string {
 	return s
 }
 
-func (stmt *CreateTable) Plan(ctx session.Context, tx *engine.Transaction) (execute.Plan, error) {
+func (stmt *CreateTable) Plan(ses execute.Session, tx *engine.Transaction) (execute.Plan, error) {
 	return stmt, nil
 }
 
-func (stmt *CreateTable) Execute(ctx session.Context, tx *engine.Transaction) (int64, error) {
-	return 0, engine.CreateTable(ctx, tx, stmt.Table.Database, stmt.Table.Table, stmt.Columns,
+func (stmt *CreateTable) Execute(ses execute.Session, tx *engine.Transaction) (int64, error) {
+	return 0, engine.CreateTable(ses, tx, stmt.Table.Database, stmt.Table.Table, stmt.Columns,
 		stmt.ColumnTypes)
 }
 
@@ -60,12 +59,12 @@ func (stmt *CreateDatabase) String() string {
 	return s
 }
 
-func (stmt *CreateDatabase) Plan(ctx session.Context, tx *engine.Transaction) (execute.Plan,
+func (stmt *CreateDatabase) Plan(ses execute.Session, tx *engine.Transaction) (execute.Plan,
 	error) {
 
 	return stmt, nil
 }
 
-func (stmt *CreateDatabase) Execute(ctx session.Context, tx *engine.Transaction) (int64, error) {
-	return 0, engine.CreateDatabase(ctx.DefaultEngine(), stmt.Database, stmt.Options)
+func (stmt *CreateDatabase) Execute(ses execute.Session, tx *engine.Transaction) (int64, error) {
+	return 0, engine.CreateDatabase(ses.DefaultEngine(), stmt.Database, stmt.Options)
 }

@@ -6,7 +6,6 @@ import (
 	"github.com/leftmike/maho/config"
 	"github.com/leftmike/maho/engine"
 	"github.com/leftmike/maho/execute"
-	"github.com/leftmike/maho/session"
 	"github.com/leftmike/maho/sql"
 )
 
@@ -19,10 +18,10 @@ func (stmt *Set) String() string {
 	return fmt.Sprintf("SET %s TO %s", stmt.Variable, stmt.Value)
 }
 
-func (stmt *Set) Plan(ctx session.Context, tx *engine.Transaction) (execute.Plan, error) {
+func (stmt *Set) Plan(ses execute.Session, tx *engine.Transaction) (execute.Plan, error) {
 	return stmt, nil
 }
 
-func (stmt *Set) Execute(ctx session.Context, tx *engine.Transaction) (int64, error) {
+func (stmt *Set) Execute(ses execute.Session, tx *engine.Transaction) (int64, error) {
 	return 0, config.Set(stmt.Variable.String(), stmt.Value)
 }

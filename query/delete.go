@@ -8,7 +8,6 @@ import (
 	"github.com/leftmike/maho/engine"
 	"github.com/leftmike/maho/execute"
 	"github.com/leftmike/maho/expr"
-	"github.com/leftmike/maho/session"
 	"github.com/leftmike/maho/sql"
 )
 
@@ -29,17 +28,17 @@ type deletePlan struct {
 	rows db.Rows
 }
 
-func (dp *deletePlan) Execute(ctx session.Context, tx *engine.Transaction) (int64, error) {
+func (dp *deletePlan) Execute(ses execute.Session, tx *engine.Transaction) (int64, error) {
 	dest := make([]sql.Value, len(dp.rows.Columns()))
 	cnt := int64(0)
 	for {
-		err := dp.rows.Next(ctx, dest)
+		err := dp.rows.Next(ses, dest)
 		if err == io.EOF {
 			return cnt, nil
 		} else if err != nil {
 			return cnt, err
 		}
-		err = dp.rows.Delete(ctx)
+		err = dp.rows.Delete(ses)
 		if err != nil {
 			return cnt, err
 		}
@@ -47,8 +46,8 @@ func (dp *deletePlan) Execute(ctx session.Context, tx *engine.Transaction) (int6
 	}
 }
 
-func (stmt *Delete) Plan(ctx session.Context, tx *engine.Transaction) (execute.Plan, error) {
-	tbl, err := engine.LookupTable(ctx, tx, stmt.Table.Database, stmt.Table.Table)
+func (stmt *Delete) Plan(ses execute.Session, tx *engine.Transaction) (execute.Plan, error) {
+	tbl, err := engine.LookupTable(ses, tx, stmt.Table.Database, stmt.Table.Table)
 	if err != nil {
 		return nil, err
 	}

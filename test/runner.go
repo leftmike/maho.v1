@@ -10,7 +10,6 @@ import (
 	"github.com/leftmike/maho/engine"
 	"github.com/leftmike/maho/execute"
 	"github.com/leftmike/maho/parser"
-	"github.com/leftmike/maho/session"
 	"github.com/leftmike/maho/sql"
 )
 
@@ -31,16 +30,16 @@ func (run *Runner) RunExec(tst *sqltest.Test) error {
 			return err
 		}
 		tx := engine.Begin()
-		ctx := session.NewContext(run.Type, run.Database)
-		ret, err := stmt.Plan(ctx, tx)
+		ses := execute.NewSession(run.Type, run.Database)
+		ret, err := stmt.Plan(ses, tx)
 		if err != nil {
 			return err
 		}
-		_, err = ret.(execute.Executor).Execute(ctx, tx)
+		_, err = ret.(execute.Executor).Execute(ses, tx)
 		if err != nil {
 			return err
 		}
-		err = tx.Commit(ctx)
+		err = tx.Commit(ses)
 		if err != nil {
 			return err
 		}
@@ -56,8 +55,8 @@ func (run *Runner) RunQuery(tst *sqltest.Test) ([]string, [][]string, error) {
 		return nil, nil, err
 	}
 	tx := engine.Begin()
-	ctx := session.NewContext(run.Type, run.Database)
-	ret, err := stmt.Plan(ctx, tx)
+	ses := execute.NewSession(run.Type, run.Database)
+	ret, err := stmt.Plan(ses, tx)
 	if err != nil {
 		return nil, nil, err
 	}
@@ -76,7 +75,7 @@ func (run *Runner) RunQuery(tst *sqltest.Test) ([]string, [][]string, error) {
 	var results [][]string
 	dest := make([]sql.Value, lenCols)
 	for {
-		err = rows.Next(ctx, dest)
+		err = rows.Next(ses, dest)
 		if err == io.EOF {
 			break
 		} else if err != nil {
@@ -94,7 +93,7 @@ func (run *Runner) RunQuery(tst *sqltest.Test) ([]string, [][]string, error) {
 		}
 		results = append(results, row)
 	}
-	err = tx.Commit(ctx)
+	err = tx.Commit(ses)
 	if err != nil {
 		return nil, nil, err
 	}

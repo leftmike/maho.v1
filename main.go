@@ -15,11 +15,11 @@ To Do:
 - utility code for executing SQL
 - (rows #) after displaying rows
 
-- session.Context --> ...; execute.NewSession()
+- delete session.Context
 - different Session for different places: db.Session, engine.Session, execute.Session
-type db.Session interface{Done} --> look at context in standard packages
-type engine.Session interface {Done, DefaultEngine, DefaultDatabase}
-type execute.Session interface {Done, DefaultEngine, DefaultDatabase, Transaction, SetTransaction}
+type db.Session interface{Context}
+type engine.Session interface {Context, DefaultEngine, DefaultDatabase}
+- add db.Session to Table methods
 
 - memory engine (w/ mvcc)
 - distributed memory engine, using raft
@@ -43,7 +43,6 @@ import (
 	_ "github.com/leftmike/maho/engine/memory"
 	"github.com/leftmike/maho/execute"
 	"github.com/leftmike/maho/parser"
-	"github.com/leftmike/maho/session"
 	"github.com/leftmike/maho/sql"
 )
 
@@ -60,8 +59,8 @@ func replSQL(p parser.Parser, w io.Writer) {
 		}
 
 		tx = engine.Begin()
-		ctx := session.NewContext(*eng, sql.ID(*database))
-		ret, err := stmt.Plan(ctx, tx)
+		ses := execute.NewSession(*eng, sql.ID(*database))
+		ret, err := stmt.Plan(ses, tx)
 		if err != nil {
 			fmt.Println(err)
 			break
@@ -69,7 +68,7 @@ func replSQL(p parser.Parser, w io.Writer) {
 
 		if exec, ok := ret.(execute.Executor); ok {
 			var cnt int64
-			cnt, err = exec.Execute(ctx, tx)
+			cnt, err = exec.Execute(ses, tx)
 			if err != nil {
 				fmt.Println(err)
 				break
@@ -93,7 +92,7 @@ func replSQL(p parser.Parser, w io.Writer) {
 			dest := make([]sql.Value, len(cols))
 			i := 1
 			for {
-				err = rows.Next(ctx, dest)
+				err = rows.Next(ses, dest)
 				if err != nil {
 					break
 				}
@@ -111,7 +110,7 @@ func replSQL(p parser.Parser, w io.Writer) {
 			}
 		}
 
-		err = tx.Commit(ctx)
+		err = tx.Commit(ses)
 		if err != nil {
 			fmt.Println(err)
 			return

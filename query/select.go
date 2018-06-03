@@ -137,8 +137,8 @@ func (stmt *Select) String() string {
 	return s
 }
 
-func (stmt *Select) Plan(ctx session.Context, tx *engine.Transaction) (execute.Plan, error) {
-	return stmt.Rows(ctx, tx)
+func (stmt *Select) Plan(ses execute.Session, tx *engine.Transaction) (execute.Plan, error) {
+	return stmt.Rows(ses, tx)
 }
 
 func (stmt *Select) Rows(ctx session.Context, tx *engine.Transaction) (db.Rows, error) {

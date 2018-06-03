@@ -9,7 +9,6 @@ import (
 	"github.com/leftmike/maho/engine"
 	"github.com/leftmike/maho/execute"
 	"github.com/leftmike/maho/parser"
-	"github.com/leftmike/maho/session"
 	"github.com/leftmike/maho/sql"
 )
 
@@ -46,8 +45,8 @@ func TestValuesSimple(t *testing.T) {
 			continue
 		}
 		tx := engine.Begin()
-		ctx := session.NewContext("basic", sql.ID("core_test"))
-		ret, err := stmt.Plan(ctx, tx)
+		ses := execute.NewSession("basic", sql.ID("core_test"))
+		ret, err := stmt.Plan(ses, tx)
 		if c.fail {
 			if err == nil {
 				t.Errorf("Plan(%q) did not fail", c.sql)
@@ -65,7 +64,7 @@ func TestValuesSimple(t *testing.T) {
 		}
 		dest := make([]sql.Value, len(rows.Columns()))
 		for i, r := range c.rows {
-			if rows.Next(ctx, dest) != nil {
+			if rows.Next(ses, dest) != nil {
 				t.Errorf("Plan(%q).Rows() got %d rows; want %d rows", c.sql, i, len(c.rows))
 				break
 			}

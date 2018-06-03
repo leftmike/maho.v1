@@ -10,7 +10,6 @@ import (
 	"github.com/leftmike/maho/expr"
 	"github.com/leftmike/maho/parser"
 	"github.com/leftmike/maho/query"
-	"github.com/leftmike/maho/session"
 	"github.com/leftmike/maho/sql"
 	"github.com/leftmike/maho/testutil"
 )
@@ -195,33 +194,33 @@ func TestInsert(t *testing.T) {
 		insertCases3)
 }
 
-func statement(ctx session.Context, tx *engine.Transaction, s string) error {
+func statement(ses execute.Session, tx *engine.Transaction, s string) error {
 	p := parser.NewParser(strings.NewReader(s), "statement")
 	stmt, err := p.Parse()
 	if err != nil {
 		return err
 	}
-	ret, err := stmt.Plan(ctx, tx)
+	ret, err := stmt.Plan(ses, tx)
 	if err != nil {
 		return err
 	}
-	_, err = ret.(execute.Executor).Execute(ctx, tx)
+	_, err = ret.(execute.Executor).Execute(ses, tx)
 	return err
 }
 
 func testInsert(t *testing.T, dbnam, nam sql.Identifier, cols []sql.Identifier,
 	colTypes []db.ColumnType, cases []insertCase) {
 
-	ctx := session.NewContext("basic", sql.ID("test"))
+	ses := execute.NewSession("basic", sql.ID("test"))
 	for _, c := range cases {
 		tx := engine.Begin()
-		err := engine.CreateTable(ctx, tx, dbnam, nam, cols, colTypes)
+		err := engine.CreateTable(ses, tx, dbnam, nam, cols, colTypes)
 		if err != nil {
 			t.Error(err)
 			return
 		}
 
-		err = statement(ctx, tx, c.stmt)
+		err = statement(ses, tx, c.stmt)
 		if c.fail {
 			if err == nil {
 				t.Errorf("Parse(\"%s\").Execute() did not fail", c.stmt)
@@ -230,7 +229,7 @@ func testInsert(t *testing.T, dbnam, nam sql.Identifier, cols []sql.Identifier,
 			t.Errorf("Parse(\"%s\").Execute() failed with %s", c.stmt, err.Error())
 		} else {
 			var tbl db.Table
-			tbl, err = engine.LookupTable(ctx, tx, dbnam, nam)
+			tbl, err = engine.LookupTable(ses, tx, dbnam, nam)
 			if err != nil {
 				t.Error(err)
 				continue
@@ -242,7 +241,7 @@ func testInsert(t *testing.T, dbnam, nam sql.Identifier, cols []sql.Identifier,
 				continue
 			}
 			var all [][]sql.Value
-			all, err = query.AllRows(ctx, rows)
+			all, err = query.AllRows(ses, rows)
 			if err != nil {
 				t.Errorf("(%s).Rows().Next() failed with %s", nam, err)
 				continue
@@ -253,7 +252,7 @@ func testInsert(t *testing.T, dbnam, nam sql.Identifier, cols []sql.Identifier,
 			}
 		}
 
-		err = engine.DropTable(ctx, tx, dbnam, nam, false)
+		err = engine.DropTable(ses, tx, dbnam, nam, false)
 		if err != nil {
 			t.Error(err)
 			return

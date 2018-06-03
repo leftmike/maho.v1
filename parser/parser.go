@@ -15,13 +15,12 @@ import (
 	"github.com/leftmike/maho/parser/scanner"
 	"github.com/leftmike/maho/parser/token"
 	"github.com/leftmike/maho/query"
-	"github.com/leftmike/maho/session"
 	"github.com/leftmike/maho/sql"
 )
 
 type Stmt interface {
 	fmt.Stringer
-	Plan(ctx session.Context, tx *engine.Transaction) (execute.Plan, error)
+	Plan(ses execute.Session, tx *engine.Transaction) (execute.Plan, error)
 }
 
 type Parser interface {

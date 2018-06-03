@@ -6,7 +6,6 @@ import (
 	"github.com/leftmike/maho/engine"
 	"github.com/leftmike/maho/execute"
 	"github.com/leftmike/maho/expr"
-	"github.com/leftmike/maho/session"
 	"github.com/leftmike/maho/sql"
 )
 
@@ -51,12 +50,12 @@ func (stmt *InsertValues) String() string {
 	return s
 }
 
-func (stmt *InsertValues) Plan(ctx session.Context, tx *engine.Transaction) (execute.Plan, error) {
+func (stmt *InsertValues) Plan(ses execute.Session, tx *engine.Transaction) (execute.Plan, error) {
 	return stmt, nil
 }
 
-func (stmt *InsertValues) Execute(ctx session.Context, tx *engine.Transaction) (int64, error) {
-	tbl, err := engine.LookupTable(ctx, tx, stmt.Table.Database, stmt.Table.Table)
+func (stmt *InsertValues) Execute(ses execute.Session, tx *engine.Transaction) (int64, error) {
+	tbl, err := engine.LookupTable(ses, tx, stmt.Table.Database, stmt.Table.Table)
 	if err != nil {
 		return 0, err
 	}

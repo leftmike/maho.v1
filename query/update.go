@@ -8,7 +8,6 @@ import (
 	"github.com/leftmike/maho/engine"
 	"github.com/leftmike/maho/execute"
 	"github.com/leftmike/maho/expr"
-	"github.com/leftmike/maho/session"
 	"github.com/leftmike/maho/sql"
 )
 
@@ -54,13 +53,13 @@ func (up *updatePlan) EvalRef(idx int) sql.Value {
 	return up.dest[idx]
 }
 
-func (up *updatePlan) Execute(ctx session.Context, tx *engine.Transaction) (int64, error) {
+func (up *updatePlan) Execute(ses execute.Session, tx *engine.Transaction) (int64, error) {
 	up.dest = make([]sql.Value, len(up.rows.Columns()))
 	cnt := int64(0)
 	updates := make([]db.ColumnUpdate, len(up.updates))
 
 	for {
-		err := up.rows.Next(ctx, up.dest)
+		err := up.rows.Next(ses, up.dest)
 		if err == io.EOF {
 			return cnt, nil
 		} else if err != nil {
@@ -79,7 +78,7 @@ func (up *updatePlan) Execute(ctx session.Context, tx *engine.Transaction) (int6
 			}
 			updates[idx] = db.ColumnUpdate{Index: cdx, Value: val}
 		}
-		err = up.rows.Update(ctx, updates)
+		err = up.rows.Update(ses, updates)
 		if err != nil {
 			return cnt, err
 		}
@@ -87,8 +86,8 @@ func (up *updatePlan) Execute(ctx session.Context, tx *engine.Transaction) (int6
 	}
 }
 
-func (stmt *Update) Plan(ctx session.Context, tx *engine.Transaction) (execute.Plan, error) {
-	tbl, err := engine.LookupTable(ctx, tx, stmt.Table.Database, stmt.Table.Table)
+func (stmt *Update) Plan(ses execute.Session, tx *engine.Transaction) (execute.Plan, error) {
+	tbl, err := engine.LookupTable(ses, tx, stmt.Table.Database, stmt.Table.Table)
 	if err != nil {
 		return nil, err
 	}
