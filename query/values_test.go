@@ -67,9 +67,9 @@ func TestValues(t *testing.T) {
 	}
 
 	startEngine(t)
-	tx := engine.Begin()
 	ses := execute.NewSession("basic", sql.ID("test"))
 	for _, c := range cases {
+		tx := engine.Begin()
 		if c.values.String() != c.s {
 			t.Errorf("(%v).String() got %q want %q", c.values, c.values.String(), c.s)
 			continue
@@ -91,6 +91,11 @@ func TestValues(t *testing.T) {
 		var trc string
 		if !testutil.DeepEqual(all, c.rows, &trc) {
 			t.Errorf("(%v).Rows() got %v want %v\n%s", c.values, all, c.rows, trc)
+		}
+
+		err = tx.Commit(ses)
+		if err != nil {
+			t.Error(err)
 		}
 	}
 }
@@ -172,6 +177,11 @@ func TestFromValues(t *testing.T) {
 		var trc string
 		if !testutil.DeepEqual(all, c.rows, &trc) {
 			t.Errorf("(%v).Rows() got %v want %v\n%s", c.from, all, c.rows, trc)
+		}
+
+		err = tx.Commit(ses)
+		if err != nil {
+			t.Error(err)
 		}
 	}
 }

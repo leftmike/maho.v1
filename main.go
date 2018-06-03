@@ -13,7 +13,6 @@ To Do:
 - ROLLBACK
 - improve interactive execution
 - utility code for executing SQL
-- (rows #) after displaying rows
 
 - memory engine (w/ mvcc)
 - distributed memory engine, using raft
@@ -41,79 +40,74 @@ import (
 )
 
 func replSQL(p parser.Parser, w io.Writer) {
-	var tx *engine.Transaction
+	ses := execute.NewSession(*eng, sql.ID(*database))
 	for {
 		stmt, err := p.Parse()
 		if err == io.EOF {
 			return
 		}
 		if err != nil {
-			fmt.Println(err)
-			return
+			fmt.Fprintln(w, err)
+			continue
 		}
 
-		tx = engine.Begin()
-		ses := execute.NewSession(*eng, sql.ID(*database))
-		ret, err := stmt.Plan(ses, tx)
-		if err != nil {
-			fmt.Println(err)
-			break
-		}
-
-		if exec, ok := ret.(execute.Executor); ok {
-			var cnt int64
-			cnt, err = exec.Execute(ses, tx)
-			if err != nil {
-				fmt.Println(err)
-				break
-			}
-			fmt.Printf("%d rows updated\n", cnt)
-		} else if rows, ok := ret.(execute.Rows); ok {
-			w := tabwriter.NewWriter(w, 0, 0, 1, ' ', tabwriter.AlignRight)
-
-			cols := rows.Columns()
-			fmt.Fprint(w, "\t")
-			for _, col := range cols {
-				fmt.Fprintf(w, "%s\t", col)
-			}
-			fmt.Fprint(w, "\n\t")
-			for _, col := range cols {
-				fmt.Fprintf(w, "%s\t", strings.Repeat("-", len(col.String())))
-
-			}
-			fmt.Fprintln(w)
-
-			dest := make([]sql.Value, len(cols))
-			i := 1
-			for {
-				err = rows.Next(ses, dest)
+		err = ses.Run(stmt,
+			func(tx *engine.Transaction, stmt execute.Stmt) error {
+				ret, err := stmt.Plan(ses, tx)
 				if err != nil {
-					break
+					return err
 				}
-				fmt.Fprintf(w, "%d\t", i)
-				for _, v := range dest {
-					fmt.Fprintf(w, "%s\t", sql.Format(v))
-				}
-				fmt.Fprintln(w)
-				i += 1
-			}
-			w.Flush()
-			if err != io.EOF {
-				fmt.Println(err)
-				break
-			}
-		}
 
-		err = tx.Commit(ses)
+				if exec, ok := ret.(execute.Executor); ok {
+					var cnt int64
+					cnt, err = exec.Execute(ses, tx)
+					if err != nil {
+						return err
+					}
+					if cnt >= 0 {
+						fmt.Fprintf(w, "%d rows updated\n", cnt)
+					}
+				} else if rows, ok := ret.(execute.Rows); ok {
+					w := tabwriter.NewWriter(w, 0, 0, 1, ' ', tabwriter.AlignRight)
+
+					cols := rows.Columns()
+					fmt.Fprint(w, "\t")
+					for _, col := range cols {
+						fmt.Fprintf(w, "%s\t", col)
+					}
+					fmt.Fprint(w, "\n\t")
+					for _, col := range cols {
+						fmt.Fprintf(w, "%s\t", strings.Repeat("-", len(col.String())))
+
+					}
+					fmt.Fprintln(w)
+
+					dest := make([]sql.Value, len(cols))
+					i := 1
+					for {
+						err = rows.Next(ses, dest)
+						if err != nil {
+							break
+						}
+						fmt.Fprintf(w, "%d\t", i)
+						for _, v := range dest {
+							fmt.Fprintf(w, "%s\t", sql.Format(v))
+						}
+						fmt.Fprintln(w)
+						i += 1
+					}
+					fmt.Fprintf(w, "(%d rows)\n", i-1)
+					w.Flush()
+					if err != io.EOF {
+						return err
+					}
+				}
+				return nil
+			})
+
 		if err != nil {
-			fmt.Println(err)
-			return
+			fmt.Fprintln(w, err)
 		}
-	}
-
-	err := tx.Rollback()
-	if err != nil {
-		fmt.Println(err)
 	}
 }
 

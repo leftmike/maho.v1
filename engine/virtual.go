@@ -108,7 +108,7 @@ func (vdb *virtualDatabase) Rollback(tctx interface{}) error {
 	return nil
 }
 
-func (vdb *virtualDatabase) NextCommand(tctx interface{}) {}
+func (vdb *virtualDatabase) NextStmt(tctx interface{}) {}
 
 type VirtualTable struct {
 	Cols     []sql.Identifier

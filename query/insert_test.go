@@ -186,15 +186,16 @@ func TestInsert(t *testing.T) {
 	}
 
 	startEngine(t)
-	testInsert(t, sql.ID("test"), sql.ID("t"), insertColumns1, insertColumnTypes1,
+	ses := execute.NewSession("basic", sql.ID("test"))
+	testInsert(t, ses, sql.ID("test"), sql.ID("t"), insertColumns1, insertColumnTypes1,
 		insertCases1)
-	testInsert(t, sql.ID("test"), sql.ID("t2"), insertColumns2, insertColumnTypes2,
+	testInsert(t, ses, sql.ID("test"), sql.ID("t2"), insertColumns2, insertColumnTypes2,
 		insertCases2)
-	testInsert(t, sql.ID("test"), sql.ID("t3"), insertColumns3, insertColumnTypes3,
+	testInsert(t, ses, sql.ID("test"), sql.ID("t3"), insertColumns3, insertColumnTypes3,
 		insertCases3)
 }
 
-func statement(ses execute.Session, tx *engine.Transaction, s string) error {
+func statement(ses *execute.Session, tx *engine.Transaction, s string) error {
 	p := parser.NewParser(strings.NewReader(s), "statement")
 	stmt, err := p.Parse()
 	if err != nil {
@@ -208,10 +209,9 @@ func statement(ses execute.Session, tx *engine.Transaction, s string) error {
 	return err
 }
 
-func testInsert(t *testing.T, dbnam, nam sql.Identifier, cols []sql.Identifier,
-	colTypes []db.ColumnType, cases []insertCase) {
+func testInsert(t *testing.T, ses *execute.Session, dbnam, nam sql.Identifier,
+	cols []sql.Identifier, colTypes []db.ColumnType, cases []insertCase) {
 
-	ses := execute.NewSession("basic", sql.ID("test"))
 	for _, c := range cases {
 		tx := engine.Begin()
 		err := engine.CreateTable(ses, tx, dbnam, nam, cols, colTypes)
@@ -253,6 +253,12 @@ func testInsert(t *testing.T, dbnam, nam sql.Identifier, cols []sql.Identifier,
 		}
 
 		err = engine.DropTable(ses, tx, dbnam, nam, false)
+		if err != nil {
+			t.Error(err)
+			return
+		}
+
+		err = tx.Commit(ses)
 		if err != nil {
 			t.Error(err)
 			return

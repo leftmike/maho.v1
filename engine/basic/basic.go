@@ -114,7 +114,7 @@ func (bdb *database) Rollback(tctx interface{}) error {
 	return nil
 }
 
-func (bdb *database) NextCommand(tctx interface{}) {}
+func (bdb *database) NextStmt(tctx interface{}) {}
 
 func (bt *table) Columns(ses db.Session) []sql.Identifier {
 	return bt.columns

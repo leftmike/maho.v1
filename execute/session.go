@@ -2,47 +2,78 @@ package execute
 
 import (
 	"context"
+	"fmt"
 
-	"github.com/leftmike/maho/db"
 	"github.com/leftmike/maho/engine"
 	"github.com/leftmike/maho/sql"
 )
 
-type Session interface {
-	db.Session
-	Transaction() *engine.Transaction
-	SetTransaction(tx *engine.Transaction)
-}
-
-type session struct {
+type Session struct {
 	eng  string
 	name sql.Identifier
 	tx   *engine.Transaction
 }
 
-func NewSession(eng string, name sql.Identifier) Session {
-	return &session{
+func NewSession(eng string, name sql.Identifier) *Session {
+	return &Session{
 		eng:  eng,
 		name: name,
 	}
 }
 
-func (ses *session) Context() context.Context {
+func (ses *Session) Context() context.Context {
 	return nil
 }
 
-func (ses *session) DefaultEngine() string {
+func (ses *Session) DefaultEngine() string {
 	return ses.eng
 }
 
-func (ses *session) DefaultDatabase() sql.Identifier {
+func (ses *Session) DefaultDatabase() sql.Identifier {
 	return ses.name
 }
 
-func (ses *session) Transaction() *engine.Transaction {
-	return ses.tx
+func (ses *Session) Begin() error {
+	if ses.tx != nil {
+		return fmt.Errorf("execute: session already has active transaction")
+	}
+	ses.tx = engine.Begin()
+	return nil
 }
 
-func (ses *session) SetTransaction(tx *engine.Transaction) {
-	ses.tx = tx
+func (ses *Session) Commit() error {
+	if ses.tx == nil {
+		return fmt.Errorf("execute: session does not have active transaction")
+	}
+	err := ses.tx.Commit(ses)
+	ses.tx = nil
+	return err
+}
+
+func (ses *Session) Rollback() error {
+	if ses.tx == nil {
+		return fmt.Errorf("execute: session does not have active transaction")
+	}
+	err := ses.tx.Rollback()
+	ses.tx = nil
+	return err
+}
+
+func (ses *Session) Run(stmt Stmt, run func(tx *engine.Transaction, stmt Stmt) error) error {
+	if ses.tx != nil {
+		ses.tx.NextStmt()
+		return run(ses.tx, stmt)
+	}
+
+	tx := engine.Begin()
+	err := run(tx, stmt)
+	if err != nil {
+		rerr := tx.Rollback()
+		if rerr != nil {
+			err = fmt.Errorf("%s; rollback: %s", err, rerr)
+		}
+	} else {
+		err = tx.Commit(ses)
+	}
+	return err
 }

@@ -183,7 +183,7 @@ func (mdb *database) Rollback(tx interface{}) error {
 	return nil
 }
 
-func (mdb *database) NextCommand(tx interface{}) {
+func (mdb *database) NextStmt(tx interface{}) {
 	tctx := tx.(*tcontext)
 	tctx.cid += 1
 }

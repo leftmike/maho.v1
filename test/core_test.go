@@ -37,6 +37,7 @@ func TestValuesSimple(t *testing.T) {
 		t.Fatal(err)
 	}
 
+	ses := execute.NewSession("basic", sql.ID("core_test"))
 	for i, c := range cases {
 		p := parser.NewParser(strings.NewReader(c.sql), fmt.Sprintf("tests[%d]", i))
 		stmt, err := p.Parse()
@@ -45,7 +46,6 @@ func TestValuesSimple(t *testing.T) {
 			continue
 		}
 		tx := engine.Begin()
-		ses := execute.NewSession("basic", sql.ID("core_test"))
 		ret, err := stmt.Plan(ses, tx)
 		if c.fail {
 			if err == nil {
@@ -72,6 +72,11 @@ func TestValuesSimple(t *testing.T) {
 				t.Errorf("Plan(%q).Rows()[%d] got %q want %q", c.sql, i, dest, r)
 				break
 			}
+		}
+
+		err = tx.Commit(ses)
+		if err != nil {
+			t.Error(err)
 		}
 	}
 }

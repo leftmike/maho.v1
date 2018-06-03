@@ -11,10 +11,10 @@ func (stmt *Rollback) String() string {
 	return "ROLLBACK"
 }
 
-func (stmt *Rollback) Plan(ses execute.Session, tx *engine.Transaction) (execute.Plan, error) {
+func (stmt *Rollback) Plan(ses *execute.Session, tx *engine.Transaction) (execute.Plan, error) {
 	return stmt, nil
 }
 
-func (stmt *Rollback) Execute(ses execute.Session, tx *engine.Transaction) (int64, error) {
-	return 0, nil // XXX
+func (stmt *Rollback) Execute(ses *execute.Session, tx *engine.Transaction) (int64, error) {
+	return -1, ses.Rollback()
 }

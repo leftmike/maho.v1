@@ -9,9 +9,6 @@ import (
 
 func TestContext(t *testing.T) {
 	ses := execute.NewSession("engine", sql.ID("name"))
-	if _, ok := ses.(execute.Session); !ok {
-		t.Errorf("NewSession() got %T want execute.Session", ses)
-	}
 	if ses.DefaultEngine() != "engine" {
 		t.Errorf("DefaultEngine() got %q want %q", ses.DefaultEngine(), "engine")
 	}

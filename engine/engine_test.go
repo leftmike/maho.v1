@@ -127,12 +127,12 @@ func (tdb *testDatabase) Rollback(tx interface{}) error {
 	return nil
 }
 
-func (tdb *testDatabase) NextCommand(tx interface{}) {
+func (tdb *testDatabase) NextStmt(tx interface{}) {
 	tctx := tx.(*tcontext)
 	if tctx.tdb != tdb {
 		panic("tctx.tdb != tdb")
 	}
-	tdb.te.op("NextCommand")
+	tdb.te.op("NextStmt")
 }
 
 type tcontext struct {
@@ -222,8 +222,8 @@ func TestDatabase(t *testing.T) {
 	if err != nil {
 		t.Errorf("CreateTable(table1) failed with %s", err)
 	}
-	tx.NextCommand()
-	tx.NextCommand()
+	tx.NextStmt()
+	tx.NextStmt()
 	err = tx.Commit(ses)
 	if err != nil {
 		t.Errorf("Commit() failed with %s", err)
@@ -231,8 +231,8 @@ func TestDatabase(t *testing.T) {
 	te.checkOps(t, []testOp{
 		{op: "Begin"},
 		{op: "CreateTable", args: []string{"table1"}},
-		{op: "NextCommand"},
-		{op: "NextCommand"},
+		{op: "NextStmt"},
+		{op: "NextStmt"},
 		{op: "Commit"},
 	})
 

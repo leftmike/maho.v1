@@ -24,12 +24,12 @@ func (stmt *AttachDatabase) String() string {
 	return s
 }
 
-func (stmt *AttachDatabase) Plan(ses execute.Session, tx *engine.Transaction) (execute.Plan,
+func (stmt *AttachDatabase) Plan(ses *execute.Session, tx *engine.Transaction) (execute.Plan,
 	error) {
 
 	return stmt, nil
 }
 
-func (stmt *AttachDatabase) Execute(ses execute.Session, tx *engine.Transaction) (int64, error) {
-	return 0, engine.AttachDatabase(ses.DefaultEngine(), stmt.Database, stmt.Options)
+func (stmt *AttachDatabase) Execute(ses *execute.Session, tx *engine.Transaction) (int64, error) {
+	return -1, engine.AttachDatabase(ses.DefaultEngine(), stmt.Database, stmt.Options)
 }

@@ -8,7 +8,6 @@ import (
 
 	"github.com/leftmike/maho/datadef"
 	"github.com/leftmike/maho/db"
-	"github.com/leftmike/maho/engine"
 	"github.com/leftmike/maho/execute"
 	"github.com/leftmike/maho/expr"
 	"github.com/leftmike/maho/misc"
@@ -18,13 +17,8 @@ import (
 	"github.com/leftmike/maho/sql"
 )
 
-type Stmt interface {
-	fmt.Stringer
-	Plan(ses execute.Session, tx *engine.Transaction) (execute.Plan, error)
-}
-
 type Parser interface {
-	Parse() (Stmt, error)
+	Parse() (execute.Stmt, error)
 	ParseExpr() (expr.Expr, error)
 }
 
@@ -49,7 +43,7 @@ func newParser(rr io.RuneReader, fn string) *parser {
 	return &p
 }
 
-func (p *parser) Parse() (stmt Stmt, err error) {
+func (p *parser) Parse() (stmt execute.Stmt, err error) {
 	if p.scan() == token.EOF {
 		return nil, io.EOF
 	}
@@ -234,7 +228,7 @@ func (p *parser) expectEndOfStatement() {
 	}
 }
 
-func (p *parser) parseStmt() Stmt {
+func (p *parser) parseStmt() execute.Stmt {
 	switch p.expectReserved(
 		sql.ATTACH,
 		sql.BEGIN,
@@ -357,7 +351,7 @@ func (p *parser) parseColumnAliases() []sql.Identifier {
 	return cols
 }
 
-func (p *parser) parseCreateTable() Stmt {
+func (p *parser) parseCreateTable() execute.Stmt {
 	// CREATE TABLE ...
 	var s datadef.CreateTable
 	s.Table = p.parseTableName()
@@ -469,7 +463,7 @@ func (p *parser) parseCreateColumns(s *datadef.CreateTable) {
 	}
 }
 
-func (p *parser) parseDelete() Stmt {
+func (p *parser) parseDelete() execute.Stmt {
 	// DELETE FROM [database '.'] table [WHERE <expr>]
 	var s query.Delete
 	s.Table = p.parseTableName()
@@ -480,7 +474,7 @@ func (p *parser) parseDelete() Stmt {
 	return &s
 }
 
-func (p *parser) parseDropTable() Stmt {
+func (p *parser) parseDropTable() execute.Stmt {
 	// DROP TABLE [IF EXISTS] [database '.' ] table [',' ...]
 	var s datadef.DropTable
 	if p.optionalReserved(sql.IF) {
@@ -669,7 +663,7 @@ func (p *parser) parseSubExpr() expr.Expr {
 	return &expr.Binary{Op: op, Left: e, Right: p.parseSubExpr()}
 }
 
-func (p *parser) parseInsert() Stmt {
+func (p *parser) parseInsert() execute.Stmt {
 	/*
 		INSERT INTO [database '.'] table ['(' column [',' ...] ')']
 			VALUES '(' <expr> | DEFAULT [',' ...] ')' [',' ...]
@@ -952,7 +946,7 @@ func (p *parser) parseFromList() query.FromItem {
 	return fi
 }
 
-func (p *parser) parseUpdate() Stmt {
+func (p *parser) parseUpdate() execute.Stmt {
 	// UPDATE [database '.'] table SET column '=' <expr> [',' ...] [WHERE <expr>]
 	var s query.Update
 	s.Table = p.parseTableName()
@@ -976,7 +970,7 @@ func (p *parser) parseUpdate() Stmt {
 	return &s
 }
 
-func (p *parser) parseSet() Stmt {
+func (p *parser) parseSet() execute.Stmt {
 	// SET variable ( TO | '=' ) <literal>
 	var s misc.Set
 
@@ -1032,7 +1026,7 @@ func (p *parser) parseOptions() map[sql.Identifier]string {
 	return options
 }
 
-func (p *parser) parseAttachDatabase() Stmt {
+func (p *parser) parseAttachDatabase() execute.Stmt {
 	// ATTACH DATABASE database [ [ WITH ] [ PATH [ '=' ] path ] [ ENGINE [ '=' ] engine ] ]
 	var s datadef.AttachDatabase
 
@@ -1043,7 +1037,7 @@ func (p *parser) parseAttachDatabase() Stmt {
 	return &s
 }
 
-func (p *parser) parseCreateDatabase() Stmt {
+func (p *parser) parseCreateDatabase() execute.Stmt {
 	// CREATE DATABASE database [ [ WITH ] [ PATH [ '=' ] path ] [ ENGINE [ '=' ] engine ] ]
 	var s datadef.CreateDatabase
 
@@ -1054,7 +1048,7 @@ func (p *parser) parseCreateDatabase() Stmt {
 	return &s
 }
 
-func (p *parser) parseDetachDatabase() Stmt {
+func (p *parser) parseDetachDatabase() execute.Stmt {
 	// DETACH DATABASE database
 	var s datadef.DetachDatabase
 

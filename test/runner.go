@@ -16,9 +16,13 @@ import (
 type Runner struct {
 	Type     string
 	Database sql.Identifier
+	ses      *execute.Session
 }
 
 func (run *Runner) RunExec(tst *sqltest.Test) error {
+	if run.ses == nil {
+		run.ses = execute.NewSession(run.Type, run.Database)
+	}
 	p := parser.NewParser(strings.NewReader(tst.Test),
 		fmt.Sprintf("%s:%d", tst.Filename, tst.LineNumber))
 	for {
@@ -29,17 +33,20 @@ func (run *Runner) RunExec(tst *sqltest.Test) error {
 		if err != nil {
 			return err
 		}
-		tx := engine.Begin()
-		ses := execute.NewSession(run.Type, run.Database)
-		ret, err := stmt.Plan(ses, tx)
-		if err != nil {
-			return err
-		}
-		_, err = ret.(execute.Executor).Execute(ses, tx)
-		if err != nil {
-			return err
-		}
-		err = tx.Commit(ses)
+		err = run.ses.Run(stmt,
+			func(tx *engine.Transaction, stmt execute.Stmt) error {
+				ret, err := stmt.Plan(run.ses, tx)
+				if err != nil {
+					return err
+				}
+				_, err = ret.(execute.Executor).Execute(run.ses, tx)
+				if err != nil {
+					return err
+				}
+
+				return nil
+			})
+
 		if err != nil {
 			return err
 		}
@@ -48,52 +55,60 @@ func (run *Runner) RunExec(tst *sqltest.Test) error {
 }
 
 func (run *Runner) RunQuery(tst *sqltest.Test) ([]string, [][]string, error) {
+	if run.ses == nil {
+		run.ses = execute.NewSession(run.Type, run.Database)
+	}
 	p := parser.NewParser(strings.NewReader(tst.Test),
 		fmt.Sprintf("%s:%d", tst.Filename, tst.LineNumber))
 	stmt, err := p.Parse()
 	if err != nil {
 		return nil, nil, err
 	}
-	tx := engine.Begin()
-	ses := execute.NewSession(run.Type, run.Database)
-	ret, err := stmt.Plan(ses, tx)
-	if err != nil {
-		return nil, nil, err
-	}
-	rows, ok := ret.(execute.Rows)
-	if !ok {
-		return nil, nil, fmt.Errorf("%s:%d: expected a query", tst.Filename, tst.LineNumber)
-	}
 
-	cols := rows.Columns()
-	lenCols := len(cols)
-	resultCols := make([]string, 0, lenCols)
-	for _, col := range cols {
-		resultCols = append(resultCols, col.String())
-	}
-
+	var resultCols []string
 	var results [][]string
-	dest := make([]sql.Value, lenCols)
-	for {
-		err = rows.Next(ses, dest)
-		if err == io.EOF {
-			break
-		} else if err != nil {
-			return nil, nil, err
-		}
-		row := make([]string, 0, lenCols)
-		for _, v := range dest {
-			if v == nil {
-				row = append(row, "")
-			} else if s, ok := v.(sql.StringValue); ok {
-				row = append(row, string(s))
-			} else {
-				row = append(row, sql.Format(v))
+	err = run.ses.Run(stmt,
+		func(tx *engine.Transaction, stmt execute.Stmt) error {
+			ret, err := stmt.Plan(run.ses, tx)
+			if err != nil {
+				return err
 			}
-		}
-		results = append(results, row)
-	}
-	err = tx.Commit(ses)
+			rows, ok := ret.(execute.Rows)
+			if !ok {
+				return fmt.Errorf("%s:%d: expected a query", tst.Filename, tst.LineNumber)
+			}
+
+			cols := rows.Columns()
+			lenCols := len(cols)
+			resultCols = make([]string, 0, lenCols)
+			for _, col := range cols {
+				resultCols = append(resultCols, col.String())
+			}
+
+			dest := make([]sql.Value, lenCols)
+			for {
+				err = rows.Next(run.ses, dest)
+				if err == io.EOF {
+					break
+				} else if err != nil {
+					return err
+				}
+				row := make([]string, 0, lenCols)
+				for _, v := range dest {
+					if v == nil {
+						row = append(row, "")
+					} else if s, ok := v.(sql.StringValue); ok {
+						row = append(row, string(s))
+					} else {
+						row = append(row, sql.Format(v))
+					}
+				}
+				results = append(results, row)
+			}
+
+			return nil
+		})
+
 	if err != nil {
 		return nil, nil, err
 	}

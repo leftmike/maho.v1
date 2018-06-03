@@ -50,14 +50,14 @@ func (stmt *InsertValues) String() string {
 	return s
 }
 
-func (stmt *InsertValues) Plan(ses execute.Session, tx *engine.Transaction) (execute.Plan, error) {
+func (stmt *InsertValues) Plan(ses *execute.Session, tx *engine.Transaction) (execute.Plan, error) {
 	return stmt, nil
 }
 
-func (stmt *InsertValues) Execute(ses execute.Session, tx *engine.Transaction) (int64, error) {
+func (stmt *InsertValues) Execute(ses *execute.Session, tx *engine.Transaction) (int64, error) {
 	tbl, err := engine.LookupTable(ses, tx, stmt.Table.Database, stmt.Table.Table)
 	if err != nil {
-		return 0, err
+		return -1, err
 	}
 
 	cols := tbl.Columns(ses)
@@ -82,7 +82,7 @@ func (stmt *InsertValues) Execute(ses execute.Session, tx *engine.Transaction) (
 		for v, nam := range stmt.Columns {
 			c, ok := cmap[nam]
 			if !ok {
-				return 0, fmt.Errorf("engine: %s: column not found: %s", stmt.Table, nam)
+				return -1, fmt.Errorf("engine: %s: column not found: %s", stmt.Table, nam)
 			}
 			c2v[c] = v
 		}
@@ -90,7 +90,7 @@ func (stmt *InsertValues) Execute(ses execute.Session, tx *engine.Transaction) (
 
 	for _, r := range stmt.Rows {
 		if len(r) > mv {
-			return 0, fmt.Errorf("engine: %s: too many values", stmt.Table)
+			return -1, fmt.Errorf("engine: %s: too many values", stmt.Table)
 		}
 		row := make([]sql.Value, len(cols))
 		for i, c := range colTypes {
@@ -106,23 +106,23 @@ func (stmt *InsertValues) Execute(ses execute.Session, tx *engine.Transaction) (
 				var ce expr.CExpr
 				ce, err = expr.Compile(nil, e, false)
 				if err != nil {
-					return 0, err
+					return -1, err
 				}
 				v, err = ce.Eval(nil)
 				if err != nil {
-					return 0, err
+					return -1, err
 				}
 			}
 
 			row[i], err = c.ConvertValue(cols[i], v)
 			if err != nil {
-				return 0, fmt.Errorf("engine: table %s: %s", stmt.Table, err.Error())
+				return -1, fmt.Errorf("engine: table %s: %s", stmt.Table, err.Error())
 			}
 		}
 
 		err := tbl.Insert(ses, row)
 		if err != nil {
-			return 0, err
+			return -1, err
 		}
 	}
 

@@ -44,7 +44,7 @@ func (stmt *Values) String() string {
 	return s
 }
 
-func (stmt *Values) Plan(ses execute.Session, tx *engine.Transaction) (execute.Plan, error) {
+func (stmt *Values) Plan(ses *execute.Session, tx *engine.Transaction) (execute.Plan, error) {
 	return stmt.Rows(tx)
 }
 

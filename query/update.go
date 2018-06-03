@@ -53,7 +53,7 @@ func (up *updatePlan) EvalRef(idx int) sql.Value {
 	return up.dest[idx]
 }
 
-func (up *updatePlan) Execute(ses execute.Session, tx *engine.Transaction) (int64, error) {
+func (up *updatePlan) Execute(ses *execute.Session, tx *engine.Transaction) (int64, error) {
 	up.dest = make([]sql.Value, len(up.rows.Columns()))
 	cnt := int64(0)
 	updates := make([]db.ColumnUpdate, len(up.updates))
@@ -63,30 +63,30 @@ func (up *updatePlan) Execute(ses execute.Session, tx *engine.Transaction) (int6
 		if err == io.EOF {
 			return cnt, nil
 		} else if err != nil {
-			return cnt, err
+			return -1, err
 		}
 		for idx := range up.updates {
 			cdx := up.updates[idx].index
 			var val sql.Value
 			val, err = up.updates[idx].expr.Eval(up)
 			if err != nil {
-				return cnt, err
+				return -1, err
 			}
 			val, err = up.types[cdx].ConvertValue(up.columns[cdx], val)
 			if err != nil {
-				return cnt, err
+				return -1, err
 			}
 			updates[idx] = db.ColumnUpdate{Index: cdx, Value: val}
 		}
 		err = up.rows.Update(ses, updates)
 		if err != nil {
-			return cnt, err
+			return -1, err
 		}
 		cnt += 1
 	}
 }
 
-func (stmt *Update) Plan(ses execute.Session, tx *engine.Transaction) (execute.Plan, error) {
+func (stmt *Update) Plan(ses *execute.Session, tx *engine.Transaction) (execute.Plan, error) {
 	tbl, err := engine.LookupTable(ses, tx, stmt.Table.Database, stmt.Table.Table)
 	if err != nil {
 		return nil, err

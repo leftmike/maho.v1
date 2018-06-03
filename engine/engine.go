@@ -70,7 +70,7 @@ type Database interface {
 	Begin() interface{}
 	Commit(ses db.Session, tctx interface{}) error
 	Rollback(tctx interface{}) error
-	NextCommand(tctx interface{})
+	NextStmt(tctx interface{})
 }
 
 type databaseEntry struct {
@@ -218,9 +218,9 @@ func (tx *Transaction) Rollback() error {
 	})
 }
 
-func (tx *Transaction) NextCommand() {
+func (tx *Transaction) NextStmt() {
 	tx.forContexts(func(d Database, tctx interface{}) error {
-		d.NextCommand(tctx)
+		d.NextStmt(tctx)
 		return nil
 	})
 }

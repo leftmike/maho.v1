@@ -25,16 +25,16 @@ func (stmt *DropTable) String() string {
 	return s
 }
 
-func (stmt *DropTable) Plan(ses execute.Session, tx *engine.Transaction) (execute.Plan, error) {
+func (stmt *DropTable) Plan(ses *execute.Session, tx *engine.Transaction) (execute.Plan, error) {
 	return stmt, nil
 }
 
-func (stmt *DropTable) Execute(ses execute.Session, tx *engine.Transaction) (int64, error) {
+func (stmt *DropTable) Execute(ses *execute.Session, tx *engine.Transaction) (int64, error) {
 	for _, tbl := range stmt.Tables {
 		err := engine.DropTable(ses, tx, tbl.Database, tbl.Table, stmt.IfExists)
 		if err != nil {
-			return 0, err
+			return -1, err
 		}
 	}
-	return 0, nil
+	return -1, nil
 }
