@@ -8,9 +8,7 @@ import (
 )
 
 type Session interface {
-	Context() context.Context
-	DefaultEngine() string
-	DefaultDatabase() sql.Identifier
+	engine.Session
 	Transaction() *engine.Transaction
 	SetTransaction(tx *engine.Transaction)
 }

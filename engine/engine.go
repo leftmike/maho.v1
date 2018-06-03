@@ -1,6 +1,7 @@
 package engine
 
 import (
+	"context"
 	"fmt"
 	"path/filepath"
 	"sync"
@@ -59,6 +60,12 @@ func (ds databaseState) String() string {
 	default:
 		panic(fmt.Sprintf("unexpected value for database state: %d", ds))
 	}
+}
+
+type Session interface {
+	Context() context.Context
+	DefaultEngine() string
+	DefaultDatabase() sql.Identifier
 }
 
 type Database interface {
@@ -207,9 +214,9 @@ func (tx *Transaction) forContexts(fn func(d Database, tctx interface{}) error) 
 	return err
 }
 
-func (tx *Transaction) Commit(ctx session.Context) error {
+func (tx *Transaction) Commit(ses Session) error {
 	return tx.forContexts(func(d Database, tctx interface{}) error {
-		return d.Commit(ctx, tctx)
+		return d.Commit(ses, tctx)
 	})
 }
 
@@ -236,14 +243,13 @@ func (tx *Transaction) getContext(d Database) interface{} {
 }
 
 // LookupTable looks up the named table in the named database.
-func LookupTable(ctx session.Context, tx *Transaction, dbname, tblname sql.Identifier) (db.Table,
-	error) {
+func LookupTable(ses Session, tx *Transaction, dbname, tblname sql.Identifier) (db.Table, error) {
 
 	mutex.RLock()
 	defer mutex.RUnlock()
 
 	if dbname == 0 {
-		dbname = ctx.DefaultDatabase()
+		dbname = ses.DefaultDatabase()
 	}
 	de, ok := databases[dbname]
 	if !ok {
@@ -253,22 +259,22 @@ func LookupTable(ctx session.Context, tx *Transaction, dbname, tblname sql.Ident
 		return nil, fmt.Errorf("engine: database %s not running", dbname)
 	}
 	tctx := tx.getContext(de.database)
-	tbl, err := lookupVirtual(ctx, tctx, de.database, tblname)
+	tbl, err := lookupVirtual(ses, tctx, de.database, tblname)
 	if tbl != nil || err != nil {
 		return tbl, err
 	}
-	return de.database.LookupTable(ctx, tctx, tblname)
+	return de.database.LookupTable(ses, tctx, tblname)
 }
 
 // CreateTable creates the named table in the named database.
-func CreateTable(ctx session.Context, tx *Transaction, dbname, tblname sql.Identifier,
+func CreateTable(ses Session, tx *Transaction, dbname, tblname sql.Identifier,
 	cols []sql.Identifier, colTypes []db.ColumnType) error {
 
 	mutex.RLock()
 	defer mutex.RUnlock()
 
 	if dbname == 0 {
-		dbname = ctx.DefaultDatabase()
+		dbname = ses.DefaultDatabase()
 	}
 	de, ok := databases[dbname]
 	if !ok {
@@ -277,18 +283,18 @@ func CreateTable(ctx session.Context, tx *Transaction, dbname, tblname sql.Ident
 	if de.state != Running {
 		return fmt.Errorf("engine: database %s not running", dbname)
 	}
-	return de.database.CreateTable(ctx, tx.getContext(de.database), tblname, cols, colTypes)
+	return de.database.CreateTable(ses, tx.getContext(de.database), tblname, cols, colTypes)
 }
 
 // DropTable drops the named table from the named database.
-func DropTable(ctx session.Context, tx *Transaction, dbname, tblname sql.Identifier,
+func DropTable(ses Session, tx *Transaction, dbname, tblname sql.Identifier,
 	exists bool) error {
 
 	mutex.RLock()
 	defer mutex.RUnlock()
 
 	if dbname == 0 {
-		dbname = ctx.DefaultDatabase()
+		dbname = ses.DefaultDatabase()
 	}
 	de, ok := databases[dbname]
 	if !ok {
@@ -297,7 +303,7 @@ func DropTable(ctx session.Context, tx *Transaction, dbname, tblname sql.Identif
 	if de.state != Running {
 		return fmt.Errorf("engine: database %s not running", dbname)
 	}
-	return de.database.DropTable(ctx, tx.getContext(de.database), tblname, exists)
+	return de.database.DropTable(ses, tx.getContext(de.database), tblname, exists)
 }
 
 func Register(typ string, e Engine) {

@@ -18,7 +18,6 @@ To Do:
 - delete session.Context
 - different Session for different places: db.Session, engine.Session, execute.Session
 type db.Session interface{Context}
-type engine.Session interface {Context, DefaultEngine, DefaultDatabase}
 - add db.Session to Table methods
 
 - memory engine (w/ mvcc)
