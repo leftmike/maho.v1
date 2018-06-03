@@ -5,9 +5,9 @@ import (
 
 	"github.com/leftmike/maho/engine"
 	_ "github.com/leftmike/maho/engine/basic"
+	"github.com/leftmike/maho/execute"
 	"github.com/leftmike/maho/expr"
 	"github.com/leftmike/maho/query"
-	"github.com/leftmike/maho/session"
 	"github.com/leftmike/maho/sql"
 	"github.com/leftmike/maho/testutil"
 )
@@ -68,7 +68,7 @@ func TestValues(t *testing.T) {
 
 	startEngine(t)
 	tx := engine.Begin()
-	ctx := session.NewContext("basic", sql.ID("test"))
+	ses := execute.NewSession("basic", sql.ID("test"))
 	for _, c := range cases {
 		if c.values.String() != c.s {
 			t.Errorf("(%v).String() got %q want %q", c.values, c.values.String(), c.s)
@@ -84,7 +84,7 @@ func TestValues(t *testing.T) {
 			t.Errorf("(%v).Rows().Columns() got %v want %v", c.values, cols, c.cols)
 			continue
 		}
-		all, err := query.AllRows(ctx, rows)
+		all, err := query.AllRows(ses, rows)
 		if err != nil {
 			t.Errorf("(%v).Rows().Next() failed with %s", c.values, err)
 		}
@@ -143,14 +143,14 @@ func TestFromValues(t *testing.T) {
 		},
 	}
 
-	ctx := session.NewContext("basic", sql.ID("test"))
+	ses := execute.NewSession("basic", sql.ID("test"))
 	for _, c := range cases {
 		if c.from.String() != c.s {
 			t.Errorf("(%v).String() got %q want %q", c.from, c.from.String(), c.s)
 			continue
 		}
 		tx := engine.Begin()
-		rows, fctx, err := c.from.TestRows(ctx, tx)
+		rows, fctx, err := c.from.TestRows(ses, tx)
 		if err != nil {
 			t.Errorf("(%v).Rows() failed with %s", c.from, err)
 			continue
@@ -165,7 +165,7 @@ func TestFromValues(t *testing.T) {
 				c.from, len(cols), len(rows.Columns()))
 			continue
 		}
-		all, err := query.AllRows(ctx, rows)
+		all, err := query.AllRows(ses, rows)
 		if err != nil {
 			t.Errorf("(%v).Rows().Next() failed with %s", c.from, err)
 		}

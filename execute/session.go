@@ -3,12 +3,13 @@ package execute
 import (
 	"context"
 
+	"github.com/leftmike/maho/db"
 	"github.com/leftmike/maho/engine"
 	"github.com/leftmike/maho/sql"
 )
 
 type Session interface {
-	engine.Session
+	db.Session
 	Transaction() *engine.Transaction
 	SetTransaction(tx *engine.Transaction)
 }

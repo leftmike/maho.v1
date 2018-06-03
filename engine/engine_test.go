@@ -1,6 +1,7 @@
 package engine
 
 import (
+	"context"
 	"fmt"
 	"path/filepath"
 	"reflect"
@@ -9,7 +10,6 @@ import (
 	"time"
 
 	"github.com/leftmike/maho/db"
-	"github.com/leftmike/maho/session"
 	"github.com/leftmike/maho/sql"
 )
 
@@ -75,7 +75,7 @@ func (tdb *testDatabase) Message() string {
 	return ""
 }
 
-func (tdb *testDatabase) LookupTable(ctx session.Context, tx interface{},
+func (tdb *testDatabase) LookupTable(ses db.Session, tx interface{},
 	tblname sql.Identifier) (db.Table, error) {
 
 	_ = tx.(*tcontext)
@@ -83,7 +83,7 @@ func (tdb *testDatabase) LookupTable(ctx session.Context, tx interface{},
 	return nil, nil
 }
 
-func (tdb *testDatabase) CreateTable(ctx session.Context, tx interface{}, tblname sql.Identifier,
+func (tdb *testDatabase) CreateTable(ses db.Session, tx interface{}, tblname sql.Identifier,
 	cols []sql.Identifier, colTypes []db.ColumnType) error {
 
 	_ = tx.(*tcontext)
@@ -91,7 +91,7 @@ func (tdb *testDatabase) CreateTable(ctx session.Context, tx interface{}, tblnam
 	return nil
 }
 
-func (tdb *testDatabase) DropTable(ctx session.Context, tx interface{}, tblname sql.Identifier,
+func (tdb *testDatabase) DropTable(ses db.Session, tx interface{}, tblname sql.Identifier,
 	exists bool) error {
 
 	_ = tx.(*tcontext)
@@ -99,7 +99,7 @@ func (tdb *testDatabase) DropTable(ctx session.Context, tx interface{}, tblname 
 	return nil
 }
 
-func (tdb *testDatabase) ListTables(ctx session.Context, tx interface{}) ([]TableEntry, error) {
+func (tdb *testDatabase) ListTables(ses db.Session, tx interface{}) ([]TableEntry, error) {
 	tdb.te.op("ListTables")
 	return nil, nil
 }
@@ -109,7 +109,7 @@ func (tdb *testDatabase) Begin() interface{} {
 	return &tcontext{tdb}
 }
 
-func (tdb *testDatabase) Commit(ctx session.Context, tx interface{}) error {
+func (tdb *testDatabase) Commit(ses db.Session, tx interface{}) error {
 	tctx := tx.(*tcontext)
 	if tctx.tdb != tdb {
 		panic("tctx.tdb != tdb")
@@ -137,6 +137,23 @@ func (tdb *testDatabase) NextCommand(tx interface{}) {
 
 type tcontext struct {
 	tdb *testDatabase
+}
+
+type session struct {
+	eng  string
+	name sql.Identifier
+}
+
+func (ses *session) Context() context.Context {
+	return nil
+}
+
+func (ses *session) DefaultEngine() string {
+	return ses.eng
+}
+
+func (ses *session) DefaultDatabase() sql.Identifier {
+	return ses.name
 }
 
 func checkDatabaseState(t *testing.T, state databaseState, name sql.Identifier) {
@@ -197,14 +214,17 @@ func TestDatabase(t *testing.T) {
 	})
 
 	tx := Begin()
-	ctx := session.NewContext("test2", sql.ID("db3"))
-	err = CreateTable(ctx, tx, 0, sql.ID("table1"), nil, nil)
+	ses := &session{
+		eng:  "test2",
+		name: sql.ID("db3"),
+	}
+	err = CreateTable(ses, tx, 0, sql.ID("table1"), nil, nil)
 	if err != nil {
 		t.Errorf("CreateTable(table1) failed with %s", err)
 	}
 	tx.NextCommand()
 	tx.NextCommand()
-	err = tx.Commit(ctx)
+	err = tx.Commit(ses)
 	if err != nil {
 		t.Errorf("Commit() failed with %s", err)
 	}
@@ -217,8 +237,11 @@ func TestDatabase(t *testing.T) {
 	})
 
 	tx = Begin()
-	ctx = session.NewContext("test2", sql.ID("db3"))
-	_, err = LookupTable(ctx, tx, 0, sql.ID("table1"))
+	ses = &session{
+		eng:  "test2",
+		name: sql.ID("db3"),
+	}
+	_, err = LookupTable(ses, tx, 0, sql.ID("table1"))
 	if err != nil {
 		t.Errorf("LookupTable(table1) failed with %s", err)
 	}

@@ -7,7 +7,6 @@ import (
 	"github.com/leftmike/maho/db"
 	"github.com/leftmike/maho/engine"
 	"github.com/leftmike/maho/expr"
-	"github.com/leftmike/maho/session"
 	"github.com/leftmike/maho/sql"
 )
 
@@ -62,12 +61,12 @@ func (fj FromJoin) String() string {
 }
 
 // AllRows returns all of the rows from a db.Rows as slices of values.
-func AllRows(ctx session.Context, rows db.Rows) ([][]sql.Value, error) {
+func AllRows(ses db.Session, rows db.Rows) ([][]sql.Value, error) {
 	all := [][]sql.Value{}
 	l := len(rows.Columns())
 	for {
 		dest := make([]sql.Value, l)
-		err := rows.Next(ctx, dest)
+		err := rows.Next(ses, dest)
 		if err == io.EOF {
 			break
 		} else if err != nil {
@@ -171,7 +170,7 @@ func (jr *joinRows) onUsing(dest []sql.Value) (bool, error) {
 	return true, nil
 }
 
-func (jr *joinRows) Next(ctx session.Context, dest []sql.Value) error {
+func (jr *joinRows) Next(ses db.Session, dest []sql.Value) error {
 	if jr.state == allDone {
 		return io.EOF
 	} else if jr.state == rightRemaining {
@@ -202,11 +201,11 @@ func (jr *joinRows) Next(ctx session.Context, dest []sql.Value) error {
 	for {
 		// Make sure that we have a left row.
 		if !jr.haveLeft {
-			err := jr.leftRows.Next(ctx, jr.leftDest)
+			err := jr.leftRows.Next(ses, jr.leftDest)
 			if err == io.EOF && jr.rightUsed != nil {
 				jr.state = rightRemaining
 				jr.rightIndex = 0
-				return jr.Next(ctx, dest)
+				return jr.Next(ses, dest)
 			}
 			if err != nil {
 				jr.state = allDone
@@ -257,27 +256,26 @@ func (jr *joinRows) Next(ctx session.Context, dest []sql.Value) error {
 	}
 }
 
-func (_ *joinRows) Delete(ctx session.Context) error {
+func (_ *joinRows) Delete(ses db.Session) error {
 	return fmt.Errorf("join rows may not be deleted")
 }
 
-func (_ *joinRows) Update(ctx session.Context, updates []db.ColumnUpdate) error {
+func (_ *joinRows) Update(ses db.Session, updates []db.ColumnUpdate) error {
 	return fmt.Errorf("join rows may not be updated")
 }
 
-func (fj FromJoin) rows(ctx session.Context, tx *engine.Transaction) (db.Rows, *fromContext,
-	error) {
+func (fj FromJoin) rows(ses db.Session, tx *engine.Transaction) (db.Rows, *fromContext, error) {
 
-	leftRows, leftCtx, err := fj.Left.rows(ctx, tx)
+	leftRows, leftCtx, err := fj.Left.rows(ses, tx)
 	if err != nil {
 		return nil, nil, err
 	}
-	rightRows, rightCtx, err := fj.Right.rows(ctx, tx)
+	rightRows, rightCtx, err := fj.Right.rows(ses, tx)
 	if err != nil {
 		return nil, nil, err
 	}
 
-	rrows, err := AllRows(ctx, rightRows)
+	rrows, err := AllRows(ses, rightRows)
 	if err != nil {
 		return nil, nil, err
 	}

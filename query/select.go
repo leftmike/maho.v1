@@ -9,7 +9,6 @@ import (
 	"github.com/leftmike/maho/engine"
 	"github.com/leftmike/maho/execute"
 	"github.com/leftmike/maho/expr"
-	"github.com/leftmike/maho/session"
 	"github.com/leftmike/maho/sql"
 )
 
@@ -141,7 +140,7 @@ func (stmt *Select) Plan(ses execute.Session, tx *engine.Transaction) (execute.P
 	return stmt.Rows(ses, tx)
 }
 
-func (stmt *Select) Rows(ctx session.Context, tx *engine.Transaction) (db.Rows, error) {
+func (stmt *Select) Rows(ses db.Session, tx *engine.Transaction) (db.Rows, error) {
 	var rows db.Rows
 	var fctx *fromContext
 	var err error
@@ -150,7 +149,7 @@ func (stmt *Select) Rows(ctx session.Context, tx *engine.Transaction) (db.Rows, 
 		rows = &oneEmptyRow{}
 		fctx = &fromContext{}
 	} else {
-		rows, fctx, err = stmt.From.rows(ctx, tx)
+		rows, fctx, err = stmt.From.rows(ses, tx)
 		if err != nil {
 			return nil, err
 		}
@@ -171,10 +170,9 @@ func (stmt *Select) Rows(ctx session.Context, tx *engine.Transaction) (db.Rows, 
 	return group(rows, fctx, stmt.Results, stmt.GroupBy, stmt.Having, stmt.OrderBy)
 }
 
-func (fs FromSelect) rows(ctx session.Context, tx *engine.Transaction) (db.Rows, *fromContext,
-	error) {
+func (fs FromSelect) rows(ses db.Session, tx *engine.Transaction) (db.Rows, *fromContext, error) {
 
-	rows, err := fs.Select.Rows(ctx, tx)
+	rows, err := fs.Select.Rows(ses, tx)
 	if err != nil {
 		return nil, nil, err
 	}
@@ -210,12 +208,12 @@ func (sr *sortRows) Close() error {
 	return sr.rows.Close()
 }
 
-func (sr *sortRows) sort(ctx session.Context) error {
+func (sr *sortRows) sort(ses db.Session) error {
 	sr.sorted = true
 
 	for {
 		dest := make([]sql.Value, len(sr.rows.Columns()))
-		err := sr.rows.Next(ctx, dest)
+		err := sr.rows.Next(ses, dest)
 		if err == io.EOF {
 			break
 		} else if err != nil {
@@ -228,9 +226,9 @@ func (sr *sortRows) sort(ctx session.Context) error {
 	return nil
 }
 
-func (sr *sortRows) Next(ctx session.Context, dest []sql.Value) error {
+func (sr *sortRows) Next(ses db.Session, dest []sql.Value) error {
 	if !sr.sorted {
-		err := sr.sort(ctx)
+		err := sr.sort(ses)
 		if err != nil {
 			return err
 		}
@@ -244,11 +242,11 @@ func (sr *sortRows) Next(ctx session.Context, dest []sql.Value) error {
 	return io.EOF
 }
 
-func (_ *sortRows) Delete(ctx session.Context) error {
+func (_ *sortRows) Delete(ses db.Session) error {
 	return fmt.Errorf("sort rows may not be deleted")
 }
 
-func (_ *sortRows) Update(ctx session.Context, updates []db.ColumnUpdate) error {
+func (_ *sortRows) Update(ses db.Session, updates []db.ColumnUpdate) error {
 	return fmt.Errorf("sort rows may not be updated")
 }
 
@@ -357,9 +355,9 @@ func (fr *filterRows) Close() error {
 	return fr.rows.Close()
 }
 
-func (fr *filterRows) Next(ctx session.Context, dest []sql.Value) error {
+func (fr *filterRows) Next(ses db.Session, dest []sql.Value) error {
 	for {
-		err := fr.rows.Next(ctx, dest)
+		err := fr.rows.Next(ses, dest)
 		if err != nil {
 			return err
 		}
@@ -383,12 +381,12 @@ func (fr *filterRows) Next(ctx session.Context, dest []sql.Value) error {
 	return nil
 }
 
-func (fr *filterRows) Delete(ctx session.Context) error {
-	return fr.rows.Delete(ctx)
+func (fr *filterRows) Delete(ses db.Session) error {
+	return fr.rows.Delete(ses)
 }
 
-func (fr *filterRows) Update(ctx session.Context, updates []db.ColumnUpdate) error {
-	return fr.rows.Update(ctx, updates)
+func (fr *filterRows) Update(ses db.Session, updates []db.ColumnUpdate) error {
+	return fr.rows.Update(ses, updates)
 }
 
 func where(rows db.Rows, fctx *fromContext, cond expr.Expr) (db.Rows, error) {
@@ -415,7 +413,7 @@ func (oer *oneEmptyRow) Close() error {
 	return nil
 }
 
-func (oer *oneEmptyRow) Next(ctx session.Context, dest []sql.Value) error {
+func (oer *oneEmptyRow) Next(ses db.Session, dest []sql.Value) error {
 	if oer.one {
 		return io.EOF
 	}
@@ -423,11 +421,11 @@ func (oer *oneEmptyRow) Next(ctx session.Context, dest []sql.Value) error {
 	return nil
 }
 
-func (_ *oneEmptyRow) Delete(ctx session.Context) error {
+func (_ *oneEmptyRow) Delete(ses db.Session) error {
 	return fmt.Errorf("one empty row may not be deleted")
 }
 
-func (_ *oneEmptyRow) Update(ctx session.Context, updates []db.ColumnUpdate) error {
+func (_ *oneEmptyRow) Update(ses db.Session, updates []db.ColumnUpdate) error {
 	return fmt.Errorf("one empty row may not be updated")
 }
 
@@ -444,15 +442,15 @@ func (arr *allResultRows) Close() error {
 	return arr.rows.Close()
 }
 
-func (arr *allResultRows) Next(ctx session.Context, dest []sql.Value) error {
-	return arr.rows.Next(ctx, dest)
+func (arr *allResultRows) Next(ses db.Session, dest []sql.Value) error {
+	return arr.rows.Next(ses, dest)
 }
 
-func (_ *allResultRows) Delete(ctx session.Context) error {
+func (_ *allResultRows) Delete(ses db.Session) error {
 	return fmt.Errorf("all result rows may not be deleted")
 }
 
-func (_ *allResultRows) Update(ctx session.Context, updates []db.ColumnUpdate) error {
+func (_ *allResultRows) Update(ses db.Session, updates []db.ColumnUpdate) error {
 	return fmt.Errorf("all result rows may not be updated")
 }
 
@@ -486,11 +484,11 @@ func (rr *resultRows) Close() error {
 	return rr.rows.Close()
 }
 
-func (rr *resultRows) Next(ctx session.Context, dest []sql.Value) error {
+func (rr *resultRows) Next(ses db.Session, dest []sql.Value) error {
 	if rr.dest == nil {
 		rr.dest = make([]sql.Value, len(rr.rows.Columns()))
 	}
-	err := rr.rows.Next(ctx, rr.dest)
+	err := rr.rows.Next(ses, rr.dest)
 	if err != nil {
 		return err
 	}
@@ -507,11 +505,11 @@ func (rr *resultRows) Next(ctx session.Context, dest []sql.Value) error {
 	return nil
 }
 
-func (_ *resultRows) Delete(ctx session.Context) error {
+func (_ *resultRows) Delete(ses db.Session) error {
 	return fmt.Errorf("result rows may not be deleted")
 }
 
-func (_ *resultRows) Update(ctx session.Context, updates []db.ColumnUpdate) error {
+func (_ *resultRows) Update(ses db.Session, updates []db.ColumnUpdate) error {
 	return fmt.Errorf("result rows may not be updated")
 }
 

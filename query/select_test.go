@@ -5,9 +5,9 @@ import (
 
 	"github.com/leftmike/maho/engine"
 	_ "github.com/leftmike/maho/engine/basic"
+	"github.com/leftmike/maho/execute"
 	"github.com/leftmike/maho/expr"
 	"github.com/leftmike/maho/query"
-	"github.com/leftmike/maho/session"
 	"github.com/leftmike/maho/sql"
 	"github.com/leftmike/maho/testutil"
 )
@@ -98,13 +98,13 @@ func TestSelect(t *testing.T) {
 
 	startEngine(t)
 	tx := engine.Begin()
-	ctx := session.NewContext("basic", sql.ID("test"))
+	ses := execute.NewSession("basic", sql.ID("test"))
 	for _, c := range cases {
 		if c.stmt.String() != c.s {
 			t.Errorf("(%v).String() got %q want %q", c.stmt, c.stmt.String(), c.s)
 			continue
 		}
-		rows, err := c.stmt.Rows(ctx, tx)
+		rows, err := c.stmt.Rows(ses, tx)
 		if err != nil {
 			t.Errorf("(%v).Rows() failed with %s", c.stmt, err)
 			continue
@@ -114,7 +114,7 @@ func TestSelect(t *testing.T) {
 			t.Errorf("(%v).Rows().Columns() got %v want %v", c.stmt, cols, c.cols)
 			continue
 		}
-		all, err := query.AllRows(ctx, rows)
+		all, err := query.AllRows(ses, rows)
 		if err != nil {
 			t.Errorf("(%v).Rows().Next() failed with %s", c.stmt, err)
 		}

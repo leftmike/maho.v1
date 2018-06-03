@@ -1,14 +1,12 @@
 package engine
 
 import (
-	"context"
 	"fmt"
 	"path/filepath"
 	"sync"
 
 	"github.com/leftmike/maho/config"
 	"github.com/leftmike/maho/db"
-	"github.com/leftmike/maho/session"
 	"github.com/leftmike/maho/sql"
 )
 
@@ -62,21 +60,15 @@ func (ds databaseState) String() string {
 	}
 }
 
-type Session interface {
-	Context() context.Context
-	DefaultEngine() string
-	DefaultDatabase() sql.Identifier
-}
-
 type Database interface {
 	Message() string
-	LookupTable(ctx session.Context, tctx interface{}, tblname sql.Identifier) (db.Table, error)
-	CreateTable(ctx session.Context, tctx interface{}, tblname sql.Identifier,
+	LookupTable(ses db.Session, tctx interface{}, tblname sql.Identifier) (db.Table, error)
+	CreateTable(ses db.Session, tctx interface{}, tblname sql.Identifier,
 		cols []sql.Identifier, colTypes []db.ColumnType) error
-	DropTable(ctx session.Context, tctx interface{}, tblname sql.Identifier, exists bool) error
-	ListTables(ctx session.Context, tctx interface{}) ([]TableEntry, error)
+	DropTable(ses db.Session, tctx interface{}, tblname sql.Identifier, exists bool) error
+	ListTables(ses db.Session, tctx interface{}) ([]TableEntry, error)
 	Begin() interface{}
-	Commit(ctx session.Context, tctx interface{}) error
+	Commit(ses db.Session, tctx interface{}) error
 	Rollback(tctx interface{}) error
 	NextCommand(tctx interface{})
 }
@@ -214,7 +206,7 @@ func (tx *Transaction) forContexts(fn func(d Database, tctx interface{}) error) 
 	return err
 }
 
-func (tx *Transaction) Commit(ses Session) error {
+func (tx *Transaction) Commit(ses db.Session) error {
 	return tx.forContexts(func(d Database, tctx interface{}) error {
 		return d.Commit(ses, tctx)
 	})
@@ -243,7 +235,8 @@ func (tx *Transaction) getContext(d Database) interface{} {
 }
 
 // LookupTable looks up the named table in the named database.
-func LookupTable(ses Session, tx *Transaction, dbname, tblname sql.Identifier) (db.Table, error) {
+func LookupTable(ses db.Session, tx *Transaction, dbname, tblname sql.Identifier) (db.Table,
+	error) {
 
 	mutex.RLock()
 	defer mutex.RUnlock()
@@ -267,7 +260,7 @@ func LookupTable(ses Session, tx *Transaction, dbname, tblname sql.Identifier) (
 }
 
 // CreateTable creates the named table in the named database.
-func CreateTable(ses Session, tx *Transaction, dbname, tblname sql.Identifier,
+func CreateTable(ses db.Session, tx *Transaction, dbname, tblname sql.Identifier,
 	cols []sql.Identifier, colTypes []db.ColumnType) error {
 
 	mutex.RLock()
@@ -287,9 +280,7 @@ func CreateTable(ses Session, tx *Transaction, dbname, tblname sql.Identifier,
 }
 
 // DropTable drops the named table from the named database.
-func DropTable(ses Session, tx *Transaction, dbname, tblname sql.Identifier,
-	exists bool) error {
-
+func DropTable(ses db.Session, tx *Transaction, dbname, tblname sql.Identifier, exists bool) error {
 	mutex.RLock()
 	defer mutex.RUnlock()
 

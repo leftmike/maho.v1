@@ -13,7 +13,6 @@ import (
 
 	"github.com/leftmike/maho/db"
 	"github.com/leftmike/maho/engine"
-	"github.com/leftmike/maho/session"
 	"github.com/leftmike/maho/sql"
 )
 
@@ -69,8 +68,8 @@ func (mdb *database) Message() string {
 	return ""
 }
 
-func (mdb *database) LookupTable(ctx session.Context, tx interface{},
-	tblname sql.Identifier) (db.Table, error) {
+func (mdb *database) LookupTable(ses db.Session, tx interface{}, tblname sql.Identifier) (db.Table,
+	error) {
 
 	tctx := tx.(*tcontext)
 	tbl, ok := tctx.tables[tblname]
@@ -90,7 +89,7 @@ func (mdb *database) LookupTable(ctx session.Context, tx interface{},
 	return tbl, nil
 }
 
-func (mdb *database) CreateTable(ctx session.Context, tx interface{}, tblname sql.Identifier,
+func (mdb *database) CreateTable(ses db.Session, tx interface{}, tblname sql.Identifier,
 	cols []sql.Identifier, colTypes []db.ColumnType) error {
 
 	mdb.mutex.Lock()
@@ -108,7 +107,7 @@ func (mdb *database) CreateTable(ctx session.Context, tx interface{}, tblname sq
 	return nil
 }
 
-func (mdb *database) DropTable(ctx session.Context, tx interface{}, tblname sql.Identifier,
+func (mdb *database) DropTable(ses db.Session, tx interface{}, tblname sql.Identifier,
 	exists bool) error {
 
 	mdb.mutex.Lock()
@@ -124,8 +123,7 @@ func (mdb *database) DropTable(ctx session.Context, tx interface{}, tblname sql.
 	return nil
 }
 
-func (mdb *database) ListTables(ctx session.Context, tx interface{}) ([]engine.TableEntry,
-	error) {
+func (mdb *database) ListTables(ses db.Session, tx interface{}) ([]engine.TableEntry, error) {
 
 	mdb.mutex.RLock()
 	defer mdb.mutex.RUnlock()
@@ -152,7 +150,7 @@ func (mdb *database) Begin() interface{} {
 	}
 }
 
-func (mdb *database) Commit(ctx session.Context, tx interface{}) error {
+func (mdb *database) Commit(ses db.Session, tx interface{}) error {
 	tctx := tx.(*tcontext)
 
 	for _, tbl := range tctx.tables {
@@ -221,7 +219,7 @@ func (mr *rows) Close() error {
 	return nil
 }
 
-func (mr *rows) Next(ctx session.Context, dest []sql.Value) error {
+func (mr *rows) Next(ses db.Session, dest []sql.Value) error {
 	var err error
 	mr.index, err = mr.table.table.next(mr.table.tctx, dest, mr.index)
 	if err != nil {
@@ -232,7 +230,7 @@ func (mr *rows) Next(ctx session.Context, dest []sql.Value) error {
 	return nil
 }
 
-func (mr *rows) Delete(ctx session.Context) error {
+func (mr *rows) Delete(ses db.Session) error {
 	if !mr.haveRow {
 		return fmt.Errorf("memory: no row to delete")
 	}
@@ -245,7 +243,7 @@ func (mr *rows) Delete(ctx session.Context) error {
 	return nil
 }
 
-func (mr *rows) Update(ctx session.Context, updates []db.ColumnUpdate) error {
+func (mr *rows) Update(ses db.Session, updates []db.ColumnUpdate) error {
 	if !mr.haveRow {
 		return fmt.Errorf("memory: no row to update")
 	}

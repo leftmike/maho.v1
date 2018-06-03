@@ -15,9 +15,6 @@ To Do:
 - utility code for executing SQL
 - (rows #) after displaying rows
 
-- delete session.Context
-- different Session for different places: db.Session, engine.Session, execute.Session
-type db.Session interface{Context}
 - add db.Session to Table methods
 
 - memory engine (w/ mvcc)

@@ -6,7 +6,6 @@ import (
 
 	"github.com/leftmike/maho/db"
 	"github.com/leftmike/maho/engine"
-	"github.com/leftmike/maho/session"
 	"github.com/leftmike/maho/sql"
 )
 
@@ -53,7 +52,7 @@ func (bdb *database) Message() string {
 	return ""
 }
 
-func (bdb *database) LookupTable(ctx session.Context, tctx interface{},
+func (bdb *database) LookupTable(ses db.Session, tctx interface{},
 	tblname sql.Identifier) (db.Table, error) {
 
 	tbl, ok := bdb.tables[tblname]
@@ -63,7 +62,7 @@ func (bdb *database) LookupTable(ctx session.Context, tctx interface{},
 	return tbl, nil
 }
 
-func (bdb *database) CreateTable(ctx session.Context, tctx interface{}, tblname sql.Identifier,
+func (bdb *database) CreateTable(ses db.Session, tctx interface{}, tblname sql.Identifier,
 	cols []sql.Identifier, colTypes []db.ColumnType) error {
 
 	if _, dup := bdb.tables[tblname]; dup {
@@ -78,7 +77,7 @@ func (bdb *database) CreateTable(ctx session.Context, tctx interface{}, tblname 
 	return nil
 }
 
-func (bdb *database) DropTable(ctx session.Context, tctx interface{}, tblname sql.Identifier,
+func (bdb *database) DropTable(ses db.Session, tctx interface{}, tblname sql.Identifier,
 	exists bool) error {
 
 	if _, ok := bdb.tables[tblname]; !ok {
@@ -91,8 +90,7 @@ func (bdb *database) DropTable(ctx session.Context, tctx interface{}, tblname sq
 	return nil
 }
 
-func (bdb *database) ListTables(ctx session.Context, tctx interface{}) ([]engine.TableEntry,
-	error) {
+func (bdb *database) ListTables(ses db.Session, tctx interface{}) ([]engine.TableEntry, error) {
 
 	var tbls []engine.TableEntry
 	for name, _ := range bdb.tables {
@@ -108,7 +106,7 @@ func (bdb *database) Begin() interface{} {
 	return nil
 }
 
-func (bdb *database) Commit(ctx session.Context, tctx interface{}) error {
+func (bdb *database) Commit(ses db.Session, tctx interface{}) error {
 	return nil
 }
 
@@ -145,7 +143,7 @@ func (br *rows) Close() error {
 	return nil
 }
 
-func (br *rows) Next(ctx session.Context, dest []sql.Value) error {
+func (br *rows) Next(ses db.Session, dest []sql.Value) error {
 	for br.index < len(br.rows) {
 		if br.rows[br.index] != nil {
 			copy(dest, br.rows[br.index])
@@ -160,7 +158,7 @@ func (br *rows) Next(ctx session.Context, dest []sql.Value) error {
 	return io.EOF
 }
 
-func (br *rows) Delete(ctx session.Context) error {
+func (br *rows) Delete(ses db.Session) error {
 	if !br.haveRow {
 		return fmt.Errorf("basic: no row to delete")
 	}
@@ -169,7 +167,7 @@ func (br *rows) Delete(ctx session.Context) error {
 	return nil
 }
 
-func (br *rows) Update(ctx session.Context, updates []db.ColumnUpdate) error {
+func (br *rows) Update(ses db.Session, updates []db.ColumnUpdate) error {
 	if !br.haveRow {
 		return fmt.Errorf("basic: no row to update")
 	}
