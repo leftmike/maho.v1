@@ -9,7 +9,7 @@ import (
 
 	"github.com/leftmike/maho/engine"
 	_ "github.com/leftmike/maho/engine/basic"
-	_ "github.com/leftmike/maho/engine/memory"
+	_ "github.com/leftmike/maho/engine/memrows"
 	"github.com/leftmike/maho/sql"
 	"github.com/leftmike/maho/test"
 )
@@ -76,6 +76,6 @@ func TestSQLBasic(t *testing.T) {
 	testSQL(t, "basic", sql.ID("test_basic"))
 }
 
-func TestSQLMemory(t *testing.T) {
-	testSQL(t, "memory", sql.ID("test_memory"))
+func TestSQLMemRows(t *testing.T) {
+	testSQL(t, "memrows", sql.ID("test_memrows"))
 }

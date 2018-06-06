@@ -1,4 +1,4 @@
-package memory
+package memrows
 
 const (
 	transactionFlag = 0xFFFF000000000000

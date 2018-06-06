@@ -1,9 +1,10 @@
-package memory
+package memrows
 
 /*
 - row index is fixed and never changes for the life of a row
 - keep track of deleted rows and reuse them
 - cleanup old versions and old rows
+- snapshots
 */
 
 import (
@@ -46,13 +47,13 @@ type rows struct {
 }
 
 func init() {
-	engine.Register("memory", &eng{})
+	engine.Register("memrows", &eng{})
 }
 
 func (me *eng) AttachDatabase(name sql.Identifier, path string,
 	options engine.Options) (engine.Database, error) {
 
-	return nil, fmt.Errorf("memory: attach database not supported")
+	return nil, fmt.Errorf("memrows: attach database not supported")
 }
 
 func (me *eng) CreateDatabase(name sql.Identifier, path string,
@@ -82,7 +83,7 @@ func (mdb *database) LookupTable(ses db.Session, tx interface{}, tblname sql.Ide
 
 	ti, ok := mdb.tables[tblname]
 	if !ok {
-		return nil, fmt.Errorf("memory: table %s not found in database %s", tblname, mdb.name)
+		return nil, fmt.Errorf("memrows: table %s not found in database %s", tblname, mdb.name)
 	}
 	tbl = &table{tctx: tctx, table: ti}
 	tctx.tables[tblname] = tbl
@@ -96,7 +97,7 @@ func (mdb *database) CreateTable(ses db.Session, tx interface{}, tblname sql.Ide
 	defer mdb.mutex.Unlock()
 
 	if _, dup := mdb.tables[tblname]; dup {
-		return fmt.Errorf("memory: table %s already exists in database %s", tblname, mdb.name)
+		return fmt.Errorf("memrows: table %s already exists in database %s", tblname, mdb.name)
 	}
 
 	mdb.tables[tblname] = &tableImpl{
@@ -117,7 +118,7 @@ func (mdb *database) DropTable(ses db.Session, tx interface{}, tblname sql.Ident
 		if exists {
 			return nil
 		}
-		return fmt.Errorf("memory: table %s does not exist in database %s", tblname, mdb.name)
+		return fmt.Errorf("memrows: table %s does not exist in database %s", tblname, mdb.name)
 	}
 	delete(mdb.tables, tblname)
 	return nil
@@ -232,7 +233,7 @@ func (mr *rows) Next(ses db.Session, dest []sql.Value) error {
 
 func (mr *rows) Delete(ses db.Session) error {
 	if !mr.haveRow {
-		return fmt.Errorf("memory: no row to delete")
+		return fmt.Errorf("memrows: no row to delete")
 	}
 	mr.haveRow = false
 	err := mr.table.table.delete(mr.table.tctx, mr.index-1)
@@ -245,7 +246,7 @@ func (mr *rows) Delete(ses db.Session) error {
 
 func (mr *rows) Update(ses db.Session, updates []db.ColumnUpdate) error {
 	if !mr.haveRow {
-		return fmt.Errorf("memory: no row to update")
+		return fmt.Errorf("memrows: no row to update")
 	}
 	err := mr.table.table.update(mr.table.tctx, updates, mr.index-1)
 	if err != nil {

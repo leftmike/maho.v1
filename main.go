@@ -14,8 +14,9 @@ To Do:
 - improve interactive execution
 - utility code for executing SQL
 
-- memory engine (w/ mvcc)
-- distributed memory engine, using raft
+- memrows engine (w/ mvcc)
+- memcols engine (w/ mvcc)
+- distributed memrows and/or memcols engine, using raft
 - boltdb engine
 - badger engine
 */
@@ -33,7 +34,7 @@ import (
 	"github.com/leftmike/maho/config"
 	"github.com/leftmike/maho/engine"
 	_ "github.com/leftmike/maho/engine/basic"
-	_ "github.com/leftmike/maho/engine/memory"
+	_ "github.com/leftmike/maho/engine/memrows"
 	"github.com/leftmike/maho/execute"
 	"github.com/leftmike/maho/parser"
 	"github.com/leftmike/maho/sql"

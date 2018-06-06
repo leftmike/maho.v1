@@ -1,4 +1,4 @@
-package memory
+package memrows
 
 import (
 	"fmt"
@@ -65,7 +65,7 @@ func (mt *tableImpl) delete(tctx *tcontext, idx int) error {
 
 	row := mt.rows[idx].modifyValues(tctx, false)
 	if row == nil {
-		return fmt.Errorf("memory: update row: %d conflicting changes", idx)
+		return fmt.Errorf("memrows: update row: %d conflicting changes", idx)
 	}
 	mt.rows[idx] = row
 	return nil
@@ -77,7 +77,7 @@ func (mt *tableImpl) update(tctx *tcontext, updates []db.ColumnUpdate, idx int) 
 
 	row := mt.rows[idx].modifyValues(tctx, true)
 	if row == nil {
-		return fmt.Errorf("memory: update row: %d conflicting changes", idx)
+		return fmt.Errorf("memrows: update row: %d conflicting changes", idx)
 	}
 	mt.rows[idx] = row
 	for _, up := range updates {
@@ -92,11 +92,11 @@ func (mt *tableImpl) checkRows(s string, tid tid, rows []int) error {
 
 	for _, idx := range rows {
 		if idx >= len(mt.rows) || mt.rows[idx] == nil {
-			return fmt.Errorf("memory: %s: row: %d does not exist", s, idx)
+			return fmt.Errorf("memrows: %s: row: %d does not exist", s, idx)
 		}
 		row := mt.rows[idx]
 		if !row.version.isTransaction() || row.version.getTID() != tid {
-			return fmt.Errorf("memory: %s: row: %d not part of transaction: %d", s, idx, tid)
+			return fmt.Errorf("memrows: %s: row: %d not part of transaction: %d", s, idx, tid)
 		}
 	}
 	return nil
