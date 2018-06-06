@@ -297,6 +297,14 @@ func DropTable(ses db.Session, tx *Transaction, dbname, tblname sql.Identifier, 
 	return de.database.DropTable(ses, tx.getContext(de.database), tblname, exists)
 }
 
+func GetEngine(typ string) Engine {
+	mutex.RLock()
+	defer mutex.RUnlock()
+
+	e, _ := engines[typ]
+	return e
+}
+
 func Register(typ string, e Engine) {
 	mutex.Lock()
 	defer mutex.Unlock()
