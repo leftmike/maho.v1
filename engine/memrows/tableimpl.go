@@ -59,19 +59,19 @@ func (mt *tableImpl) next(tctx *tcontext, dest []sql.Value, idx int) (int, error
 	return idx, io.EOF
 }
 
-func (mt *tableImpl) delete(tctx *tcontext, idx int) error {
+func (mt *tableImpl) deleteRow(tctx *tcontext, idx int) error {
 	mt.mutex.Lock()
 	defer mt.mutex.Unlock()
 
 	row := mt.rows[idx].modifyValues(tctx, false)
 	if row == nil {
-		return fmt.Errorf("memrows: update row: %d conflicting changes", idx)
+		return fmt.Errorf("memrows: delete row: %d conflicting changes", idx)
 	}
 	mt.rows[idx] = row
 	return nil
 }
 
-func (mt *tableImpl) update(tctx *tcontext, updates []db.ColumnUpdate, idx int) error {
+func (mt *tableImpl) updateRow(tctx *tcontext, updates []db.ColumnUpdate, idx int) error {
 	mt.mutex.Lock()
 	defer mt.mutex.Unlock()
 

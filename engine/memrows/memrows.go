@@ -5,6 +5,13 @@ package memrows
 - keep track of deleted rows and reuse them
 - cleanup old versions and old rows
 - snapshots
+- testeng.go: finish RunTableTest
+
+LookupTable: (version <= || isTransaction and GetTID() == tctx.tid) && !dropped
+CreateTable: mdb.tables[name] == nil // handle case of table dropped by transaction
+DropTable: version <= || isTransaction and GetTID() == tctx.tid
+fatlock.Exclusive(obj interface{}, tx interface{}) bool
+fatlock.Shared(obj interface{}, tx interface{}) bool
 */
 
 import (
@@ -236,7 +243,7 @@ func (mr *rows) Delete(ses db.Session) error {
 		return fmt.Errorf("memrows: no row to delete")
 	}
 	mr.haveRow = false
-	err := mr.table.table.delete(mr.table.tctx, mr.index-1)
+	err := mr.table.table.deleteRow(mr.table.tctx, mr.index-1)
 	if err != nil {
 		return err
 	}
@@ -248,7 +255,7 @@ func (mr *rows) Update(ses db.Session, updates []db.ColumnUpdate) error {
 	if !mr.haveRow {
 		return fmt.Errorf("memrows: no row to update")
 	}
-	err := mr.table.table.update(mr.table.tctx, updates, mr.index-1)
+	err := mr.table.table.updateRow(mr.table.tctx, updates, mr.index-1)
 	if err != nil {
 		return err
 	}
