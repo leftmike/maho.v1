@@ -7,6 +7,7 @@ import (
 
 	"github.com/leftmike/maho/config"
 	"github.com/leftmike/maho/db"
+	"github.com/leftmike/maho/engine/fatlock"
 	"github.com/leftmike/maho/sql"
 )
 
@@ -67,7 +68,7 @@ type Database interface {
 		cols []sql.Identifier, colTypes []db.ColumnType) error
 	DropTable(ses db.Session, tctx interface{}, tblname sql.Identifier, exists bool) error
 	ListTables(ses db.Session, tctx interface{}) ([]TableEntry, error)
-	Begin(tx *Transaction) interface{}
+	Begin(lkr fatlock.Locker) interface{}
 	Commit(ses db.Session, tctx interface{}) error
 	Rollback(tctx interface{}) error
 	NextStmt(tctx interface{})
@@ -181,7 +182,8 @@ func DetachDatabase(name sql.Identifier) error {
 }
 
 type Transaction struct {
-	contexts map[Database]interface{}
+	lockerState fatlock.LockerState
+	contexts    map[Database]interface{}
 }
 
 // Begin a new transaction.
@@ -189,6 +191,10 @@ func Begin() *Transaction {
 	return &Transaction{
 		contexts: map[Database]interface{}{},
 	}
+}
+
+func (tx *Transaction) LockerState() *fatlock.LockerState {
+	return &tx.lockerState
 }
 
 func (tx *Transaction) forContexts(fn func(d Database, tctx interface{}) error) error {
@@ -215,6 +221,7 @@ func (tx *Transaction) Commit(ses db.Session) error {
 		return d.Commit(ses, tctx)
 	})
 	tx.contexts = nil
+	fatlock.ReleaseLocks(tx)
 	return err
 }
 
@@ -223,6 +230,7 @@ func (tx *Transaction) Rollback() error {
 		return d.Rollback(tctx)
 	})
 	tx.contexts = nil
+	fatlock.ReleaseLocks(tx)
 	return err
 }
 

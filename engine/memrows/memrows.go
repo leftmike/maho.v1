@@ -29,7 +29,7 @@ type database struct {
 }
 
 type tcontext struct {
-	tx      *engine.Transaction
+	locker  fatlock.Locker
 	version version
 	tid     tid
 	cid     cid
@@ -111,7 +111,7 @@ func (mdb *database) LookupTable(ses db.Session, tx interface{}, tblname sql.Ide
 		return tbl, nil
 	}
 
-	err := fatlock.LockTable(tctx.tx, mdb.name, tblname, fatlock.ACCESS)
+	err := fatlock.LockTable(tctx.locker, mdb.name, tblname, fatlock.ACCESS)
 	if err != nil {
 		return nil, err
 	}
@@ -139,7 +139,7 @@ func (mdb *database) CreateTable(ses db.Session, tx interface{}, tblname sql.Ide
 	cols []sql.Identifier, colTypes []db.ColumnType) error {
 
 	tctx := tx.(*tcontext)
-	err := fatlock.LockTable(tctx.tx, mdb.name, tblname, fatlock.EXCLUSIVE)
+	err := fatlock.LockTable(tctx.locker, mdb.name, tblname, fatlock.EXCLUSIVE)
 	if err != nil {
 		return err
 	}
@@ -189,7 +189,7 @@ func (mdb *database) DropTable(ses db.Session, tx interface{}, tblname sql.Ident
 	exists bool) error {
 
 	tctx := tx.(*tcontext)
-	err := fatlock.LockTable(tctx.tx, mdb.name, tblname, fatlock.EXCLUSIVE)
+	err := fatlock.LockTable(tctx.locker, mdb.name, tblname, fatlock.EXCLUSIVE)
 	if err != nil {
 		return err
 	}
@@ -264,13 +264,13 @@ func (mdb *database) ListTables(ses db.Session, tx interface{}) ([]engine.TableE
 	return tbls, nil
 }
 
-func (mdb *database) Begin(tx *engine.Transaction) interface{} {
+func (mdb *database) Begin(lkr fatlock.Locker) interface{} {
 	mdb.mutex.Lock()
 	defer mdb.mutex.Unlock()
 
 	mdb.nextTID += 1
 	return &tcontext{
-		tx:      tx,
+		locker:  lkr,
 		version: mdb.version,
 		tid:     mdb.nextTID - 1,
 		tables:  map[sql.Identifier]*table{},
@@ -357,7 +357,7 @@ func (mt *table) Rows(ses db.Session) (db.Rows, error) {
 
 func (mt *table) Insert(ses db.Session, row []sql.Value) error {
 	if !mt.modifyLock {
-		err := fatlock.LockTable(mt.tctx.tx, mt.db.name, mt.name, fatlock.ROW_MODIFY)
+		err := fatlock.LockTable(mt.tctx.locker, mt.db.name, mt.name, fatlock.ROW_MODIFY)
 		if err != nil {
 			return err
 		}
@@ -398,7 +398,7 @@ func (mr *rows) Delete(ses db.Session) error {
 		return fmt.Errorf("memrows: no row to delete")
 	}
 	if !mr.table.modifyLock {
-		err := fatlock.LockTable(mr.table.tctx.tx, mr.table.db.name, mr.table.name,
+		err := fatlock.LockTable(mr.table.tctx.locker, mr.table.db.name, mr.table.name,
 			fatlock.ROW_MODIFY)
 		if err != nil {
 			return err
@@ -420,7 +420,7 @@ func (mr *rows) Update(ses db.Session, updates []db.ColumnUpdate) error {
 		return fmt.Errorf("memrows: no row to update")
 	}
 	if !mr.table.modifyLock {
-		err := fatlock.LockTable(mr.table.tctx.tx, mr.table.db.name, mr.table.name,
+		err := fatlock.LockTable(mr.table.tctx.locker, mr.table.db.name, mr.table.name,
 			fatlock.ROW_MODIFY)
 		if err != nil {
 			return err

@@ -6,6 +6,7 @@ import (
 
 	"github.com/leftmike/maho/db"
 	"github.com/leftmike/maho/engine"
+	"github.com/leftmike/maho/engine/fatlock"
 	"github.com/leftmike/maho/sql"
 )
 
@@ -102,7 +103,7 @@ func (bdb *database) ListTables(ses db.Session, tctx interface{}) ([]engine.Tabl
 	return tbls, nil
 }
 
-func (bdb *database) Begin(tx *engine.Transaction) interface{} {
+func (bdb *database) Begin(lkr fatlock.Locker) interface{} {
 	return nil
 }
 

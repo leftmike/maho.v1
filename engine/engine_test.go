@@ -10,6 +10,7 @@ import (
 	"time"
 
 	"github.com/leftmike/maho/db"
+	"github.com/leftmike/maho/engine/fatlock"
 	"github.com/leftmike/maho/sql"
 )
 
@@ -104,7 +105,7 @@ func (tdb *testDatabase) ListTables(ses db.Session, tx interface{}) ([]TableEntr
 	return nil, nil
 }
 
-func (tdb *testDatabase) Begin(tx *Transaction) interface{} {
+func (tdb *testDatabase) Begin(lkr fatlock.Locker) interface{} {
 	tdb.te.op("Begin")
 	return &tcontext{tdb}
 }

@@ -6,6 +6,7 @@ import (
 
 	"github.com/leftmike/maho/config"
 	"github.com/leftmike/maho/db"
+	"github.com/leftmike/maho/engine/fatlock"
 	"github.com/leftmike/maho/sql"
 )
 
@@ -96,7 +97,7 @@ func (vdb *virtualDatabase) ListTables(ses db.Session, tctx interface{}) ([]Tabl
 	return tbls, nil
 }
 
-func (vdb *virtualDatabase) Begin(tx *Transaction) interface{} {
+func (vdb *virtualDatabase) Begin(lkr fatlock.Locker) interface{} {
 	return nil
 }
 

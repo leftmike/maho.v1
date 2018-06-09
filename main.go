@@ -20,10 +20,10 @@ To Do:
 - utility code for executing SQL
 
 - testeng.go: finish RunTableTest
-- testeng.go: change d.Begin to take a fatlock something
 
-- add locking: fatlock
+- fatlock: share locks properly
 - locks are tracked by transaction
+- test sharing locks
 
 - memrows engine (w/ mvcc)
 - memcols engine (w/ mvcc)

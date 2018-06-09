@@ -9,6 +9,7 @@ import (
 
 	"github.com/leftmike/maho/db"
 	"github.com/leftmike/maho/engine"
+	"github.com/leftmike/maho/engine/fatlock"
 	"github.com/leftmike/maho/sql"
 )
 
@@ -45,15 +46,24 @@ const (
 
 type cmd struct {
 	cmd              int
-	fail             bool           // The command should fail.
-	needTransactions bool           // The test requires that transactions are supported.
+	fail             bool           // The command should fail
+	needTransactions bool           // The test requires that transactions are supported
 	exists           bool           // Flag for DropTable
 	name             sql.Identifier // Name of the table
 	list             []string       // List of table names
 }
 
+type testLocker struct {
+	lockerState fatlock.LockerState
+}
+
+func (tl *testLocker) LockerState() *fatlock.LockerState {
+	return &tl.lockerState
+}
+
 func testTableLifecycle(t *testing.T, d engine.Database, cmds []cmd) {
 	var tctx interface{}
+	var locker fatlock.Locker
 
 	ses := session{}
 	for _, cmd := range cmds {
@@ -62,7 +72,8 @@ func testTableLifecycle(t *testing.T, d engine.Database, cmds []cmd) {
 			if tctx != nil {
 				panic("tctx != nil: missing commit or rollback from commands")
 			}
-			tctx = d.Begin(nil)
+			locker = &testLocker{}
+			tctx = d.Begin(locker)
 			if tctx == nil && cmd.needTransactions {
 				return // Engine does not support transactions, so skip these tests.
 			}
@@ -76,6 +87,7 @@ func testTableLifecycle(t *testing.T, d engine.Database, cmds []cmd) {
 				t.Errorf("Commit() failed with %s", err)
 			}
 			tctx = nil
+			fatlock.ReleaseLocks(locker)
 		case cmdRollback:
 			err := d.Rollback(tctx)
 			if cmd.fail {
@@ -86,6 +98,7 @@ func testTableLifecycle(t *testing.T, d engine.Database, cmds []cmd) {
 				t.Errorf("Rollback() failed with %s", err)
 			}
 			tctx = nil
+			fatlock.ReleaseLocks(locker)
 		case cmdLookupTable:
 			_, err := d.LookupTable(ses, tctx, cmd.name)
 			if cmd.fail {
@@ -147,6 +160,7 @@ func RunDatabaseTest(t *testing.T, e engine.Engine) {
 	testTableLifecycle(t, d,
 		[]cmd{
 			{cmd: cmdBegin},
+
 			{cmd: cmdLookupTable, name: sql.ID("tbl-a"), fail: true},
 			{cmd: cmdCreateTable, name: sql.ID("tbl-a")},
 			{cmd: cmdLookupTable, name: sql.ID("tbl-a")},
@@ -155,7 +169,6 @@ func RunDatabaseTest(t *testing.T, e engine.Engine) {
 			{cmd: cmdBegin},
 			{cmd: cmdListTables, list: []string{"tbl-a"}},
 			{cmd: cmdCommit},
-
 			{cmd: cmdBegin},
 			{cmd: cmdCreateTable, name: sql.ID("tbl-b")},
 			{cmd: cmdCreateTable, name: sql.ID("tbl-c")},
@@ -342,7 +355,7 @@ func RunTableTest(t *testing.T, e engine.Engine) {
 			{cmd: cmdCommit},
 		})
 
-	tctx := d.Begin(nil)
+	tctx := d.Begin(&testLocker{})
 	tbl, err := d.LookupTable(ses, tctx, tblname)
 	if err != nil {
 		t.Errorf("LookupTable(%s) failed with %s", tblname, err)
