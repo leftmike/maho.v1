@@ -5,7 +5,6 @@ import (
 	"fmt"
 	"path/filepath"
 	"reflect"
-	"sync"
 	"testing"
 	"time"
 
@@ -20,8 +19,7 @@ type testOp struct {
 }
 
 type testEngine struct {
-	cond *sync.Cond
-	done bool
+	done chan struct{}
 	ops  []testOp
 }
 
@@ -50,12 +48,7 @@ func (te *testEngine) checkOps(t *testing.T, ops []testOp) {
 func (te *testEngine) AttachDatabase(name sql.Identifier, path string, options Options) (Database,
 	error) {
 
-	te.cond.L.Lock()
-	for !te.done {
-		te.cond.Wait()
-	}
-	te.cond.L.Unlock()
-
+	<-te.done
 	te.op("AttachDatabase", name.String(), path)
 	return &testDatabase{te}, nil
 }
@@ -174,18 +167,16 @@ func checkDatabaseState(t *testing.T, state databaseState, name sql.Identifier) 
 
 func TestEngine(t *testing.T) {
 	te := &testEngine{
-		cond: sync.NewCond(&sync.Mutex{}),
+		done: make(chan struct{}),
 	}
 	Register("test", te)
 
-	te.done = false
 	err := AttachDatabase("test", sql.ID("db1"), nil)
 	if err != nil {
 		t.Errorf("AttachDatabase() failed with %s", err)
 	}
 	checkDatabaseState(t, Attaching, sql.ID("db1"))
-	te.done = true
-	te.cond.Signal()
+	te.done <- struct{}{}
 
 	time.Sleep(50 * time.Millisecond)
 	checkDatabaseState(t, Running, sql.ID("db1"))
