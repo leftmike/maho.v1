@@ -102,7 +102,7 @@ func (bdb *database) ListTables(ses db.Session, tctx interface{}) ([]engine.Tabl
 	return tbls, nil
 }
 
-func (bdb *database) Begin() interface{} {
+func (bdb *database) Begin(tx *engine.Transaction) interface{} {
 	return nil
 }
 

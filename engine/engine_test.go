@@ -104,7 +104,7 @@ func (tdb *testDatabase) ListTables(ses db.Session, tx interface{}) ([]TableEntr
 	return nil, nil
 }
 
-func (tdb *testDatabase) Begin() interface{} {
+func (tdb *testDatabase) Begin(tx *Transaction) interface{} {
 	tdb.te.op("Begin")
 	return &tcontext{tdb}
 }

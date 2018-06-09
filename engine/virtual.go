@@ -96,7 +96,7 @@ func (vdb *virtualDatabase) ListTables(ses db.Session, tctx interface{}) ([]Tabl
 	return tbls, nil
 }
 
-func (vdb *virtualDatabase) Begin() interface{} {
+func (vdb *virtualDatabase) Begin(tx *Transaction) interface{} {
 	return nil
 }
 

@@ -10,6 +10,11 @@ import (
 )
 
 type tableImpl struct {
+	createdVersion version
+	droppedVersion version
+	dropped        bool
+	previous       *tableImpl
+
 	mutex       sync.RWMutex
 	columns     []sql.Identifier
 	columnTypes []db.ColumnType

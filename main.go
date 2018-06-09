@@ -8,11 +8,22 @@ To Do:
 
 - fuzzing: parser.Parse
 
+- fix error messages in engine/... to be "engine: table <db>.<tbl>: ..."
+
+- ALTER TABLE ...
+- memrows: tableImpl: add versioned metadata and use METADATA_MODIFY locking level
+
 - BEGIN, START TRANSACTION
 - COMMIT
 - ROLLBACK
 - improve interactive execution
 - utility code for executing SQL
+
+- testeng.go: finish RunTableTest
+- testeng.go: change d.Begin to take a fatlock something
+
+- add locking: fatlock
+- locks are tracked by transaction
 
 - memrows engine (w/ mvcc)
 - memcols engine (w/ mvcc)

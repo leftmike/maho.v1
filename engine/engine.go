@@ -67,7 +67,7 @@ type Database interface {
 		cols []sql.Identifier, colTypes []db.ColumnType) error
 	DropTable(ses db.Session, tctx interface{}, tblname sql.Identifier, exists bool) error
 	ListTables(ses db.Session, tctx interface{}) ([]TableEntry, error)
-	Begin() interface{}
+	Begin(tx *Transaction) interface{}
 	Commit(ses db.Session, tctx interface{}) error
 	Rollback(tctx interface{}) error
 	NextStmt(tctx interface{})
@@ -192,6 +192,10 @@ func Begin() *Transaction {
 }
 
 func (tx *Transaction) forContexts(fn func(d Database, tctx interface{}) error) error {
+	if tx.contexts == nil {
+		panic("transaction used after commit or rollback")
+	}
+
 	var err error
 	for d, tctx := range tx.contexts {
 		cerr := fn(d, tctx)
@@ -207,15 +211,19 @@ func (tx *Transaction) forContexts(fn func(d Database, tctx interface{}) error) 
 }
 
 func (tx *Transaction) Commit(ses db.Session) error {
-	return tx.forContexts(func(d Database, tctx interface{}) error {
+	err := tx.forContexts(func(d Database, tctx interface{}) error {
 		return d.Commit(ses, tctx)
 	})
+	tx.contexts = nil
+	return err
 }
 
 func (tx *Transaction) Rollback() error {
-	return tx.forContexts(func(d Database, tctx interface{}) error {
+	err := tx.forContexts(func(d Database, tctx interface{}) error {
 		return d.Rollback(tctx)
 	})
+	tx.contexts = nil
+	return err
 }
 
 func (tx *Transaction) NextStmt() {
@@ -226,9 +234,13 @@ func (tx *Transaction) NextStmt() {
 }
 
 func (tx *Transaction) getContext(d Database) interface{} {
+	if tx.contexts == nil {
+		panic("transaction used after commit or rollback")
+	}
+
 	tctx, ok := tx.contexts[d]
 	if !ok {
-		tctx = d.Begin()
+		tctx = d.Begin(tx)
 		tx.contexts[d] = tctx
 	}
 	return tctx
