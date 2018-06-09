@@ -13,7 +13,7 @@ func TestSet(t *testing.T) {
 		r string
 	}{
 		{
-			misc.Set{sql.ID("variable"), "value"},
+			misc.Set{Variable: sql.ID("variable"), Value: "value"},
 			"SET variable TO value",
 		},
 	}

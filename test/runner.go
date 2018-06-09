@@ -35,13 +35,13 @@ func (run *Runner) RunExec(tst *sqltest.Test) error {
 		}
 		err = run.ses.Run(stmt,
 			func(tx *engine.Transaction, stmt execute.Stmt) error {
-				ret, err := stmt.Plan(run.ses, tx)
-				if err != nil {
-					return err
+				ret, err2 := stmt.Plan(run.ses, tx)
+				if err2 != nil {
+					return err2
 				}
-				_, err = ret.(execute.Executor).Execute(run.ses, tx)
-				if err != nil {
-					return err
+				_, err2 = ret.(execute.Executor).Execute(run.ses, tx)
+				if err2 != nil {
+					return err2
 				}
 
 				return nil
@@ -69,9 +69,9 @@ func (run *Runner) RunQuery(tst *sqltest.Test) ([]string, [][]string, error) {
 	var results [][]string
 	err = run.ses.Run(stmt,
 		func(tx *engine.Transaction, stmt execute.Stmt) error {
-			ret, err := stmt.Plan(run.ses, tx)
-			if err != nil {
-				return err
+			ret, err2 := stmt.Plan(run.ses, tx)
+			if err2 != nil {
+				return err2
 			}
 			rows, ok := ret.(execute.Rows)
 			if !ok {
@@ -87,11 +87,11 @@ func (run *Runner) RunQuery(tst *sqltest.Test) ([]string, [][]string, error) {
 
 			dest := make([]sql.Value, lenCols)
 			for {
-				err = rows.Next(run.ses, dest)
-				if err == io.EOF {
+				err2 = rows.Next(run.ses, dest)
+				if err2 == io.EOF {
 					break
-				} else if err != nil {
-					return err
+				} else if err2 != nil {
+					return err2
 				}
 				row := make([]string, 0, lenCols)
 				for _, v := range dest {

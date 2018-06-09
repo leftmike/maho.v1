@@ -65,16 +65,16 @@ func replSQL(p parser.Parser, w io.Writer) {
 
 		err = ses.Run(stmt,
 			func(tx *engine.Transaction, stmt execute.Stmt) error {
-				ret, err := stmt.Plan(ses, tx)
-				if err != nil {
-					return err
+				ret, err2 := stmt.Plan(ses, tx)
+				if err2 != nil {
+					return err2
 				}
 
 				if exec, ok := ret.(execute.Executor); ok {
 					var cnt int64
-					cnt, err = exec.Execute(ses, tx)
-					if err != nil {
-						return err
+					cnt, err2 = exec.Execute(ses, tx)
+					if err2 != nil {
+						return err2
 					}
 					if cnt >= 0 {
 						fmt.Fprintf(w, "%d rows updated\n", cnt)
@@ -97,8 +97,8 @@ func replSQL(p parser.Parser, w io.Writer) {
 					dest := make([]sql.Value, len(cols))
 					i := 1
 					for {
-						err = rows.Next(ses, dest)
-						if err != nil {
+						err2 = rows.Next(ses, dest)
+						if err2 != nil {
 							break
 						}
 						fmt.Fprintf(w, "%d\t", i)
@@ -110,8 +110,8 @@ func replSQL(p parser.Parser, w io.Writer) {
 					}
 					fmt.Fprintf(w, "(%d rows)\n", i-1)
 					w.Flush()
-					if err != io.EOF {
-						return err
+					if err2 != io.EOF {
+						return err2
 					}
 				}
 				return nil
