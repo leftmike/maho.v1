@@ -21,8 +21,8 @@ To Do:
 
 - testeng.go: finish RunTableTest
 
-- fatlock: share locks properly
-- locks are tracked by transaction
+- fatlock: wait for locks
+- fatlock: support querying locks (and transactions)
 - test sharing locks
 
 - memrows engine (w/ mvcc)
