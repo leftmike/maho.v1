@@ -111,7 +111,7 @@ func (mdb *database) LookupTable(ses db.Session, tx interface{}, tblname sql.Ide
 		return tbl, nil
 	}
 
-	err := fatlock.LockTable(tctx.locker, mdb.name, tblname, fatlock.ACCESS)
+	err := fatlock.LockTable(ses, tctx.locker, mdb.name, tblname, fatlock.ACCESS)
 	if err != nil {
 		return nil, err
 	}
@@ -139,7 +139,7 @@ func (mdb *database) CreateTable(ses db.Session, tx interface{}, tblname sql.Ide
 	cols []sql.Identifier, colTypes []db.ColumnType) error {
 
 	tctx := tx.(*tcontext)
-	err := fatlock.LockTable(tctx.locker, mdb.name, tblname, fatlock.EXCLUSIVE)
+	err := fatlock.LockTable(ses, tctx.locker, mdb.name, tblname, fatlock.EXCLUSIVE)
 	if err != nil {
 		return err
 	}
@@ -189,7 +189,7 @@ func (mdb *database) DropTable(ses db.Session, tx interface{}, tblname sql.Ident
 	exists bool) error {
 
 	tctx := tx.(*tcontext)
-	err := fatlock.LockTable(tctx.locker, mdb.name, tblname, fatlock.EXCLUSIVE)
+	err := fatlock.LockTable(ses, tctx.locker, mdb.name, tblname, fatlock.EXCLUSIVE)
 	if err != nil {
 		return err
 	}
@@ -357,7 +357,7 @@ func (mt *table) Rows(ses db.Session) (db.Rows, error) {
 
 func (mt *table) Insert(ses db.Session, row []sql.Value) error {
 	if !mt.modifyLock {
-		err := fatlock.LockTable(mt.tctx.locker, mt.db.name, mt.name, fatlock.ROW_MODIFY)
+		err := fatlock.LockTable(ses, mt.tctx.locker, mt.db.name, mt.name, fatlock.ROW_MODIFY)
 		if err != nil {
 			return err
 		}
@@ -398,7 +398,7 @@ func (mr *rows) Delete(ses db.Session) error {
 		return fmt.Errorf("memrows: no row to delete")
 	}
 	if !mr.table.modifyLock {
-		err := fatlock.LockTable(mr.table.tctx.locker, mr.table.db.name, mr.table.name,
+		err := fatlock.LockTable(ses, mr.table.tctx.locker, mr.table.db.name, mr.table.name,
 			fatlock.ROW_MODIFY)
 		if err != nil {
 			return err
@@ -420,7 +420,7 @@ func (mr *rows) Update(ses db.Session, updates []db.ColumnUpdate) error {
 		return fmt.Errorf("memrows: no row to update")
 	}
 	if !mr.table.modifyLock {
-		err := fatlock.LockTable(mr.table.tctx.locker, mr.table.db.name, mr.table.name,
+		err := fatlock.LockTable(ses, mr.table.tctx.locker, mr.table.db.name, mr.table.name,
 			fatlock.ROW_MODIFY)
 		if err != nil {
 			return err

@@ -1,6 +1,7 @@
 package fatlock_test
 
 import (
+	"context"
 	"testing"
 
 	"github.com/leftmike/maho/engine/fatlock"
@@ -15,10 +16,25 @@ func (tl *testLocker) LockerState() *fatlock.LockerState {
 	return &tl.lockerState
 }
 
+type session struct{}
+
+func (ses session) Context() context.Context {
+	return nil
+}
+
+func (ses session) DefaultEngine() string {
+	return ""
+}
+
+func (ses session) DefaultDatabase() sql.Identifier {
+	return 0
+}
+
 func TestFatlock(t *testing.T) {
 	var tl testLocker
 
-	err := fatlock.LockTable(&tl, sql.ID("db"), sql.ID("tbl1"), fatlock.ACCESS)
+	ses := session{}
+	err := fatlock.LockTable(ses, &tl, sql.ID("db"), sql.ID("tbl1"), fatlock.ACCESS)
 	if err != nil {
 		t.Errorf("LockTable() failed with %s", err)
 	}
