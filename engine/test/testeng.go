@@ -2,6 +2,7 @@ package test
 
 import (
 	"context"
+	"fmt"
 	"path/filepath"
 	"reflect"
 	"sort"
@@ -59,6 +60,10 @@ type testLocker struct {
 
 func (tl *testLocker) LockerState() *fatlock.LockerState {
 	return &tl.lockerState
+}
+
+func (tl *testLocker) String() string {
+	return fmt.Sprintf("locker-%p", tl)
 }
 
 func testTableLifecycle(t *testing.T, d engine.Database, cmds []cmd) {

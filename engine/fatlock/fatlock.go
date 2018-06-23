@@ -17,6 +17,21 @@ const (
 	EXCLUSIVE
 )
 
+func (ll LockLevel) String() string {
+	switch ll {
+	case ACCESS:
+		return "ACCESS"
+	case ROW_MODIFY:
+		return "ROW_MODIFY"
+	case METADATA_MODIFY:
+		return "METADATA_MODIFY"
+	case EXCLUSIVE:
+		return "EXCLUSIVE"
+	default:
+		return fmt.Sprintf("LockLevel(%d)", ll)
+	}
+}
+
 var lockSharing = [5][5]bool{
 	ACCESS:          [5]bool{ACCESS: true, ROW_MODIFY: true, METADATA_MODIFY: true},
 	ROW_MODIFY:      [5]bool{ACCESS: true, ROW_MODIFY: true},
@@ -26,6 +41,10 @@ var lockSharing = [5][5]bool{
 
 type lockKey struct {
 	db, tbl sql.Identifier
+}
+
+func (lk lockKey) String() string {
+	return fmt.Sprintf("%s.%s", lk.db, lk.tbl)
 }
 
 // A lock will exist for every Locker that has an object currently locked.
@@ -50,13 +69,18 @@ type object struct {
 // Locker is something that locks an object.
 type Locker interface {
 	LockerState() *LockerState
+	String() string
 }
 
 // LockerState keeps track of the state of a Locker.
 type LockerState struct {
+	released   bool
 	locks      map[lockKey]*lock // The set of locks this Locker currently holds.
 	nextWaiter *LockerState      // Used to link the queue of waiters together.
-	waitCh     chan struct{}     // Used to notify a Locker to try to aquire a lock.
+	// Used to notify a Locker to try to aquire a lock; true means the lock is unlocked.
+	waitCh    chan bool
+	waitLevel LockLevel // Lock level that the Locker is waiting for.
+	locker    Locker
 }
 
 var (
@@ -66,22 +90,14 @@ var (
 	objects = map[lockKey]*object{}
 )
 
-// canShareLock tests if the lock level can share access with the current lock level on the
-// object. Don't use this function (directly) when trying to increase the lock level of a
-// currently held lock: use canIncreaseLock instead.
-func canShareLock(obj *object, ll LockLevel) bool {
-	if obj.firstWaiter != nil {
-		return false
-	}
-	return lockSharing[obj.level][ll]
-}
-
 // canIncreaseLock tests if an existing lock on the object can be increased to a higher lock level.
 func canIncreaseLock(obj *object, ll LockLevel) bool {
-	if len(obj.locks) == 1 {
+	if obj.firstWaiter != nil {
+		return false
+	} else if len(obj.locks) == 1 {
 		return true
 	}
-	return canShareLock(obj, ll)
+	return lockSharing[obj.level][ll]
 }
 
 func addLock(obj *object, ls *LockerState, ll LockLevel) {
@@ -96,7 +112,8 @@ func addLock(obj *object, ls *LockerState, ll LockLevel) {
 	}
 }
 
-func waitForLock(ses db.Session, obj *object, ls *LockerState, ll LockLevel) error {
+func waitForLock(ses db.Session, obj *object, ls *LockerState, ll LockLevel) {
+	ls.waitLevel = ll
 	// Add the locker to the queue of waiters.
 	ls.nextWaiter = nil
 	if obj.lastWaiter != nil {
@@ -110,32 +127,35 @@ func waitForLock(ses db.Session, obj *object, ls *LockerState, ll LockLevel) err
 	// function is called, so unlock it before waiting on the channel.
 	for {
 		mutex.Unlock()
-		<-ls.waitCh
+		unlocked := <-ls.waitCh
 		mutex.Lock()
 
-		if canShareLock(obj, ll) {
+		if unlocked || lockSharing[obj.level][ll] {
 			break
 		}
 	}
 
-	// Remove the locker from the queue of waiters, and notify the next waiter, if there is one.
+	// Remove the locker from the queue of waiters, and notify the next waiter, if there is one,
+	// so that it can try to share the lock.
 	obj.firstWaiter = ls.nextWaiter
 	if obj.firstWaiter == nil {
 		obj.lastWaiter = nil
 	} else {
-		obj.firstWaiter.waitCh <- struct{}{}
+		obj.firstWaiter.waitCh <- false
 	}
-
-	return nil
 }
 
 // LockTable locks the table (specified by db.tbl) for lkr at the specified lock level. It may
 // block waiting for a lock.
 func LockTable(ses db.Session, lkr Locker, db, tbl sql.Identifier, ll LockLevel) error {
 	ls := lkr.LockerState()
+	if ls.released {
+		return fmt.Errorf("fatlock: locker may not be reused")
+	}
 	if ls.locks == nil {
 		ls.locks = map[lockKey]*lock{}
-		ls.waitCh = make(chan struct{}, 1)
+		ls.waitCh = make(chan bool, 1)
+		ls.locker = lkr
 	}
 	key := lockKey{db, tbl}
 
@@ -161,15 +181,12 @@ func LockTable(ses db.Session, lkr Locker, db, tbl sql.Identifier, ll LockLevel)
 
 	obj, ok := objects[key]
 	if ok {
-		if canShareLock(obj, ll) {
+		if obj.firstWaiter == nil && lockSharing[obj.level][ll] {
 			addLock(obj, ls, ll)
 			return nil
 		}
 
-		err := waitForLock(ses, obj, ls, ll)
-		if err != nil {
-			return err
-		}
+		waitForLock(ses, obj, ls, ll)
 		addLock(obj, ls, ll)
 		return nil
 	}
@@ -196,10 +213,10 @@ func releaseLock(ls *LockerState, lk *lock) {
 			delete(objects, obj.key)
 		} else {
 			obj.level = 0
-			obj.firstWaiter.waitCh <- struct{}{}
+			obj.firstWaiter.waitCh <- true
 		}
 	} else {
-		// Recompute the level of lock on the object.
+		// Recompute the maximum level of lock on the object.
 		obj.level = 0
 		for _, lk := range obj.locks {
 			if lk.level > obj.level {
@@ -208,19 +225,66 @@ func releaseLock(ls *LockerState, lk *lock) {
 		}
 		// Notify the first waiter, if there is one, so it can check if it can share the lock.
 		if obj.firstWaiter != nil {
-			obj.firstWaiter.waitCh <- struct{}{}
+			obj.firstWaiter.waitCh <- false
 		}
 	}
 }
 
 // ReleaseLocks will release all locks held by lkr.
 func ReleaseLocks(lkr Locker) error {
+	ls := lkr.LockerState()
+	if ls.released {
+		return fmt.Errorf("fatlock: locker may not be reused")
+	}
+	ls.released = true
+
 	mutex.Lock()
 	defer mutex.Unlock()
 
-	ls := lkr.LockerState()
 	for _, lk := range ls.locks {
 		releaseLock(ls, lk)
 	}
 	return nil
+}
+
+type Lock struct {
+	Key    string
+	Locker string
+	Level  LockLevel
+	Place  int // If waiting, place in the queue (one based). Otherwise, (the lock is held) zero.
+}
+
+// Locks returns all locks.
+func Locks() []Lock {
+	mutex.Lock()
+	defer mutex.Unlock()
+
+	var locks []Lock
+	for _, o := range objects {
+		key := o.key.String()
+
+		// Held locks.
+		for ls, lk := range o.locks {
+			locks = append(locks, Lock{
+				Key:    key,
+				Locker: ls.locker.String(),
+				Level:  lk.level,
+			})
+		}
+
+		// Waiting for a lock.
+		ls := o.firstWaiter
+		for pl := 1; ls != nil; pl += 1 {
+			locks = append(locks, Lock{
+				Key:    key,
+				Locker: ls.locker.String(),
+				Level:  ls.waitLevel,
+				Place:  pl,
+			})
+
+			ls = ls.nextWaiter
+		}
+	}
+
+	return locks
 }

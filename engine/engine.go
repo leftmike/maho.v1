@@ -83,10 +83,13 @@ type databaseEntry struct {
 	err      error
 }
 
+type TID uint64
+
 var (
 	mutex     sync.RWMutex
-	engines   = map[string]Engine{}
-	databases = map[sql.Identifier]*databaseEntry{}
+	engines       = map[string]Engine{}
+	databases     = map[sql.Identifier]*databaseEntry{}
+	nextTID   TID = 1
 
 	dataDir = config.Var(new(string), "data_directory").
 		Flag("data", "`directory` containing databases").NoConfig().String("testdata")
@@ -184,17 +187,30 @@ func DetachDatabase(name sql.Identifier) error {
 type Transaction struct {
 	lockerState fatlock.LockerState
 	contexts    map[Database]interface{}
+	tid         TID
+	name        string
 }
 
 // Begin a new transaction.
 func Begin() *Transaction {
+	mutex.Lock()
+	defer mutex.Unlock()
+
+	tid := nextTID
+	nextTID += 1
 	return &Transaction{
 		contexts: map[Database]interface{}{},
+		tid:      tid,
+		name:     fmt.Sprintf("transaction-%d", tid),
 	}
 }
 
 func (tx *Transaction) LockerState() *fatlock.LockerState {
 	return &tx.lockerState
+}
+
+func (tx *Transaction) String() string {
+	return tx.name
 }
 
 func (tx *Transaction) forContexts(fn func(d Database, tctx interface{}) error) error {
