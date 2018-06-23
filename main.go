@@ -13,11 +13,9 @@ To Do:
 - ALTER TABLE ...
 - memrows: tableImpl: add versioned metadata and use METADATA_MODIFY locking level
 
-- BEGIN, START TRANSACTION
-- COMMIT
-- ROLLBACK
-- improve interactive execution
-- utility code for executing SQL
+- track sessions and transactions; maybe just one table
+- improve interactive execution: prompt, interactive editing (client app?), multiple sessions
+- server: ssh interactive access, logging
 
 - testeng.go: finish RunTableTest
 

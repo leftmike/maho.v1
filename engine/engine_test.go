@@ -165,50 +165,65 @@ func checkDatabaseState(t *testing.T, state databaseState, name sql.Identifier) 
 	}
 }
 
-func TestEngine(t *testing.T) {
-	te := &testEngine{
-		done: make(chan struct{}),
+func registerEngine() (*testEngine, string, int) {
+	var typ string
+	te := &testEngine{}
+	idx := 1
+	for {
+		typ = fmt.Sprintf("test-%d", idx)
+		if GetEngine(typ) == nil {
+			break
+		}
+		idx += 1
 	}
-	Register("test", te)
+	Register(typ, te)
+	return te, typ, idx
+}
 
-	err := AttachDatabase("test", sql.ID("db1"), nil)
+func TestEngine(t *testing.T) {
+	te, typ, idx := registerEngine()
+	te.done = make(chan struct{})
+	db1 := fmt.Sprintf("db%d-1", idx)
+	db2 := fmt.Sprintf("db%d-2", idx)
+
+	err := AttachDatabase(typ, sql.ID(db1), nil)
 	if err != nil {
-		t.Errorf("AttachDatabase() failed with %s", err)
+		t.Fatalf("AttachDatabase() failed with %s", err)
 	}
-	checkDatabaseState(t, Attaching, sql.ID("db1"))
+	checkDatabaseState(t, Attaching, sql.ID(db1))
 	te.done <- struct{}{}
 
 	time.Sleep(50 * time.Millisecond)
-	checkDatabaseState(t, Running, sql.ID("db1"))
+	checkDatabaseState(t, Running, sql.ID(db1))
 
-	err = CreateDatabase("test", sql.ID("db2"), Options{sql.WAIT: "true"})
+	err = CreateDatabase(typ, sql.ID(db2), Options{sql.WAIT: "true"})
 	if err != nil {
 		t.Errorf("CreateDatabase() failed with %s", err)
 	}
-	checkDatabaseState(t, Running, sql.ID("db2"))
+	checkDatabaseState(t, Running, sql.ID(db2))
 
 	te.checkOps(t, []testOp{
-		{op: "AttachDatabase", args: []string{"db1", filepath.Join("testdata", "db1")}},
-		{op: "CreateDatabase", args: []string{"db2", filepath.Join("testdata", "db2")}},
+		{op: "AttachDatabase", args: []string{db1, filepath.Join("testdata", db1)}},
+		{op: "CreateDatabase", args: []string{db2, filepath.Join("testdata", db2)}},
 	})
 }
 
 func TestDatabase(t *testing.T) {
-	te := &testEngine{}
-	Register("test2", te)
+	te, typ, idx := registerEngine()
+	db := fmt.Sprintf("db%d", idx)
 
-	err := CreateDatabase("test2", sql.ID("db3"), Options{sql.WAIT: "true"})
+	err := CreateDatabase(typ, sql.ID(db), Options{sql.WAIT: "true"})
 	if err != nil {
 		t.Errorf("CreateDatabase() failed with %s", err)
 	}
 	te.checkOps(t, []testOp{
-		{op: "CreateDatabase", args: []string{"db3", filepath.Join("testdata", "db3")}},
+		{op: "CreateDatabase", args: []string{db, filepath.Join("testdata", db)}},
 	})
 
 	tx := Begin()
 	ses := &session{
-		eng:  "test2",
-		name: sql.ID("db3"),
+		eng:  typ,
+		name: sql.ID(db),
 	}
 	err = CreateTable(ses, tx, 0, sql.ID("table1"), nil, nil)
 	if err != nil {
@@ -230,8 +245,8 @@ func TestDatabase(t *testing.T) {
 
 	tx = Begin()
 	ses = &session{
-		eng:  "test2",
-		name: sql.ID("db3"),
+		eng:  typ,
+		name: sql.ID(db),
 	}
 	_, err = LookupTable(ses, tx, 0, sql.ID("table1"))
 	if err != nil {

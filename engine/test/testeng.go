@@ -344,8 +344,6 @@ func RunDatabaseTest(t *testing.T, e engine.Engine) {
 func RunTableTest(t *testing.T, e engine.Engine) {
 	t.Helper()
 
-	ses := session{}
-
 	d, err := e.CreateDatabase(sql.ID("database_test"), filepath.Join("testdata", "database_test"),
 		nil)
 	if err != nil {
@@ -360,11 +358,21 @@ func RunTableTest(t *testing.T, e engine.Engine) {
 			{cmd: cmdCommit},
 		})
 
-	tctx := d.Begin(&testLocker{})
-	tbl, err := d.LookupTable(ses, tctx, tblname)
-	if err != nil {
-		t.Errorf("LookupTable(%s) failed with %s", tblname, err)
-	}
+	/*
+		ses := session{}
 
-	_ = tbl // XXX
+			tl := &testLocker{}
+			tctx := d.Begin(tl)
+			tbl, err := d.LookupTable(ses, tctx, tblname)
+			if err != nil {
+				t.Errorf("LookupTable(%s) failed with %s", tblname, err)
+			}
+
+			_ = tbl // XXX
+			err = d.Commit(ses, tctx)
+			if err != nil {
+				t.Errorf("Commit() failed with %s", err)
+			}
+			fatlock.ReleaseLocks(tl)
+	*/
 }
