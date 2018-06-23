@@ -21,8 +21,6 @@ To Do:
 
 - testeng.go: finish RunTableTest
 
-- fatlock: support querying locks (and transactions)
-
 - memrows engine (w/ mvcc)
 - memcols engine (w/ mvcc)
 - distributed memrows and/or memcols engine, using raft

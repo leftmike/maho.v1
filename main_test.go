@@ -23,7 +23,8 @@ func TestMain(t *testing.T) {
  4   'db$tables' 'virtual'
  5     'engines' 'virtual'
  6 'identifiers' 'virtual'
-(6 rows)
+ 7       'locks' 'virtual'
+(7 rows)
 `},
 	}
 

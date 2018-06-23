@@ -381,6 +381,34 @@ func makeEnginesVirtual(ses db.Session, tctx interface{}, d Database,
 	}, nil
 }
 
+func makeLocksVirtual(ses db.Session, tctx interface{}, d Database,
+	tblname sql.Identifier) (db.Table, error) {
+
+	values := [][]sql.Value{}
+
+	for _, lk := range fatlock.Locks() {
+		var place sql.Value
+		if lk.Place > 0 {
+			place = sql.Int64Value(lk.Place)
+		}
+		values = append(values, []sql.Value{
+			sql.StringValue(lk.Key),
+			sql.StringValue(lk.Locker),
+			sql.StringValue(lk.Level.String()),
+			sql.BoolValue(lk.Place == 0),
+			place,
+		})
+	}
+
+	return &VirtualTable{
+		Cols: []sql.Identifier{sql.ID("key"), sql.ID("locker"), sql.ID("level"),
+			sql.ID("held"), sql.ID("place")},
+		ColTypes: []db.ColumnType{idColType, idColType, idColType, boolColType,
+			db.ColumnType{Type: sql.IntegerType, Size: 4}},
+		Values: values,
+	}, nil
+}
+
 func init() {
 	CreateVirtualTable(sql.ID("db$tables"), makeTablesVirtual)
 	CreateVirtualTable(sql.ID("db$columns"), makeColumnsVirtual)
@@ -389,5 +417,6 @@ func init() {
 		sql.ID("identifiers"): makeIdentifiersVirtual,
 		sql.ID("config"):      makeConfigVirtual,
 		sql.ID("engines"):     makeEnginesVirtual,
+		sql.ID("locks"):       makeLocksVirtual,
 	})
 }
