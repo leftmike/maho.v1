@@ -111,6 +111,10 @@ SELECT <select-list>
 ```
 
 ```
+START TRANSACTION
+```
+
+```
 UPDATE [database '.'] table SET column '=' <expr> [',' ...] [WHERE <expr>]
 ```
 
