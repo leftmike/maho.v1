@@ -338,6 +338,7 @@ func TestFatlock4(t *testing.T) {
 	steps := []testStep{
 		stepLockTable{ses: 0, tbl: tbl1, ll: fatlock.METADATA_MODIFY},
 		stepLockTable{ses: 1, tbl: tbl1, ll: fatlock.ROW_MODIFY, wg: &wg},
+		stepSleep{},
 		stepLockTable{ses: 2, tbl: tbl1, ll: fatlock.METADATA_MODIFY, wg: &wg2},
 		stepSleep{},
 		stepLocks{
