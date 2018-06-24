@@ -241,7 +241,7 @@ func testInsert(t *testing.T, ses *execute.Session, dbnam, nam sql.Identifier,
 				continue
 			}
 			var all [][]sql.Value
-			all, err = query.AllRows(ses, rows)
+			all, err = db.AllRows(ses, rows)
 			if err != nil {
 				t.Errorf("(%s).Rows().Next() failed with %s", nam, err)
 				continue

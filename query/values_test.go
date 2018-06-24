@@ -3,6 +3,7 @@ package query_test
 import (
 	"testing"
 
+	"github.com/leftmike/maho/db"
 	"github.com/leftmike/maho/engine"
 	_ "github.com/leftmike/maho/engine/basic"
 	"github.com/leftmike/maho/execute"
@@ -84,7 +85,7 @@ func TestValues(t *testing.T) {
 			t.Errorf("(%v).Rows().Columns() got %v want %v", c.values, cols, c.cols)
 			continue
 		}
-		all, err := query.AllRows(ses, rows)
+		all, err := db.AllRows(ses, rows)
 		if err != nil {
 			t.Errorf("(%v).Rows().Next() failed with %s", c.values, err)
 		}
@@ -170,7 +171,7 @@ func TestFromValues(t *testing.T) {
 				c.from, len(cols), len(rows.Columns()))
 			continue
 		}
-		all, err := query.AllRows(ses, rows)
+		all, err := db.AllRows(ses, rows)
 		if err != nil {
 			t.Errorf("(%v).Rows().Next() failed with %s", c.from, err)
 		}

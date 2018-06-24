@@ -60,23 +60,6 @@ func (fj FromJoin) String() string {
 	return s
 }
 
-// AllRows returns all of the rows from a db.Rows as slices of values.
-func AllRows(ses db.Session, rows db.Rows) ([][]sql.Value, error) {
-	all := [][]sql.Value{}
-	l := len(rows.Columns())
-	for {
-		dest := make([]sql.Value, l)
-		err := rows.Next(ses, dest)
-		if err == io.EOF {
-			break
-		} else if err != nil {
-			return nil, err
-		}
-		all = append(all, dest)
-	}
-	return all, nil
-}
-
 type joinState int
 
 const (
@@ -275,7 +258,7 @@ func (fj FromJoin) rows(ses db.Session, tx *engine.Transaction) (db.Rows, *fromC
 		return nil, nil, err
 	}
 
-	rrows, err := AllRows(ses, rightRows)
+	rrows, err := db.AllRows(ses, rightRows)
 	if err != nil {
 		return nil, nil, err
 	}
