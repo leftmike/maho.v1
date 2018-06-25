@@ -189,11 +189,22 @@ func (_ stepSleep) step(t *testing.T) {
 
 func TestFatlock1(t *testing.T) {
 	tbl1 := sql.ID("tbl1")
+	tbl2 := sql.ID("tbl2")
 
 	steps := []testStep{
 		stepLockTable{ses: 0, tbl: tbl1, ll: fatlock.ACCESS},
 		stepLocks{{Key: "db.tbl1", Locker: "locker-0", Level: fatlock.ACCESS}},
 		stepReleaseLocks{ses: 0},
+
+		stepLockTable{ses: 0, tbl: tbl1, ll: fatlock.EXCLUSIVE},
+		stepLocks{{Key: "db.tbl1", Locker: "locker-0", Level: fatlock.EXCLUSIVE}},
+		stepLockTable{ses: 1, tbl: tbl2, ll: fatlock.EXCLUSIVE},
+		stepLocks{
+			{Key: "db.tbl1", Locker: "locker-0", Level: fatlock.EXCLUSIVE},
+			{Key: "db.tbl2", Locker: "locker-1", Level: fatlock.EXCLUSIVE},
+		},
+		stepReleaseLocks{ses: 0},
+		stepReleaseLocks{ses: 1},
 
 		stepLockTable{ses: 0, tbl: tbl1, ll: fatlock.ACCESS},
 		stepLocks{{Key: "db.tbl1", Locker: "locker-0", Level: fatlock.ACCESS}},
