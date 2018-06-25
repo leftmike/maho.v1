@@ -17,9 +17,9 @@ To Do:
 - improve interactive execution: prompt, interactive editing (client app?), multiple sessions
 - server: ssh interactive access, logging
 
-- testeng.go: finish RunTableTest
+- fatlock: test that locking two different objects is completely separate
 
-- memrows engine (w/ mvcc)
+- memrows engine: persistence
 - memcols engine (w/ mvcc)
 - distributed memrows and/or memcols engine, using raft
 - boltdb engine
