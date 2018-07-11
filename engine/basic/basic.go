@@ -3,12 +3,15 @@ package basic
 import (
 	"fmt"
 	"io"
+	"sync"
 
 	"github.com/leftmike/maho/db"
 	"github.com/leftmike/maho/engine"
 	"github.com/leftmike/maho/engine/fatlock"
 	"github.com/leftmike/maho/sql"
 )
+
+var mutex sync.RWMutex
 
 type basic struct{}
 
@@ -56,6 +59,9 @@ func (bdb *database) Message() string {
 func (bdb *database) LookupTable(ses db.Session, tctx interface{},
 	tblname sql.Identifier) (db.Table, error) {
 
+	mutex.RLock()
+	defer mutex.RUnlock()
+
 	tbl, ok := bdb.tables[tblname]
 	if !ok {
 		return nil, fmt.Errorf("basic: table %s not found in database %s", tblname, bdb.name)
@@ -65,6 +71,9 @@ func (bdb *database) LookupTable(ses db.Session, tctx interface{},
 
 func (bdb *database) CreateTable(ses db.Session, tctx interface{}, tblname sql.Identifier,
 	cols []sql.Identifier, colTypes []db.ColumnType) error {
+
+	mutex.Lock()
+	defer mutex.Unlock()
 
 	if _, dup := bdb.tables[tblname]; dup {
 		return fmt.Errorf("basic: table %s already exists in database %s", tblname, bdb.name)
@@ -81,6 +90,9 @@ func (bdb *database) CreateTable(ses db.Session, tctx interface{}, tblname sql.I
 func (bdb *database) DropTable(ses db.Session, tctx interface{}, tblname sql.Identifier,
 	exists bool) error {
 
+	mutex.Lock()
+	defer mutex.Unlock()
+
 	if _, ok := bdb.tables[tblname]; !ok {
 		if exists {
 			return nil
@@ -92,6 +104,8 @@ func (bdb *database) DropTable(ses db.Session, tctx interface{}, tblname sql.Ide
 }
 
 func (bdb *database) ListTables(ses db.Session, tctx interface{}) ([]engine.TableEntry, error) {
+	mutex.RLock()
+	defer mutex.RUnlock()
 
 	var tbls []engine.TableEntry
 	for name, _ := range bdb.tables {
@@ -126,10 +140,16 @@ func (bt *table) ColumnTypes(ses db.Session) []db.ColumnType {
 }
 
 func (bt *table) Rows(ses db.Session) (db.Rows, error) {
+	mutex.RLock()
+	defer mutex.RUnlock()
+
 	return &rows{columns: bt.columns, rows: bt.rows}, nil
 }
 
 func (bt *table) Insert(ses db.Session, row []sql.Value) error {
+	mutex.Lock()
+	defer mutex.Unlock()
+
 	bt.rows = append(bt.rows, row)
 	return nil
 }
@@ -145,6 +165,9 @@ func (br *rows) Close() error {
 }
 
 func (br *rows) Next(ses db.Session, dest []sql.Value) error {
+	mutex.RLock()
+	defer mutex.RUnlock()
+
 	for br.index < len(br.rows) {
 		if br.rows[br.index] != nil {
 			copy(dest, br.rows[br.index])
@@ -160,6 +183,9 @@ func (br *rows) Next(ses db.Session, dest []sql.Value) error {
 }
 
 func (br *rows) Delete(ses db.Session) error {
+	mutex.Lock()
+	defer mutex.Unlock()
+
 	if !br.haveRow {
 		return fmt.Errorf("basic: no row to delete")
 	}
@@ -169,6 +195,9 @@ func (br *rows) Delete(ses db.Session) error {
 }
 
 func (br *rows) Update(ses db.Session, updates []db.ColumnUpdate) error {
+	mutex.Lock()
+	defer mutex.Unlock()
+
 	if !br.haveRow {
 		return fmt.Errorf("basic: no row to update")
 	}
