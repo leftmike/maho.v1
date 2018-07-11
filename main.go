@@ -22,6 +22,8 @@ To Do:
 - distributed memrows and/or memcols engine, using raft
 - boltdb engine
 - badger engine
+
+- godoc -http=:6060
 */
 
 import (

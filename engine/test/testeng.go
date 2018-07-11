@@ -3,9 +3,11 @@ package test
 import (
 	"context"
 	"fmt"
+	"io"
 	"path/filepath"
 	"reflect"
 	"sort"
+	"sync"
 	"testing"
 
 	"github.com/leftmike/maho/db"
@@ -61,7 +63,7 @@ type cmd struct {
 	list             []string          // List of table names
 	values           [][]sql.Value     // Expected rows (table.Rows)
 	row              []sql.Value       // Row to insert (table.Insert)
-	rowID            int               // Which row to update (rows.Update) or delete (rows.Delete)
+	rowID            int               // Row to update (rows.Update) or delete (rows.Delete)
 	updates          []db.ColumnUpdate // Updates to a row (rows.Update)
 }
 
@@ -504,7 +506,7 @@ func RunDatabaseTest(t *testing.T, e engine.Engine) {
 func RunTableTest(t *testing.T, e engine.Engine) {
 	t.Helper()
 
-	d, err := e.CreateDatabase(sql.ID("database_test"), filepath.Join("testdata", "database_test"),
+	d, err := e.CreateDatabase(sql.ID("table_test"), filepath.Join("testdata", "table_test"),
 		nil)
 	if err != nil {
 		t.Fatal(err)
@@ -868,6 +870,161 @@ func RunTableTest(t *testing.T, e engine.Engine) {
 				fail: true},
 			{cmd: cmdNextStmt},
 			{cmd: cmdUpdate, rowID: 1, updates: []db.ColumnUpdate{{1, sql.Int64Value(4000)}}},
+			{cmd: cmdCommit},
+		})
+}
+
+func RunParallelTest(t *testing.T, e engine.Engine) {
+	t.Helper()
+
+	d, err := e.CreateDatabase(sql.ID("parallel_test"), filepath.Join("testdata", "parallel_test"),
+		nil)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	testTableLifecycle(t, d,
+		[]cmd{
+			{cmd: cmdBegin},
+			{cmd: cmdCreateTable, name: sql.ID("tbl")},
+			{cmd: cmdCommit},
+		})
+
+	var wg sync.WaitGroup
+	for i := 0; i < 20; i++ {
+		wg.Add(1)
+		go func(t *testing.T, d engine.Database, i, r int) {
+			defer wg.Done()
+
+			for j := 0; j < r; j++ {
+				testTableLifecycle(t, d,
+					[]cmd{
+						{cmd: cmdBegin},
+						{cmd: cmdLookupTable, name: sql.ID("tbl")},
+						{cmd: cmdInsert, row: []sql.Value{sql.Int64Value(i * r + j),
+							sql.Int64Value(j), sql.StringValue(fmt.Sprintf("row %d.%d", i, j))}},
+						{cmd: cmdCommit},
+					})
+			}
+
+			for j := 0; j < r; j++ {
+				testTableLifecycle(t, d,
+					[]cmd{
+						{cmd: cmdBegin},
+						{cmd: cmdLookupTable, name: sql.ID("tbl")},
+						{cmd: cmdUpdate, rowID: i * r + j,
+							updates: []db.ColumnUpdate{{1, sql.Int64Value(j * j)}}},
+						{cmd: cmdCommit},
+					})
+			}
+		}(t, d, i, 100)
+	}
+	wg.Wait()
+}
+
+func incColumn(t *testing.T, d engine.Database, tctx interface{}, i int, name sql.Identifier) bool {
+	tbl, err := d.LookupTable(session{}, tctx, name)
+	if err != nil {
+		t.Fatalf("LookupTable(%s) failed with %s", name, err)
+	}
+	rows, err := tbl.Rows(session{})
+	if err != nil {
+		t.Fatalf("table.Rows() failed with %s", err)
+	}
+
+	dest := make([]sql.Value, len(rows.Columns()))
+	for {
+		err = rows.Next(session{}, dest)
+		if err != nil {
+			if err != io.EOF {
+				t.Errorf("rows.Next() failed with %s", err)
+			}
+			break
+		}
+		if i64, ok := dest[0].(sql.Int64Value); ok && int(i64) == i {
+			v := int(dest[1].(sql.Int64Value))
+			err = rows.Update(session{}, []db.ColumnUpdate{{1, sql.Int64Value(v + 1)}})
+			if err == nil {
+				return true
+			}
+			break
+		}
+	}
+	return false
+}
+
+func RunStressTest(t *testing.T, e engine.Engine) {
+	t.Helper()
+
+	d, err := e.CreateDatabase(sql.ID("stress_test"), filepath.Join("testdata", "stress_test"),
+		nil)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	testTableLifecycle(t, d,
+		[]cmd{
+			{cmd: cmdBegin},
+			{cmd: cmdCreateTable, name: sql.ID("tbl")},
+			{cmd: cmdCommit},
+		})
+
+	const rcnt = 100
+
+	for i := 0; i < rcnt; i++ {
+		testTableLifecycle(t, d,
+			[]cmd{
+				{cmd: cmdBegin},
+				{cmd: cmdLookupTable, name: sql.ID("tbl")},
+				{cmd: cmdInsert, row: []sql.Value{sql.Int64Value(i),
+					sql.Int64Value(0), sql.StringValue(fmt.Sprintf("row %d", i))}},
+				{cmd: cmdCommit},
+			})
+	}
+
+	const tcnt = 20
+
+	var wg sync.WaitGroup
+	for i := 0; i < tcnt; i++ {
+		wg.Add(1)
+		go func(t *testing.T, d engine.Database, i, r int) {
+			defer wg.Done()
+
+			name := sql.ID("tbl")
+			for i := 0; i < r; i++ {
+				updated := false
+				for !updated {
+					lkr := &testLocker{}
+					tctx := d.Begin(lkr)
+					updated = incColumn(t, d, tctx, i, name)
+					if updated {
+						err := d.Commit(session{}, tctx)
+						if err != nil {
+							t.Errorf("Commit() failed with %s", err)
+						}
+					} else {
+						err := d.Rollback(tctx)
+						if err != nil {
+							t.Errorf("Rollback() failed with %s", err)
+						}
+					}
+				}
+			}
+		}(t, d, i, rcnt)
+	}
+	wg.Wait()
+
+	var values [][]sql.Value
+	for i := 0; i < rcnt; i++ {
+		values = append(values, []sql.Value{sql.Int64Value(i), sql.Int64Value(tcnt),
+			sql.StringValue(fmt.Sprintf("row %d", i))})
+	}
+
+	testTableLifecycle(t, d,
+		[]cmd{
+			{cmd: cmdBegin},
+			{cmd: cmdLookupTable, name: sql.ID("tbl")},
+			{cmd: cmdRows, values: values},
 			{cmd: cmdCommit},
 		})
 }

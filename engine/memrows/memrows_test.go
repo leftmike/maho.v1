@@ -11,4 +11,6 @@ func TestMemRows(t *testing.T) {
 	e := engine.GetEngine("memrows")
 	test.RunDatabaseTest(t, e)
 	test.RunTableTest(t, e)
+	test.RunParallelTest(t, e)
+	test.RunStressTest(t, e)
 }
