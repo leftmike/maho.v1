@@ -739,7 +739,8 @@ func RunTableTest(t *testing.T, e engine.Engine) {
 
 			{cmd: cmdBegin},
 			{cmd: cmdLookupTable, name: sql.ID("tbl3")},
-			{cmd: cmdUpdate, rowID: 1, updates: []db.ColumnUpdate{{1, sql.Int64Value(10)}}},
+			{cmd: cmdUpdate, rowID: 1,
+				updates: []db.ColumnUpdate{{Index: 1, Value: sql.Int64Value(10)}}},
 			{cmd: cmdNextStmt},
 			{cmd: cmdRows,
 				values: [][]sql.Value{
@@ -753,7 +754,8 @@ func RunTableTest(t *testing.T, e engine.Engine) {
 
 			{cmd: cmdBegin, needTransactions: true},
 			{cmd: cmdLookupTable, name: sql.ID("tbl3")},
-			{cmd: cmdUpdate, rowID: 2, updates: []db.ColumnUpdate{{1, sql.Int64Value(40)}}},
+			{cmd: cmdUpdate, rowID: 2,
+				updates: []db.ColumnUpdate{{Index: 1, Value: sql.Int64Value(40)}}},
 			{cmd: cmdNextStmt},
 			{cmd: cmdRows,
 				values: [][]sql.Value{
@@ -782,8 +784,8 @@ func RunTableTest(t *testing.T, e engine.Engine) {
 			{cmd: cmdLookupTable, name: sql.ID("tbl3")},
 			{cmd: cmdUpdate, rowID: 3,
 				updates: []db.ColumnUpdate{
-					{1, sql.Int64Value(90)},
-					{2, sql.StringValue("3rd row")},
+					{Index: 1, Value: sql.Int64Value(90)},
+					{Index: 2, Value: sql.StringValue("3rd row")},
 				},
 			},
 			{cmd: cmdSession, ses: 1},
@@ -841,8 +843,8 @@ func RunTableTest(t *testing.T, e engine.Engine) {
 			{cmd: cmdBegin},
 			{cmd: cmdLookupTable, name: sql.ID("tbl4")},
 			{cmd: cmdDelete, rowID: 1, fail: true},
-			{cmd: cmdUpdate, rowID: 1, updates: []db.ColumnUpdate{{1, sql.Int64Value(40)}},
-				fail: true},
+			{cmd: cmdUpdate, rowID: 1,
+				updates: []db.ColumnUpdate{{Index: 1, Value: sql.Int64Value(40)}}, fail: true},
 			{cmd: cmdCommit},
 			{cmd: cmdSession, ses: 0},
 			{cmd: cmdRollback},
@@ -850,7 +852,8 @@ func RunTableTest(t *testing.T, e engine.Engine) {
 			{cmd: cmdSession, ses: 0},
 			{cmd: cmdBegin},
 			{cmd: cmdLookupTable, name: sql.ID("tbl4")},
-			{cmd: cmdUpdate, rowID: 1, updates: []db.ColumnUpdate{{1, sql.Int64Value(40)}}},
+			{cmd: cmdUpdate, rowID: 1,
+				updates: []db.ColumnUpdate{{Index: 1, Value: sql.Int64Value(40)}}},
 			{cmd: cmdSession, ses: 1},
 			{cmd: cmdBegin},
 			{cmd: cmdSession, ses: 0},
@@ -858,18 +861,21 @@ func RunTableTest(t *testing.T, e engine.Engine) {
 			{cmd: cmdSession, ses: 1},
 			{cmd: cmdLookupTable, name: sql.ID("tbl4")},
 			{cmd: cmdDelete, rowID: 1, fail: true},
-			{cmd: cmdUpdate, rowID: 1, updates: []db.ColumnUpdate{{1, sql.Int64Value(-40)}},
+			{cmd: cmdUpdate, rowID: 1,
+				updates: []db.ColumnUpdate{{Index: 1, Value: sql.Int64Value(-40)}},
 				fail: true},
 			{cmd: cmdCommit},
 
 			{cmd: cmdSession, ses: 0},
 			{cmd: cmdBegin},
 			{cmd: cmdLookupTable, name: sql.ID("tbl4")},
-			{cmd: cmdUpdate, rowID: 1, updates: []db.ColumnUpdate{{1, sql.Int64Value(400)}}},
-			{cmd: cmdUpdate, rowID: 1, updates: []db.ColumnUpdate{{1, sql.Int64Value(-400)}},
-				fail: true},
+			{cmd: cmdUpdate, rowID: 1,
+				updates: []db.ColumnUpdate{{Index: 1, Value: sql.Int64Value(400)}}},
+			{cmd: cmdUpdate, rowID: 1,
+				updates: []db.ColumnUpdate{{Index: 1, Value: sql.Int64Value(-400)}}, fail: true},
 			{cmd: cmdNextStmt},
-			{cmd: cmdUpdate, rowID: 1, updates: []db.ColumnUpdate{{1, sql.Int64Value(4000)}}},
+			{cmd: cmdUpdate, rowID: 1,
+				updates: []db.ColumnUpdate{{Index: 1, Value: sql.Int64Value(4000)}}},
 			{cmd: cmdCommit},
 		})
 }
@@ -913,7 +919,7 @@ func RunParallelTest(t *testing.T, e engine.Engine) {
 						{cmd: cmdBegin},
 						{cmd: cmdLookupTable, name: sql.ID("tbl")},
 						{cmd: cmdUpdate, rowID: i * r + j,
-							updates: []db.ColumnUpdate{{1, sql.Int64Value(j * j)}}},
+							updates: []db.ColumnUpdate{{Index: 1, Value: sql.Int64Value(j * j)}}},
 						{cmd: cmdCommit},
 					})
 			}
@@ -943,7 +949,7 @@ func incColumn(t *testing.T, d engine.Database, tctx interface{}, i int, name sq
 		}
 		if i64, ok := dest[0].(sql.Int64Value); ok && int(i64) == i {
 			v := int(dest[1].(sql.Int64Value))
-			err = rows.Update(session{}, []db.ColumnUpdate{{1, sql.Int64Value(v + 1)}})
+			err = rows.Update(session{}, []db.ColumnUpdate{{Index: 1, Value: sql.Int64Value(v + 1)}})
 			if err == nil {
 				return true
 			}
