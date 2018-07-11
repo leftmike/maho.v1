@@ -21,12 +21,14 @@ type database struct {
 }
 
 type table struct {
+	name        string
 	columns     []sql.Identifier
 	columnTypes []db.ColumnType
 	rows        [][]sql.Value
 }
 
 type rows struct {
+	name    string
 	columns []sql.Identifier
 	rows    [][]sql.Value
 	index   int
@@ -64,7 +66,7 @@ func (bdb *database) LookupTable(ses db.Session, tctx interface{},
 
 	tbl, ok := bdb.tables[tblname]
 	if !ok {
-		return nil, fmt.Errorf("basic: table %s not found in database %s", tblname, bdb.name)
+		return nil, fmt.Errorf("basic: table %s.%s not found", bdb.name, tblname)
 	}
 	return tbl, nil
 }
@@ -76,10 +78,11 @@ func (bdb *database) CreateTable(ses db.Session, tctx interface{}, tblname sql.I
 	defer mutex.Unlock()
 
 	if _, dup := bdb.tables[tblname]; dup {
-		return fmt.Errorf("basic: table %s already exists in database %s", tblname, bdb.name)
+		return fmt.Errorf("basic: table %s.%s already exists", bdb.name, tblname)
 	}
 
 	bdb.tables[tblname] = &table{
+		name:        fmt.Sprintf("%s.%s", bdb.name, tblname),
 		columns:     cols,
 		columnTypes: colTypes,
 		rows:        nil,
@@ -97,7 +100,7 @@ func (bdb *database) DropTable(ses db.Session, tctx interface{}, tblname sql.Ide
 		if exists {
 			return nil
 		}
-		return fmt.Errorf("basic: table %s does not exist in database %s", tblname, bdb.name)
+		return fmt.Errorf("basic: table %s.%s does not exist", bdb.name, tblname)
 	}
 	delete(bdb.tables, tblname)
 	return nil
@@ -143,7 +146,7 @@ func (bt *table) Rows(ses db.Session) (db.Rows, error) {
 	mutex.RLock()
 	defer mutex.RUnlock()
 
-	return &rows{columns: bt.columns, rows: bt.rows}, nil
+	return &rows{name: bt.name, columns: bt.columns, rows: bt.rows}, nil
 }
 
 func (bt *table) Insert(ses db.Session, row []sql.Value) error {
@@ -187,7 +190,7 @@ func (br *rows) Delete(ses db.Session) error {
 	defer mutex.Unlock()
 
 	if !br.haveRow {
-		return fmt.Errorf("basic: no row to delete")
+		return fmt.Errorf("basic: table %s no row to delete", br.name)
 	}
 	br.haveRow = false
 	br.rows[br.index-1] = nil
@@ -199,7 +202,7 @@ func (br *rows) Update(ses db.Session, updates []db.ColumnUpdate) error {
 	defer mutex.Unlock()
 
 	if !br.haveRow {
-		return fmt.Errorf("basic: no row to update")
+		return fmt.Errorf("basic: table %s no row to update", br.name)
 	}
 	row := br.rows[br.index-1]
 	for _, up := range updates {

@@ -8,8 +8,6 @@ To Do:
 
 - fuzzing: parser.Parse
 
-- fix error messages in engine/... to be "engine: table <db>.<tbl>: ..."
-
 - ALTER TABLE ...
 - memrows: tableImpl: add versioned metadata and use METADATA_MODIFY locking level
 

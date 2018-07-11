@@ -102,7 +102,7 @@ func newDatabaseEntry(eng string, name sql.Identifier, options Options,
 	defer mutex.Unlock()
 
 	if _, ok := databases[name]; ok {
-		return nil, nil, fmt.Errorf("engine: database already exists: %s", name)
+		return nil, nil, fmt.Errorf("engine: database %s already exists", name)
 	}
 
 	typ, ok := options[sql.ENGINE]
@@ -113,7 +113,7 @@ func newDatabaseEntry(eng string, name sql.Identifier, options Options,
 	}
 	e, ok := engines[typ]
 	if !ok {
-		return nil, nil, fmt.Errorf("engine: type not found: %s", typ)
+		return nil, nil, fmt.Errorf("engine: type %s not found", typ)
 	}
 	path, ok := options[sql.PATH]
 	if !ok {
@@ -288,7 +288,7 @@ func LookupTable(ses db.Session, tx *Transaction, dbname, tblname sql.Identifier
 		return nil, fmt.Errorf("engine: database %s not running", dbname)
 	}
 	tctx := tx.getContext(de.database)
-	tbl, err := lookupVirtual(ses, tctx, de.database, tblname)
+	tbl, err := lookupVirtual(ses, tctx, de.database, dbname, tblname)
 	if tbl != nil || err != nil {
 		return tbl, err
 	}

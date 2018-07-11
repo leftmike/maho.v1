@@ -11,7 +11,7 @@ import (
 )
 
 type MakeVirtual func(ses db.Session, tctx interface{}, d Database,
-	tblname sql.Identifier) (db.Table, error)
+	dbname, tblname sql.Identifier) (db.Table, error)
 
 type TableMap map[sql.Identifier]MakeVirtual
 
@@ -48,11 +48,11 @@ func CreateVirtualDatabase(name sql.Identifier, tables TableMap) {
 	}
 }
 
-func lookupVirtual(ses db.Session, tctx interface{}, d Database, tblname sql.Identifier) (db.Table,
-	error) {
+func lookupVirtual(ses db.Session, tctx interface{}, d Database, dbname,
+	tblname sql.Identifier) (db.Table, error) {
 
 	if maker, ok := virtualTables[tblname]; ok {
-		return maker(ses, tctx, d, tblname)
+		return maker(ses, tctx, d, dbname, tblname)
 	}
 	return nil, nil
 }
@@ -71,9 +71,9 @@ func (vdb *virtualDatabase) LookupTable(ses db.Session, tctx interface{},
 
 	maker, ok := vdb.tables[tblname]
 	if !ok {
-		return nil, fmt.Errorf("virtual: table %s not found in database %s", tblname, vdb.name)
+		return nil, fmt.Errorf("virtual: table %s.%s not found", vdb.name, tblname)
 	}
-	return maker(ses, tctx, vdb, tblname)
+	return maker(ses, tctx, vdb, vdb.name, tblname)
 }
 
 func (vdb *virtualDatabase) CreateTable(ses db.Session, tctx interface{}, tblname sql.Identifier,
@@ -112,12 +112,14 @@ func (vdb *virtualDatabase) Rollback(tctx interface{}) error {
 func (vdb *virtualDatabase) NextStmt(tctx interface{}) {}
 
 type VirtualTable struct {
+	Name     string
 	Cols     []sql.Identifier
 	ColTypes []db.ColumnType
 	Values   [][]sql.Value
 }
 
 type virtualRows struct {
+	name    string
 	columns []sql.Identifier
 	rows    [][]sql.Value
 	index   int
@@ -132,11 +134,11 @@ func (vt *VirtualTable) ColumnTypes(ses db.Session) []db.ColumnType {
 }
 
 func (vt *VirtualTable) Rows(ses db.Session) (db.Rows, error) {
-	return &virtualRows{columns: vt.Cols, rows: vt.Values}, nil
+	return &virtualRows{name: vt.Name, columns: vt.Cols, rows: vt.Values}, nil
 }
 
 func (vt *VirtualTable) Insert(ses db.Session, row []sql.Value) error {
-	return fmt.Errorf("virtual: table can not be modified")
+	return fmt.Errorf("virtual: table %s can not be modified", vt.Name)
 }
 
 func (vr *virtualRows) Columns() []sql.Identifier {
@@ -161,12 +163,12 @@ func (vr *virtualRows) Next(ses db.Session, dest []sql.Value) error {
 	return io.EOF
 }
 
-func (tr *virtualRows) Delete(ses db.Session) error {
-	return fmt.Errorf("virtual: table can not be modified")
+func (vr *virtualRows) Delete(ses db.Session) error {
+	return fmt.Errorf("virtual: table %s can not be modified", vr.name)
 }
 
-func (tr *virtualRows) Update(ses db.Session, updates []db.ColumnUpdate) error {
-	return fmt.Errorf("virtual: table can not be modified")
+func (vr *virtualRows) Update(ses db.Session, updates []db.ColumnUpdate) error {
+	return fmt.Errorf("virtual: table %s can not be modified", vr.name)
 }
 
 var (
@@ -190,7 +192,7 @@ func listTables(ses db.Session, tctx interface{}, d Database) ([]TableEntry, err
 }
 
 func makeTablesVirtual(ses db.Session, tctx interface{}, d Database,
-	tblname sql.Identifier) (db.Table, error) {
+	dbname, tblname sql.Identifier) (db.Table, error) {
 
 	mutex.RLock()
 	defer mutex.RUnlock()
@@ -216,6 +218,7 @@ func makeTablesVirtual(ses db.Session, tctx interface{}, d Database,
 	}
 
 	return &VirtualTable{
+		Name:     fmt.Sprintf("%s.%s", dbname, tblname),
 		Cols:     []sql.Identifier{sql.ID("table"), sql.ID("type")},
 		ColTypes: []db.ColumnType{idColType, idColType},
 		Values:   values,
@@ -230,7 +233,7 @@ var (
 )
 
 func makeColumnsVirtual(ses db.Session, tctx interface{}, d Database,
-	tblname sql.Identifier) (db.Table, error) {
+	dbname, tblname sql.Identifier) (db.Table, error) {
 
 	mutex.RLock()
 	defer mutex.RUnlock()
@@ -249,7 +252,7 @@ func makeColumnsVirtual(ses db.Session, tctx interface{}, d Database,
 			cols = columnsColumns
 			colTypes = columnsColumnTypes
 		} else {
-			tbl, err := lookupVirtual(ses, tctx, d, te.Name)
+			tbl, err := lookupVirtual(ses, tctx, d, dbname, te.Name)
 			if err != nil {
 				return nil, err
 			} else if tbl == nil {
@@ -281,6 +284,7 @@ func makeColumnsVirtual(ses db.Session, tctx interface{}, d Database,
 
 	}
 	return &VirtualTable{
+		Name:     fmt.Sprintf("%s.%s", dbname, tblname),
 		Cols:     columnsColumns,
 		ColTypes: columnsColumnTypes,
 		Values:   values,
@@ -288,7 +292,7 @@ func makeColumnsVirtual(ses db.Session, tctx interface{}, d Database,
 }
 
 func makeDatabasesVirtual(ses db.Session, tctx interface{}, d Database,
-	tblname sql.Identifier) (db.Table, error) {
+	dbname, tblname sql.Identifier) (db.Table, error) {
 
 	mutex.RLock()
 	defer mutex.RUnlock()
@@ -316,6 +320,7 @@ func makeDatabasesVirtual(ses db.Session, tctx interface{}, d Database,
 		})
 	}
 	return &VirtualTable{
+		Name:     fmt.Sprintf("%s.%s", dbname, tblname),
 		Cols: []sql.Identifier{sql.ID("database"), sql.ID("engine"), sql.ID("state"),
 			sql.ID("path"), sql.ID("message")},
 		ColTypes: []db.ColumnType{idColType, idColType, idColType, idColType, idColType},
@@ -324,7 +329,7 @@ func makeDatabasesVirtual(ses db.Session, tctx interface{}, d Database,
 }
 
 func makeIdentifiersVirtual(ses db.Session, tctx interface{}, d Database,
-	tblname sql.Identifier) (db.Table, error) {
+	dbname, tblname sql.Identifier) (db.Table, error) {
 
 	values := [][]sql.Value{}
 
@@ -338,6 +343,7 @@ func makeIdentifiersVirtual(ses db.Session, tctx interface{}, d Database,
 	}
 
 	return &VirtualTable{
+		Name:     fmt.Sprintf("%s.%s", dbname, tblname),
 		Cols:     []sql.Identifier{sql.ID("name"), sql.ID("id"), sql.ID("reserved")},
 		ColTypes: []db.ColumnType{idColType, int32ColType, boolColType},
 		Values:   values,
@@ -345,7 +351,7 @@ func makeIdentifiersVirtual(ses db.Session, tctx interface{}, d Database,
 }
 
 func makeConfigVirtual(ses db.Session, tctx interface{}, d Database,
-	tblname sql.Identifier) (db.Table, error) {
+	dbname, tblname sql.Identifier) (db.Table, error) {
 
 	values := [][]sql.Value{}
 
@@ -359,6 +365,7 @@ func makeConfigVirtual(ses db.Session, tctx interface{}, d Database,
 	}
 
 	return &VirtualTable{
+		Name:     fmt.Sprintf("%s.%s", dbname, tblname),
 		Cols:     []sql.Identifier{sql.ID("name"), sql.ID("by"), sql.ID("value")},
 		ColTypes: []db.ColumnType{idColType, idColType, stringColType},
 		Values:   values,
@@ -366,7 +373,7 @@ func makeConfigVirtual(ses db.Session, tctx interface{}, d Database,
 }
 
 func makeEnginesVirtual(ses db.Session, tctx interface{}, d Database,
-	tblname sql.Identifier) (db.Table, error) {
+	dbname, tblname sql.Identifier) (db.Table, error) {
 
 	values := [][]sql.Value{}
 
@@ -375,6 +382,7 @@ func makeEnginesVirtual(ses db.Session, tctx interface{}, d Database,
 	}
 
 	return &VirtualTable{
+		Name:     fmt.Sprintf("%s.%s", dbname, tblname),
 		Cols:     []sql.Identifier{sql.ID("name")},
 		ColTypes: []db.ColumnType{idColType},
 		Values:   values,
@@ -382,7 +390,7 @@ func makeEnginesVirtual(ses db.Session, tctx interface{}, d Database,
 }
 
 func makeLocksVirtual(ses db.Session, tctx interface{}, d Database,
-	tblname sql.Identifier) (db.Table, error) {
+	dbname, tblname sql.Identifier) (db.Table, error) {
 
 	values := [][]sql.Value{}
 
@@ -401,6 +409,7 @@ func makeLocksVirtual(ses db.Session, tctx interface{}, d Database,
 	}
 
 	return &VirtualTable{
+		Name:     fmt.Sprintf("%s.%s", dbname, tblname),
 		Cols: []sql.Identifier{sql.ID("key"), sql.ID("locker"), sql.ID("level"),
 			sql.ID("held"), sql.ID("place")},
 		ColTypes: []db.ColumnType{idColType, idColType, idColType, boolColType,

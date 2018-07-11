@@ -106,7 +106,7 @@ func (mdb *database) LookupTable(ses db.Session, tx interface{}, tblname sql.Ide
 	tbl, ok := tctx.tables[tblname]
 	if ok {
 		if tbl.dropped && !tbl.created {
-			return nil, fmt.Errorf("memrows: table %s not found in database %s", tblname, mdb.name)
+			return nil, fmt.Errorf("memrows: table %s.%s not found", mdb.name, tblname)
 		}
 		return tbl, nil
 	}
@@ -122,7 +122,7 @@ func (mdb *database) LookupTable(ses db.Session, tx interface{}, tblname sql.Ide
 
 	ti = visibleVersion(ti, tctx.version)
 	if ti == nil {
-		return nil, fmt.Errorf("memrows: table %s not found in database %s", tblname, mdb.name)
+		return nil, fmt.Errorf("memrows: table %s.%s not found", mdb.name, tblname)
 	}
 
 	tbl = &table{
@@ -148,13 +148,14 @@ func (mdb *database) CreateTable(ses db.Session, tx interface{}, tblname sql.Ide
 		if tbl.dropped && !tbl.created {
 			tbl.created = true
 			tbl.table = &tableImpl{
+				name:        fmt.Sprintf("%s.%s", mdb.name, tblname),
 				columns:     cols,
 				columnTypes: colTypes,
 				rows:        nil,
 			}
 			return nil
 		}
-		return fmt.Errorf("memrows: table %s already exists in database %s", tblname, mdb.name)
+		return fmt.Errorf("memrows: table %s.%s already exists", mdb.name, tblname)
 	}
 
 	mdb.mutex.Lock()
@@ -163,11 +164,11 @@ func (mdb *database) CreateTable(ses db.Session, tx interface{}, tblname sql.Ide
 
 	if ok {
 		if ti.createdVersion <= tctx.version && !ti.dropped {
-			return fmt.Errorf("memrows: table %s already exists in database %s", tblname, mdb.name)
+			return fmt.Errorf("memrows: table %s.%s already exists", mdb.name, tblname)
 		} else if ti.createdVersion > tctx.version ||
 			(ti.dropped && ti.droppedVersion > tctx.version) {
 
-			return fmt.Errorf("memrows: table %s.%s: conflicting change", mdb.name, tblname)
+			return fmt.Errorf("memrows: table %s.%s conflicting change", mdb.name, tblname)
 		}
 	}
 
@@ -177,6 +178,7 @@ func (mdb *database) CreateTable(ses db.Session, tx interface{}, tblname sql.Ide
 		name:    tblname,
 		created: true,
 		table: &tableImpl{
+			name:        fmt.Sprintf("%s.%s", mdb.name, tblname),
 			columns:     cols,
 			columnTypes: colTypes,
 			rows:        nil,
@@ -205,7 +207,7 @@ func (mdb *database) DropTable(ses db.Session, tx interface{}, tblname sql.Ident
 			if exists {
 				return nil
 			}
-			return fmt.Errorf("memrows: table %s does not exist in database %s", tblname, mdb.name)
+			return fmt.Errorf("memrows: table %s.%s does not exist", mdb.name, tblname)
 		}
 		tbl.dropped = true
 		tbl.table = nil
@@ -220,9 +222,9 @@ func (mdb *database) DropTable(ses db.Session, tx interface{}, tblname sql.Ident
 		if exists {
 			return nil
 		}
-		return fmt.Errorf("memrows: table %s does not exist in database %s", tblname, mdb.name)
+		return fmt.Errorf("memrows: table %s.%s does not exist", mdb.name, tblname)
 	} else if ti.createdVersion > tctx.version || (ti.dropped && ti.droppedVersion > tctx.version) {
-		return fmt.Errorf("memrows: table %s.%s: conflicting change", mdb.name, tblname)
+		return fmt.Errorf("memrows: table %s.%s conflicting change", mdb.name, tblname)
 	}
 
 	tctx.tables[tblname] = &table{
@@ -282,7 +284,7 @@ func (mdb *database) Commit(ses db.Session, tx interface{}) error {
 
 	for _, tbl := range tctx.tables {
 		if tbl.table != nil {
-			err := tbl.table.checkRows("commit", tctx.tid, tbl.modifiedRows)
+			err := tbl.table.checkRows(tctx.tid, tbl.modifiedRows)
 			if err != nil {
 				return err
 			}
@@ -322,7 +324,7 @@ func (mdb *database) Rollback(tx interface{}) error {
 	tctx := tx.(*tcontext)
 	for _, tbl := range tctx.tables {
 		if tbl.table != nil {
-			err := tbl.table.checkRows("rollback", tctx.tid, tbl.modifiedRows)
+			err := tbl.table.checkRows(tctx.tid, tbl.modifiedRows)
 			if err != nil {
 				return err
 			}
@@ -395,7 +397,8 @@ func (mr *rows) Next(ses db.Session, dest []sql.Value) error {
 
 func (mr *rows) Delete(ses db.Session) error {
 	if !mr.haveRow {
-		return fmt.Errorf("memrows: no row to delete")
+		return fmt.Errorf("memrows: table %s.%s no row to delete", mr.table.db.name,
+			mr.table.name)
 	}
 	if !mr.table.modifyLock {
 		err := fatlock.LockTable(ses, mr.table.tctx.locker, mr.table.db.name, mr.table.name,
@@ -417,7 +420,8 @@ func (mr *rows) Delete(ses db.Session) error {
 
 func (mr *rows) Update(ses db.Session, updates []db.ColumnUpdate) error {
 	if !mr.haveRow {
-		return fmt.Errorf("memrows: no row to update")
+		return fmt.Errorf("memrows: table %s.%s no row to update", mr.table.db.name,
+			mr.table.name)
 	}
 	if !mr.table.modifyLock {
 		err := fatlock.LockTable(ses, mr.table.tctx.locker, mr.table.db.name, mr.table.name,
