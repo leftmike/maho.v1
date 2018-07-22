@@ -13,7 +13,14 @@ To Do:
 
 - track sessions and transactions; maybe just one table
 - improve interactive execution: prompt, interactive editing (client app?), multiple sessions
-- server: ssh interactive access, logging
+- server: ssh interactive access
+-- table for users + password --or-- authorized public key
+-- load authorized public keys from authorized_keys file (same format as used by OpenSSH)
+-- -ssh [true], -ssh-port [8261]
+-- -repl [true], -sql (multiple)
+-- -ssh-host-key [./id_rsa] (multiple), -ssh-authorized-keys [./authorized_keys]
+- server: logging
+-- log ssh authorization
 
 - memrows engine: persistence
 - memcols engine (w/ mvcc)
@@ -116,9 +123,10 @@ func replSQL(p parser.Parser, w io.Writer) {
 }
 
 var (
-	database = config.Var(new(string), "database").Flag("database", "default `database`").
-			String("maho")
-	eng = config.Var(new(string), "engine").Flag("engine", "default `engine`").String("basic")
+	database = config.Var(new(string), "database").Usage("default `database`").String("maho")
+	eng = config.Var(new(string), "engine").Usage("default `engine`").String("basic")
+	sqlArgs = config.Var(new(config.Array), "sql").
+		Usage("sql `query` to execute (may be specified more than once)").NoConfig().Array()
 
 	configFile = flag.String("config-file", "", "`file` to load config from")
 	noConfig   = flag.Bool("no-config", false, "don't load config file")
@@ -151,6 +159,12 @@ func main() {
 	if err != nil {
 		fmt.Println(err)
 		return
+	}
+
+	for idx := range *sqlArgs {
+		arg := (*sqlArgs)[idx].(string)
+		replSQL(parser.NewParser(strings.NewReader(arg), fmt.Sprintf("sql arg %d", idx + 1)),
+			os.Stdout)
 	}
 
 	args := flag.Args()
