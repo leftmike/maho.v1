@@ -125,15 +125,27 @@ func replSQL(p parser.Parser, w io.Writer) {
 var (
 	database = config.Var(new(string), "database").Usage("default `database`").String("maho")
 	eng = config.Var(new(string), "engine").Usage("default `engine`").String("basic")
-	sqlArgs = config.Var(new(config.Array), "sql").
-		Usage("sql `query` to execute (may be specified more than once)").NoConfig().Array()
 
 	configFile = flag.String("config-file", "", "`file` to load config from")
 	noConfig   = flag.Bool("no-config", false, "don't load config file")
 	listConfig = flag.Bool("list-config", false, "list config and exit")
 )
 
+type stringSlice []string
+
+func (ss *stringSlice) Set(s string) error {
+	*ss = append(*ss, s)
+	return nil
+}
+
+func (ss *stringSlice) String() string {
+	return fmt.Sprintf("%v", *ss)
+}
+
 func main() {
+	var sqlArgs stringSlice
+	flag.Var(&sqlArgs, "sql","sql `query` to execute (may be specified more than once)")
+
 	flag.Parse()
 	config.Env()
 
@@ -161,8 +173,7 @@ func main() {
 		return
 	}
 
-	for idx := range *sqlArgs {
-		arg := (*sqlArgs)[idx].(string)
+	for idx, arg := range sqlArgs {
 		replSQL(parser.NewParser(strings.NewReader(arg), fmt.Sprintf("sql arg %d", idx + 1)),
 			os.Stdout)
 	}
