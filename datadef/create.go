@@ -34,7 +34,7 @@ func (stmt *CreateTable) String() string {
 	return s
 }
 
-func (stmt *CreateTable) Plan(ses *execute.Session, tx *engine.Transaction) (execute.Plan, error) {
+func (stmt *CreateTable) Plan(ses *execute.Session, tx *engine.Transaction) (interface{}, error) {
 	return stmt, nil
 }
 
@@ -59,7 +59,7 @@ func (stmt *CreateDatabase) String() string {
 	return s
 }
 
-func (stmt *CreateDatabase) Plan(ses *execute.Session, tx *engine.Transaction) (execute.Plan,
+func (stmt *CreateDatabase) Plan(ses *execute.Session, tx *engine.Transaction) (interface{},
 	error) {
 
 	return stmt, nil

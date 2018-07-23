@@ -9,7 +9,7 @@ import (
 
 type Stmt interface {
 	fmt.Stringer
-	Plan(ses *Session, tx *engine.Transaction) (Plan, error)
+	Plan(ses *Session, tx *engine.Transaction) (interface{}, error)
 }
 
 type Rows db.Rows
@@ -17,5 +17,3 @@ type Rows db.Rows
 type Executor interface {
 	Execute(ses *Session, tx *engine.Transaction) (int64, error)
 }
-
-type Plan interface{}

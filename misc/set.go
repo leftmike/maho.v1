@@ -18,7 +18,7 @@ func (stmt *Set) String() string {
 	return fmt.Sprintf("SET %s TO %s", stmt.Variable, stmt.Value)
 }
 
-func (stmt *Set) Plan(ses *execute.Session, tx *engine.Transaction) (execute.Plan, error) {
+func (stmt *Set) Plan(ses *execute.Session, tx *engine.Transaction) (interface{}, error) {
 	return stmt, nil
 }
 

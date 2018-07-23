@@ -50,7 +50,7 @@ func (stmt *InsertValues) String() string {
 	return s
 }
 
-func (stmt *InsertValues) Plan(ses *execute.Session, tx *engine.Transaction) (execute.Plan, error) {
+func (stmt *InsertValues) Plan(ses *execute.Session, tx *engine.Transaction) (interface{}, error) {
 	return stmt, nil
 }
 

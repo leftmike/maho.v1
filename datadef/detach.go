@@ -16,7 +16,7 @@ func (stmt *DetachDatabase) String() string {
 	return fmt.Sprintf("DETACH DATABASE %s", stmt.Database)
 }
 
-func (stmt *DetachDatabase) Plan(ses *execute.Session, tx *engine.Transaction) (execute.Plan,
+func (stmt *DetachDatabase) Plan(ses *execute.Session, tx *engine.Transaction) (interface{},
 	error) {
 
 	return stmt, nil

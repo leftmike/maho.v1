@@ -37,10 +37,9 @@ To Do:
 - db.ColumnType??? ==> engine.ColumnType or sql.ColumnType
 - db.ColumnUpdate??? ==> engine.ColumnUpdate
 - move maho/execute to maho/evaluate
-- Plan ==> interface{}
-- move Stmt into parser
-- move Executor into server (maybe call evaluator instead)
-- move Session into engine and into evaluate
+- move Stmt into parser ==> maybe can't do that
+- move Executor into server (maybe call evaluator instead) or into evaluate?
+- move Session into engine (as interface) and into evaluate (as struct)
 
 - layers: parser / evaluate / engine
 - server: ReplSQL, ssh, etc

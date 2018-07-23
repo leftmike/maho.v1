@@ -25,7 +25,7 @@ func (stmt *DropTable) String() string {
 	return s
 }
 
-func (stmt *DropTable) Plan(ses *execute.Session, tx *engine.Transaction) (execute.Plan, error) {
+func (stmt *DropTable) Plan(ses *execute.Session, tx *engine.Transaction) (interface{}, error) {
 	return stmt, nil
 }
 

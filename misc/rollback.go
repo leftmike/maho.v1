@@ -11,7 +11,7 @@ func (stmt *Rollback) String() string {
 	return "ROLLBACK"
 }
 
-func (stmt *Rollback) Plan(ses *execute.Session, tx *engine.Transaction) (execute.Plan, error) {
+func (stmt *Rollback) Plan(ses *execute.Session, tx *engine.Transaction) (interface{}, error) {
 	return stmt, nil
 }
 

@@ -24,7 +24,7 @@ func (stmt *AttachDatabase) String() string {
 	return s
 }
 
-func (stmt *AttachDatabase) Plan(ses *execute.Session, tx *engine.Transaction) (execute.Plan,
+func (stmt *AttachDatabase) Plan(ses *execute.Session, tx *engine.Transaction) (interface{},
 	error) {
 
 	return stmt, nil

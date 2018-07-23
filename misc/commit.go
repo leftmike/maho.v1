@@ -11,7 +11,7 @@ func (stmt *Commit) String() string {
 	return "COMMIT"
 }
 
-func (stmt *Commit) Plan(ses *execute.Session, tx *engine.Transaction) (execute.Plan, error) {
+func (stmt *Commit) Plan(ses *execute.Session, tx *engine.Transaction) (interface{}, error) {
 	return stmt, nil
 }
 
