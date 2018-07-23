@@ -5,7 +5,7 @@ import (
 
 	"github.com/leftmike/maho/db"
 	"github.com/leftmike/maho/engine"
-	_ "github.com/leftmike/maho/engine/basic"
+	"github.com/leftmike/maho/engine/basic"
 	"github.com/leftmike/maho/execute"
 	"github.com/leftmike/maho/expr"
 	"github.com/leftmike/maho/query"
@@ -13,18 +13,18 @@ import (
 	"github.com/leftmike/maho/testutil"
 )
 
-var started bool
-
-func startEngine(t *testing.T) {
+func startManager(t *testing.T) *engine.Manager {
 	t.Helper()
 
-	if !started {
-		err := engine.CreateDatabase("basic", sql.ID("test"), engine.Options{sql.WAIT: "true"})
-		if err != nil {
-			t.Fatal(err)
-		}
-		started = true
+	mgr := engine.NewManager(map[string]engine.Engine{
+		"basic": basic.Engine{},
+	})
+	err := mgr.CreateDatabase("basic", sql.ID("test"), engine.Options{sql.WAIT: "true"})
+	if err != nil {
+		t.Fatal(err)
 	}
+
+	return mgr
 }
 
 func TestValues(t *testing.T) {
@@ -67,10 +67,10 @@ func TestValues(t *testing.T) {
 		},
 	}
 
-	startEngine(t)
-	ses := execute.NewSession("basic", sql.ID("test"))
+	mgr := startManager(t)
+	ses := execute.NewSession(mgr, "basic", sql.ID("test"))
 	for _, c := range cases {
-		tx := engine.Begin()
+		tx := mgr.Begin()
 		if c.values.String() != c.s {
 			t.Errorf("(%v).String() got %q want %q", c.values, c.values.String(), c.s)
 			continue
@@ -149,13 +149,14 @@ func TestFromValues(t *testing.T) {
 		},
 	}
 
-	ses := execute.NewSession("basic", sql.ID("test"))
+	mgr := startManager(t)
+	ses := execute.NewSession(mgr, "basic", sql.ID("test"))
 	for _, c := range cases {
 		if c.from.String() != c.s {
 			t.Errorf("(%v).String() got %q want %q", c.from, c.from.String(), c.s)
 			continue
 		}
-		tx := engine.Begin()
+		tx := mgr.Begin()
 		rows, fctx, err := c.from.TestRows(ses, tx)
 		if err != nil {
 			t.Errorf("(%v).Rows() failed with %s", c.from, err)

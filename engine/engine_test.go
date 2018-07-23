@@ -150,13 +150,13 @@ func (ses *session) DefaultDatabase() sql.Identifier {
 	return ses.name
 }
 
-func checkDatabaseState(t *testing.T, state databaseState, name sql.Identifier) {
+func checkDatabaseState(t *testing.T, m *Manager, state databaseState, name sql.Identifier) {
 	t.Helper()
 
-	mutex.RLock()
-	defer mutex.RUnlock()
+	m.mutex.RLock()
+	defer m.mutex.RUnlock()
 
-	if de, ok := databases[name]; ok {
+	if de, ok := m.databases[name]; ok {
 		if de.state != state {
 			t.Errorf("database(%s).state: got %s want %s", name, de.state, state)
 		}
@@ -165,42 +165,35 @@ func checkDatabaseState(t *testing.T, state databaseState, name sql.Identifier) 
 	}
 }
 
-func registerEngine() (*testEngine, string, int) {
-	var typ string
+func registerEngine() (*Manager, *testEngine) {
 	te := &testEngine{}
-	idx := 1
-	for {
-		typ = fmt.Sprintf("test-%d", idx)
-		if GetEngine(typ) == nil {
-			break
-		}
-		idx += 1
-	}
-	Register(typ, te)
-	return te, typ, idx
+	m := NewManager(map[string]Engine{
+		"test": te,
+	})
+	return m, te
 }
 
 func TestEngine(t *testing.T) {
-	te, typ, idx := registerEngine()
+	m, te := registerEngine()
 	te.done = make(chan struct{})
-	db1 := fmt.Sprintf("db%d-1", idx)
-	db2 := fmt.Sprintf("db%d-2", idx)
+	db1 := "db-1"
+	db2 := "db-2"
 
-	err := AttachDatabase(typ, sql.ID(db1), nil)
+	err := m.AttachDatabase("test", sql.ID(db1), nil)
 	if err != nil {
 		t.Fatalf("AttachDatabase() failed with %s", err)
 	}
-	checkDatabaseState(t, Attaching, sql.ID(db1))
+	checkDatabaseState(t, m, Attaching, sql.ID(db1))
 	te.done <- struct{}{}
 
 	time.Sleep(50 * time.Millisecond)
-	checkDatabaseState(t, Running, sql.ID(db1))
+	checkDatabaseState(t, m, Running, sql.ID(db1))
 
-	err = CreateDatabase(typ, sql.ID(db2), Options{sql.WAIT: "true"})
+	err = m.CreateDatabase("test", sql.ID(db2), Options{sql.WAIT: "true"})
 	if err != nil {
 		t.Errorf("CreateDatabase() failed with %s", err)
 	}
-	checkDatabaseState(t, Running, sql.ID(db2))
+	checkDatabaseState(t, m, Running, sql.ID(db2))
 
 	te.checkOps(t, []testOp{
 		{op: "AttachDatabase", args: []string{db1, filepath.Join("testdata", db1)}},
@@ -209,10 +202,10 @@ func TestEngine(t *testing.T) {
 }
 
 func TestDatabase(t *testing.T) {
-	te, typ, idx := registerEngine()
-	db := fmt.Sprintf("db%d", idx)
+	m, te := registerEngine()
+	db := "db"
 
-	err := CreateDatabase(typ, sql.ID(db), Options{sql.WAIT: "true"})
+	err := m.CreateDatabase("test", sql.ID(db), Options{sql.WAIT: "true"})
 	if err != nil {
 		t.Errorf("CreateDatabase() failed with %s", err)
 	}
@@ -220,12 +213,12 @@ func TestDatabase(t *testing.T) {
 		{op: "CreateDatabase", args: []string{db, filepath.Join("testdata", db)}},
 	})
 
-	tx := Begin()
+	tx := m.Begin()
 	ses := &session{
-		eng:  typ,
+		eng:  "test",
 		name: sql.ID(db),
 	}
-	err = CreateTable(ses, tx, 0, sql.ID("table1"), nil, nil)
+	err = m.CreateTable(ses, tx, 0, sql.ID("table1"), nil, nil)
 	if err != nil {
 		t.Errorf("CreateTable(table1) failed with %s", err)
 	}
@@ -243,12 +236,12 @@ func TestDatabase(t *testing.T) {
 		{op: "Commit"},
 	})
 
-	tx = Begin()
+	tx = m.Begin()
 	ses = &session{
-		eng:  typ,
+		eng:  "test",
 		name: sql.ID(db),
 	}
-	_, err = LookupTable(ses, tx, 0, sql.ID("table1"))
+	_, err = m.LookupTable(ses, tx, 0, sql.ID("table1"))
 	if err != nil {
 		t.Errorf("LookupTable(table1) failed with %s", err)
 	}

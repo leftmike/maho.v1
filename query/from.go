@@ -4,6 +4,7 @@ import (
 	"fmt"
 
 	"github.com/leftmike/maho/db"
+	"github.com/leftmike/maho/execute"
 	"github.com/leftmike/maho/engine"
 	"github.com/leftmike/maho/expr"
 	"github.com/leftmike/maho/sql"
@@ -23,7 +24,7 @@ func (fta FromTableAlias) String() string {
 func (fta FromTableAlias) rows(ses db.Session, tx *engine.Transaction) (db.Rows, *fromContext,
 	error) {
 
-	tbl, err := engine.LookupTable(ses, tx, fta.Database, fta.Table)
+	tbl, err := ses.(*execute.Session).LookupTable(tx, fta.Database, fta.Table)
 	if err != nil {
 		return nil, nil, err
 	}

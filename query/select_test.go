@@ -4,8 +4,6 @@ import (
 	"testing"
 
 	"github.com/leftmike/maho/db"
-	"github.com/leftmike/maho/engine"
-	_ "github.com/leftmike/maho/engine/basic"
 	"github.com/leftmike/maho/execute"
 	"github.com/leftmike/maho/expr"
 	"github.com/leftmike/maho/query"
@@ -97,10 +95,10 @@ func TestSelect(t *testing.T) {
 		},
 	}
 
-	startEngine(t)
-	ses := execute.NewSession("basic", sql.ID("test"))
+	mgr := startManager(t)
+	ses := execute.NewSession(mgr, "basic", sql.ID("test"))
 	for _, c := range cases {
-		tx := engine.Begin()
+		tx := mgr.Begin()
 		if c.stmt.String() != c.s {
 			t.Errorf("(%v).String() got %q want %q", c.stmt, c.stmt.String(), c.s)
 			continue

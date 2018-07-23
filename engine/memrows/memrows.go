@@ -18,7 +18,7 @@ import (
 	"github.com/leftmike/maho/sql"
 )
 
-type eng struct{}
+type Engine struct{}
 
 type database struct {
 	mutex   sync.RWMutex
@@ -66,17 +66,13 @@ type rows struct {
 	haveRow bool
 }
 
-func init() {
-	engine.Register("memrows", &eng{})
-}
-
-func (me *eng) AttachDatabase(name sql.Identifier, path string,
+func (_ Engine) AttachDatabase(name sql.Identifier, path string,
 	options engine.Options) (engine.Database, error) {
 
 	return nil, fmt.Errorf("memrows: attach database not supported")
 }
 
-func (me *eng) CreateDatabase(name sql.Identifier, path string,
+func (_ Engine) CreateDatabase(name sql.Identifier, path string,
 	options engine.Options) (engine.Database, error) {
 
 	return &database{

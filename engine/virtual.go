@@ -15,29 +15,25 @@ type MakeVirtual func(ses db.Session, tctx interface{}, d Database,
 
 type TableMap map[sql.Identifier]MakeVirtual
 
-var (
-	virtualTables = TableMap{}
-)
+func (m *Manager) CreateVirtualTable(tblname sql.Identifier, maker MakeVirtual) {
+	m.mutex.Lock()
+	defer m.mutex.Unlock()
 
-func CreateVirtualTable(tblname sql.Identifier, maker MakeVirtual) {
-	mutex.Lock()
-	defer mutex.Unlock()
-
-	if _, ok := virtualTables[tblname]; ok {
+	if _, ok := m.virtualTables[tblname]; ok {
 		panic(fmt.Sprintf("virtual table already created: *.%s", tblname))
 	}
-	virtualTables[tblname] = maker
+	m.virtualTables[tblname] = maker
 }
 
-func CreateVirtualDatabase(name sql.Identifier, tables TableMap) {
-	mutex.Lock()
-	defer mutex.Unlock()
+func (m *Manager) CreateVirtualDatabase(name sql.Identifier, tables TableMap) {
+	m.mutex.Lock()
+	defer m.mutex.Unlock()
 
-	_, ok := databases[name]
+	_, ok := m.databases[name]
 	if ok {
 		panic(fmt.Sprintf("virtual database already created: %s", name))
 	}
-	databases[name] = &databaseEntry{
+	m.databases[name] = &databaseEntry{
 		database: &virtualDatabase{
 			name:   name,
 			tables: tables,
@@ -48,10 +44,10 @@ func CreateVirtualDatabase(name sql.Identifier, tables TableMap) {
 	}
 }
 
-func lookupVirtual(ses db.Session, tctx interface{}, d Database, dbname,
+func (m *Manager) lookupVirtual(ses db.Session, tctx interface{}, d Database, dbname,
 	tblname sql.Identifier) (db.Table, error) {
 
-	if maker, ok := virtualTables[tblname]; ok {
+	if maker, ok := m.virtualTables[tblname]; ok {
 		return maker(ses, tctx, d, dbname, tblname)
 	}
 	return nil, nil
@@ -179,25 +175,25 @@ var (
 	stringColType = db.ColumnType{Type: sql.CharacterType, Size: 4096, NotNull: true}
 )
 
-func listTables(ses db.Session, tctx interface{}, d Database) ([]TableEntry, error) {
+func (m *Manager) listTables(ses db.Session, tctx interface{}, d Database) ([]TableEntry, error) {
 	tbls, err := d.ListTables(ses, tctx)
 	if err != nil {
 		return nil, err
 	}
 
-	for nam := range virtualTables {
+	for nam := range m.virtualTables {
 		tbls = append(tbls, TableEntry{nam, VirtualType})
 	}
 	return tbls, nil
 }
 
-func makeTablesVirtual(ses db.Session, tctx interface{}, d Database,
+func (m *Manager) makeTablesVirtual(ses db.Session, tctx interface{}, d Database,
 	dbname, tblname sql.Identifier) (db.Table, error) {
 
-	mutex.RLock()
-	defer mutex.RUnlock()
+	m.mutex.RLock()
+	defer m.mutex.RUnlock()
 
-	tbls, err := listTables(ses, tctx, d)
+	tbls, err := m.listTables(ses, tctx, d)
 	if err != nil {
 		return nil, err
 	}
@@ -232,13 +228,13 @@ var (
 		boolColType, boolColType, boolColType, idColType}
 )
 
-func makeColumnsVirtual(ses db.Session, tctx interface{}, d Database,
+func (m *Manager) makeColumnsVirtual(ses db.Session, tctx interface{}, d Database,
 	dbname, tblname sql.Identifier) (db.Table, error) {
 
-	mutex.RLock()
-	defer mutex.RUnlock()
+	m.mutex.RLock()
+	defer m.mutex.RUnlock()
 
-	tbls, err := listTables(ses, tctx, d)
+	tbls, err := m.listTables(ses, tctx, d)
 	if err != nil {
 		return nil, err
 	}
@@ -252,7 +248,7 @@ func makeColumnsVirtual(ses db.Session, tctx interface{}, d Database,
 			cols = columnsColumns
 			colTypes = columnsColumnTypes
 		} else {
-			tbl, err := lookupVirtual(ses, tctx, d, dbname, te.Name)
+			tbl, err := m.lookupVirtual(ses, tctx, d, dbname, te.Name)
 			if err != nil {
 				return nil, err
 			} else if tbl == nil {
@@ -291,14 +287,14 @@ func makeColumnsVirtual(ses db.Session, tctx interface{}, d Database,
 	}, nil
 }
 
-func makeDatabasesVirtual(ses db.Session, tctx interface{}, d Database,
+func (m *Manager) makeDatabasesVirtual(ses db.Session, tctx interface{}, d Database,
 	dbname, tblname sql.Identifier) (db.Table, error) {
 
-	mutex.RLock()
-	defer mutex.RUnlock()
+	m.mutex.RLock()
+	defer m.mutex.RUnlock()
 
 	values := [][]sql.Value{}
-	for id, de := range databases {
+	for id, de := range m.databases {
 		var msg, path sql.Value
 		if de.path != "" {
 			path = sql.StringValue(de.path)
@@ -372,12 +368,12 @@ func makeConfigVirtual(ses db.Session, tctx interface{}, d Database,
 	}, nil
 }
 
-func makeEnginesVirtual(ses db.Session, tctx interface{}, d Database,
+func (m *Manager) makeEnginesVirtual(ses db.Session, tctx interface{}, d Database,
 	dbname, tblname sql.Identifier) (db.Table, error) {
 
 	values := [][]sql.Value{}
 
-	for nam := range engines {
+	for nam := range m.engines {
 		values = append(values, []sql.Value{sql.StringValue(nam)})
 	}
 
@@ -416,16 +412,4 @@ func makeLocksVirtual(ses db.Session, tctx interface{}, d Database,
 			db.ColumnType{Type: sql.IntegerType, Size: 4}},
 		Values: values,
 	}, nil
-}
-
-func init() {
-	CreateVirtualTable(sql.ID("db$tables"), makeTablesVirtual)
-	CreateVirtualTable(sql.ID("db$columns"), makeColumnsVirtual)
-	CreateVirtualDatabase(sql.ID("system"), TableMap{
-		sql.ID("databases"):   makeDatabasesVirtual,
-		sql.ID("identifiers"): makeIdentifiersVirtual,
-		sql.ID("config"):      makeConfigVirtual,
-		sql.ID("engines"):     makeEnginesVirtual,
-		sql.ID("locks"):       makeLocksVirtual,
-	})
 }

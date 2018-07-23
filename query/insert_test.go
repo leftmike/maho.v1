@@ -185,13 +185,13 @@ func TestInsert(t *testing.T) {
 		t.Errorf("InsertValues{}.String() got %s want %s", s.String(), r)
 	}
 
-	startEngine(t)
-	ses := execute.NewSession("basic", sql.ID("test"))
-	testInsert(t, ses, sql.ID("test"), sql.ID("t"), insertColumns1, insertColumnTypes1,
+	mgr := startManager(t)
+	ses := execute.NewSession(mgr, "basic", sql.ID("test"))
+	testInsert(t, mgr, ses, sql.ID("test"), sql.ID("t"), insertColumns1, insertColumnTypes1,
 		insertCases1)
-	testInsert(t, ses, sql.ID("test"), sql.ID("t2"), insertColumns2, insertColumnTypes2,
+	testInsert(t, mgr, ses, sql.ID("test"), sql.ID("t2"), insertColumns2, insertColumnTypes2,
 		insertCases2)
-	testInsert(t, ses, sql.ID("test"), sql.ID("t3"), insertColumns3, insertColumnTypes3,
+	testInsert(t, mgr, ses, sql.ID("test"), sql.ID("t3"), insertColumns3, insertColumnTypes3,
 		insertCases3)
 }
 
@@ -209,12 +209,12 @@ func statement(ses *execute.Session, tx *engine.Transaction, s string) error {
 	return err
 }
 
-func testInsert(t *testing.T, ses *execute.Session, dbnam, nam sql.Identifier,
+func testInsert(t *testing.T, mgr *engine.Manager, ses *execute.Session, dbnam, nam sql.Identifier,
 	cols []sql.Identifier, colTypes []db.ColumnType, cases []insertCase) {
 
 	for _, c := range cases {
-		tx := engine.Begin()
-		err := engine.CreateTable(ses, tx, dbnam, nam, cols, colTypes)
+		tx := mgr.Begin()
+		err := mgr.CreateTable(ses, tx, dbnam, nam, cols, colTypes)
 		if err != nil {
 			t.Error(err)
 			return
@@ -229,7 +229,7 @@ func testInsert(t *testing.T, ses *execute.Session, dbnam, nam sql.Identifier,
 			t.Errorf("Parse(\"%s\").Execute() failed with %s", c.stmt, err.Error())
 		} else {
 			var tbl db.Table
-			tbl, err = engine.LookupTable(ses, tx, dbnam, nam)
+			tbl, err = mgr.LookupTable(ses, tx, dbnam, nam)
 			if err != nil {
 				t.Error(err)
 				continue
@@ -252,7 +252,7 @@ func testInsert(t *testing.T, ses *execute.Session, dbnam, nam sql.Identifier,
 			}
 		}
 
-		err = engine.DropTable(ses, tx, dbnam, nam, false)
+		err = mgr.DropTable(ses, tx, dbnam, nam, false)
 		if err != nil {
 			t.Error(err)
 			return

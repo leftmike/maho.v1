@@ -13,7 +13,7 @@ import (
 
 var mutex sync.RWMutex
 
-type basic struct{}
+type Engine struct{}
 
 type database struct {
 	name   sql.Identifier
@@ -35,17 +35,13 @@ type rows struct {
 	haveRow bool
 }
 
-func init() {
-	engine.Register("basic", &basic{})
-}
-
-func (be *basic) AttachDatabase(name sql.Identifier, path string,
+func (_ Engine) AttachDatabase(name sql.Identifier, path string,
 	options engine.Options) (engine.Database, error) {
 
 	return nil, fmt.Errorf("basic: attach database not supported")
 }
 
-func (be *basic) CreateDatabase(name sql.Identifier, path string,
+func (_ Engine) CreateDatabase(name sql.Identifier, path string,
 	options engine.Options) (engine.Database, error) {
 
 	return &database{

@@ -8,8 +8,8 @@ import (
 
 type Session interface {
 	Context() context.Context
-	DefaultEngine() string
-	DefaultDatabase() sql.Identifier
+	DefaultEngine() string // XXX: delete?
+	DefaultDatabase() sql.Identifier // XXX: delete?
 }
 
 type ColumnUpdate struct {

@@ -55,7 +55,7 @@ func (stmt *InsertValues) Plan(ses *execute.Session, tx *engine.Transaction) (ex
 }
 
 func (stmt *InsertValues) Execute(ses *execute.Session, tx *engine.Transaction) (int64, error) {
-	tbl, err := engine.LookupTable(ses, tx, stmt.Table.Database, stmt.Table.Table)
+	tbl, err := ses.LookupTable(tx, stmt.Table.Database, stmt.Table.Table)
 	if err != nil {
 		return -1, err
 	}

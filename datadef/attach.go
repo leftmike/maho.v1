@@ -31,5 +31,5 @@ func (stmt *AttachDatabase) Plan(ses *execute.Session, tx *engine.Transaction) (
 }
 
 func (stmt *AttachDatabase) Execute(ses *execute.Session, tx *engine.Transaction) (int64, error) {
-	return -1, engine.AttachDatabase(ses.DefaultEngine(), stmt.Database, stmt.Options)
+	return -1, ses.AttachDatabase(stmt.Database, stmt.Options)
 }

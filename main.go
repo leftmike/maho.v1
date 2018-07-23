@@ -11,6 +11,8 @@ To Do:
 - ALTER TABLE ...
 - memrows: tableImpl: add versioned metadata and use METADATA_MODIFY locking level
 
+- serialize access to config variables
+
 - track sessions and transactions; maybe just one table
 - improve interactive execution: prompt, interactive editing (client app?), multiple sessions
 - server: ssh interactive access
@@ -29,6 +31,24 @@ To Do:
 - badger engine
 
 - godoc -http=:6060
+
+- move db.Rows into engine
+- add evaluate.Rows for use internally in evaluate
+- db.ColumnType??? ==> engine.ColumnType or sql.ColumnType
+- db.ColumnUpdate??? ==> engine.ColumnUpdate
+- move maho/execute to maho/evaluate
+- Plan ==> interface{}
+- move Stmt into parser
+- move Executor into server (maybe call evaluator instead)
+- move Session into engine and into evaluate
+
+- layers: parser / evaluate / engine
+- server: ReplSQL, ssh, etc
+- main: tie it all together
+- move datadef, misc, and query into evaluate
+
+- fatlock: no global variables
+
 */
 
 import (
@@ -43,15 +63,15 @@ import (
 
 	"github.com/leftmike/maho/config"
 	"github.com/leftmike/maho/engine"
-	_ "github.com/leftmike/maho/engine/basic"
-	_ "github.com/leftmike/maho/engine/memrows"
+	"github.com/leftmike/maho/engine/basic"
+	"github.com/leftmike/maho/engine/memrows"
 	"github.com/leftmike/maho/execute"
 	"github.com/leftmike/maho/parser"
 	"github.com/leftmike/maho/sql"
 )
 
-func replSQL(p parser.Parser, w io.Writer) {
-	ses := execute.NewSession(*eng, sql.ID(*database))
+func replSQL(mgr *engine.Manager, p parser.Parser, w io.Writer) {
+	ses := execute.NewSession(mgr, *eng, sql.ID(*database))
 	for {
 		stmt, err := p.Parse()
 		if err == io.EOF {
@@ -125,6 +145,8 @@ func replSQL(p parser.Parser, w io.Writer) {
 var (
 	database = config.Var(new(string), "database").Usage("default `database`").String("maho")
 	eng = config.Var(new(string), "engine").Usage("default `engine`").String("basic")
+	dataDir = config.Var(new(string), "data_directory").
+		Flag("data", "`directory` containing databases").NoConfig().String("testdata")
 
 	configFile = flag.String("config-file", "", "`file` to load config from")
 	noConfig   = flag.Bool("no-config", false, "don't load config file")
@@ -167,20 +189,25 @@ func main() {
 		return
 	}
 
-	err := engine.CreateDatabase(*eng, sql.ID(*database), engine.Options{sql.WAIT: "true"})
+	mgr := engine.NewManager(map[string]engine.Engine{
+		"basic": basic.Engine{},
+		"memrows": memrows.Engine{},
+	})
+
+	err := mgr.CreateDatabase(*eng, sql.ID(*database), engine.Options{sql.WAIT: "true"})
 	if err != nil {
 		fmt.Println(err)
 		return
 	}
 
 	for idx, arg := range sqlArgs {
-		replSQL(parser.NewParser(strings.NewReader(arg), fmt.Sprintf("sql arg %d", idx + 1)),
+		replSQL(mgr, parser.NewParser(strings.NewReader(arg), fmt.Sprintf("sql arg %d", idx + 1)),
 			os.Stdout)
 	}
 
 	args := flag.Args()
 	if len(args) == 0 {
-		replSQL(parser.NewParser(bufio.NewReader(os.Stdin), "[Stdin]"), os.Stdout)
+		replSQL(mgr, parser.NewParser(bufio.NewReader(os.Stdin), "[Stdin]"), os.Stdout)
 	} else {
 		for idx := 0; idx < len(args); idx++ {
 			/*			f, err := os.Open(os.Args[idx])
@@ -188,7 +215,7 @@ func main() {
 							log.Fatal(err)
 						}
 						replSQL(e, bufio.NewReader(f), os.Args[idx])*/
-			replSQL(parser.NewParser(strings.NewReader(args[idx]),
+			replSQL(mgr, parser.NewParser(strings.NewReader(args[idx]),
 				fmt.Sprintf("os.Args[%d]", idx)), os.Stdout)
 		}
 	}

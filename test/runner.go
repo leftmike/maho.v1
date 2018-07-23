@@ -16,12 +16,13 @@ import (
 type Runner struct {
 	Type     string
 	Database sql.Identifier
+	Mgr      *engine.Manager
 	ses      *execute.Session
 }
 
 func (run *Runner) RunExec(tst *sqltest.Test) error {
 	if run.ses == nil {
-		run.ses = execute.NewSession(run.Type, run.Database)
+		run.ses = execute.NewSession(run.Mgr, run.Type, run.Database)
 	}
 	p := parser.NewParser(strings.NewReader(tst.Test),
 		fmt.Sprintf("%s:%d", tst.Filename, tst.LineNumber))
@@ -56,7 +57,7 @@ func (run *Runner) RunExec(tst *sqltest.Test) error {
 
 func (run *Runner) RunQuery(tst *sqltest.Test) ([]string, [][]string, error) {
 	if run.ses == nil {
-		run.ses = execute.NewSession(run.Type, run.Database)
+		run.ses = execute.NewSession(run.Mgr, run.Type, run.Database)
 	}
 	p := parser.NewParser(strings.NewReader(tst.Test),
 		fmt.Sprintf("%s:%d", tst.Filename, tst.LineNumber))

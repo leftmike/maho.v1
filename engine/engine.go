@@ -5,7 +5,6 @@ import (
 	"path/filepath"
 	"sync"
 
-	"github.com/leftmike/maho/config"
 	"github.com/leftmike/maho/db"
 	"github.com/leftmike/maho/engine/fatlock"
 	"github.com/leftmike/maho/sql"
@@ -85,23 +84,41 @@ type databaseEntry struct {
 
 type TID uint64
 
-var (
+type Manager struct {
 	mutex     sync.RWMutex
-	engines       = map[string]Engine{}
-	databases     = map[sql.Identifier]*databaseEntry{}
-	nextTID   TID = 1
+	engines   map[string]Engine
+	databases map[sql.Identifier]*databaseEntry
+	virtualTables TableMap
+	lastTID   TID
+}
 
-	dataDir = config.Var(new(string), "data_directory").
-		Flag("data", "`directory` containing databases").NoConfig().String("testdata")
-)
+func NewManager(engines map[string]Engine) *Manager {
+	m := Manager{
+		engines: engines,
+		databases: map[sql.Identifier]*databaseEntry{},
+		virtualTables: TableMap{},
+	}
 
-func newDatabaseEntry(eng string, name sql.Identifier, options Options,
+	m.CreateVirtualTable(sql.ID("db$tables"), m.makeTablesVirtual)
+	m.CreateVirtualTable(sql.ID("db$columns"), m.makeColumnsVirtual)
+	m.CreateVirtualDatabase(sql.ID("system"), TableMap{
+		sql.ID("databases"):   m.makeDatabasesVirtual,
+		sql.ID("identifiers"): makeIdentifiersVirtual,
+		sql.ID("config"):      makeConfigVirtual,
+		sql.ID("engines"):     m.makeEnginesVirtual,
+		sql.ID("locks"):       makeLocksVirtual,
+	})
+
+	return &m
+}
+
+func (m *Manager) newDatabaseEntry(eng string, name sql.Identifier, options Options,
 	state databaseState) (Engine, *databaseEntry, error) {
 
-	mutex.Lock()
-	defer mutex.Unlock()
+	m.mutex.Lock()
+	defer m.mutex.Unlock()
 
-	if _, ok := databases[name]; ok {
+	if _, ok := m.databases[name]; ok {
 		return nil, nil, fmt.Errorf("engine: database %s already exists", name)
 	}
 
@@ -111,13 +128,13 @@ func newDatabaseEntry(eng string, name sql.Identifier, options Options,
 	} else {
 		delete(options, sql.ENGINE)
 	}
-	e, ok := engines[typ]
+	e, ok := m.engines[typ]
 	if !ok {
 		return nil, nil, fmt.Errorf("engine: type %s not found", typ)
 	}
 	path, ok := options[sql.PATH]
 	if !ok {
-		path = filepath.Join(*dataDir, name.String())
+		path = filepath.Join("testdata", name.String()) // XXX
 	} else {
 		delete(options, sql.PATH)
 	}
@@ -127,11 +144,11 @@ func newDatabaseEntry(eng string, name sql.Identifier, options Options,
 		path:  path,
 		typ:   typ,
 	}
-	databases[name] = de
+	m.databases[name] = de
 	return e, de, nil
 }
 
-func setupDatabase(e Engine, de *databaseEntry, options Options) {
+func (m *Manager) setupDatabase(e Engine, de *databaseEntry, options Options) {
 	var d Database
 	if de.state == Attaching {
 		d, de.err = e.AttachDatabase(de.name, de.path, options)
@@ -140,8 +157,8 @@ func setupDatabase(e Engine, de *databaseEntry, options Options) {
 		d, de.err = e.CreateDatabase(de.name, de.path, options)
 	}
 
-	mutex.Lock()
-	defer mutex.Unlock()
+	m.mutex.Lock()
+	defer m.mutex.Unlock()
 
 	if de.err == nil {
 		de.state = Running
@@ -155,8 +172,10 @@ func setupDatabase(e Engine, de *databaseEntry, options Options) {
 	}
 }
 
-func prepareDatabase(eng string, name sql.Identifier, options Options, state databaseState) error {
-	e, de, err := newDatabaseEntry(eng, name, options, state)
+func (m *Manager) prepareDatabase(eng string, name sql.Identifier, options Options,
+	state databaseState) error {
+
+	e, de, err := m.newDatabaseEntry(eng, name, options, state)
 	if err != nil {
 		return err
 	}
@@ -164,23 +183,23 @@ func prepareDatabase(eng string, name sql.Identifier, options Options, state dat
 	_, ok := options[sql.WAIT]
 	if ok {
 		delete(options, sql.WAIT)
-		setupDatabase(e, de, options)
+		m.setupDatabase(e, de, options)
 		return de.err
 	}
 
-	go setupDatabase(e, de, options)
+	go m.setupDatabase(e, de, options)
 	return nil
 }
 
-func AttachDatabase(eng string, name sql.Identifier, options Options) error {
-	return prepareDatabase(eng, name, options, Attaching)
+func (m *Manager) AttachDatabase(eng string, name sql.Identifier, options Options) error {
+	return m.prepareDatabase(eng, name, options, Attaching)
 }
 
-func CreateDatabase(eng string, name sql.Identifier, options Options) error {
-	return prepareDatabase(eng, name, options, Creating)
+func (m *Manager) CreateDatabase(eng string, name sql.Identifier, options Options) error {
+	return m.prepareDatabase(eng, name, options, Creating)
 }
 
-func DetachDatabase(name sql.Identifier) error {
+func (m *Manager) DetachDatabase(name sql.Identifier) error {
 	return nil // XXX
 }
 
@@ -192,16 +211,15 @@ type Transaction struct {
 }
 
 // Begin a new transaction.
-func Begin() *Transaction {
-	mutex.Lock()
-	defer mutex.Unlock()
+func (m *Manager) Begin() *Transaction {
+	m.mutex.Lock()
+	defer m.mutex.Unlock()
 
-	tid := nextTID
-	nextTID += 1
+	m.lastTID += 1
 	return &Transaction{
 		contexts: map[Database]interface{}{},
-		tid:      tid,
-		name:     fmt.Sprintf("transaction-%d", tid),
+		tid:      m.lastTID,
+		name:     fmt.Sprintf("transaction-%d", m.lastTID),
 	}
 }
 
@@ -271,16 +289,16 @@ func (tx *Transaction) getContext(d Database) interface{} {
 }
 
 // LookupTable looks up the named table in the named database.
-func LookupTable(ses db.Session, tx *Transaction, dbname, tblname sql.Identifier) (db.Table,
-	error) {
+func (m *Manager) LookupTable(ses db.Session, tx *Transaction, dbname,
+	tblname sql.Identifier) (db.Table, error) {
 
-	mutex.RLock()
-	defer mutex.RUnlock()
+	m.mutex.RLock()
+	defer m.mutex.RUnlock()
 
 	if dbname == 0 {
 		dbname = ses.DefaultDatabase()
 	}
-	de, ok := databases[dbname]
+	de, ok := m.databases[dbname]
 	if !ok {
 		return nil, fmt.Errorf("engine: database %s not found", dbname)
 	}
@@ -288,7 +306,7 @@ func LookupTable(ses db.Session, tx *Transaction, dbname, tblname sql.Identifier
 		return nil, fmt.Errorf("engine: database %s not running", dbname)
 	}
 	tctx := tx.getContext(de.database)
-	tbl, err := lookupVirtual(ses, tctx, de.database, dbname, tblname)
+	tbl, err := m.lookupVirtual(ses, tctx, de.database, dbname, tblname)
 	if tbl != nil || err != nil {
 		return tbl, err
 	}
@@ -296,16 +314,16 @@ func LookupTable(ses db.Session, tx *Transaction, dbname, tblname sql.Identifier
 }
 
 // CreateTable creates the named table in the named database.
-func CreateTable(ses db.Session, tx *Transaction, dbname, tblname sql.Identifier,
+func (m *Manager) CreateTable(ses db.Session, tx *Transaction, dbname, tblname sql.Identifier,
 	cols []sql.Identifier, colTypes []db.ColumnType) error {
 
-	mutex.RLock()
-	defer mutex.RUnlock()
+	m.mutex.RLock()
+	defer m.mutex.RUnlock()
 
 	if dbname == 0 {
 		dbname = ses.DefaultDatabase()
 	}
-	de, ok := databases[dbname]
+	de, ok := m.databases[dbname]
 	if !ok {
 		return fmt.Errorf("engine: database %s not found", dbname)
 	}
@@ -316,14 +334,16 @@ func CreateTable(ses db.Session, tx *Transaction, dbname, tblname sql.Identifier
 }
 
 // DropTable drops the named table from the named database.
-func DropTable(ses db.Session, tx *Transaction, dbname, tblname sql.Identifier, exists bool) error {
-	mutex.RLock()
-	defer mutex.RUnlock()
+func (m *Manager) DropTable(ses db.Session, tx *Transaction, dbname, tblname sql.Identifier,
+	exists bool) error {
+
+	m.mutex.RLock()
+	defer m.mutex.RUnlock()
 
 	if dbname == 0 {
 		dbname = ses.DefaultDatabase()
 	}
-	de, ok := databases[dbname]
+	de, ok := m.databases[dbname]
 	if !ok {
 		return fmt.Errorf("engine: database %s not found", dbname)
 	}
@@ -331,22 +351,4 @@ func DropTable(ses db.Session, tx *Transaction, dbname, tblname sql.Identifier, 
 		return fmt.Errorf("engine: database %s not running", dbname)
 	}
 	return de.database.DropTable(ses, tx.getContext(de.database), tblname, exists)
-}
-
-func GetEngine(typ string) Engine {
-	mutex.RLock()
-	defer mutex.RUnlock()
-
-	e, _ := engines[typ]
-	return e
-}
-
-func Register(typ string, e Engine) {
-	mutex.Lock()
-	defer mutex.Unlock()
-
-	if _, dup := engines[typ]; dup {
-		panic(fmt.Sprintf("engine already registered: %s", typ))
-	}
-	engines[typ] = e
 }

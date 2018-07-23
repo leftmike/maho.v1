@@ -8,8 +8,8 @@ import (
 	"github.com/leftmike/sqltest/pkg/sqltest"
 
 	"github.com/leftmike/maho/engine"
-	_ "github.com/leftmike/maho/engine/basic"
-	_ "github.com/leftmike/maho/engine/memrows"
+	"github.com/leftmike/maho/engine/basic"
+	"github.com/leftmike/maho/engine/memrows"
 	"github.com/leftmike/maho/sql"
 	"github.com/leftmike/maho/test"
 )
@@ -50,12 +50,17 @@ func (_ mahoDialect) DriverName() string {
 func testSQL(t *testing.T, typ string, dbname sql.Identifier) {
 	t.Helper()
 
-	err := engine.CreateDatabase(typ, dbname, engine.Options{sql.WAIT: "true"})
+	mgr := engine.NewManager(map[string]engine.Engine{
+		"basic":   basic.Engine{},
+		"memrows": memrows.Engine{},
+	})
+	err := mgr.CreateDatabase(typ, dbname, engine.Options{sql.WAIT: "true"})
 	if err != nil {
 		// If the test is run multiple times, then the database will already exist.
 	}
 
 	run := test.Runner{
+		Mgr:      mgr,
 		Type:     typ,
 		Database: dbname,
 	}

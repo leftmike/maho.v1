@@ -7,6 +7,7 @@ import (
 	"testing"
 
 	"github.com/leftmike/maho/engine"
+	"github.com/leftmike/maho/engine/basic"
 	"github.com/leftmike/maho/execute"
 	"github.com/leftmike/maho/parser"
 	"github.com/leftmike/maho/sql"
@@ -32,12 +33,15 @@ func TestValuesSimple(t *testing.T) {
 		},
 	}
 
-	err := engine.CreateDatabase("basic", sql.ID("core_test"), engine.Options{sql.WAIT: "true"})
+	mgr := engine.NewManager(map[string]engine.Engine{
+		"basic": basic.Engine{},
+	})
+	err := mgr.CreateDatabase("basic", sql.ID("core_test"), engine.Options{sql.WAIT: "true"})
 	if err != nil {
 		// If the test is run multiple times, then the database will already exist.
 	}
 
-	ses := execute.NewSession("basic", sql.ID("core_test"))
+	ses := execute.NewSession(mgr, "basic", sql.ID("core_test"))
 	for i, c := range cases {
 		p := parser.NewParser(strings.NewReader(c.sql), fmt.Sprintf("tests[%d]", i))
 		stmt, err := p.Parse()
@@ -45,7 +49,7 @@ func TestValuesSimple(t *testing.T) {
 			t.Errorf("Parse(%q) failed with %s", c.sql, err)
 			continue
 		}
-		tx := engine.Begin()
+		tx := mgr.Begin()
 		ret, err := stmt.Plan(ses, tx)
 		if c.fail {
 			if err == nil {

@@ -39,7 +39,7 @@ func (stmt *CreateTable) Plan(ses *execute.Session, tx *engine.Transaction) (exe
 }
 
 func (stmt *CreateTable) Execute(ses *execute.Session, tx *engine.Transaction) (int64, error) {
-	return -1, engine.CreateTable(ses, tx, stmt.Table.Database, stmt.Table.Table, stmt.Columns,
+	return -1, ses.CreateTable(tx, stmt.Table.Database, stmt.Table.Table, stmt.Columns,
 		stmt.ColumnTypes)
 }
 
@@ -66,5 +66,5 @@ func (stmt *CreateDatabase) Plan(ses *execute.Session, tx *engine.Transaction) (
 }
 
 func (stmt *CreateDatabase) Execute(ses *execute.Session, tx *engine.Transaction) (int64, error) {
-	return -1, engine.CreateDatabase(ses.DefaultEngine(), stmt.Database, stmt.Options)
+	return -1, ses.CreateDatabase(stmt.Database, stmt.Options)
 }

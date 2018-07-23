@@ -31,7 +31,7 @@ func (stmt *DropTable) Plan(ses *execute.Session, tx *engine.Transaction) (execu
 
 func (stmt *DropTable) Execute(ses *execute.Session, tx *engine.Transaction) (int64, error) {
 	for _, tbl := range stmt.Tables {
-		err := engine.DropTable(ses, tx, tbl.Database, tbl.Table, stmt.IfExists)
+		err := ses.DropTable(tx, tbl.Database, tbl.Table, stmt.IfExists)
 		if err != nil {
 			return -1, err
 		}
