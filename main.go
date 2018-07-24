@@ -32,7 +32,8 @@ To Do:
 
 - godoc -http=:6060
 
-- add evaluate.Rows for use internally in evaluate
+- move db.Rows to evaluate.Rows
+- add evaluate.Session as an interface
 - db.ColumnType ==> sql.ColumnType; uses expr.Expr, so would need to move that as well
 - db.ColumnUpdate ==> sql.ColumnUpdate
 - move maho/execute to maho/evaluate
