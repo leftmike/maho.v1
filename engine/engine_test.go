@@ -69,15 +69,15 @@ func (tdb *testDatabase) Message() string {
 	return ""
 }
 
-func (tdb *testDatabase) LookupTable(ses db.Session, tx interface{},
-	tblname sql.Identifier) (db.Table, error) {
+func (tdb *testDatabase) LookupTable(ses Session, tx interface{}, tblname sql.Identifier) (Table,
+	error) {
 
 	_ = tx.(*tcontext)
 	tdb.te.op("LookupTable", tblname.String())
 	return nil, nil
 }
 
-func (tdb *testDatabase) CreateTable(ses db.Session, tx interface{}, tblname sql.Identifier,
+func (tdb *testDatabase) CreateTable(ses Session, tx interface{}, tblname sql.Identifier,
 	cols []sql.Identifier, colTypes []db.ColumnType) error {
 
 	_ = tx.(*tcontext)
@@ -85,7 +85,7 @@ func (tdb *testDatabase) CreateTable(ses db.Session, tx interface{}, tblname sql
 	return nil
 }
 
-func (tdb *testDatabase) DropTable(ses db.Session, tx interface{}, tblname sql.Identifier,
+func (tdb *testDatabase) DropTable(ses Session, tx interface{}, tblname sql.Identifier,
 	exists bool) error {
 
 	_ = tx.(*tcontext)
@@ -93,7 +93,7 @@ func (tdb *testDatabase) DropTable(ses db.Session, tx interface{}, tblname sql.I
 	return nil
 }
 
-func (tdb *testDatabase) ListTables(ses db.Session, tx interface{}) ([]TableEntry, error) {
+func (tdb *testDatabase) ListTables(ses Session, tx interface{}) ([]TableEntry, error) {
 	tdb.te.op("ListTables")
 	return nil, nil
 }
@@ -103,7 +103,7 @@ func (tdb *testDatabase) Begin(lkr fatlock.Locker) interface{} {
 	return &tcontext{tdb}
 }
 
-func (tdb *testDatabase) Commit(ses db.Session, tx interface{}) error {
+func (tdb *testDatabase) Commit(ses Session, tx interface{}) error {
 	tctx := tx.(*tcontext)
 	if tctx.tdb != tdb {
 		panic("tctx.tdb != tdb")

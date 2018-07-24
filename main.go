@@ -32,14 +32,13 @@ To Do:
 
 - godoc -http=:6060
 
-- move db.Rows into engine
 - add evaluate.Rows for use internally in evaluate
-- db.ColumnType??? ==> engine.ColumnType or sql.ColumnType
-- db.ColumnUpdate??? ==> engine.ColumnUpdate
+- db.ColumnType ==> sql.ColumnType; uses expr.Expr, so would need to move that as well
+- db.ColumnUpdate ==> sql.ColumnUpdate
 - move maho/execute to maho/evaluate
 - move Stmt into parser ==> maybe can't do that
 - move Executor into server (maybe call evaluator instead) or into evaluate?
-- move Session into engine (as interface) and into evaluate (as struct)
+- move Session into engine (as interface) and into evaluate (as interface)
 
 - layers: parser / evaluate / engine
 - server: ReplSQL, ssh, etc

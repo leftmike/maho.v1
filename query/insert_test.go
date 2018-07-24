@@ -1,6 +1,7 @@
 package query_test
 
 import (
+	"io"
 	"strings"
 	"testing"
 
@@ -209,6 +210,22 @@ func statement(ses *execute.Session, tx *engine.Transaction, s string) error {
 	return err
 }
 
+func allRows(ses *execute.Session, rows engine.Rows) ([][]sql.Value, error) {
+	all := [][]sql.Value{}
+	l := len(rows.Columns())
+	for {
+		dest := make([]sql.Value, l)
+		err := rows.Next(ses, dest)
+		if err == io.EOF {
+			break
+		} else if err != nil {
+			return nil, err
+		}
+		all = append(all, dest)
+	}
+	return all, nil
+}
+
 func testInsert(t *testing.T, mgr *engine.Manager, ses *execute.Session, dbnam, nam sql.Identifier,
 	cols []sql.Identifier, colTypes []db.ColumnType, cases []insertCase) {
 
@@ -228,20 +245,20 @@ func testInsert(t *testing.T, mgr *engine.Manager, ses *execute.Session, dbnam, 
 		} else if err != nil {
 			t.Errorf("Parse(\"%s\").Execute() failed with %s", c.stmt, err.Error())
 		} else {
-			var tbl db.Table
+			var tbl engine.Table
 			tbl, err = mgr.LookupTable(ses, tx, dbnam, nam)
 			if err != nil {
 				t.Error(err)
 				continue
 			}
-			var rows db.Rows
+			var rows engine.Rows
 			rows, err = tbl.Rows(ses)
 			if err != nil {
 				t.Errorf("(%s).Rows() failed with %s", nam, err)
 				continue
 			}
 			var all [][]sql.Value
-			all, err = db.AllRows(ses, rows)
+			all, err = allRows(ses, rows)
 			if err != nil {
 				t.Errorf("(%s).Rows().Next() failed with %s", nam, err)
 				continue

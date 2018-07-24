@@ -83,14 +83,33 @@ type sessionState struct {
 	ses    session
 	tctx   interface{}
 	locker fatlock.Locker
-	tbl    db.Table
-	rows   db.Rows
+	tbl    engine.Table
+	rows   engine.Rows
 }
 
 var (
 	columns     = []sql.Identifier{sql.ID("ID"), sql.ID("intCol"), sql.ID("stringCol")}
 	columnTypes = []db.ColumnType{int32ColType, int64ColType, stringColType}
 )
+
+func allRows(t *testing.T, ses engine.Session, rows engine.Rows) [][]sql.Value {
+	t.Helper()
+
+	all := [][]sql.Value{}
+	l := len(rows.Columns())
+	for {
+		dest := make([]sql.Value, l)
+		err := rows.Next(ses, dest)
+		if err == io.EOF {
+			break
+		} else if err != nil {
+			t.Errorf("rows.Next(): failed with %s", err)
+			return nil
+		}
+		all = append(all, dest)
+	}
+	return all
+}
 
 func testTableLifecycle(t *testing.T, d engine.Database, cmds []cmd) {
 	sessions := [4]sessionState{}
@@ -208,10 +227,8 @@ func testTableLifecycle(t *testing.T, d engine.Database, cmds []cmd) {
 			if err != nil {
 				t.Errorf("table.Rows() failed with %s", err)
 			} else {
-				vals, err := db.AllRows(state.ses, state.rows)
-				if err != nil {
-					t.Errorf("db.AllRows() failed with %s", err)
-				} else {
+				vals := allRows(t, state.ses, state.rows)
+				if vals != nil {
 					testutil.SortValues(vals)
 					if !reflect.DeepEqual(vals, cmd.values) {
 						t.Errorf("table.Rows() got %v want %v", vals, cmd.values)

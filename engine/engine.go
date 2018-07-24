@@ -1,6 +1,7 @@
 package engine
 
 import (
+	"context"
 	"fmt"
 	"path/filepath"
 	"sync"
@@ -60,15 +61,36 @@ func (ds databaseState) String() string {
 	}
 }
 
+type Session interface {
+	Context() context.Context
+	DefaultEngine() string // XXX: delete?
+	DefaultDatabase() sql.Identifier // XXX: delete?
+}
+
+type Rows interface {
+	Columns() []sql.Identifier
+	Close() error
+	Next(ses Session, dest []sql.Value) error
+	Delete(ses Session) error
+	Update(ses Session, updates []db.ColumnUpdate) error
+}
+
+type Table interface {
+	Columns(ses Session) []sql.Identifier
+	ColumnTypes(ses Session) []db.ColumnType
+	Rows(ses Session) (Rows, error)
+	Insert(ses Session, row []sql.Value) error
+}
+
 type Database interface {
 	Message() string
-	LookupTable(ses db.Session, tctx interface{}, tblname sql.Identifier) (db.Table, error)
-	CreateTable(ses db.Session, tctx interface{}, tblname sql.Identifier,
-		cols []sql.Identifier, colTypes []db.ColumnType) error
-	DropTable(ses db.Session, tctx interface{}, tblname sql.Identifier, exists bool) error
-	ListTables(ses db.Session, tctx interface{}) ([]TableEntry, error)
+	LookupTable(ses Session, tctx interface{}, tblname sql.Identifier) (Table, error)
+	CreateTable(ses Session, tctx interface{}, tblname sql.Identifier, cols []sql.Identifier,
+		colTypes []db.ColumnType) error
+	DropTable(ses Session, tctx interface{}, tblname sql.Identifier, exists bool) error
+	ListTables(ses Session, tctx interface{}) ([]TableEntry, error)
 	Begin(lkr fatlock.Locker) interface{}
-	Commit(ses db.Session, tctx interface{}) error
+	Commit(ses Session, tctx interface{}) error
 	Rollback(tctx interface{}) error
 	NextStmt(tctx interface{})
 }
@@ -250,7 +272,7 @@ func (tx *Transaction) forContexts(fn func(d Database, tctx interface{}) error) 
 	return err
 }
 
-func (tx *Transaction) Commit(ses db.Session) error {
+func (tx *Transaction) Commit(ses Session) error {
 	err := tx.forContexts(func(d Database, tctx interface{}) error {
 		return d.Commit(ses, tctx)
 	})
@@ -289,8 +311,8 @@ func (tx *Transaction) getContext(d Database) interface{} {
 }
 
 // LookupTable looks up the named table in the named database.
-func (m *Manager) LookupTable(ses db.Session, tx *Transaction, dbname,
-	tblname sql.Identifier) (db.Table, error) {
+func (m *Manager) LookupTable(ses Session, tx *Transaction, dbname,	tblname sql.Identifier) (Table,
+	error) {
 
 	m.mutex.RLock()
 	defer m.mutex.RUnlock()
@@ -314,7 +336,7 @@ func (m *Manager) LookupTable(ses db.Session, tx *Transaction, dbname,
 }
 
 // CreateTable creates the named table in the named database.
-func (m *Manager) CreateTable(ses db.Session, tx *Transaction, dbname, tblname sql.Identifier,
+func (m *Manager) CreateTable(ses Session, tx *Transaction, dbname, tblname sql.Identifier,
 	cols []sql.Identifier, colTypes []db.ColumnType) error {
 
 	m.mutex.RLock()
@@ -334,7 +356,7 @@ func (m *Manager) CreateTable(ses db.Session, tx *Transaction, dbname, tblname s
 }
 
 // DropTable drops the named table from the named database.
-func (m *Manager) DropTable(ses db.Session, tx *Transaction, dbname, tblname sql.Identifier,
+func (m *Manager) DropTable(ses Session, tx *Transaction, dbname, tblname sql.Identifier,
 	exists bool) error {
 
 	m.mutex.RLock()

@@ -21,14 +21,48 @@ func (fta FromTableAlias) String() string {
 	return ((sql.TableAlias)(fta)).String()
 }
 
+type engineRows struct {
+	engine.Rows
+}
+
+func (er engineRows) Columns() []sql.Identifier {
+	return er.Rows.Columns()
+}
+
+func (er engineRows) Close() error {
+	return er.Rows.Close()
+}
+
+func (er engineRows) Next(ses db.Session, dest []sql.Value) error {
+	return er.Rows.Next(ses, dest)
+}
+
+func (er engineRows) Delete(ses db.Session) error {
+	return er.Rows.Delete(ses)
+}
+
+func (er engineRows) Update(ses db.Session, updates []db.ColumnUpdate) error {
+	return er.Rows.Update(ses, updates)
+}
+
+func lookupRows(ses *execute.Session, tx *engine.Transaction, dbname,
+	tblname sql.Identifier) (db.Rows, error) {
+
+	tbl, err := ses.LookupTable(tx, dbname, tblname)
+	if err != nil {
+		return nil, err
+	}
+	rows, err := tbl.Rows(ses)
+	if err != nil {
+		return nil, err
+	}
+	return engineRows{rows}, nil
+}
+
 func (fta FromTableAlias) rows(ses db.Session, tx *engine.Transaction) (db.Rows, *fromContext,
 	error) {
 
-	tbl, err := ses.(*execute.Session).LookupTable(tx, fta.Database, fta.Table)
-	if err != nil {
-		return nil, nil, err
-	}
-	rows, err := tbl.Rows(ses)
+	rows, err := lookupRows(ses.(*execute.Session), tx, fta.Database, fta.Table) // XXX: fix this
 	if err != nil {
 		return nil, nil, err
 	}

@@ -54,8 +54,8 @@ func (bdb *database) Message() string {
 	return ""
 }
 
-func (bdb *database) LookupTable(ses db.Session, tctx interface{},
-	tblname sql.Identifier) (db.Table, error) {
+func (bdb *database) LookupTable(ses engine.Session, tctx interface{},
+	tblname sql.Identifier) (engine.Table, error) {
 
 	mutex.RLock()
 	defer mutex.RUnlock()
@@ -67,7 +67,7 @@ func (bdb *database) LookupTable(ses db.Session, tctx interface{},
 	return tbl, nil
 }
 
-func (bdb *database) CreateTable(ses db.Session, tctx interface{}, tblname sql.Identifier,
+func (bdb *database) CreateTable(ses engine.Session, tctx interface{}, tblname sql.Identifier,
 	cols []sql.Identifier, colTypes []db.ColumnType) error {
 
 	mutex.Lock()
@@ -86,7 +86,7 @@ func (bdb *database) CreateTable(ses db.Session, tctx interface{}, tblname sql.I
 	return nil
 }
 
-func (bdb *database) DropTable(ses db.Session, tctx interface{}, tblname sql.Identifier,
+func (bdb *database) DropTable(ses engine.Session, tctx interface{}, tblname sql.Identifier,
 	exists bool) error {
 
 	mutex.Lock()
@@ -102,7 +102,7 @@ func (bdb *database) DropTable(ses db.Session, tctx interface{}, tblname sql.Ide
 	return nil
 }
 
-func (bdb *database) ListTables(ses db.Session, tctx interface{}) ([]engine.TableEntry, error) {
+func (bdb *database) ListTables(ses engine.Session, tctx interface{}) ([]engine.TableEntry, error) {
 	mutex.RLock()
 	defer mutex.RUnlock()
 
@@ -120,7 +120,7 @@ func (bdb *database) Begin(lkr fatlock.Locker) interface{} {
 	return nil
 }
 
-func (bdb *database) Commit(ses db.Session, tctx interface{}) error {
+func (bdb *database) Commit(ses engine.Session, tctx interface{}) error {
 	return nil
 }
 
@@ -130,22 +130,22 @@ func (bdb *database) Rollback(tctx interface{}) error {
 
 func (bdb *database) NextStmt(tctx interface{}) {}
 
-func (bt *table) Columns(ses db.Session) []sql.Identifier {
+func (bt *table) Columns(ses engine.Session) []sql.Identifier {
 	return bt.columns
 }
 
-func (bt *table) ColumnTypes(ses db.Session) []db.ColumnType {
+func (bt *table) ColumnTypes(ses engine.Session) []db.ColumnType {
 	return bt.columnTypes
 }
 
-func (bt *table) Rows(ses db.Session) (db.Rows, error) {
+func (bt *table) Rows(ses engine.Session) (engine.Rows, error) {
 	mutex.RLock()
 	defer mutex.RUnlock()
 
 	return &rows{name: bt.name, columns: bt.columns, rows: bt.rows}, nil
 }
 
-func (bt *table) Insert(ses db.Session, row []sql.Value) error {
+func (bt *table) Insert(ses engine.Session, row []sql.Value) error {
 	mutex.Lock()
 	defer mutex.Unlock()
 
@@ -163,7 +163,7 @@ func (br *rows) Close() error {
 	return nil
 }
 
-func (br *rows) Next(ses db.Session, dest []sql.Value) error {
+func (br *rows) Next(ses engine.Session, dest []sql.Value) error {
 	mutex.RLock()
 	defer mutex.RUnlock()
 
@@ -181,7 +181,7 @@ func (br *rows) Next(ses db.Session, dest []sql.Value) error {
 	return io.EOF
 }
 
-func (br *rows) Delete(ses db.Session) error {
+func (br *rows) Delete(ses engine.Session) error {
 	mutex.Lock()
 	defer mutex.Unlock()
 
@@ -193,7 +193,7 @@ func (br *rows) Delete(ses db.Session) error {
 	return nil
 }
 
-func (br *rows) Update(ses db.Session, updates []db.ColumnUpdate) error {
+func (br *rows) Update(ses engine.Session, updates []db.ColumnUpdate) error {
 	mutex.Lock()
 	defer mutex.Unlock()
 

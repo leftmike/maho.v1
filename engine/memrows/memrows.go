@@ -95,8 +95,8 @@ func visibleVersion(ti *tableImpl, v version) *tableImpl {
 	return ti
 }
 
-func (mdb *database) LookupTable(ses db.Session, tx interface{}, tblname sql.Identifier) (db.Table,
-	error) {
+func (mdb *database) LookupTable(ses engine.Session, tx interface{},
+	tblname sql.Identifier) (engine.Table, error) {
 
 	tctx := tx.(*tcontext)
 	tbl, ok := tctx.tables[tblname]
@@ -131,7 +131,7 @@ func (mdb *database) LookupTable(ses db.Session, tx interface{}, tblname sql.Ide
 	return tbl, nil
 }
 
-func (mdb *database) CreateTable(ses db.Session, tx interface{}, tblname sql.Identifier,
+func (mdb *database) CreateTable(ses engine.Session, tx interface{}, tblname sql.Identifier,
 	cols []sql.Identifier, colTypes []db.ColumnType) error {
 
 	tctx := tx.(*tcontext)
@@ -183,7 +183,7 @@ func (mdb *database) CreateTable(ses db.Session, tx interface{}, tblname sql.Ide
 	return nil
 }
 
-func (mdb *database) DropTable(ses db.Session, tx interface{}, tblname sql.Identifier,
+func (mdb *database) DropTable(ses engine.Session, tx interface{}, tblname sql.Identifier,
 	exists bool) error {
 
 	tctx := tx.(*tcontext)
@@ -232,7 +232,7 @@ func (mdb *database) DropTable(ses db.Session, tx interface{}, tblname sql.Ident
 	return nil
 }
 
-func (mdb *database) ListTables(ses db.Session, tx interface{}) ([]engine.TableEntry, error) {
+func (mdb *database) ListTables(ses engine.Session, tx interface{}) ([]engine.TableEntry, error) {
 	var tbls []engine.TableEntry
 
 	tctx := tx.(*tcontext)
@@ -275,7 +275,7 @@ func (mdb *database) Begin(lkr fatlock.Locker) interface{} {
 	}
 }
 
-func (mdb *database) Commit(ses db.Session, tx interface{}) error {
+func (mdb *database) Commit(ses engine.Session, tx interface{}) error {
 	tctx := tx.(*tcontext)
 
 	for _, tbl := range tctx.tables {
@@ -341,19 +341,19 @@ func (mdb *database) NextStmt(tx interface{}) {
 	tctx.cid += 1
 }
 
-func (mt *table) Columns(ses db.Session) []sql.Identifier {
+func (mt *table) Columns(ses engine.Session) []sql.Identifier {
 	return mt.table.getColumns(mt.tctx)
 }
 
-func (mt *table) ColumnTypes(ses db.Session) []db.ColumnType {
+func (mt *table) ColumnTypes(ses engine.Session) []db.ColumnType {
 	return mt.table.getColumnTypes(mt.tctx)
 }
 
-func (mt *table) Rows(ses db.Session) (db.Rows, error) {
+func (mt *table) Rows(ses engine.Session) (engine.Rows, error) {
 	return &rows{table: mt}, nil
 }
 
-func (mt *table) Insert(ses db.Session, row []sql.Value) error {
+func (mt *table) Insert(ses engine.Session, row []sql.Value) error {
 	if !mt.modifyLock {
 		err := fatlock.LockTable(ses, mt.tctx.locker, mt.db.name, mt.name, fatlock.ROW_MODIFY)
 		if err != nil {
@@ -380,7 +380,7 @@ func (mr *rows) Close() error {
 	return nil
 }
 
-func (mr *rows) Next(ses db.Session, dest []sql.Value) error {
+func (mr *rows) Next(ses engine.Session, dest []sql.Value) error {
 	var err error
 	mr.index, err = mr.table.table.next(mr.table.tctx, dest, mr.index)
 	if err != nil {
@@ -391,7 +391,7 @@ func (mr *rows) Next(ses db.Session, dest []sql.Value) error {
 	return nil
 }
 
-func (mr *rows) Delete(ses db.Session) error {
+func (mr *rows) Delete(ses engine.Session) error {
 	if !mr.haveRow {
 		return fmt.Errorf("memrows: table %s.%s no row to delete", mr.table.db.name,
 			mr.table.name)
@@ -414,7 +414,7 @@ func (mr *rows) Delete(ses db.Session) error {
 	return nil
 }
 
-func (mr *rows) Update(ses db.Session, updates []db.ColumnUpdate) error {
+func (mr *rows) Update(ses engine.Session, updates []db.ColumnUpdate) error {
 	if !mr.haveRow {
 		return fmt.Errorf("memrows: table %s.%s no row to update", mr.table.db.name,
 			mr.table.name)

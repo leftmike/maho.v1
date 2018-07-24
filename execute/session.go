@@ -105,8 +105,8 @@ func (ses *Session) DropTable(tx *engine.Transaction, dbname, tblname sql.Identi
 	return ses.mgr.DropTable(ses, tx, dbname, tblname, exists)
 }
 
-func (ses *Session) LookupTable(tx *engine.Transaction, dbname, tblname sql.Identifier) (db.Table,
-	error) {
+func (ses *Session) LookupTable(tx *engine.Transaction, dbname,
+	tblname sql.Identifier) (engine.Table, error) {
 
 	return ses.mgr.LookupTable(ses, tx, dbname, tblname)
 }
