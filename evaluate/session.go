@@ -9,8 +9,8 @@ import (
 
 type Session interface {
 	Context() context.Context
-	DefaultEngine() string // XXX: delete?
-	DefaultDatabase() sql.Identifier // XXX: delete?
+	DefaultEngine() string
+	DefaultDatabase() sql.Identifier
 	Manager() *engine.Manager
 	Begin() error
 	Commit() error

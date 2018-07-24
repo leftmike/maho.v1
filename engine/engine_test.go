@@ -133,21 +133,10 @@ type tcontext struct {
 	tdb *testDatabase
 }
 
-type session struct {
-	eng  string
-	name sql.Identifier
-}
+type session struct{}
 
-func (ses *session) Context() context.Context {
+func (_ session) Context() context.Context {
 	return nil
-}
-
-func (ses *session) DefaultEngine() string {
-	return ses.eng
-}
-
-func (ses *session) DefaultDatabase() sql.Identifier {
-	return ses.name
 }
 
 func checkDatabaseState(t *testing.T, m *Manager, state databaseState, name sql.Identifier) {
@@ -214,11 +203,8 @@ func TestDatabase(t *testing.T) {
 	})
 
 	tx := m.Begin()
-	ses := &session{
-		eng:  "test",
-		name: sql.ID(db),
-	}
-	err = m.CreateTable(ses, tx, 0, sql.ID("table1"), nil, nil)
+	ses := session{}
+	err = m.CreateTable(ses, tx, sql.ID(db), sql.ID("table1"), nil, nil)
 	if err != nil {
 		t.Errorf("CreateTable(table1) failed with %s", err)
 	}
@@ -237,11 +223,8 @@ func TestDatabase(t *testing.T) {
 	})
 
 	tx = m.Begin()
-	ses = &session{
-		eng:  "test",
-		name: sql.ID(db),
-	}
-	_, err = m.LookupTable(ses, tx, 0, sql.ID("table1"))
+	ses = session{}
+	_, err = m.LookupTable(ses, tx, sql.ID(db), sql.ID("table1"))
 	if err != nil {
 		t.Errorf("LookupTable(table1) failed with %s", err)
 	}

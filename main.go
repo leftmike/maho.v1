@@ -32,7 +32,6 @@ To Do:
 
 - godoc -http=:6060
 
-- remove DefaultEngine and DefaultDatabase from engine.Session
 - db.ColumnType ==> sql.ColumnType; uses expr.Expr, so would need to move that as well
 - db.ColumnUpdate ==> sql.ColumnUpdate
 - move Expr into evaluate

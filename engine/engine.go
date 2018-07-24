@@ -63,8 +63,6 @@ func (ds databaseState) String() string {
 
 type Session interface {
 	Context() context.Context
-	DefaultEngine() string // XXX: delete?
-	DefaultDatabase() sql.Identifier // XXX: delete?
 }
 
 type Rows interface {
@@ -317,9 +315,6 @@ func (m *Manager) LookupTable(ses Session, tx *Transaction, dbname,	tblname sql.
 	m.mutex.RLock()
 	defer m.mutex.RUnlock()
 
-	if dbname == 0 {
-		dbname = ses.DefaultDatabase()
-	}
 	de, ok := m.databases[dbname]
 	if !ok {
 		return nil, fmt.Errorf("engine: database %s not found", dbname)
@@ -342,9 +337,6 @@ func (m *Manager) CreateTable(ses Session, tx *Transaction, dbname, tblname sql.
 	m.mutex.RLock()
 	defer m.mutex.RUnlock()
 
-	if dbname == 0 {
-		dbname = ses.DefaultDatabase()
-	}
 	de, ok := m.databases[dbname]
 	if !ok {
 		return fmt.Errorf("engine: database %s not found", dbname)
@@ -362,9 +354,6 @@ func (m *Manager) DropTable(ses Session, tx *Transaction, dbname, tblname sql.Id
 	m.mutex.RLock()
 	defer m.mutex.RUnlock()
 
-	if dbname == 0 {
-		dbname = ses.DefaultDatabase()
-	}
 	de, ok := m.databases[dbname]
 	if !ok {
 		return fmt.Errorf("engine: database %s not found", dbname)

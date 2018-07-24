@@ -31,7 +31,11 @@ func (stmt *DropTable) Plan(ses evaluate.Session, tx *engine.Transaction) (inter
 
 func (stmt *DropTable) Execute(ses evaluate.Session, tx *engine.Transaction) (int64, error) {
 	for _, tbl := range stmt.Tables {
-		err := ses.Manager().DropTable(ses, tx, tbl.Database, tbl.Table, stmt.IfExists)
+		dbname := tbl.Database
+		if dbname == 0 {
+			dbname = ses.DefaultDatabase()
+		}
+		err := ses.Manager().DropTable(ses, tx, dbname, tbl.Table, stmt.IfExists)
 		if err != nil {
 			return -1, err
 		}

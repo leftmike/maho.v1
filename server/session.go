@@ -28,11 +28,11 @@ func (ses *Session) Context() context.Context {
 	return nil
 }
 
-func (ses *Session) DefaultEngine() string { // XXX: delete
+func (ses *Session) DefaultEngine() string {
 	return ses.eng
 }
 
-func (ses *Session) DefaultDatabase() sql.Identifier { // XXX: delete
+func (ses *Session) DefaultDatabase() sql.Identifier {
 	return ses.name
 }
 

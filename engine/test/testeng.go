@@ -23,14 +23,6 @@ func (_ session) Context() context.Context {
 	return nil
 }
 
-func (_ session) DefaultEngine() string {
-	return ""
-}
-
-func (_ session) DefaultDatabase() sql.Identifier {
-	return 0
-}
-
 var (
 	int32ColType  = db.ColumnType{Type: sql.IntegerType, Size: 4, NotNull: true}
 	int64ColType  = db.ColumnType{Type: sql.IntegerType, Size: 8, NotNull: true}

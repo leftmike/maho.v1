@@ -31,16 +31,8 @@ type session struct {
 	tl *testLocker
 }
 
-func (ses *session) Context() context.Context {
+func (_ *session) Context() context.Context {
 	return nil
-}
-
-func (ses *session) DefaultEngine() string {
-	return ""
-}
-
-func (ses *session) DefaultDatabase() sql.Identifier {
-	return 0
 }
 
 func (ses *session) String() string {
