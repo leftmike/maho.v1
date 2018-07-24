@@ -2,7 +2,7 @@ package datadef
 
 import (
 	"github.com/leftmike/maho/engine"
-	"github.com/leftmike/maho/execute"
+	"github.com/leftmike/maho/evaluate"
 	"github.com/leftmike/maho/sql"
 )
 
@@ -25,13 +25,13 @@ func (stmt *DropTable) String() string {
 	return s
 }
 
-func (stmt *DropTable) Plan(ses *execute.Session, tx *engine.Transaction) (interface{}, error) {
+func (stmt *DropTable) Plan(ses evaluate.Session, tx *engine.Transaction) (interface{}, error) {
 	return stmt, nil
 }
 
-func (stmt *DropTable) Execute(ses *execute.Session, tx *engine.Transaction) (int64, error) {
+func (stmt *DropTable) Execute(ses evaluate.Session, tx *engine.Transaction) (int64, error) {
 	for _, tbl := range stmt.Tables {
-		err := ses.DropTable(tx, tbl.Database, tbl.Table, stmt.IfExists)
+		err := ses.Manager().DropTable(ses, tx, tbl.Database, tbl.Table, stmt.IfExists)
 		if err != nil {
 			return -1, err
 		}

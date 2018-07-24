@@ -1,14 +1,14 @@
-package execute_test
+package server_test
 
 import (
 	"testing"
 
-	"github.com/leftmike/maho/execute"
+	"github.com/leftmike/maho/server"
 	"github.com/leftmike/maho/sql"
 )
 
 func TestContext(t *testing.T) {
-	ses := execute.NewSession(nil, "engine", sql.ID("name"))
+	ses := server.NewSession(nil, "engine", sql.ID("name"))
 	if ses.DefaultEngine() != "engine" {
 		t.Errorf("DefaultEngine() got %q want %q", ses.DefaultEngine(), "engine")
 	}

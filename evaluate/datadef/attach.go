@@ -4,7 +4,7 @@ import (
 	"fmt"
 
 	"github.com/leftmike/maho/engine"
-	"github.com/leftmike/maho/execute"
+	"github.com/leftmike/maho/evaluate"
 	"github.com/leftmike/maho/sql"
 )
 
@@ -24,12 +24,12 @@ func (stmt *AttachDatabase) String() string {
 	return s
 }
 
-func (stmt *AttachDatabase) Plan(ses *execute.Session, tx *engine.Transaction) (interface{},
+func (stmt *AttachDatabase) Plan(ses evaluate.Session, tx *engine.Transaction) (interface{},
 	error) {
 
 	return stmt, nil
 }
 
-func (stmt *AttachDatabase) Execute(ses *execute.Session, tx *engine.Transaction) (int64, error) {
-	return -1, ses.AttachDatabase(stmt.Database, stmt.Options)
+func (stmt *AttachDatabase) Execute(ses evaluate.Session, tx *engine.Transaction) (int64, error) {
+	return -1, ses.Manager().AttachDatabase(ses.DefaultEngine(), stmt.Database, stmt.Options)
 }

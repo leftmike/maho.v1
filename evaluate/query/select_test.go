@@ -3,10 +3,10 @@ package query_test
 import (
 	"testing"
 
-	"github.com/leftmike/maho/db"
-	"github.com/leftmike/maho/execute"
-	"github.com/leftmike/maho/expr"
+	"github.com/leftmike/maho/evaluate"
 	"github.com/leftmike/maho/evaluate/query"
+	"github.com/leftmike/maho/expr"
+	"github.com/leftmike/maho/server"
 	"github.com/leftmike/maho/sql"
 	"github.com/leftmike/maho/testutil"
 )
@@ -96,7 +96,7 @@ func TestSelect(t *testing.T) {
 	}
 
 	mgr := startManager(t)
-	ses := execute.NewSession(mgr, "basic", sql.ID("test"))
+	ses := server.NewSession(mgr, "basic", sql.ID("test"))
 	for _, c := range cases {
 		tx := mgr.Begin()
 		if c.stmt.String() != c.s {
@@ -113,7 +113,7 @@ func TestSelect(t *testing.T) {
 			t.Errorf("(%v).Rows().Columns() got %v want %v", c.stmt, cols, c.cols)
 			continue
 		}
-		all, err := db.AllRows(ses, rows)
+		all, err := evaluate.AllRows(ses, rows)
 		if err != nil {
 			t.Errorf("(%v).Rows().Next() failed with %s", c.stmt, err)
 		}

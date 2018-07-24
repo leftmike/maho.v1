@@ -32,16 +32,11 @@ To Do:
 
 - godoc -http=:6060
 
-- move db.Rows to evaluate.Rows
-- add evaluate.Session as an interface
+- remove DefaultEngine and DefaultDatabase from engine.Session
 - db.ColumnType ==> sql.ColumnType; uses expr.Expr, so would need to move that as well
 - db.ColumnUpdate ==> sql.ColumnUpdate
-- move maho/execute to maho/evaluate
-- move Stmt into parser ==> maybe can't do that
-- move Executor into server (maybe call evaluator instead) or into evaluate?
-- move Session into engine (as interface) and into evaluate (as interface)
+- move Expr into evaluate
 
-- layers: parser / evaluate / engine
 - server: ReplSQL, ssh, etc
 - main: tie it all together
 
@@ -63,13 +58,14 @@ import (
 	"github.com/leftmike/maho/engine"
 	"github.com/leftmike/maho/engine/basic"
 	"github.com/leftmike/maho/engine/memrows"
-	"github.com/leftmike/maho/execute"
+	"github.com/leftmike/maho/evaluate"
 	"github.com/leftmike/maho/parser"
+	"github.com/leftmike/maho/server"
 	"github.com/leftmike/maho/sql"
 )
 
 func replSQL(mgr *engine.Manager, p parser.Parser, w io.Writer) {
-	ses := execute.NewSession(mgr, *eng, sql.ID(*database))
+	ses := server.NewSession(mgr, *eng, sql.ID(*database))
 	for {
 		stmt, err := p.Parse()
 		if err == io.EOF {
@@ -81,13 +77,13 @@ func replSQL(mgr *engine.Manager, p parser.Parser, w io.Writer) {
 		}
 
 		err = ses.Run(stmt,
-			func(tx *engine.Transaction, stmt execute.Stmt) error {
+			func(tx *engine.Transaction, stmt parser.Stmt) error {
 				ret, err2 := stmt.Plan(ses, tx)
 				if err2 != nil {
 					return err2
 				}
 
-				if exec, ok := ret.(execute.Executor); ok {
+				if exec, ok := ret.(evaluate.Executor); ok {
 					var cnt int64
 					cnt, err2 = exec.Execute(ses, tx)
 					if err2 != nil {
@@ -96,7 +92,7 @@ func replSQL(mgr *engine.Manager, p parser.Parser, w io.Writer) {
 					if cnt >= 0 {
 						fmt.Fprintf(w, "%d rows updated\n", cnt)
 					}
-				} else if rows, ok := ret.(execute.Rows); ok {
+				} else if rows, ok := ret.(evaluate.Rows); ok {
 					w := tabwriter.NewWriter(w, 0, 0, 1, ' ', tabwriter.AlignRight)
 
 					cols := rows.Columns()

@@ -10,6 +10,11 @@ import (
 	"github.com/leftmike/maho/sql"
 )
 
+type ColumnUpdate struct {
+	Index int
+	Value sql.Value
+}
+
 const (
 	MaxColumnSize = math.MaxUint32 - 1
 )

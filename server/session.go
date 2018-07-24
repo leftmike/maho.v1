@@ -1,11 +1,11 @@
-package execute
+package server
 
 import (
 	"context"
 	"fmt"
 
-	"github.com/leftmike/maho/db"
 	"github.com/leftmike/maho/engine"
+	"github.com/leftmike/maho/parser"
 	"github.com/leftmike/maho/sql"
 )
 
@@ -36,6 +36,10 @@ func (ses *Session) DefaultDatabase() sql.Identifier { // XXX: delete
 	return ses.name
 }
 
+func (ses *Session) Manager() *engine.Manager {
+	return ses.mgr
+}
+
 func (ses *Session) Begin() error {
 	if ses.tx != nil {
 		return fmt.Errorf("execute: session already has active transaction")
@@ -62,7 +66,9 @@ func (ses *Session) Rollback() error {
 	return err
 }
 
-func (ses *Session) Run(stmt Stmt, run func(tx *engine.Transaction, stmt Stmt) error) error {
+func (ses *Session) Run(stmt parser.Stmt,
+	run func(tx *engine.Transaction, stmt parser.Stmt) error) error {
+
 	if ses.tx != nil {
 		ses.tx.NextStmt()
 		return run(ses.tx, stmt)
@@ -79,34 +85,4 @@ func (ses *Session) Run(stmt Stmt, run func(tx *engine.Transaction, stmt Stmt) e
 		err = tx.Commit(ses)
 	}
 	return err
-}
-
-func (ses *Session) AttachDatabase(name sql.Identifier, options engine.Options) error {
-	return ses.mgr.AttachDatabase(ses.eng, name, options)
-}
-
-func (ses *Session) CreateDatabase(name sql.Identifier, options engine.Options) error {
-	return ses.mgr.CreateDatabase(ses.eng, name, options)
-}
-
-func (ses *Session) DetachDatabase(name sql.Identifier) error {
-	return ses.mgr.DetachDatabase(name)
-}
-
-func (ses *Session) CreateTable(tx *engine.Transaction, dbname, tblname sql.Identifier,
-	cols []sql.Identifier, colTypes []db.ColumnType) error {
-
-	return ses.mgr.CreateTable(ses, tx, dbname, tblname, cols, colTypes)
-}
-
-func (ses *Session) DropTable(tx *engine.Transaction, dbname, tblname sql.Identifier,
-	exists bool) error {
-
-	return ses.mgr.DropTable(ses, tx, dbname, tblname, exists)
-}
-
-func (ses *Session) LookupTable(tx *engine.Transaction, dbname,
-	tblname sql.Identifier) (engine.Table, error) {
-
-	return ses.mgr.LookupTable(ses, tx, dbname, tblname)
 }

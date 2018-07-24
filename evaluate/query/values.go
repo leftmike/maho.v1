@@ -6,7 +6,7 @@ import (
 
 	"github.com/leftmike/maho/db"
 	"github.com/leftmike/maho/engine"
-	"github.com/leftmike/maho/execute"
+	"github.com/leftmike/maho/evaluate"
 	"github.com/leftmike/maho/expr"
 	"github.com/leftmike/maho/sql"
 )
@@ -15,7 +15,7 @@ type Values struct {
 	Expressions [][]expr.Expr
 }
 
-// values implements the db.Rows interface.
+// values implements the evaluate.Rows interface.
 type values struct {
 	columns []sql.Identifier
 	rows    [][]sql.Value
@@ -44,11 +44,11 @@ func (stmt *Values) String() string {
 	return s
 }
 
-func (stmt *Values) Plan(ses *execute.Session, tx *engine.Transaction) (interface{}, error) {
+func (stmt *Values) Plan(ses evaluate.Session, tx *engine.Transaction) (interface{}, error) {
 	return stmt.Rows(tx)
 }
 
-func (stmt *Values) Rows(tx *engine.Transaction) (db.Rows, error) {
+func (stmt *Values) Rows(tx *engine.Transaction) (evaluate.Rows, error) {
 	columns := make([]sql.Identifier, len(stmt.Expressions[0]))
 	for i := 0; i < len(columns); i++ {
 		columns[i] = sql.ID(fmt.Sprintf("column%d", i+1))
@@ -82,7 +82,7 @@ func (v *values) Close() error {
 	return nil
 }
 
-func (v *values) Next(ses db.Session, dest []sql.Value) error {
+func (v *values) Next(ses evaluate.Session, dest []sql.Value) error {
 	if v.index == len(v.rows) {
 		return io.EOF
 	}
@@ -91,11 +91,11 @@ func (v *values) Next(ses db.Session, dest []sql.Value) error {
 	return nil
 }
 
-func (_ *values) Delete(ses db.Session) error {
+func (_ *values) Delete(ses evaluate.Session) error {
 	return fmt.Errorf("values rows may not be deleted")
 }
 
-func (_ *values) Update(ses db.Session, updates []db.ColumnUpdate) error {
+func (_ *values) Update(ses evaluate.Session, updates []db.ColumnUpdate) error {
 	return fmt.Errorf("values rows may not be updated")
 }
 
@@ -120,8 +120,8 @@ func (fv FromValues) String() string {
 	return s
 }
 
-func (fv FromValues) rows(ses db.Session, tx *engine.Transaction) (db.Rows, *fromContext,
-	error) {
+func (fv FromValues) rows(ses evaluate.Session, tx *engine.Transaction) (evaluate.Rows,
+	*fromContext, error) {
 
 	rows, err := fv.Values.Rows(tx)
 	if err != nil {
@@ -138,8 +138,8 @@ func (fv FromValues) rows(ses db.Session, tx *engine.Transaction) (db.Rows, *fro
 }
 
 // TestRows is used for testing.
-func (fv FromValues) TestRows(ses db.Session, tx *engine.Transaction) (db.Rows, *fromContext,
-	error) {
+func (fv FromValues) TestRows(ses evaluate.Session, tx *engine.Transaction) (evaluate.Rows,
+	*fromContext, error) {
 
 	return fv.rows(ses, tx)
 }

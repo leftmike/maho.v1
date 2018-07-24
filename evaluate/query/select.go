@@ -7,7 +7,7 @@ import (
 
 	"github.com/leftmike/maho/db"
 	"github.com/leftmike/maho/engine"
-	"github.com/leftmike/maho/execute"
+	"github.com/leftmike/maho/evaluate"
 	"github.com/leftmike/maho/expr"
 	"github.com/leftmike/maho/sql"
 )
@@ -136,12 +136,12 @@ func (stmt *Select) String() string {
 	return s
 }
 
-func (stmt *Select) Plan(ses *execute.Session, tx *engine.Transaction) (interface{}, error) {
+func (stmt *Select) Plan(ses evaluate.Session, tx *engine.Transaction) (interface{}, error) {
 	return stmt.Rows(ses, tx)
 }
 
-func (stmt *Select) Rows(ses db.Session, tx *engine.Transaction) (db.Rows, error) {
-	var rows db.Rows
+func (stmt *Select) Rows(ses evaluate.Session, tx *engine.Transaction) (evaluate.Rows, error) {
+	var rows evaluate.Rows
 	var fctx *fromContext
 	var err error
 
@@ -170,7 +170,8 @@ func (stmt *Select) Rows(ses db.Session, tx *engine.Transaction) (db.Rows, error
 	return group(rows, fctx, stmt.Results, stmt.GroupBy, stmt.Having, stmt.OrderBy)
 }
 
-func (fs FromSelect) rows(ses db.Session, tx *engine.Transaction) (db.Rows, *fromContext, error) {
+func (fs FromSelect) rows(ses evaluate.Session, tx *engine.Transaction) (evaluate.Rows, *fromContext,
+	error) {
 
 	rows, err := fs.Select.Rows(ses, tx)
 	if err != nil {
@@ -192,7 +193,7 @@ type orderBy struct {
 }
 
 type sortRows struct {
-	rows    db.Rows
+	rows    evaluate.Rows
 	orderBy []orderBy
 	values  [][]sql.Value
 	index   int
@@ -208,7 +209,7 @@ func (sr *sortRows) Close() error {
 	return sr.rows.Close()
 }
 
-func (sr *sortRows) sort(ses db.Session) error {
+func (sr *sortRows) sort(ses evaluate.Session) error {
 	sr.sorted = true
 
 	for {
@@ -226,7 +227,7 @@ func (sr *sortRows) sort(ses db.Session) error {
 	return nil
 }
 
-func (sr *sortRows) Next(ses db.Session, dest []sql.Value) error {
+func (sr *sortRows) Next(ses evaluate.Session, dest []sql.Value) error {
 	if !sr.sorted {
 		err := sr.sort(ses)
 		if err != nil {
@@ -242,11 +243,11 @@ func (sr *sortRows) Next(ses db.Session, dest []sql.Value) error {
 	return io.EOF
 }
 
-func (_ *sortRows) Delete(ses db.Session) error {
+func (_ *sortRows) Delete(ses evaluate.Session) error {
 	return fmt.Errorf("sort rows may not be deleted")
 }
 
-func (_ *sortRows) Update(ses db.Session, updates []db.ColumnUpdate) error {
+func (_ *sortRows) Update(ses evaluate.Session, updates []db.ColumnUpdate) error {
 	return fmt.Errorf("sort rows may not be updated")
 }
 
@@ -308,7 +309,7 @@ func orderByInput(order []OrderBy, fctx *fromContext) []orderBy {
 	return byInput
 }
 
-func order(rows db.Rows, fctx *fromContext, order []OrderBy) (db.Rows, error) {
+func order(rows evaluate.Rows, fctx *fromContext, order []OrderBy) (evaluate.Rows, error) {
 	if order == nil {
 		return rows, nil
 	}
@@ -338,7 +339,7 @@ func order(rows db.Rows, fctx *fromContext, order []OrderBy) (db.Rows, error) {
 }
 
 type filterRows struct {
-	rows db.Rows
+	rows evaluate.Rows
 	cond expr.CExpr
 	dest []sql.Value
 }
@@ -355,7 +356,7 @@ func (fr *filterRows) Close() error {
 	return fr.rows.Close()
 }
 
-func (fr *filterRows) Next(ses db.Session, dest []sql.Value) error {
+func (fr *filterRows) Next(ses evaluate.Session, dest []sql.Value) error {
 	for {
 		err := fr.rows.Next(ses, dest)
 		if err != nil {
@@ -381,15 +382,15 @@ func (fr *filterRows) Next(ses db.Session, dest []sql.Value) error {
 	return nil
 }
 
-func (fr *filterRows) Delete(ses db.Session) error {
+func (fr *filterRows) Delete(ses evaluate.Session) error {
 	return fr.rows.Delete(ses)
 }
 
-func (fr *filterRows) Update(ses db.Session, updates []db.ColumnUpdate) error {
+func (fr *filterRows) Update(ses evaluate.Session, updates []db.ColumnUpdate) error {
 	return fr.rows.Update(ses, updates)
 }
 
-func where(rows db.Rows, fctx *fromContext, cond expr.Expr) (db.Rows, error) {
+func where(rows evaluate.Rows, fctx *fromContext, cond expr.Expr) (evaluate.Rows, error) {
 	if cond == nil {
 		return rows, nil
 	}
@@ -413,7 +414,7 @@ func (oer *oneEmptyRow) Close() error {
 	return nil
 }
 
-func (oer *oneEmptyRow) Next(ses db.Session, dest []sql.Value) error {
+func (oer *oneEmptyRow) Next(ses evaluate.Session, dest []sql.Value) error {
 	if oer.one {
 		return io.EOF
 	}
@@ -421,16 +422,16 @@ func (oer *oneEmptyRow) Next(ses db.Session, dest []sql.Value) error {
 	return nil
 }
 
-func (_ *oneEmptyRow) Delete(ses db.Session) error {
+func (_ *oneEmptyRow) Delete(ses evaluate.Session) error {
 	return fmt.Errorf("one empty row may not be deleted")
 }
 
-func (_ *oneEmptyRow) Update(ses db.Session, updates []db.ColumnUpdate) error {
+func (_ *oneEmptyRow) Update(ses evaluate.Session, updates []db.ColumnUpdate) error {
 	return fmt.Errorf("one empty row may not be updated")
 }
 
 type allResultRows struct {
-	rows    db.Rows
+	rows    evaluate.Rows
 	columns []sql.Identifier
 }
 
@@ -442,15 +443,15 @@ func (arr *allResultRows) Close() error {
 	return arr.rows.Close()
 }
 
-func (arr *allResultRows) Next(ses db.Session, dest []sql.Value) error {
+func (arr *allResultRows) Next(ses evaluate.Session, dest []sql.Value) error {
 	return arr.rows.Next(ses, dest)
 }
 
-func (_ *allResultRows) Delete(ses db.Session) error {
+func (_ *allResultRows) Delete(ses evaluate.Session) error {
 	return fmt.Errorf("all result rows may not be deleted")
 }
 
-func (_ *allResultRows) Update(ses db.Session, updates []db.ColumnUpdate) error {
+func (_ *allResultRows) Update(ses evaluate.Session, updates []db.ColumnUpdate) error {
 	return fmt.Errorf("all result rows may not be updated")
 }
 
@@ -465,7 +466,7 @@ type expr2dest struct {
 }
 
 type resultRows struct {
-	rows      db.Rows
+	rows      evaluate.Rows
 	dest      []sql.Value
 	columns   []sql.Identifier
 	destCols  []src2dest
@@ -484,7 +485,7 @@ func (rr *resultRows) Close() error {
 	return rr.rows.Close()
 }
 
-func (rr *resultRows) Next(ses db.Session, dest []sql.Value) error {
+func (rr *resultRows) Next(ses evaluate.Session, dest []sql.Value) error {
 	if rr.dest == nil {
 		rr.dest = make([]sql.Value, len(rr.rows.Columns()))
 	}
@@ -505,15 +506,15 @@ func (rr *resultRows) Next(ses db.Session, dest []sql.Value) error {
 	return nil
 }
 
-func (_ *resultRows) Delete(ses db.Session) error {
+func (_ *resultRows) Delete(ses evaluate.Session) error {
 	return fmt.Errorf("result rows may not be deleted")
 }
 
-func (_ *resultRows) Update(ses db.Session, updates []db.ColumnUpdate) error {
+func (_ *resultRows) Update(ses evaluate.Session, updates []db.ColumnUpdate) error {
 	return fmt.Errorf("result rows may not be updated")
 }
 
-func results(rows db.Rows, fctx *fromContext, results []SelectResult) (db.Rows, error) {
+func results(rows evaluate.Rows, fctx *fromContext, results []SelectResult) (evaluate.Rows, error) {
 	if results == nil {
 		return &allResultRows{rows: rows, columns: fctx.columns()}, nil
 	}
@@ -548,7 +549,9 @@ func results(rows db.Rows, fctx *fromContext, results []SelectResult) (db.Rows, 
 	return makeResultRows(rows, cols, destExprs), nil
 }
 
-func makeResultRows(rows db.Rows, cols []sql.Identifier, destExprs []expr2dest) db.Rows {
+func makeResultRows(rows evaluate.Rows, cols []sql.Identifier,
+	destExprs []expr2dest) evaluate.Rows {
+
 	rr := resultRows{rows: rows, columns: cols}
 	for _, de := range destExprs {
 		if ci, ok := expr.ColumnIndex(de.expr); ok {

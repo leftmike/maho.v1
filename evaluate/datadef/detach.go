@@ -4,7 +4,7 @@ import (
 	"fmt"
 
 	"github.com/leftmike/maho/engine"
-	"github.com/leftmike/maho/execute"
+	"github.com/leftmike/maho/evaluate"
 	"github.com/leftmike/maho/sql"
 )
 
@@ -16,12 +16,12 @@ func (stmt *DetachDatabase) String() string {
 	return fmt.Sprintf("DETACH DATABASE %s", stmt.Database)
 }
 
-func (stmt *DetachDatabase) Plan(ses *execute.Session, tx *engine.Transaction) (interface{},
+func (stmt *DetachDatabase) Plan(ses evaluate.Session, tx *engine.Transaction) (interface{},
 	error) {
 
 	return stmt, nil
 }
 
-func (stmt *DetachDatabase) Execute(ses *execute.Session, tx *engine.Transaction) (int64, error) {
-	return -1, ses.DetachDatabase(stmt.Database)
+func (stmt *DetachDatabase) Execute(ses evaluate.Session, tx *engine.Transaction) (int64, error) {
+	return -1, ses.Manager().DetachDatabase(stmt.Database)
 }

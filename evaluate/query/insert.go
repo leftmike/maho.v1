@@ -4,7 +4,7 @@ import (
 	"fmt"
 
 	"github.com/leftmike/maho/engine"
-	"github.com/leftmike/maho/execute"
+	"github.com/leftmike/maho/evaluate"
 	"github.com/leftmike/maho/expr"
 	"github.com/leftmike/maho/sql"
 )
@@ -50,12 +50,12 @@ func (stmt *InsertValues) String() string {
 	return s
 }
 
-func (stmt *InsertValues) Plan(ses *execute.Session, tx *engine.Transaction) (interface{}, error) {
+func (stmt *InsertValues) Plan(ses evaluate.Session, tx *engine.Transaction) (interface{}, error) {
 	return stmt, nil
 }
 
-func (stmt *InsertValues) Execute(ses *execute.Session, tx *engine.Transaction) (int64, error) {
-	tbl, err := ses.LookupTable(tx, stmt.Table.Database, stmt.Table.Table)
+func (stmt *InsertValues) Execute(ses evaluate.Session, tx *engine.Transaction) (int64, error) {
+	tbl, err := ses.Manager().LookupTable(ses, tx, stmt.Table.Database, stmt.Table.Table)
 	if err != nil {
 		return -1, err
 	}

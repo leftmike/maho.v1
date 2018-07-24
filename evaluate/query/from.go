@@ -4,15 +4,15 @@ import (
 	"fmt"
 
 	"github.com/leftmike/maho/db"
-	"github.com/leftmike/maho/execute"
 	"github.com/leftmike/maho/engine"
+	"github.com/leftmike/maho/evaluate"
 	"github.com/leftmike/maho/expr"
 	"github.com/leftmike/maho/sql"
 )
 
 type FromItem interface {
 	fmt.Stringer
-	rows(ses db.Session, tx *engine.Transaction) (db.Rows, *fromContext, error)
+	rows(ses evaluate.Session, tx *engine.Transaction) (evaluate.Rows, *fromContext, error)
 }
 
 type FromTableAlias sql.TableAlias
@@ -33,22 +33,22 @@ func (er engineRows) Close() error {
 	return er.Rows.Close()
 }
 
-func (er engineRows) Next(ses db.Session, dest []sql.Value) error {
+func (er engineRows) Next(ses evaluate.Session, dest []sql.Value) error {
 	return er.Rows.Next(ses, dest)
 }
 
-func (er engineRows) Delete(ses db.Session) error {
+func (er engineRows) Delete(ses evaluate.Session) error {
 	return er.Rows.Delete(ses)
 }
 
-func (er engineRows) Update(ses db.Session, updates []db.ColumnUpdate) error {
+func (er engineRows) Update(ses evaluate.Session, updates []db.ColumnUpdate) error {
 	return er.Rows.Update(ses, updates)
 }
 
-func lookupRows(ses *execute.Session, tx *engine.Transaction, dbname,
-	tblname sql.Identifier) (db.Rows, error) {
+func lookupRows(ses evaluate.Session, tx *engine.Transaction, dbname,
+	tblname sql.Identifier) (evaluate.Rows, error) {
 
-	tbl, err := ses.LookupTable(tx, dbname, tblname)
+	tbl, err := ses.Manager().LookupTable(ses, tx, dbname, tblname)
 	if err != nil {
 		return nil, err
 	}
@@ -59,10 +59,10 @@ func lookupRows(ses *execute.Session, tx *engine.Transaction, dbname,
 	return engineRows{rows}, nil
 }
 
-func (fta FromTableAlias) rows(ses db.Session, tx *engine.Transaction) (db.Rows, *fromContext,
-	error) {
+func (fta FromTableAlias) rows(ses evaluate.Session, tx *engine.Transaction) (evaluate.Rows,
+	*fromContext, error) {
 
-	rows, err := lookupRows(ses.(*execute.Session), tx, fta.Database, fta.Table) // XXX: fix this
+	rows, err := lookupRows(ses, tx, fta.Database, fta.Table)
 	if err != nil {
 		return nil, nil, err
 	}

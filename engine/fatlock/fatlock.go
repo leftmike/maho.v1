@@ -1,10 +1,10 @@
 package fatlock
 
 import (
+	"context"
 	"fmt"
 	"sync"
 
-	"github.com/leftmike/maho/db"
 	"github.com/leftmike/maho/sql"
 )
 
@@ -112,7 +112,7 @@ func addLock(obj *object, ls *LockerState, ll LockLevel) {
 	}
 }
 
-func waitForLock(ses db.Session, obj *object, ls *LockerState, ll LockLevel) {
+func waitForLock(ses Session, obj *object, ls *LockerState, ll LockLevel) {
 	ls.waitLevel = ll
 	// Add the locker to the queue of waiters.
 	ls.nextWaiter = nil
@@ -145,9 +145,13 @@ func waitForLock(ses db.Session, obj *object, ls *LockerState, ll LockLevel) {
 	}
 }
 
+type Session interface {
+	Context() context.Context
+}
+
 // LockTable locks the table (specified by db.tbl) for lkr at the specified lock level. It may
 // block waiting for a lock.
-func LockTable(ses db.Session, lkr Locker, db, tbl sql.Identifier, ll LockLevel) error {
+func LockTable(ses Session, lkr Locker, db, tbl sql.Identifier, ll LockLevel) error {
 	ls := lkr.LockerState()
 	if ls.released {
 		return fmt.Errorf("fatlock: locker may not be reused")

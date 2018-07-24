@@ -6,6 +6,7 @@ import (
 
 	"github.com/leftmike/maho/db"
 	"github.com/leftmike/maho/engine"
+	"github.com/leftmike/maho/evaluate"
 	"github.com/leftmike/maho/expr"
 	"github.com/leftmike/maho/sql"
 )
@@ -75,7 +76,7 @@ type usingMatch struct {
 type joinRows struct {
 	state joinState
 
-	leftRows db.Rows
+	leftRows evaluate.Rows
 	haveLeft bool
 	leftDest []sql.Value
 	leftLen  int
@@ -153,7 +154,7 @@ func (jr *joinRows) onUsing(dest []sql.Value) (bool, error) {
 	return true, nil
 }
 
-func (jr *joinRows) Next(ses db.Session, dest []sql.Value) error {
+func (jr *joinRows) Next(ses evaluate.Session, dest []sql.Value) error {
 	if jr.state == allDone {
 		return io.EOF
 	} else if jr.state == rightRemaining {
@@ -239,15 +240,16 @@ func (jr *joinRows) Next(ses db.Session, dest []sql.Value) error {
 	}
 }
 
-func (_ *joinRows) Delete(ses db.Session) error {
+func (_ *joinRows) Delete(ses evaluate.Session) error {
 	return fmt.Errorf("join rows may not be deleted")
 }
 
-func (_ *joinRows) Update(ses db.Session, updates []db.ColumnUpdate) error {
+func (_ *joinRows) Update(ses evaluate.Session, updates []db.ColumnUpdate) error {
 	return fmt.Errorf("join rows may not be updated")
 }
 
-func (fj FromJoin) rows(ses db.Session, tx *engine.Transaction) (db.Rows, *fromContext, error) {
+func (fj FromJoin) rows(ses evaluate.Session, tx *engine.Transaction) (evaluate.Rows, *fromContext,
+	error) {
 
 	leftRows, leftCtx, err := fj.Left.rows(ses, tx)
 	if err != nil {
@@ -258,7 +260,7 @@ func (fj FromJoin) rows(ses db.Session, tx *engine.Transaction) (db.Rows, *fromC
 		return nil, nil, err
 	}
 
-	rrows, err := db.AllRows(ses, rightRows)
+	rrows, err := evaluate.AllRows(ses, rightRows)
 	if err != nil {
 		return nil, nil, err
 	}

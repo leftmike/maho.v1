@@ -6,7 +6,7 @@ import (
 
 	"github.com/leftmike/maho/db"
 	"github.com/leftmike/maho/engine"
-	"github.com/leftmike/maho/execute"
+	"github.com/leftmike/maho/evaluate"
 	"github.com/leftmike/maho/expr"
 	"github.com/leftmike/maho/sql"
 )
@@ -45,7 +45,7 @@ type updatePlan struct {
 	columns []sql.Identifier
 	types   []db.ColumnType
 	dest    []sql.Value
-	rows    db.Rows
+	rows    evaluate.Rows
 	updates []columnUpdate
 }
 
@@ -53,7 +53,7 @@ func (up *updatePlan) EvalRef(idx int) sql.Value {
 	return up.dest[idx]
 }
 
-func (up *updatePlan) Execute(ses *execute.Session, tx *engine.Transaction) (int64, error) {
+func (up *updatePlan) Execute(ses evaluate.Session, tx *engine.Transaction) (int64, error) {
 	up.dest = make([]sql.Value, len(up.rows.Columns()))
 	cnt := int64(0)
 	updates := make([]db.ColumnUpdate, len(up.updates))
@@ -86,8 +86,8 @@ func (up *updatePlan) Execute(ses *execute.Session, tx *engine.Transaction) (int
 	}
 }
 
-func (stmt *Update) Plan(ses *execute.Session, tx *engine.Transaction) (interface{}, error) {
-	tbl, err := ses.LookupTable(tx, stmt.Table.Database, stmt.Table.Table)
+func (stmt *Update) Plan(ses evaluate.Session, tx *engine.Transaction) (interface{}, error) {
+	tbl, err := ses.Manager().LookupTable(ses, tx, stmt.Table.Database, stmt.Table.Table)
 	if err != nil {
 		return nil, err
 	}
@@ -95,7 +95,7 @@ func (stmt *Update) Plan(ses *execute.Session, tx *engine.Transaction) (interfac
 	if err != nil {
 		return nil, err
 	}
-	var rows db.Rows
+	var rows evaluate.Rows
 	rows = engineRows{er}
 	fctx := makeFromContext(stmt.Table.Table, rows.Columns())
 	if stmt.Where != nil {

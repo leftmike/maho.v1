@@ -5,6 +5,7 @@ import (
 	"io"
 
 	"github.com/leftmike/maho/db"
+	"github.com/leftmike/maho/evaluate"
 	"github.com/leftmike/maho/expr"
 	"github.com/leftmike/maho/sql"
 )
@@ -15,7 +16,7 @@ type aggregator struct {
 }
 
 type groupRows struct {
-	rows        db.Rows
+	rows        evaluate.Rows
 	dest        []sql.Value
 	columns     []sql.Identifier
 	groupExprs  []expr2dest
@@ -42,7 +43,7 @@ type groupRow struct {
 	aggregators []expr.Aggregator
 }
 
-func (gr *groupRows) group(ses db.Session) error {
+func (gr *groupRows) group(ses evaluate.Session) error {
 	gr.dest = make([]sql.Value, len(gr.rows.Columns()))
 	groups := map[string]groupRow{}
 	for {
@@ -104,7 +105,7 @@ func (gr *groupRows) group(ses db.Session) error {
 	return nil
 }
 
-func (gr *groupRows) Next(ses db.Session, dest []sql.Value) error {
+func (gr *groupRows) Next(ses evaluate.Session, dest []sql.Value) error {
 	if gr.dest == nil {
 		err := gr.group(ses)
 		if err != nil {
@@ -120,11 +121,11 @@ func (gr *groupRows) Next(ses db.Session, dest []sql.Value) error {
 	return io.EOF
 }
 
-func (_ *groupRows) Delete(ses db.Session) error {
+func (_ *groupRows) Delete(ses evaluate.Session) error {
 	return fmt.Errorf("group rows may not be deleted")
 }
 
-func (_ *groupRows) Update(ses db.Session, updates []db.ColumnUpdate) error {
+func (_ *groupRows) Update(ses evaluate.Session, updates []db.ColumnUpdate) error {
 	return fmt.Errorf("group rows may not be updated")
 }
 
@@ -162,7 +163,8 @@ func (gctx *groupContext) CompileAggregator(c *expr.Call, maker expr.MakeAggrega
 	return len(gctx.group) + len(gctx.aggregators) - 1
 }
 
-func (gctx *groupContext) makeGroupRows(rows db.Rows, fctx *fromContext) (db.Rows, error) {
+func (gctx *groupContext) makeGroupRows(rows evaluate.Rows, fctx *fromContext) (evaluate.Rows,
+	error) {
 
 	gr := &groupRows{rows: rows, columns: gctx.groupCols, groupExprs: gctx.groupExprs}
 	for idx := range gctx.aggregators {
@@ -205,8 +207,8 @@ func makeGroupContext(fctx *fromContext, group []expr.Expr) (*groupContext, erro
 
 }
 
-func group(rows db.Rows, fctx *fromContext, results []SelectResult, group []expr.Expr,
-	having expr.Expr, orderBy []OrderBy) (db.Rows, error) {
+func group(rows evaluate.Rows, fctx *fromContext, results []SelectResult, group []expr.Expr,
+	having expr.Expr, orderBy []OrderBy) (evaluate.Rows, error) {
 
 	gctx, err := makeGroupContext(fctx, group)
 

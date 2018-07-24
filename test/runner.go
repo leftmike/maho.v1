@@ -8,8 +8,9 @@ import (
 	"github.com/leftmike/sqltest/pkg/sqltest"
 
 	"github.com/leftmike/maho/engine"
-	"github.com/leftmike/maho/execute"
+	"github.com/leftmike/maho/evaluate"
 	"github.com/leftmike/maho/parser"
+	"github.com/leftmike/maho/server"
 	"github.com/leftmike/maho/sql"
 )
 
@@ -17,12 +18,12 @@ type Runner struct {
 	Type     string
 	Database sql.Identifier
 	Mgr      *engine.Manager
-	ses      *execute.Session
+	ses      *server.Session
 }
 
 func (run *Runner) RunExec(tst *sqltest.Test) error {
 	if run.ses == nil {
-		run.ses = execute.NewSession(run.Mgr, run.Type, run.Database)
+		run.ses = server.NewSession(run.Mgr, run.Type, run.Database)
 	}
 	p := parser.NewParser(strings.NewReader(tst.Test),
 		fmt.Sprintf("%s:%d", tst.Filename, tst.LineNumber))
@@ -35,12 +36,12 @@ func (run *Runner) RunExec(tst *sqltest.Test) error {
 			return err
 		}
 		err = run.ses.Run(stmt,
-			func(tx *engine.Transaction, stmt execute.Stmt) error {
+			func(tx *engine.Transaction, stmt parser.Stmt) error {
 				ret, err2 := stmt.Plan(run.ses, tx)
 				if err2 != nil {
 					return err2
 				}
-				_, err2 = ret.(execute.Executor).Execute(run.ses, tx)
+				_, err2 = ret.(evaluate.Executor).Execute(run.ses, tx)
 				if err2 != nil {
 					return err2
 				}
@@ -57,7 +58,7 @@ func (run *Runner) RunExec(tst *sqltest.Test) error {
 
 func (run *Runner) RunQuery(tst *sqltest.Test) ([]string, [][]string, error) {
 	if run.ses == nil {
-		run.ses = execute.NewSession(run.Mgr, run.Type, run.Database)
+		run.ses = server.NewSession(run.Mgr, run.Type, run.Database)
 	}
 	p := parser.NewParser(strings.NewReader(tst.Test),
 		fmt.Sprintf("%s:%d", tst.Filename, tst.LineNumber))
@@ -69,12 +70,12 @@ func (run *Runner) RunQuery(tst *sqltest.Test) ([]string, [][]string, error) {
 	var resultCols []string
 	var results [][]string
 	err = run.ses.Run(stmt,
-		func(tx *engine.Transaction, stmt execute.Stmt) error {
+		func(tx *engine.Transaction, stmt parser.Stmt) error {
 			ret, err2 := stmt.Plan(run.ses, tx)
 			if err2 != nil {
 				return err2
 			}
-			rows, ok := ret.(execute.Rows)
+			rows, ok := ret.(evaluate.Rows)
 			if !ok {
 				return fmt.Errorf("%s:%d: expected a query", tst.Filename, tst.LineNumber)
 			}

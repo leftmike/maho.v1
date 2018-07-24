@@ -3,12 +3,12 @@ package query_test
 import (
 	"testing"
 
-	"github.com/leftmike/maho/db"
 	"github.com/leftmike/maho/engine"
 	"github.com/leftmike/maho/engine/basic"
-	"github.com/leftmike/maho/execute"
-	"github.com/leftmike/maho/expr"
+	"github.com/leftmike/maho/evaluate"
 	"github.com/leftmike/maho/evaluate/query"
+	"github.com/leftmike/maho/expr"
+	"github.com/leftmike/maho/server"
 	"github.com/leftmike/maho/sql"
 	"github.com/leftmike/maho/testutil"
 )
@@ -68,7 +68,7 @@ func TestValues(t *testing.T) {
 	}
 
 	mgr := startManager(t)
-	ses := execute.NewSession(mgr, "basic", sql.ID("test"))
+	ses := server.NewSession(mgr, "basic", sql.ID("test"))
 	for _, c := range cases {
 		tx := mgr.Begin()
 		if c.values.String() != c.s {
@@ -85,7 +85,7 @@ func TestValues(t *testing.T) {
 			t.Errorf("(%v).Rows().Columns() got %v want %v", c.values, cols, c.cols)
 			continue
 		}
-		all, err := db.AllRows(ses, rows)
+		all, err := evaluate.AllRows(ses, rows)
 		if err != nil {
 			t.Errorf("(%v).Rows().Next() failed with %s", c.values, err)
 		}
@@ -150,7 +150,7 @@ func TestFromValues(t *testing.T) {
 	}
 
 	mgr := startManager(t)
-	ses := execute.NewSession(mgr, "basic", sql.ID("test"))
+	ses := server.NewSession(mgr, "basic", sql.ID("test"))
 	for _, c := range cases {
 		if c.from.String() != c.s {
 			t.Errorf("(%v).String() got %q want %q", c.from, c.from.String(), c.s)
@@ -172,7 +172,7 @@ func TestFromValues(t *testing.T) {
 				c.from, len(cols), len(rows.Columns()))
 			continue
 		}
-		all, err := db.AllRows(ses, rows)
+		all, err := evaluate.AllRows(ses, rows)
 		if err != nil {
 			t.Errorf("(%v).Rows().Next() failed with %s", c.from, err)
 		}
