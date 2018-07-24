@@ -4,7 +4,6 @@ import (
 	"fmt"
 	"io"
 
-	"github.com/leftmike/maho/db"
 	"github.com/leftmike/maho/evaluate"
 	"github.com/leftmike/maho/expr"
 	"github.com/leftmike/maho/sql"
@@ -125,12 +124,12 @@ func (_ *groupRows) Delete(ses evaluate.Session) error {
 	return fmt.Errorf("group rows may not be deleted")
 }
 
-func (_ *groupRows) Update(ses evaluate.Session, updates []db.ColumnUpdate) error {
+func (_ *groupRows) Update(ses evaluate.Session, updates []sql.ColumnUpdate) error {
 	return fmt.Errorf("group rows may not be updated")
 }
 
 type groupContext struct {
-	group       []expr.Expr
+	group       []sql.Expr
 	groupExprs  []expr2dest
 	groupCols   []sql.Identifier
 	groupRefs   []bool
@@ -143,7 +142,7 @@ func (_ *groupContext) CompileRef(r expr.Ref) (int, error) {
 		"aggregate function", r)
 }
 
-func (gctx *groupContext) MaybeRefExpr(e expr.Expr) (int, bool) {
+func (gctx *groupContext) MaybeRefExpr(e sql.Expr) (int, bool) {
 	for gdx, ge := range gctx.group {
 		if gctx.groupRefs[gdx] && e.Equal(ge) {
 			return gdx, true
@@ -182,7 +181,7 @@ func (gctx *groupContext) makeGroupRows(rows evaluate.Rows, fctx *fromContext) (
 	return gr, nil
 }
 
-func makeGroupContext(fctx *fromContext, group []expr.Expr) (*groupContext, error) {
+func makeGroupContext(fctx *fromContext, group []sql.Expr) (*groupContext, error) {
 	var groupExprs []expr2dest
 	var groupCols []sql.Identifier
 	var groupRefs []bool
@@ -207,8 +206,8 @@ func makeGroupContext(fctx *fromContext, group []expr.Expr) (*groupContext, erro
 
 }
 
-func group(rows evaluate.Rows, fctx *fromContext, results []SelectResult, group []expr.Expr,
-	having expr.Expr, orderBy []OrderBy) (evaluate.Rows, error) {
+func group(rows evaluate.Rows, fctx *fromContext, results []SelectResult, group []sql.Expr,
+	having sql.Expr, orderBy []OrderBy) (evaluate.Rows, error) {
 
 	gctx, err := makeGroupContext(fctx, group)
 

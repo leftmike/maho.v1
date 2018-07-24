@@ -3,7 +3,6 @@ package datadef
 import (
 	"fmt"
 
-	"github.com/leftmike/maho/db"
 	"github.com/leftmike/maho/engine"
 	"github.com/leftmike/maho/evaluate"
 	"github.com/leftmike/maho/sql"
@@ -12,7 +11,7 @@ import (
 type CreateTable struct {
 	Table       sql.TableName
 	Columns     []sql.Identifier
-	ColumnTypes []db.ColumnType
+	ColumnTypes []sql.ColumnType
 }
 
 func (stmt *CreateTable) String() string {

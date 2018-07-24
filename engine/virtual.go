@@ -5,7 +5,6 @@ import (
 	"io"
 
 	"github.com/leftmike/maho/config"
-	"github.com/leftmike/maho/db"
 	"github.com/leftmike/maho/engine/fatlock"
 	"github.com/leftmike/maho/sql"
 )
@@ -73,7 +72,7 @@ func (vdb *virtualDatabase) LookupTable(ses Session, tctx interface{},
 }
 
 func (vdb *virtualDatabase) CreateTable(ses Session, tctx interface{}, tblname sql.Identifier,
-	cols []sql.Identifier, colTypes []db.ColumnType) error {
+	cols []sql.Identifier, colTypes []sql.ColumnType) error {
 
 	return fmt.Errorf("virtual: database %s may not be modified", vdb.name)
 }
@@ -110,7 +109,7 @@ func (vdb *virtualDatabase) NextStmt(tctx interface{}) {}
 type VirtualTable struct {
 	Name     string
 	Cols     []sql.Identifier
-	ColTypes []db.ColumnType
+	ColTypes []sql.ColumnType
 	Values   [][]sql.Value
 }
 
@@ -125,7 +124,7 @@ func (vt *VirtualTable) Columns(ses Session) []sql.Identifier {
 	return vt.Cols
 }
 
-func (vt *VirtualTable) ColumnTypes(ses Session) []db.ColumnType {
+func (vt *VirtualTable) ColumnTypes(ses Session) []sql.ColumnType {
 	return vt.ColTypes
 }
 
@@ -163,16 +162,16 @@ func (vr *virtualRows) Delete(ses Session) error {
 	return fmt.Errorf("virtual: table %s can not be modified", vr.name)
 }
 
-func (vr *virtualRows) Update(ses Session, updates []db.ColumnUpdate) error {
+func (vr *virtualRows) Update(ses Session, updates []sql.ColumnUpdate) error {
 	return fmt.Errorf("virtual: table %s can not be modified", vr.name)
 }
 
 var (
-	idColType     = db.ColumnType{Type: sql.CharacterType, Size: sql.MaxIdentifier, NotNull: true}
-	int32ColType  = db.ColumnType{Type: sql.IntegerType, Size: 4, NotNull: true}
-	int64ColType  = db.ColumnType{Type: sql.IntegerType, Size: 8, NotNull: true}
-	boolColType   = db.ColumnType{Type: sql.BooleanType, NotNull: true}
-	stringColType = db.ColumnType{Type: sql.CharacterType, Size: 4096, NotNull: true}
+	idColType     = sql.ColumnType{Type: sql.CharacterType, Size: sql.MaxIdentifier, NotNull: true}
+	int32ColType  = sql.ColumnType{Type: sql.IntegerType, Size: 4, NotNull: true}
+	int64ColType  = sql.ColumnType{Type: sql.IntegerType, Size: 8, NotNull: true}
+	boolColType   = sql.ColumnType{Type: sql.BooleanType, NotNull: true}
+	stringColType = sql.ColumnType{Type: sql.CharacterType, Size: 4096, NotNull: true}
 )
 
 func (m *Manager) listTables(ses Session, tctx interface{}, d Database) ([]TableEntry, error) {
@@ -216,7 +215,7 @@ func (m *Manager) makeTablesVirtual(ses Session, tctx interface{}, d Database, d
 	return &VirtualTable{
 		Name:     fmt.Sprintf("%s.%s", dbname, tblname),
 		Cols:     []sql.Identifier{sql.ID("table"), sql.ID("type")},
-		ColTypes: []db.ColumnType{idColType, idColType},
+		ColTypes: []sql.ColumnType{idColType, idColType},
 		Values:   values,
 	}, nil
 }
@@ -224,7 +223,7 @@ func (m *Manager) makeTablesVirtual(ses Session, tctx interface{}, d Database, d
 var (
 	columnsColumns = []sql.Identifier{sql.ID("table"), sql.ID("column"), sql.ID("type"),
 		sql.ID("size"), sql.ID("fixed"), sql.ID("binary"), sql.ID("not_null"), sql.ID("default")}
-	columnsColumnTypes = []db.ColumnType{idColType, idColType, idColType, int32ColType,
+	columnsColumnTypes = []sql.ColumnType{idColType, idColType, idColType, int32ColType,
 		boolColType, boolColType, boolColType, idColType}
 )
 
@@ -242,7 +241,7 @@ func (m *Manager) makeColumnsVirtual(ses Session, tctx interface{}, d Database,	
 	values := [][]sql.Value{}
 	for _, te := range tbls {
 		var cols []sql.Identifier
-		var colTypes []db.ColumnType
+		var colTypes []sql.ColumnType
 
 		if te.Name == sql.ID("db$columns") {
 			cols = columnsColumns
@@ -319,7 +318,7 @@ func (m *Manager) makeDatabasesVirtual(ses Session, tctx interface{}, d Database
 		Name:     fmt.Sprintf("%s.%s", dbname, tblname),
 		Cols: []sql.Identifier{sql.ID("database"), sql.ID("engine"), sql.ID("state"),
 			sql.ID("path"), sql.ID("message")},
-		ColTypes: []db.ColumnType{idColType, idColType, idColType, idColType, idColType},
+		ColTypes: []sql.ColumnType{idColType, idColType, idColType, idColType, idColType},
 		Values:   values,
 	}, nil
 }
@@ -341,7 +340,7 @@ func makeIdentifiersVirtual(ses Session, tctx interface{}, d Database, dbname,
 	return &VirtualTable{
 		Name:     fmt.Sprintf("%s.%s", dbname, tblname),
 		Cols:     []sql.Identifier{sql.ID("name"), sql.ID("id"), sql.ID("reserved")},
-		ColTypes: []db.ColumnType{idColType, int32ColType, boolColType},
+		ColTypes: []sql.ColumnType{idColType, int32ColType, boolColType},
 		Values:   values,
 	}, nil
 }
@@ -363,7 +362,7 @@ func makeConfigVirtual(ses Session, tctx interface{}, d Database, dbname,
 	return &VirtualTable{
 		Name:     fmt.Sprintf("%s.%s", dbname, tblname),
 		Cols:     []sql.Identifier{sql.ID("name"), sql.ID("by"), sql.ID("value")},
-		ColTypes: []db.ColumnType{idColType, idColType, stringColType},
+		ColTypes: []sql.ColumnType{idColType, idColType, stringColType},
 		Values:   values,
 	}, nil
 }
@@ -380,7 +379,7 @@ func (m *Manager) makeEnginesVirtual(ses Session, tctx interface{}, d Database, 
 	return &VirtualTable{
 		Name:     fmt.Sprintf("%s.%s", dbname, tblname),
 		Cols:     []sql.Identifier{sql.ID("name")},
-		ColTypes: []db.ColumnType{idColType},
+		ColTypes: []sql.ColumnType{idColType},
 		Values:   values,
 	}, nil
 }
@@ -408,8 +407,8 @@ func makeLocksVirtual(ses Session, tctx interface{}, d Database, dbname,
 		Name:     fmt.Sprintf("%s.%s", dbname, tblname),
 		Cols: []sql.Identifier{sql.ID("key"), sql.ID("locker"), sql.ID("level"),
 			sql.ID("held"), sql.ID("place")},
-		ColTypes: []db.ColumnType{idColType, idColType, idColType, boolColType,
-			db.ColumnType{Type: sql.IntegerType, Size: 4}},
+		ColTypes: []sql.ColumnType{idColType, idColType, idColType, boolColType,
+			sql.ColumnType{Type: sql.IntegerType, Size: 4}},
 		Values: values,
 	}, nil
 }

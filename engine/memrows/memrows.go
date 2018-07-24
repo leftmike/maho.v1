@@ -12,7 +12,6 @@ import (
 	"math"
 	"sync"
 
-	"github.com/leftmike/maho/db"
 	"github.com/leftmike/maho/engine"
 	"github.com/leftmike/maho/engine/fatlock"
 	"github.com/leftmike/maho/sql"
@@ -132,7 +131,7 @@ func (mdb *database) LookupTable(ses engine.Session, tx interface{},
 }
 
 func (mdb *database) CreateTable(ses engine.Session, tx interface{}, tblname sql.Identifier,
-	cols []sql.Identifier, colTypes []db.ColumnType) error {
+	cols []sql.Identifier, colTypes []sql.ColumnType) error {
 
 	tctx := tx.(*tcontext)
 	err := fatlock.LockTable(ses, tctx.locker, mdb.name, tblname, fatlock.EXCLUSIVE)
@@ -345,7 +344,7 @@ func (mt *table) Columns(ses engine.Session) []sql.Identifier {
 	return mt.table.getColumns(mt.tctx)
 }
 
-func (mt *table) ColumnTypes(ses engine.Session) []db.ColumnType {
+func (mt *table) ColumnTypes(ses engine.Session) []sql.ColumnType {
 	return mt.table.getColumnTypes(mt.tctx)
 }
 
@@ -414,7 +413,7 @@ func (mr *rows) Delete(ses engine.Session) error {
 	return nil
 }
 
-func (mr *rows) Update(ses engine.Session, updates []db.ColumnUpdate) error {
+func (mr *rows) Update(ses engine.Session, updates []sql.ColumnUpdate) error {
 	if !mr.haveRow {
 		return fmt.Errorf("memrows: table %s.%s no row to update", mr.table.db.name,
 			mr.table.name)

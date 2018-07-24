@@ -32,9 +32,7 @@ To Do:
 
 - godoc -http=:6060
 
-- db.ColumnType ==> sql.ColumnType; uses expr.Expr, so would need to move that as well
-- db.ColumnUpdate ==> sql.ColumnUpdate
-- move Expr into evaluate
+- move expr into evaluate
 
 - server: ReplSQL, ssh, etc
 - main: tie it all together

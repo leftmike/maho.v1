@@ -12,7 +12,7 @@ import (
 type InsertValues struct {
 	Table   sql.TableName
 	Columns []sql.Identifier
-	Rows    [][]expr.Expr
+	Rows    [][]sql.Expr
 }
 
 func (stmt *InsertValues) String() string {

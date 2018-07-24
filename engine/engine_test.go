@@ -8,7 +8,6 @@ import (
 	"testing"
 	"time"
 
-	"github.com/leftmike/maho/db"
 	"github.com/leftmike/maho/engine/fatlock"
 	"github.com/leftmike/maho/sql"
 )
@@ -78,7 +77,7 @@ func (tdb *testDatabase) LookupTable(ses Session, tx interface{}, tblname sql.Id
 }
 
 func (tdb *testDatabase) CreateTable(ses Session, tx interface{}, tblname sql.Identifier,
-	cols []sql.Identifier, colTypes []db.ColumnType) error {
+	cols []sql.Identifier, colTypes []sql.ColumnType) error {
 
 	_ = tx.(*tcontext)
 	tdb.te.op("CreateTable", tblname.String())

@@ -4,7 +4,6 @@ import (
 	"fmt"
 	"io"
 
-	"github.com/leftmike/maho/db"
 	"github.com/leftmike/maho/engine"
 	"github.com/leftmike/maho/evaluate"
 	"github.com/leftmike/maho/expr"
@@ -12,7 +11,7 @@ import (
 )
 
 type Values struct {
-	Expressions [][]expr.Expr
+	Expressions [][]sql.Expr
 }
 
 // values implements the evaluate.Rows interface.
@@ -95,7 +94,7 @@ func (_ *values) Delete(ses evaluate.Session) error {
 	return fmt.Errorf("values rows may not be deleted")
 }
 
-func (_ *values) Update(ses evaluate.Session, updates []db.ColumnUpdate) error {
+func (_ *values) Update(ses evaluate.Session, updates []sql.ColumnUpdate) error {
 	return fmt.Errorf("values rows may not be updated")
 }
 

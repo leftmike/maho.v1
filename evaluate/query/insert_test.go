@@ -5,7 +5,6 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/leftmike/maho/db"
 	"github.com/leftmike/maho/engine"
 	"github.com/leftmike/maho/evaluate"
 	"github.com/leftmike/maho/evaluate/query"
@@ -24,7 +23,7 @@ type insertCase struct {
 
 var (
 	insertColumns1     = []sql.Identifier{sql.ID("c1"), sql.ID("c2"), sql.ID("c3"), sql.ID("c4")}
-	insertColumnTypes1 = []db.ColumnType{
+	insertColumnTypes1 = []sql.ColumnType{
 		{Type: sql.BooleanType, Size: 1},
 		{Type: sql.CharacterType, Size: 128},
 		{Type: sql.FloatType, Size: 8},
@@ -132,7 +131,7 @@ var (
 
 	insertColumns2 = []sql.Identifier{sql.ID("b1"), sql.ID("b2"), sql.ID("b3"), sql.ID("b4"),
 		sql.ID("b5"), sql.ID("b6")}
-	insertColumnTypes2 = []db.ColumnType{
+	insertColumnTypes2 = []sql.ColumnType{
 		{Type: sql.BooleanType, Size: 1},
 		{Type: sql.BooleanType, Size: 1},
 		{Type: sql.BooleanType, Size: 1},
@@ -154,7 +153,7 @@ var (
 	}
 
 	insertColumns3     = []sql.Identifier{sql.ID("c1"), sql.ID("c2"), sql.ID("c3")}
-	insertColumnTypes3 = []db.ColumnType{
+	insertColumnTypes3 = []sql.ColumnType{
 		{Type: sql.IntegerType, Size: 4, Default: expr.Int64Literal(1)},
 		{Type: sql.IntegerType, Size: 4, NotNull: true},
 		{Type: sql.IntegerType, Size: 4, Default: expr.Int64Literal(3),
@@ -228,7 +227,7 @@ func allRows(ses evaluate.Session, rows engine.Rows) ([][]sql.Value, error) {
 }
 
 func testInsert(t *testing.T, mgr *engine.Manager, ses evaluate.Session, dbnam, nam sql.Identifier,
-	cols []sql.Identifier, colTypes []db.ColumnType, cases []insertCase) {
+	cols []sql.Identifier, colTypes []sql.ColumnType, cases []insertCase) {
 
 	for _, c := range cases {
 		tx := mgr.Begin()

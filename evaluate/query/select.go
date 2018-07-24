@@ -5,7 +5,6 @@ import (
 	"io"
 	"sort"
 
-	"github.com/leftmike/maho/db"
 	"github.com/leftmike/maho/engine"
 	"github.com/leftmike/maho/evaluate"
 	"github.com/leftmike/maho/expr"
@@ -21,21 +20,21 @@ type TableResult struct {
 }
 
 type ExprResult struct {
-	Expr  expr.Expr
+	Expr  sql.Expr
 	Alias sql.Identifier
 }
 
 type OrderBy struct {
-	Expr    expr.Expr
+	Expr    sql.Expr
 	Reverse bool
 }
 
 type Select struct {
 	Results []SelectResult
 	From    FromItem
-	Where   expr.Expr
-	GroupBy []expr.Expr
-	Having  expr.Expr
+	Where   sql.Expr
+	GroupBy []sql.Expr
+	Having  sql.Expr
 	OrderBy []OrderBy
 }
 
@@ -247,7 +246,7 @@ func (_ *sortRows) Delete(ses evaluate.Session) error {
 	return fmt.Errorf("sort rows may not be deleted")
 }
 
-func (_ *sortRows) Update(ses evaluate.Session, updates []db.ColumnUpdate) error {
+func (_ *sortRows) Update(ses evaluate.Session, updates []sql.ColumnUpdate) error {
 	return fmt.Errorf("sort rows may not be updated")
 }
 
@@ -386,11 +385,11 @@ func (fr *filterRows) Delete(ses evaluate.Session) error {
 	return fr.rows.Delete(ses)
 }
 
-func (fr *filterRows) Update(ses evaluate.Session, updates []db.ColumnUpdate) error {
+func (fr *filterRows) Update(ses evaluate.Session, updates []sql.ColumnUpdate) error {
 	return fr.rows.Update(ses, updates)
 }
 
-func where(rows evaluate.Rows, fctx *fromContext, cond expr.Expr) (evaluate.Rows, error) {
+func where(rows evaluate.Rows, fctx *fromContext, cond sql.Expr) (evaluate.Rows, error) {
 	if cond == nil {
 		return rows, nil
 	}
@@ -426,7 +425,7 @@ func (_ *oneEmptyRow) Delete(ses evaluate.Session) error {
 	return fmt.Errorf("one empty row may not be deleted")
 }
 
-func (_ *oneEmptyRow) Update(ses evaluate.Session, updates []db.ColumnUpdate) error {
+func (_ *oneEmptyRow) Update(ses evaluate.Session, updates []sql.ColumnUpdate) error {
 	return fmt.Errorf("one empty row may not be updated")
 }
 
@@ -451,7 +450,7 @@ func (_ *allResultRows) Delete(ses evaluate.Session) error {
 	return fmt.Errorf("all result rows may not be deleted")
 }
 
-func (_ *allResultRows) Update(ses evaluate.Session, updates []db.ColumnUpdate) error {
+func (_ *allResultRows) Update(ses evaluate.Session, updates []sql.ColumnUpdate) error {
 	return fmt.Errorf("all result rows may not be updated")
 }
 
@@ -510,7 +509,7 @@ func (_ *resultRows) Delete(ses evaluate.Session) error {
 	return fmt.Errorf("result rows may not be deleted")
 }
 
-func (_ *resultRows) Update(ses evaluate.Session, updates []db.ColumnUpdate) error {
+func (_ *resultRows) Update(ses evaluate.Session, updates []sql.ColumnUpdate) error {
 	return fmt.Errorf("result rows may not be updated")
 }
 

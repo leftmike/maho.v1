@@ -6,7 +6,6 @@ import (
 	"runtime"
 	"strconv"
 
-	"github.com/leftmike/maho/db"
 	"github.com/leftmike/maho/engine"
 	"github.com/leftmike/maho/evaluate"
 	"github.com/leftmike/maho/evaluate/datadef"
@@ -25,7 +24,7 @@ type Stmt interface {
 
 type Parser interface {
 	Parse() (Stmt, error)
-	ParseExpr() (expr.Expr, error)
+	ParseExpr() (sql.Expr, error)
 }
 
 const lookBackAmount = 3
@@ -371,13 +370,13 @@ func (p *parser) parseCreateTable() Stmt {
 	return nil
 }
 
-var types = map[sql.Identifier]db.ColumnType{
+var types = map[sql.Identifier]sql.ColumnType{
 	sql.BINARY:    {Type: sql.CharacterType, Fixed: true, Binary: true, Size: 1},
 	sql.VARBINARY: {Type: sql.CharacterType, Fixed: false, Binary: true},
-	sql.BLOB:      {Type: sql.CharacterType, Fixed: false, Binary: true, Size: db.MaxColumnSize},
+	sql.BLOB:      {Type: sql.CharacterType, Fixed: false, Binary: true, Size: sql.MaxColumnSize},
 	sql.CHAR:      {Type: sql.CharacterType, Fixed: true, Size: 1},
 	sql.VARCHAR:   {Type: sql.CharacterType, Fixed: false},
-	sql.TEXT:      {Type: sql.CharacterType, Fixed: false, Size: db.MaxColumnSize},
+	sql.TEXT:      {Type: sql.CharacterType, Fixed: false, Size: sql.MaxColumnSize},
 	sql.BOOL:      {Type: sql.BooleanType, Size: 1},
 	sql.BOOLEAN:   {Type: sql.BooleanType, Size: 1},
 	sql.DOUBLE:    {Type: sql.FloatType, Size: 8},
@@ -438,7 +437,7 @@ func (p *parser) parseCreateColumns(s *datadef.CreateTable) {
 
 		if ct.Type == sql.CharacterType {
 			if p.maybeToken(token.LParen) {
-				ct.Size = uint32(p.expectInteger(0, db.MaxColumnSize))
+				ct.Size = uint32(p.expectInteger(0, sql.MaxColumnSize))
 				p.expectTokens(token.RParen)
 			}
 		}
@@ -495,7 +494,7 @@ func (p *parser) parseDropTable() Stmt {
 	return &s
 }
 
-func (p *parser) ParseExpr() (e expr.Expr, err error) {
+func (p *parser) ParseExpr() (e sql.Expr, err error) {
 	defer func() {
 		if r := recover(); r != nil {
 			if _, ok := r.(runtime.Error); ok {
@@ -510,7 +509,7 @@ func (p *parser) ParseExpr() (e expr.Expr, err error) {
 	return
 }
 
-func adjustPrecedence(e expr.Expr) expr.Expr {
+func adjustPrecedence(e sql.Expr) sql.Expr {
 	switch e := e.(type) {
 	case *expr.Unary:
 		e.Expr = adjustPrecedence(e.Expr)
@@ -550,7 +549,7 @@ func adjustPrecedence(e expr.Expr) expr.Expr {
 	return e
 }
 
-func (p *parser) parseExpr() expr.Expr {
+func (p *parser) parseExpr() sql.Expr {
 	return adjustPrecedence(p.parseSubExpr())
 }
 
@@ -590,8 +589,8 @@ var binaryOps = map[rune]expr.Op{
 	token.Star:           expr.MultiplyOp,
 }
 
-func (p *parser) parseSubExpr() expr.Expr {
-	var e expr.Expr
+func (p *parser) parseSubExpr() sql.Expr {
+	var e sql.Expr
 	r := p.scan()
 	if r == token.Reserved {
 		if p.sctx.Identifier == sql.TRUE {
@@ -697,7 +696,7 @@ func (p *parser) parseInsert() Stmt {
 	p.expectReserved(sql.VALUES)
 
 	for {
-		var row []expr.Expr
+		var row []sql.Expr
 
 		p.expectTokens(token.LParen)
 		for {
@@ -731,7 +730,7 @@ func (p *parser) parseValues() *query.Values {
 
 	var s query.Values
 	for {
-		var row []expr.Expr
+		var row []sql.Expr
 
 		p.expectTokens(token.LParen)
 		for {

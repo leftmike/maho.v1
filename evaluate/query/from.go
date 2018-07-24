@@ -3,7 +3,6 @@ package query
 import (
 	"fmt"
 
-	"github.com/leftmike/maho/db"
 	"github.com/leftmike/maho/engine"
 	"github.com/leftmike/maho/evaluate"
 	"github.com/leftmike/maho/expr"
@@ -41,7 +40,7 @@ func (er engineRows) Delete(ses evaluate.Session) error {
 	return er.Rows.Delete(ses)
 }
 
-func (er engineRows) Update(ses evaluate.Session, updates []db.ColumnUpdate) error {
+func (er engineRows) Update(ses evaluate.Session, updates []sql.ColumnUpdate) error {
 	return er.Rows.Update(ses, updates)
 }
 

@@ -5,7 +5,6 @@ import (
 	"io"
 	"sync"
 
-	"github.com/leftmike/maho/db"
 	"github.com/leftmike/maho/sql"
 )
 
@@ -18,7 +17,7 @@ type tableImpl struct {
 
 	mutex       sync.RWMutex
 	columns     []sql.Identifier
-	columnTypes []db.ColumnType
+	columnTypes []sql.ColumnType
 	rows        []*rowImpl
 }
 
@@ -32,7 +31,7 @@ func (mt *tableImpl) getColumns(tctx *tcontext) []sql.Identifier {
 	return mt.columns
 }
 
-func (mt *tableImpl) getColumnTypes(tctx *tcontext) []db.ColumnType {
+func (mt *tableImpl) getColumnTypes(tctx *tcontext) []sql.ColumnType {
 	return mt.columnTypes
 }
 
@@ -77,7 +76,7 @@ func (mt *tableImpl) deleteRow(tctx *tcontext, idx int) error {
 	return nil
 }
 
-func (mt *tableImpl) updateRow(tctx *tcontext, updates []db.ColumnUpdate, idx int) error {
+func (mt *tableImpl) updateRow(tctx *tcontext, updates []sql.ColumnUpdate, idx int) error {
 	mt.mutex.Lock()
 	defer mt.mutex.Unlock()
 

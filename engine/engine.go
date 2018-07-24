@@ -6,7 +6,6 @@ import (
 	"path/filepath"
 	"sync"
 
-	"github.com/leftmike/maho/db"
 	"github.com/leftmike/maho/engine/fatlock"
 	"github.com/leftmike/maho/sql"
 )
@@ -70,12 +69,12 @@ type Rows interface {
 	Close() error
 	Next(ses Session, dest []sql.Value) error
 	Delete(ses Session) error
-	Update(ses Session, updates []db.ColumnUpdate) error
+	Update(ses Session, updates []sql.ColumnUpdate) error
 }
 
 type Table interface {
 	Columns(ses Session) []sql.Identifier
-	ColumnTypes(ses Session) []db.ColumnType
+	ColumnTypes(ses Session) []sql.ColumnType
 	Rows(ses Session) (Rows, error)
 	Insert(ses Session, row []sql.Value) error
 }
@@ -84,7 +83,7 @@ type Database interface {
 	Message() string
 	LookupTable(ses Session, tctx interface{}, tblname sql.Identifier) (Table, error)
 	CreateTable(ses Session, tctx interface{}, tblname sql.Identifier, cols []sql.Identifier,
-		colTypes []db.ColumnType) error
+		colTypes []sql.ColumnType) error
 	DropTable(ses Session, tctx interface{}, tblname sql.Identifier, exists bool) error
 	ListTables(ses Session, tctx interface{}) ([]TableEntry, error)
 	Begin(lkr fatlock.Locker) interface{}
@@ -332,7 +331,7 @@ func (m *Manager) LookupTable(ses Session, tx *Transaction, dbname,	tblname sql.
 
 // CreateTable creates the named table in the named database.
 func (m *Manager) CreateTable(ses Session, tx *Transaction, dbname, tblname sql.Identifier,
-	cols []sql.Identifier, colTypes []db.ColumnType) error {
+	cols []sql.Identifier, colTypes []sql.ColumnType) error {
 
 	m.mutex.RLock()
 	defer m.mutex.RUnlock()

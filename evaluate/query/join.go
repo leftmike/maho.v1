@@ -4,7 +4,6 @@ import (
 	"fmt"
 	"io"
 
-	"github.com/leftmike/maho/db"
 	"github.com/leftmike/maho/engine"
 	"github.com/leftmike/maho/evaluate"
 	"github.com/leftmike/maho/expr"
@@ -35,7 +34,7 @@ type FromJoin struct {
 	Left  FromItem
 	Right FromItem
 	Type  JoinType
-	On    expr.Expr
+	On    sql.Expr
 	Using []sql.Identifier
 }
 
@@ -244,7 +243,7 @@ func (_ *joinRows) Delete(ses evaluate.Session) error {
 	return fmt.Errorf("join rows may not be deleted")
 }
 
-func (_ *joinRows) Update(ses evaluate.Session, updates []db.ColumnUpdate) error {
+func (_ *joinRows) Update(ses evaluate.Session, updates []sql.ColumnUpdate) error {
 	return fmt.Errorf("join rows may not be updated")
 }
 

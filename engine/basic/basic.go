@@ -5,7 +5,6 @@ import (
 	"io"
 	"sync"
 
-	"github.com/leftmike/maho/db"
 	"github.com/leftmike/maho/engine"
 	"github.com/leftmike/maho/engine/fatlock"
 	"github.com/leftmike/maho/sql"
@@ -23,7 +22,7 @@ type database struct {
 type table struct {
 	name        string
 	columns     []sql.Identifier
-	columnTypes []db.ColumnType
+	columnTypes []sql.ColumnType
 	rows        [][]sql.Value
 }
 
@@ -68,7 +67,7 @@ func (bdb *database) LookupTable(ses engine.Session, tctx interface{},
 }
 
 func (bdb *database) CreateTable(ses engine.Session, tctx interface{}, tblname sql.Identifier,
-	cols []sql.Identifier, colTypes []db.ColumnType) error {
+	cols []sql.Identifier, colTypes []sql.ColumnType) error {
 
 	mutex.Lock()
 	defer mutex.Unlock()
@@ -134,7 +133,7 @@ func (bt *table) Columns(ses engine.Session) []sql.Identifier {
 	return bt.columns
 }
 
-func (bt *table) ColumnTypes(ses engine.Session) []db.ColumnType {
+func (bt *table) ColumnTypes(ses engine.Session) []sql.ColumnType {
 	return bt.columnTypes
 }
 
@@ -193,7 +192,7 @@ func (br *rows) Delete(ses engine.Session) error {
 	return nil
 }
 
-func (br *rows) Update(ses engine.Session, updates []db.ColumnUpdate) error {
+func (br *rows) Update(ses engine.Session, updates []sql.ColumnUpdate) error {
 	mutex.Lock()
 	defer mutex.Unlock()
 

@@ -12,7 +12,7 @@ import (
 
 type Delete struct {
 	Table sql.TableName
-	Where expr.Expr
+	Where sql.Expr
 }
 
 func (stmt *Delete) String() string {

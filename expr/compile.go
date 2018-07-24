@@ -12,7 +12,7 @@ type CompileContext interface {
 }
 
 type AggregatorContext interface {
-	MaybeRefExpr(e Expr) (int, bool)
+	MaybeRefExpr(e sql.Expr) (int, bool)
 	CompileAggregator(c *Call, maker MakeAggregator) int
 }
 
@@ -28,7 +28,7 @@ func CompileRef(idx int) CExpr {
 	return colIndex(idx)
 }
 
-func Compile(ctx CompileContext, e Expr, agg bool) (CExpr, error) {
+func Compile(ctx CompileContext, e sql.Expr, agg bool) (CExpr, error) {
 	if agg {
 		idx, ok := ctx.(AggregatorContext).MaybeRefExpr(e)
 		if ok {

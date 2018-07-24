@@ -67,12 +67,6 @@ func (op Op) String() string {
 	return ops[op].name
 }
 
-type Expr interface {
-	fmt.Stringer
-	Equal(e Expr) bool
-	HasRef() bool
-}
-
 type Literal struct {
 	Value sql.Value
 }
@@ -81,7 +75,7 @@ func (l *Literal) String() string {
 	return sql.Format(l.Value)
 }
 
-func (l *Literal) Equal(e Expr) bool {
+func (l *Literal) Equal(e sql.Expr) bool {
 	l2, ok := e.(*Literal)
 	if !ok {
 		return false
@@ -119,7 +113,7 @@ func StringLiteral(s string) *Literal {
 
 type Unary struct {
 	Op   Op
-	Expr Expr
+	Expr sql.Expr
 }
 
 func (u *Unary) String() string {
@@ -129,7 +123,7 @@ func (u *Unary) String() string {
 	return fmt.Sprintf("(%s %s)", ops[u.Op].name, u.Expr)
 }
 
-func (u *Unary) Equal(e Expr) bool {
+func (u *Unary) Equal(e sql.Expr) bool {
 	u2, ok := e.(*Unary)
 	if !ok {
 		return false
@@ -143,15 +137,15 @@ func (u *Unary) HasRef() bool {
 
 type Binary struct {
 	Op    Op
-	Left  Expr
-	Right Expr
+	Left  sql.Expr
+	Right sql.Expr
 }
 
 func (b *Binary) String() string {
 	return fmt.Sprintf("(%s %s %s)", b.Left, ops[b.Op].name, b.Right)
 }
 
-func (b *Binary) Equal(e Expr) bool {
+func (b *Binary) Equal(e sql.Expr) bool {
 	b2, ok := e.(*Binary)
 	if !ok {
 		return false
@@ -173,7 +167,7 @@ func (r Ref) String() string {
 	return s
 }
 
-func (r Ref) Equal(e Expr) bool {
+func (r Ref) Equal(e sql.Expr) bool {
 	r2, ok := e.(Ref)
 	if !ok {
 		return false
@@ -195,7 +189,7 @@ func (_ Ref) HasRef() bool {
 
 type Call struct {
 	Name sql.Identifier
-	Args []Expr
+	Args []sql.Expr
 }
 
 func (c *Call) String() string {
@@ -210,7 +204,7 @@ func (c *Call) String() string {
 	return s
 }
 
-func (c *Call) Equal(e Expr) bool {
+func (c *Call) Equal(e sql.Expr) bool {
 	c2, ok := e.(*Call)
 	if !ok {
 		return false

@@ -10,7 +10,6 @@ import (
 	"sync"
 	"testing"
 
-	"github.com/leftmike/maho/db"
 	"github.com/leftmike/maho/engine"
 	"github.com/leftmike/maho/engine/fatlock"
 	"github.com/leftmike/maho/sql"
@@ -24,9 +23,9 @@ func (_ session) Context() context.Context {
 }
 
 var (
-	int32ColType  = db.ColumnType{Type: sql.IntegerType, Size: 4, NotNull: true}
-	int64ColType  = db.ColumnType{Type: sql.IntegerType, Size: 8, NotNull: true}
-	stringColType = db.ColumnType{Type: sql.CharacterType, Size: 4096, NotNull: true}
+	int32ColType  = sql.ColumnType{Type: sql.IntegerType, Size: 4, NotNull: true}
+	int64ColType  = sql.ColumnType{Type: sql.IntegerType, Size: 8, NotNull: true}
+	stringColType = sql.ColumnType{Type: sql.CharacterType, Size: 4096, NotNull: true}
 )
 
 const (
@@ -56,7 +55,7 @@ type cmd struct {
 	values           [][]sql.Value     // Expected rows (table.Rows)
 	row              []sql.Value       // Row to insert (table.Insert)
 	rowID            int               // Row to update (rows.Update) or delete (rows.Delete)
-	updates          []db.ColumnUpdate // Updates to a row (rows.Update)
+	updates          []sql.ColumnUpdate // Updates to a row (rows.Update)
 }
 
 type testLocker struct {
@@ -81,7 +80,7 @@ type sessionState struct {
 
 var (
 	columns     = []sql.Identifier{sql.ID("ID"), sql.ID("intCol"), sql.ID("stringCol")}
-	columnTypes = []db.ColumnType{int32ColType, int64ColType, stringColType}
+	columnTypes = []sql.ColumnType{int32ColType, int64ColType, stringColType}
 )
 
 func allRows(t *testing.T, ses engine.Session, rows engine.Rows) [][]sql.Value {
@@ -749,7 +748,7 @@ func RunTableTest(t *testing.T, e engine.Engine) {
 			{cmd: cmdBegin},
 			{cmd: cmdLookupTable, name: sql.ID("tbl3")},
 			{cmd: cmdUpdate, rowID: 1,
-				updates: []db.ColumnUpdate{{Index: 1, Value: sql.Int64Value(10)}}},
+				updates: []sql.ColumnUpdate{{Index: 1, Value: sql.Int64Value(10)}}},
 			{cmd: cmdNextStmt},
 			{cmd: cmdRows,
 				values: [][]sql.Value{
@@ -764,7 +763,7 @@ func RunTableTest(t *testing.T, e engine.Engine) {
 			{cmd: cmdBegin, needTransactions: true},
 			{cmd: cmdLookupTable, name: sql.ID("tbl3")},
 			{cmd: cmdUpdate, rowID: 2,
-				updates: []db.ColumnUpdate{{Index: 1, Value: sql.Int64Value(40)}}},
+				updates: []sql.ColumnUpdate{{Index: 1, Value: sql.Int64Value(40)}}},
 			{cmd: cmdNextStmt},
 			{cmd: cmdRows,
 				values: [][]sql.Value{
@@ -792,7 +791,7 @@ func RunTableTest(t *testing.T, e engine.Engine) {
 			{cmd: cmdBegin},
 			{cmd: cmdLookupTable, name: sql.ID("tbl3")},
 			{cmd: cmdUpdate, rowID: 3,
-				updates: []db.ColumnUpdate{
+				updates: []sql.ColumnUpdate{
 					{Index: 1, Value: sql.Int64Value(90)},
 					{Index: 2, Value: sql.StringValue("3rd row")},
 				},
@@ -853,7 +852,7 @@ func RunTableTest(t *testing.T, e engine.Engine) {
 			{cmd: cmdLookupTable, name: sql.ID("tbl4")},
 			{cmd: cmdDelete, rowID: 1, fail: true},
 			{cmd: cmdUpdate, rowID: 1,
-				updates: []db.ColumnUpdate{{Index: 1, Value: sql.Int64Value(40)}}, fail: true},
+				updates: []sql.ColumnUpdate{{Index: 1, Value: sql.Int64Value(40)}}, fail: true},
 			{cmd: cmdCommit},
 			{cmd: cmdSession, ses: 0},
 			{cmd: cmdRollback},
@@ -862,7 +861,7 @@ func RunTableTest(t *testing.T, e engine.Engine) {
 			{cmd: cmdBegin},
 			{cmd: cmdLookupTable, name: sql.ID("tbl4")},
 			{cmd: cmdUpdate, rowID: 1,
-				updates: []db.ColumnUpdate{{Index: 1, Value: sql.Int64Value(40)}}},
+				updates: []sql.ColumnUpdate{{Index: 1, Value: sql.Int64Value(40)}}},
 			{cmd: cmdSession, ses: 1},
 			{cmd: cmdBegin},
 			{cmd: cmdSession, ses: 0},
@@ -871,7 +870,7 @@ func RunTableTest(t *testing.T, e engine.Engine) {
 			{cmd: cmdLookupTable, name: sql.ID("tbl4")},
 			{cmd: cmdDelete, rowID: 1, fail: true},
 			{cmd: cmdUpdate, rowID: 1,
-				updates: []db.ColumnUpdate{{Index: 1, Value: sql.Int64Value(-40)}},
+				updates: []sql.ColumnUpdate{{Index: 1, Value: sql.Int64Value(-40)}},
 				fail: true},
 			{cmd: cmdCommit},
 
@@ -879,12 +878,12 @@ func RunTableTest(t *testing.T, e engine.Engine) {
 			{cmd: cmdBegin},
 			{cmd: cmdLookupTable, name: sql.ID("tbl4")},
 			{cmd: cmdUpdate, rowID: 1,
-				updates: []db.ColumnUpdate{{Index: 1, Value: sql.Int64Value(400)}}},
+				updates: []sql.ColumnUpdate{{Index: 1, Value: sql.Int64Value(400)}}},
 			{cmd: cmdUpdate, rowID: 1,
-				updates: []db.ColumnUpdate{{Index: 1, Value: sql.Int64Value(-400)}}, fail: true},
+				updates: []sql.ColumnUpdate{{Index: 1, Value: sql.Int64Value(-400)}}, fail: true},
 			{cmd: cmdNextStmt},
 			{cmd: cmdUpdate, rowID: 1,
-				updates: []db.ColumnUpdate{{Index: 1, Value: sql.Int64Value(4000)}}},
+				updates: []sql.ColumnUpdate{{Index: 1, Value: sql.Int64Value(4000)}}},
 			{cmd: cmdCommit},
 		})
 }
@@ -928,7 +927,7 @@ func RunParallelTest(t *testing.T, e engine.Engine) {
 						{cmd: cmdBegin},
 						{cmd: cmdLookupTable, name: sql.ID("tbl")},
 						{cmd: cmdUpdate, rowID: i * r + j,
-							updates: []db.ColumnUpdate{{Index: 1, Value: sql.Int64Value(j * j)}}},
+							updates: []sql.ColumnUpdate{{Index: 1, Value: sql.Int64Value(j * j)}}},
 						{cmd: cmdCommit},
 					})
 			}
@@ -958,7 +957,8 @@ func incColumn(t *testing.T, d engine.Database, tctx interface{}, i int, name sq
 		}
 		if i64, ok := dest[0].(sql.Int64Value); ok && int(i64) == i {
 			v := int(dest[1].(sql.Int64Value))
-			err = rows.Update(session{}, []db.ColumnUpdate{{Index: 1, Value: sql.Int64Value(v + 1)}})
+			err = rows.Update(session{},
+				[]sql.ColumnUpdate{{Index: 1, Value: sql.Int64Value(v + 1)}})
 			if err == nil {
 				return true
 			}

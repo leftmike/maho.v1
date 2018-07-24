@@ -4,7 +4,6 @@ import (
 	"fmt"
 	"io"
 
-	"github.com/leftmike/maho/db"
 	"github.com/leftmike/maho/engine"
 	"github.com/leftmike/maho/evaluate"
 	"github.com/leftmike/maho/expr"
@@ -13,13 +12,13 @@ import (
 
 type ColumnUpdate struct {
 	Column sql.Identifier
-	Expr   expr.Expr
+	Expr   sql.Expr
 }
 
 type Update struct {
 	Table         sql.TableName
 	ColumnUpdates []ColumnUpdate
-	Where         expr.Expr
+	Where         sql.Expr
 }
 
 func (stmt *Update) String() string {
@@ -43,7 +42,7 @@ type columnUpdate struct {
 
 type updatePlan struct {
 	columns []sql.Identifier
-	types   []db.ColumnType
+	types   []sql.ColumnType
 	dest    []sql.Value
 	rows    evaluate.Rows
 	updates []columnUpdate
@@ -56,7 +55,7 @@ func (up *updatePlan) EvalRef(idx int) sql.Value {
 func (up *updatePlan) Execute(ses evaluate.Session, tx *engine.Transaction) (int64, error) {
 	up.dest = make([]sql.Value, len(up.rows.Columns()))
 	cnt := int64(0)
-	updates := make([]db.ColumnUpdate, len(up.updates))
+	updates := make([]sql.ColumnUpdate, len(up.updates))
 
 	for {
 		err := up.rows.Next(ses, up.dest)
@@ -76,7 +75,7 @@ func (up *updatePlan) Execute(ses evaluate.Session, tx *engine.Transaction) (int
 			if err != nil {
 				return -1, err
 			}
-			updates[idx] = db.ColumnUpdate{Index: cdx, Value: val}
+			updates[idx] = sql.ColumnUpdate{Index: cdx, Value: val}
 		}
 		err = up.rows.Update(ses, updates)
 		if err != nil {

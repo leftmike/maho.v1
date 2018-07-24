@@ -9,7 +9,7 @@ import (
 
 func TestExpr(t *testing.T) {
 	cases := []struct {
-		e Expr
+		e sql.Expr
 		s string
 	}{
 		{
@@ -22,7 +22,7 @@ func TestExpr(t *testing.T) {
 		{
 			e: &Call{
 				Name: sql.ID("abc"),
-				Args: []Expr{
+				Args: []sql.Expr{
 					&Unary{Op: NegateOp, Expr: Int64Literal(123)},
 					Int64Literal(456),
 					&Binary{Op: AddOp,

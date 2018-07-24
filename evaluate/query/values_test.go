@@ -36,7 +36,7 @@ func TestValues(t *testing.T) {
 	}{
 		{
 			values: query.Values{
-				Expressions: [][]expr.Expr{
+				Expressions: [][]sql.Expr{
 					{expr.Int64Literal(1), expr.StringLiteral("abc"), expr.True(), expr.Nil()},
 				},
 			},
@@ -49,7 +49,7 @@ func TestValues(t *testing.T) {
 		},
 		{
 			values: query.Values{
-				Expressions: [][]expr.Expr{
+				Expressions: [][]sql.Expr{
 					{expr.Int64Literal(1), expr.StringLiteral("abc"), expr.True()},
 					{expr.Int64Literal(2), expr.StringLiteral("def"), expr.False()},
 					{expr.Int64Literal(3), expr.StringLiteral("ghi"), expr.True()},
@@ -111,7 +111,7 @@ func TestFromValues(t *testing.T) {
 		{
 			from: query.FromValues{
 				Values: query.Values{
-					Expressions: [][]expr.Expr{
+					Expressions: [][]sql.Expr{
 						{expr.Int64Literal(1), expr.StringLiteral("abc"), expr.True(), expr.Nil()},
 					},
 				},
@@ -128,7 +128,7 @@ func TestFromValues(t *testing.T) {
 		{
 			from: query.FromValues{
 				Values: query.Values{
-					Expressions: [][]expr.Expr{
+					Expressions: [][]sql.Expr{
 						{expr.Int64Literal(1), expr.StringLiteral("abc"), expr.True()},
 						{expr.Int64Literal(2), expr.StringLiteral("def"), expr.False()},
 						{expr.Int64Literal(3), expr.StringLiteral("ghi"), expr.True()},
