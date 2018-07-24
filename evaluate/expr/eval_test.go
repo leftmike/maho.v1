@@ -5,7 +5,7 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/leftmike/maho/expr"
+	"github.com/leftmike/maho/evaluate/expr"
 	"github.com/leftmike/maho/parser"
 	"github.com/leftmike/maho/sql"
 )

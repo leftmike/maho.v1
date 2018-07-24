@@ -32,8 +32,6 @@ To Do:
 
 - godoc -http=:6060
 
-- move expr into evaluate
-
 - server: ReplSQL, ssh, etc
 - main: tie it all together
 

@@ -5,7 +5,7 @@ import (
 
 	"github.com/leftmike/maho/engine"
 	"github.com/leftmike/maho/evaluate"
-	"github.com/leftmike/maho/expr"
+	"github.com/leftmike/maho/evaluate/expr"
 	"github.com/leftmike/maho/sql"
 )
 

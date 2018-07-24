@@ -4,8 +4,8 @@ import (
 	"testing"
 
 	"github.com/leftmike/maho/evaluate"
+	"github.com/leftmike/maho/evaluate/expr"
 	"github.com/leftmike/maho/evaluate/query"
-	"github.com/leftmike/maho/expr"
 	"github.com/leftmike/maho/server"
 	"github.com/leftmike/maho/sql"
 	"github.com/leftmike/maho/testutil"
