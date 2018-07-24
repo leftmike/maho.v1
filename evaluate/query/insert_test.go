@@ -10,7 +10,7 @@ import (
 	"github.com/leftmike/maho/execute"
 	"github.com/leftmike/maho/expr"
 	"github.com/leftmike/maho/parser"
-	"github.com/leftmike/maho/query"
+	"github.com/leftmike/maho/evaluate/query"
 	"github.com/leftmike/maho/sql"
 	"github.com/leftmike/maho/testutil"
 )

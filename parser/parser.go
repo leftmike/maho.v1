@@ -6,14 +6,14 @@ import (
 	"runtime"
 	"strconv"
 
-	"github.com/leftmike/maho/datadef"
+	"github.com/leftmike/maho/evaluate/datadef"
 	"github.com/leftmike/maho/db"
 	"github.com/leftmike/maho/execute"
 	"github.com/leftmike/maho/expr"
-	"github.com/leftmike/maho/misc"
+	"github.com/leftmike/maho/evaluate/misc"
 	"github.com/leftmike/maho/parser/scanner"
 	"github.com/leftmike/maho/parser/token"
-	"github.com/leftmike/maho/query"
+	"github.com/leftmike/maho/evaluate/query"
 	"github.com/leftmike/maho/sql"
 )
 

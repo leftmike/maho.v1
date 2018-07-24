@@ -43,7 +43,6 @@ To Do:
 - layers: parser / evaluate / engine
 - server: ReplSQL, ssh, etc
 - main: tie it all together
-- move datadef, misc, and query into evaluate
 
 - fatlock: no global variables
 

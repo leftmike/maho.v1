@@ -3,7 +3,7 @@ package datadef_test
 import (
 	"testing"
 
-	"github.com/leftmike/maho/datadef"
+	"github.com/leftmike/maho/evaluate/datadef"
 	"github.com/leftmike/maho/sql"
 )
 

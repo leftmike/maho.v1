@@ -3,7 +3,7 @@ package misc_test
 import (
 	"testing"
 
-	"github.com/leftmike/maho/misc"
+	"github.com/leftmike/maho/evaluate/misc"
 	"github.com/leftmike/maho/sql"
 )
 
