@@ -22,11 +22,17 @@ type TableEntry struct {
 	Type TableType
 }
 
+type Services interface {
+	LockService() fatlock.LockService
+}
+
 type Options map[sql.Identifier]string
 
 type Engine interface {
-	AttachDatabase(name sql.Identifier, path string, options Options) (Database, error)
-	CreateDatabase(name sql.Identifier, path string, options Options) (Database, error)
+	AttachDatabase(svcs Services, name sql.Identifier, path string, options Options) (Database,
+		error)
+	CreateDatabase(svcs Services, name sql.Identifier, path string, options Options) (Database,
+		error)
 }
 
 type databaseState int
@@ -104,19 +110,22 @@ type databaseEntry struct {
 type TID uint64
 
 type Manager struct {
-	mutex     sync.RWMutex
-	engines   map[string]Engine
-	databases map[sql.Identifier]*databaseEntry
+	mutex         sync.RWMutex
+	engines       map[string]Engine
+	databases     map[sql.Identifier]*databaseEntry
 	virtualTables TableMap
-	lastTID   TID
+	lastTID       TID
+	lockService   fatlock.Service
 }
 
 func NewManager(engines map[string]Engine) *Manager {
 	m := Manager{
-		engines: engines,
-		databases: map[sql.Identifier]*databaseEntry{},
+		engines:       engines,
+		databases:     map[sql.Identifier]*databaseEntry{},
 		virtualTables: TableMap{},
 	}
+
+	m.lockService.Init()
 
 	m.CreateVirtualTable(sql.ID("db$tables"), m.makeTablesVirtual)
 	m.CreateVirtualTable(sql.ID("db$columns"), m.makeColumnsVirtual)
@@ -125,10 +134,14 @@ func NewManager(engines map[string]Engine) *Manager {
 		sql.ID("identifiers"): makeIdentifiersVirtual,
 		sql.ID("config"):      makeConfigVirtual,
 		sql.ID("engines"):     m.makeEnginesVirtual,
-		sql.ID("locks"):       makeLocksVirtual,
+		sql.ID("locks"):       m.makeLocksVirtual,
 	})
 
 	return &m
+}
+
+func (m *Manager) LockService() fatlock.LockService {
+	return &m.lockService
 }
 
 func (m *Manager) newDatabaseEntry(eng string, name sql.Identifier, options Options,
@@ -170,10 +183,10 @@ func (m *Manager) newDatabaseEntry(eng string, name sql.Identifier, options Opti
 func (m *Manager) setupDatabase(e Engine, de *databaseEntry, options Options) {
 	var d Database
 	if de.state == Attaching {
-		d, de.err = e.AttachDatabase(de.name, de.path, options)
+		d, de.err = e.AttachDatabase(m, de.name, de.path, options)
 	} else {
 		// de.state == Creating
-		d, de.err = e.CreateDatabase(de.name, de.path, options)
+		d, de.err = e.CreateDatabase(m, de.name, de.path, options)
 	}
 
 	m.mutex.Lock()
@@ -224,6 +237,7 @@ func (m *Manager) DetachDatabase(name sql.Identifier) error {
 
 type Transaction struct {
 	lockerState fatlock.LockerState
+	lockService *fatlock.Service
 	contexts    map[Database]interface{}
 	tid         TID
 	name        string
@@ -236,9 +250,10 @@ func (m *Manager) Begin() *Transaction {
 
 	m.lastTID += 1
 	return &Transaction{
-		contexts: map[Database]interface{}{},
-		tid:      m.lastTID,
-		name:     fmt.Sprintf("transaction-%d", m.lastTID),
+		lockService: &m.lockService,
+		contexts:    map[Database]interface{}{},
+		tid:         m.lastTID,
+		name:        fmt.Sprintf("transaction-%d", m.lastTID),
 	}
 }
 
@@ -274,7 +289,7 @@ func (tx *Transaction) Commit(ses Session) error {
 		return d.Commit(ses, tctx)
 	})
 	tx.contexts = nil
-	fatlock.ReleaseLocks(tx)
+	tx.lockService.ReleaseLocks(tx)
 	return err
 }
 
@@ -283,7 +298,7 @@ func (tx *Transaction) Rollback() error {
 		return d.Rollback(tctx)
 	})
 	tx.contexts = nil
-	fatlock.ReleaseLocks(tx)
+	tx.lockService.ReleaseLocks(tx)
 	return err
 }
 
@@ -308,7 +323,7 @@ func (tx *Transaction) getContext(d Database) interface{} {
 }
 
 // LookupTable looks up the named table in the named database.
-func (m *Manager) LookupTable(ses Session, tx *Transaction, dbname,	tblname sql.Identifier) (Table,
+func (m *Manager) LookupTable(ses Session, tx *Transaction, dbname, tblname sql.Identifier) (Table,
 	error) {
 
 	m.mutex.RLock()

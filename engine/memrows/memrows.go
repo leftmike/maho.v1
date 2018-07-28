@@ -20,11 +20,12 @@ import (
 type Engine struct{}
 
 type database struct {
-	mutex   sync.RWMutex
-	name    sql.Identifier
-	tables  map[sql.Identifier]*tableImpl
-	version version // current version of the database
-	nextTID tid
+	lockService fatlock.LockService
+	mutex       sync.RWMutex
+	name        sql.Identifier
+	tables      map[sql.Identifier]*tableImpl
+	version     version // current version of the database
+	nextTID     tid
 }
 
 type tcontext struct {
@@ -65,18 +66,19 @@ type rows struct {
 	haveRow bool
 }
 
-func (_ Engine) AttachDatabase(name sql.Identifier, path string,
+func (_ Engine) AttachDatabase(svcs engine.Services, name sql.Identifier, path string,
 	options engine.Options) (engine.Database, error) {
 
 	return nil, fmt.Errorf("memrows: attach database not supported")
 }
 
-func (_ Engine) CreateDatabase(name sql.Identifier, path string,
+func (_ Engine) CreateDatabase(svcs engine.Services, name sql.Identifier, path string,
 	options engine.Options) (engine.Database, error) {
 
 	return &database{
-		name:   name,
-		tables: map[sql.Identifier]*tableImpl{},
+		lockService: svcs.LockService(),
+		name:        name,
+		tables:      map[sql.Identifier]*tableImpl{},
 	}, nil
 }
 
@@ -106,7 +108,7 @@ func (mdb *database) LookupTable(ses engine.Session, tx interface{},
 		return tbl, nil
 	}
 
-	err := fatlock.LockTable(ses, tctx.locker, mdb.name, tblname, fatlock.ACCESS)
+	err := mdb.lockService.LockTable(ses, tctx.locker, mdb.name, tblname, fatlock.ACCESS)
 	if err != nil {
 		return nil, err
 	}
@@ -134,7 +136,7 @@ func (mdb *database) CreateTable(ses engine.Session, tx interface{}, tblname sql
 	cols []sql.Identifier, colTypes []sql.ColumnType) error {
 
 	tctx := tx.(*tcontext)
-	err := fatlock.LockTable(ses, tctx.locker, mdb.name, tblname, fatlock.EXCLUSIVE)
+	err := mdb.lockService.LockTable(ses, tctx.locker, mdb.name, tblname, fatlock.EXCLUSIVE)
 	if err != nil {
 		return err
 	}
@@ -186,7 +188,7 @@ func (mdb *database) DropTable(ses engine.Session, tx interface{}, tblname sql.I
 	exists bool) error {
 
 	tctx := tx.(*tcontext)
-	err := fatlock.LockTable(ses, tctx.locker, mdb.name, tblname, fatlock.EXCLUSIVE)
+	err := mdb.lockService.LockTable(ses, tctx.locker, mdb.name, tblname, fatlock.EXCLUSIVE)
 	if err != nil {
 		return err
 	}
@@ -354,7 +356,8 @@ func (mt *table) Rows(ses engine.Session) (engine.Rows, error) {
 
 func (mt *table) Insert(ses engine.Session, row []sql.Value) error {
 	if !mt.modifyLock {
-		err := fatlock.LockTable(ses, mt.tctx.locker, mt.db.name, mt.name, fatlock.ROW_MODIFY)
+		err := mt.db.lockService.LockTable(ses, mt.tctx.locker, mt.db.name, mt.name,
+			fatlock.ROW_MODIFY)
 		if err != nil {
 			return err
 		}
@@ -396,8 +399,8 @@ func (mr *rows) Delete(ses engine.Session) error {
 			mr.table.name)
 	}
 	if !mr.table.modifyLock {
-		err := fatlock.LockTable(ses, mr.table.tctx.locker, mr.table.db.name, mr.table.name,
-			fatlock.ROW_MODIFY)
+		err := mr.table.db.lockService.LockTable(ses, mr.table.tctx.locker, mr.table.db.name,
+			mr.table.name, fatlock.ROW_MODIFY)
 		if err != nil {
 			return err
 		}
@@ -419,8 +422,8 @@ func (mr *rows) Update(ses engine.Session, updates []sql.ColumnUpdate) error {
 			mr.table.name)
 	}
 	if !mr.table.modifyLock {
-		err := fatlock.LockTable(ses, mr.table.tctx.locker, mr.table.db.name, mr.table.name,
-			fatlock.ROW_MODIFY)
+		err := mr.table.db.lockService.LockTable(ses, mr.table.tctx.locker, mr.table.db.name,
+			mr.table.name, fatlock.ROW_MODIFY)
 		if err != nil {
 			return err
 		}

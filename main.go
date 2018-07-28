@@ -34,9 +34,6 @@ To Do:
 
 - server: ReplSQL, ssh, etc
 - main: tie it all together
-
-- fatlock: no global variables
-
 */
 
 import (
@@ -133,9 +130,9 @@ func replSQL(mgr *engine.Manager, p parser.Parser, w io.Writer) {
 
 var (
 	database = config.Var(new(string), "database").Usage("default `database`").String("maho")
-	eng = config.Var(new(string), "engine").Usage("default `engine`").String("basic")
-	dataDir = config.Var(new(string), "data_directory").
-		Flag("data", "`directory` containing databases").NoConfig().String("testdata")
+	eng      = config.Var(new(string), "engine").Usage("default `engine`").String("basic")
+	dataDir  = config.Var(new(string), "data_directory").
+			Flag("data", "`directory` containing databases").NoConfig().String("testdata")
 
 	configFile = flag.String("config-file", "", "`file` to load config from")
 	noConfig   = flag.Bool("no-config", false, "don't load config file")
@@ -155,7 +152,7 @@ func (ss *stringSlice) String() string {
 
 func main() {
 	var sqlArgs stringSlice
-	flag.Var(&sqlArgs, "sql","sql `query` to execute (may be specified more than once)")
+	flag.Var(&sqlArgs, "sql", "sql `query` to execute (may be specified more than once)")
 
 	flag.Parse()
 	config.Env()
@@ -179,7 +176,7 @@ func main() {
 	}
 
 	mgr := engine.NewManager(map[string]engine.Engine{
-		"basic": basic.Engine{},
+		"basic":   basic.Engine{},
 		"memrows": memrows.Engine{},
 	})
 
@@ -190,7 +187,7 @@ func main() {
 	}
 
 	for idx, arg := range sqlArgs {
-		replSQL(mgr, parser.NewParser(strings.NewReader(arg), fmt.Sprintf("sql arg %d", idx + 1)),
+		replSQL(mgr, parser.NewParser(strings.NewReader(arg), fmt.Sprintf("sql arg %d", idx+1)),
 			os.Stdout)
 	}
 

@@ -83,12 +83,20 @@ type LockerState struct {
 	locker    Locker
 }
 
-var (
+type LockService interface {
+	LockTable(ses Session, lkr Locker, db, tbl sql.Identifier, ll LockLevel) error
+}
+
+type Service struct {
 	mutex sync.Mutex
 
 	// The set of locked objects: all of them have at least one lock.
-	objects = map[lockKey]*object{}
-)
+	objects map[lockKey]*object
+}
+
+func (svc *Service) Init() {
+	svc.objects = map[lockKey]*object{}
+}
 
 // canIncreaseLock tests if an existing lock on the object can be increased to a higher lock level.
 func canIncreaseLock(obj *object, ll LockLevel) bool {
@@ -112,7 +120,7 @@ func addLock(obj *object, ls *LockerState, ll LockLevel) {
 	}
 }
 
-func waitForLock(ses Session, obj *object, ls *LockerState, ll LockLevel) {
+func (svc *Service) waitForLock(ses Session, obj *object, ls *LockerState, ll LockLevel) {
 	ls.waitLevel = ll
 	// Add the locker to the queue of waiters.
 	ls.nextWaiter = nil
@@ -126,9 +134,9 @@ func waitForLock(ses Session, obj *object, ls *LockerState, ll LockLevel) {
 	// Loop, waiting until the lock becomes available. Note that the mutex is locked when this
 	// function is called, so unlock it before waiting on the channel.
 	for {
-		mutex.Unlock()
+		svc.mutex.Unlock()
 		unlocked := <-ls.waitCh
-		mutex.Lock()
+		svc.mutex.Lock()
 
 		if unlocked || lockSharing[obj.level][ll] {
 			break
@@ -151,7 +159,7 @@ type Session interface {
 
 // LockTable locks the table (specified by db.tbl) for lkr at the specified lock level. It may
 // block waiting for a lock.
-func LockTable(ses Session, lkr Locker, db, tbl sql.Identifier, ll LockLevel) error {
+func (svc *Service) LockTable(ses Session, lkr Locker, db, tbl sql.Identifier, ll LockLevel) error {
 	ls := lkr.LockerState()
 	if ls.released {
 		return fmt.Errorf("fatlock: locker may not be reused")
@@ -163,8 +171,8 @@ func LockTable(ses Session, lkr Locker, db, tbl sql.Identifier, ll LockLevel) er
 	}
 	key := lockKey{db, tbl}
 
-	mutex.Lock()
-	defer mutex.Unlock()
+	svc.mutex.Lock()
+	defer svc.mutex.Unlock()
 
 	lk, ok := ls.locks[key]
 	if ok {
@@ -183,14 +191,14 @@ func LockTable(ses Session, lkr Locker, db, tbl sql.Identifier, ll LockLevel) er
 		return fmt.Errorf("fatlock: unable to increase level of held lock")
 	}
 
-	obj, ok := objects[key]
+	obj, ok := svc.objects[key]
 	if ok {
 		if obj.firstWaiter == nil && lockSharing[obj.level][ll] {
 			addLock(obj, ls, ll)
 			return nil
 		}
 
-		waitForLock(ses, obj, ls, ll)
+		svc.waitForLock(ses, obj, ls, ll)
 		addLock(obj, ls, ll)
 		return nil
 	}
@@ -200,13 +208,13 @@ func LockTable(ses Session, lkr Locker, db, tbl sql.Identifier, ll LockLevel) er
 		key:   key,
 		locks: map[*LockerState]*lock{},
 	}
-	objects[key] = obj
+	svc.objects[key] = obj
 
 	addLock(obj, ls, ll)
 	return nil
 }
 
-func releaseLock(ls *LockerState, lk *lock) {
+func (svc *Service) releaseLock(ls *LockerState, lk *lock) {
 	obj := lk.obj
 	delete(obj.locks, ls)
 
@@ -214,7 +222,7 @@ func releaseLock(ls *LockerState, lk *lock) {
 		// The object is no longer locked; notify the first waiter if there is one, otherwise
 		// delete it from the map of locked objects.
 		if obj.firstWaiter == nil {
-			delete(objects, obj.key)
+			delete(svc.objects, obj.key)
 		} else {
 			obj.level = 0
 			obj.firstWaiter.waitCh <- true
@@ -235,18 +243,18 @@ func releaseLock(ls *LockerState, lk *lock) {
 }
 
 // ReleaseLocks will release all locks held by lkr.
-func ReleaseLocks(lkr Locker) error {
+func (svc *Service) ReleaseLocks(lkr Locker) error {
 	ls := lkr.LockerState()
 	if ls.released {
 		return fmt.Errorf("fatlock: locker may not be reused")
 	}
 	ls.released = true
 
-	mutex.Lock()
-	defer mutex.Unlock()
+	svc.mutex.Lock()
+	defer svc.mutex.Unlock()
 
 	for _, lk := range ls.locks {
-		releaseLock(ls, lk)
+		svc.releaseLock(ls, lk)
 	}
 	return nil
 }
@@ -259,12 +267,12 @@ type Lock struct {
 }
 
 // Locks returns all locks.
-func Locks() []Lock {
-	mutex.Lock()
-	defer mutex.Unlock()
+func (svc *Service) Locks() []Lock {
+	svc.mutex.Lock()
+	defer svc.mutex.Unlock()
 
 	var locks []Lock
-	for _, o := range objects {
+	for _, o := range svc.objects {
 		key := o.key.String()
 
 		// Held locks.

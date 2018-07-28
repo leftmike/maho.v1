@@ -227,7 +227,7 @@ var (
 		boolColType, boolColType, boolColType, idColType}
 )
 
-func (m *Manager) makeColumnsVirtual(ses Session, tctx interface{}, d Database,	dbname,
+func (m *Manager) makeColumnsVirtual(ses Session, tctx interface{}, d Database, dbname,
 	tblname sql.Identifier) (Table, error) {
 
 	m.mutex.RLock()
@@ -315,7 +315,7 @@ func (m *Manager) makeDatabasesVirtual(ses Session, tctx interface{}, d Database
 		})
 	}
 	return &VirtualTable{
-		Name:     fmt.Sprintf("%s.%s", dbname, tblname),
+		Name: fmt.Sprintf("%s.%s", dbname, tblname),
 		Cols: []sql.Identifier{sql.ID("database"), sql.ID("engine"), sql.ID("state"),
 			sql.ID("path"), sql.ID("message")},
 		ColTypes: []sql.ColumnType{idColType, idColType, idColType, idColType, idColType},
@@ -384,12 +384,12 @@ func (m *Manager) makeEnginesVirtual(ses Session, tctx interface{}, d Database, 
 	}, nil
 }
 
-func makeLocksVirtual(ses Session, tctx interface{}, d Database, dbname,
+func (m *Manager) makeLocksVirtual(ses Session, tctx interface{}, d Database, dbname,
 	tblname sql.Identifier) (Table, error) {
 
 	values := [][]sql.Value{}
 
-	for _, lk := range fatlock.Locks() {
+	for _, lk := range m.lockService.Locks() {
 		var place sql.Value
 		if lk.Place > 0 {
 			place = sql.Int64Value(lk.Place)
@@ -404,7 +404,7 @@ func makeLocksVirtual(ses Session, tctx interface{}, d Database, dbname,
 	}
 
 	return &VirtualTable{
-		Name:     fmt.Sprintf("%s.%s", dbname, tblname),
+		Name: fmt.Sprintf("%s.%s", dbname, tblname),
 		Cols: []sql.Identifier{sql.ID("key"), sql.ID("locker"), sql.ID("level"),
 			sql.ID("held"), sql.ID("place")},
 		ColTypes: []sql.ColumnType{idColType, idColType, idColType, boolColType,

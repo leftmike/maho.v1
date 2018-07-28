@@ -47,7 +47,7 @@ func getSession(ses int) *session {
 }
 
 type testStep interface {
-	step(t *testing.T)
+	step(t *testing.T, svc *fatlock.Service)
 }
 
 type stepLockTable struct {
@@ -58,10 +58,10 @@ type stepLockTable struct {
 	wg   *sync.WaitGroup
 }
 
-func (slt stepLockTable) lockTable(t *testing.T, ses *session) {
+func (slt stepLockTable) lockTable(t *testing.T, ses *session, svc *fatlock.Service) {
 	t.Helper()
 
-	err := fatlock.LockTable(ses, ses.tl, sql.ID("db"), slt.tbl, slt.ll)
+	err := svc.LockTable(ses, ses.tl, sql.ID("db"), slt.tbl, slt.ll)
 	if slt.fail {
 		if err == nil {
 			t.Errorf("LockTable(%s, %s, %s) did not fail", ses, ses.tl, slt.ll)
@@ -71,7 +71,7 @@ func (slt stepLockTable) lockTable(t *testing.T, ses *session) {
 	}
 }
 
-func (slt stepLockTable) step(t *testing.T) {
+func (slt stepLockTable) step(t *testing.T, svc *fatlock.Service) {
 	t.Helper()
 
 	ses := getSession(slt.ses)
@@ -85,10 +85,10 @@ func (slt stepLockTable) step(t *testing.T) {
 		go func() {
 			defer slt.wg.Done()
 
-			slt.lockTable(t, ses)
+			slt.lockTable(t, ses, svc)
 		}()
 	} else {
-		slt.lockTable(t, ses)
+		slt.lockTable(t, ses, svc)
 	}
 }
 
@@ -98,11 +98,11 @@ type stepReleaseLocks struct {
 	keep bool
 }
 
-func (srl stepReleaseLocks) step(t *testing.T) {
+func (srl stepReleaseLocks) step(t *testing.T, svc *fatlock.Service) {
 	t.Helper()
 
 	ses := getSession(srl.ses)
-	err := fatlock.ReleaseLocks(ses.tl)
+	err := svc.ReleaseLocks(ses.tl)
 	if srl.fail {
 		if err == nil {
 			t.Errorf("ReleaseLocks(%s) did not fail", ses.tl)
@@ -119,7 +119,7 @@ type stepWait struct {
 	wg *sync.WaitGroup
 }
 
-func (sw stepWait) step(t *testing.T) {
+func (sw stepWait) step(t *testing.T, svc *fatlock.Service) {
 	t.Helper()
 
 	sw.wg.Wait()
@@ -157,10 +157,10 @@ func (sl stepLocks) Less(i, j int) bool {
 	return sl[i].Place < sl[j].Place
 }
 
-func (sl stepLocks) step(t *testing.T) {
+func (sl stepLocks) step(t *testing.T, svc *fatlock.Service) {
 	t.Helper()
 
-	lks := fatlock.Locks()
+	lks := svc.Locks()
 
 	sort.Sort(sl)
 	sort.Sort((stepLocks)(lks))
@@ -173,7 +173,7 @@ func (sl stepLocks) step(t *testing.T) {
 
 type stepSleep struct{}
 
-func (_ stepSleep) step(t *testing.T) {
+func (_ stepSleep) step(t *testing.T, svc *fatlock.Service) {
 	t.Helper()
 
 	time.Sleep(20 * time.Millisecond)
@@ -274,8 +274,10 @@ func TestFatlock1(t *testing.T) {
 		stepReleaseLocks{ses: 0},
 	}
 
+	var svc fatlock.Service
+	svc.Init()
 	for _, ts := range steps {
-		ts.step(t)
+		ts.step(t, &svc)
 	}
 }
 
@@ -299,8 +301,10 @@ func TestFatlock2(t *testing.T) {
 		stepReleaseLocks{ses: 1},
 	}
 
+	var svc fatlock.Service
+	svc.Init()
 	for _, ts := range steps {
-		ts.step(t)
+		ts.step(t, &svc)
 	}
 }
 
@@ -329,8 +333,10 @@ func TestFatlock3(t *testing.T) {
 		stepReleaseLocks{ses: 2},
 	}
 
+	var svc fatlock.Service
+	svc.Init()
 	for _, ts := range steps {
-		ts.step(t)
+		ts.step(t, &svc)
 	}
 }
 
@@ -363,8 +369,10 @@ func TestFatlock4(t *testing.T) {
 		stepReleaseLocks{ses: 2},
 	}
 
+	var svc fatlock.Service
+	svc.Init()
 	for _, ts := range steps {
-		ts.step(t)
+		ts.step(t, &svc)
 	}
 }
 
@@ -389,8 +397,10 @@ func TestFatlock5(t *testing.T) {
 		stepReleaseLocks{ses: 1},
 	}
 
+	var svc fatlock.Service
+	svc.Init()
 	for _, ts := range steps {
-		ts.step(t)
+		ts.step(t, &svc)
 	}
 }
 
@@ -422,7 +432,9 @@ func TestFatlock6(t *testing.T) {
 		stepReleaseLocks{ses: 2},
 	}
 
+	var svc fatlock.Service
+	svc.Init()
 	for _, ts := range steps {
-		ts.step(t)
+		ts.step(t, &svc)
 	}
 }

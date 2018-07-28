@@ -22,6 +22,18 @@ func (_ session) Context() context.Context {
 	return nil
 }
 
+type services struct {
+	lockService fatlock.Service
+}
+
+func (svcs *services) Init() {
+	svcs.lockService.Init()
+}
+
+func (svcs *services) LockService() fatlock.LockService {
+	return &svcs.lockService
+}
+
 var (
 	int32ColType  = sql.ColumnType{Type: sql.IntegerType, Size: 4, NotNull: true}
 	int64ColType  = sql.ColumnType{Type: sql.IntegerType, Size: 8, NotNull: true}
@@ -46,15 +58,15 @@ const (
 
 type cmd struct {
 	cmd              int
-	ses              int               // Which session to use
-	fail             bool              // The command should fail
-	needTransactions bool              // The test requires that transactions are supported
-	exists           bool              // Flag for DropTable
-	name             sql.Identifier    // Name of the table
-	list             []string          // List of table names
-	values           [][]sql.Value     // Expected rows (table.Rows)
-	row              []sql.Value       // Row to insert (table.Insert)
-	rowID            int               // Row to update (rows.Update) or delete (rows.Delete)
+	ses              int                // Which session to use
+	fail             bool               // The command should fail
+	needTransactions bool               // The test requires that transactions are supported
+	exists           bool               // Flag for DropTable
+	name             sql.Identifier     // Name of the table
+	list             []string           // List of table names
+	values           [][]sql.Value      // Expected rows (table.Rows)
+	row              []sql.Value        // Row to insert (table.Insert)
+	rowID            int                // Row to update (rows.Update) or delete (rows.Delete)
 	updates          []sql.ColumnUpdate // Updates to a row (rows.Update)
 }
 
@@ -102,7 +114,7 @@ func allRows(t *testing.T, ses engine.Session, rows engine.Rows) [][]sql.Value {
 	return all
 }
 
-func testTableLifecycle(t *testing.T, d engine.Database, cmds []cmd) {
+func testTableLifecycle(t *testing.T, d engine.Database, svcs *services, cmds []cmd) {
 	sessions := [4]sessionState{}
 	state := &sessions[0]
 
@@ -147,7 +159,7 @@ func testTableLifecycle(t *testing.T, d engine.Database, cmds []cmd) {
 				t.Errorf("Commit() failed with %s", err)
 			}
 			state.tctx = nil
-			fatlock.ReleaseLocks(state.locker)
+			svcs.lockService.ReleaseLocks(state.locker)
 		case cmdRollback:
 			err := d.Rollback(state.tctx)
 			if cmd.fail {
@@ -158,7 +170,7 @@ func testTableLifecycle(t *testing.T, d engine.Database, cmds []cmd) {
 				t.Errorf("Rollback() failed with %s", err)
 			}
 			state.tctx = nil
-			fatlock.ReleaseLocks(state.locker)
+			svcs.lockService.ReleaseLocks(state.locker)
 		case cmdNextStmt:
 			d.NextStmt(state.tctx)
 		case cmdLookupTable:
@@ -292,15 +304,17 @@ func testTableLifecycle(t *testing.T, d engine.Database, cmds []cmd) {
 func RunDatabaseTest(t *testing.T, e engine.Engine) {
 	t.Helper()
 
-	d, err := e.CreateDatabase(sql.ID("database_test"), filepath.Join("testdata", "database_test"),
-		nil)
+	var svcs services
+	svcs.Init()
+	d, err := e.CreateDatabase(&svcs, sql.ID("database_test"),
+		filepath.Join("testdata", "database_test"), nil)
 	if err != nil {
 		t.Fatal(err)
 	}
 
 	_ = d.Message()
 
-	testTableLifecycle(t, d,
+	testTableLifecycle(t, d, &svcs,
 		[]cmd{
 			{cmd: cmdBegin},
 			{cmd: cmdLookupTable, name: sql.ID("tbl-a"), fail: true},
@@ -357,7 +371,7 @@ func RunDatabaseTest(t *testing.T, e engine.Engine) {
 		})
 
 	for i := 0; i < 2; i++ {
-		testTableLifecycle(t, d,
+		testTableLifecycle(t, d, &svcs,
 			[]cmd{
 				{cmd: cmdBegin},
 				{cmd: cmdLookupTable, name: sql.ID("tbl1"), fail: true},
@@ -372,7 +386,7 @@ func RunDatabaseTest(t *testing.T, e engine.Engine) {
 			})
 	}
 
-	testTableLifecycle(t, d,
+	testTableLifecycle(t, d, &svcs,
 		[]cmd{
 			{cmd: cmdBegin},
 			{cmd: cmdLookupTable, name: sql.ID("tbl2"), fail: true},
@@ -381,7 +395,7 @@ func RunDatabaseTest(t *testing.T, e engine.Engine) {
 			{cmd: cmdCommit},
 		})
 
-	testTableLifecycle(t, d,
+	testTableLifecycle(t, d, &svcs,
 		[]cmd{
 			{cmd: cmdBegin},
 			{cmd: cmdLookupTable, name: sql.ID("tbl2"), fail: true},
@@ -390,7 +404,7 @@ func RunDatabaseTest(t *testing.T, e engine.Engine) {
 			{cmd: cmdCommit},
 		})
 
-	testTableLifecycle(t, d,
+	testTableLifecycle(t, d, &svcs,
 		[]cmd{
 			{cmd: cmdBegin},
 			{cmd: cmdCreateTable, name: sql.ID("tbl3")},
@@ -409,7 +423,7 @@ func RunDatabaseTest(t *testing.T, e engine.Engine) {
 		})
 
 	for i := 0; i < 2; i++ {
-		testTableLifecycle(t, d,
+		testTableLifecycle(t, d, &svcs,
 			[]cmd{
 				{cmd: cmdBegin},
 				{cmd: cmdCreateTable, name: sql.ID("tbl4")},
@@ -424,7 +438,7 @@ func RunDatabaseTest(t *testing.T, e engine.Engine) {
 			})
 	}
 
-	testTableLifecycle(t, d,
+	testTableLifecycle(t, d, &svcs,
 		[]cmd{
 			{cmd: cmdBegin, exists: true},
 			{cmd: cmdCreateTable, name: sql.ID("tbl5")},
@@ -442,7 +456,7 @@ func RunDatabaseTest(t *testing.T, e engine.Engine) {
 			{cmd: cmdCommit},
 		})
 
-	testTableLifecycle(t, d,
+	testTableLifecycle(t, d, &svcs,
 		[]cmd{
 			{cmd: cmdBegin},
 			{cmd: cmdCreateTable, name: sql.ID("tbl6")},
@@ -455,7 +469,7 @@ func RunDatabaseTest(t *testing.T, e engine.Engine) {
 			{cmd: cmdCommit},
 		})
 
-	testTableLifecycle(t, d,
+	testTableLifecycle(t, d, &svcs,
 		[]cmd{
 			{cmd: cmdBegin},
 			{cmd: cmdCreateTable, name: sql.ID("tbl7")},
@@ -464,7 +478,7 @@ func RunDatabaseTest(t *testing.T, e engine.Engine) {
 		})
 
 	for i := 0; i < 8; i++ {
-		testTableLifecycle(t, d,
+		testTableLifecycle(t, d, &svcs,
 			[]cmd{
 				{cmd: cmdBegin},
 				{cmd: cmdLookupTable, name: sql.ID("tbl7")},
@@ -476,14 +490,14 @@ func RunDatabaseTest(t *testing.T, e engine.Engine) {
 			})
 	}
 
-	testTableLifecycle(t, d,
+	testTableLifecycle(t, d, &svcs,
 		[]cmd{
 			{cmd: cmdBegin},
 			{cmd: cmdLookupTable, name: sql.ID("tbl7")},
 			{cmd: cmdCommit},
 		})
 
-	testTableLifecycle(t, d,
+	testTableLifecycle(t, d, &svcs,
 		[]cmd{
 			{cmd: cmdSession, ses: 0},
 			{cmd: cmdBegin},
@@ -514,13 +528,15 @@ func RunDatabaseTest(t *testing.T, e engine.Engine) {
 func RunTableTest(t *testing.T, e engine.Engine) {
 	t.Helper()
 
-	d, err := e.CreateDatabase(sql.ID("table_test"), filepath.Join("testdata", "table_test"),
-		nil)
+	var svcs services
+	svcs.Init()
+	d, err := e.CreateDatabase(&svcs, sql.ID("table_test"),
+		filepath.Join("testdata", "table_test"), nil)
 	if err != nil {
 		t.Fatal(err)
 	}
 
-	testTableLifecycle(t, d,
+	testTableLifecycle(t, d, &svcs,
 		[]cmd{
 			{cmd: cmdBegin},
 			{cmd: cmdCreateTable, name: sql.ID("tbl1")},
@@ -630,7 +646,7 @@ func RunTableTest(t *testing.T, e engine.Engine) {
 			{cmd: cmdCommit},
 		})
 
-	testTableLifecycle(t, d,
+	testTableLifecycle(t, d, &svcs,
 		[]cmd{
 			{cmd: cmdBegin},
 			{cmd: cmdCreateTable, name: sql.ID("tbl2")},
@@ -721,7 +737,7 @@ func RunTableTest(t *testing.T, e engine.Engine) {
 			{cmd: cmdCommit},
 		})
 
-	testTableLifecycle(t, d,
+	testTableLifecycle(t, d, &svcs,
 		[]cmd{
 			{cmd: cmdBegin},
 			{cmd: cmdCreateTable, name: sql.ID("tbl3")},
@@ -825,7 +841,7 @@ func RunTableTest(t *testing.T, e engine.Engine) {
 			{cmd: cmdCommit},
 		})
 
-	testTableLifecycle(t, d,
+	testTableLifecycle(t, d, &svcs,
 		[]cmd{
 			{cmd: cmdBegin, needTransactions: true},
 			{cmd: cmdCreateTable, name: sql.ID("tbl4")},
@@ -871,7 +887,7 @@ func RunTableTest(t *testing.T, e engine.Engine) {
 			{cmd: cmdDelete, rowID: 1, fail: true},
 			{cmd: cmdUpdate, rowID: 1,
 				updates: []sql.ColumnUpdate{{Index: 1, Value: sql.Int64Value(-40)}},
-				fail: true},
+				fail:    true},
 			{cmd: cmdCommit},
 
 			{cmd: cmdSession, ses: 0},
@@ -891,13 +907,15 @@ func RunTableTest(t *testing.T, e engine.Engine) {
 func RunParallelTest(t *testing.T, e engine.Engine) {
 	t.Helper()
 
-	d, err := e.CreateDatabase(sql.ID("parallel_test"), filepath.Join("testdata", "parallel_test"),
-		nil)
+	var svcs services
+	svcs.Init()
+	d, err := e.CreateDatabase(&svcs, sql.ID("parallel_test"),
+		filepath.Join("testdata", "parallel_test"), nil)
 	if err != nil {
 		t.Fatal(err)
 	}
 
-	testTableLifecycle(t, d,
+	testTableLifecycle(t, d, &svcs,
 		[]cmd{
 			{cmd: cmdBegin},
 			{cmd: cmdCreateTable, name: sql.ID("tbl")},
@@ -911,22 +929,22 @@ func RunParallelTest(t *testing.T, e engine.Engine) {
 			defer wg.Done()
 
 			for j := 0; j < r; j++ {
-				testTableLifecycle(t, d,
+				testTableLifecycle(t, d, &svcs,
 					[]cmd{
 						{cmd: cmdBegin},
 						{cmd: cmdLookupTable, name: sql.ID("tbl")},
-						{cmd: cmdInsert, row: []sql.Value{sql.Int64Value(i * r + j),
+						{cmd: cmdInsert, row: []sql.Value{sql.Int64Value(i*r + j),
 							sql.Int64Value(j), sql.StringValue(fmt.Sprintf("row %d.%d", i, j))}},
 						{cmd: cmdCommit},
 					})
 			}
 
 			for j := 0; j < r; j++ {
-				testTableLifecycle(t, d,
+				testTableLifecycle(t, d, &svcs,
 					[]cmd{
 						{cmd: cmdBegin},
 						{cmd: cmdLookupTable, name: sql.ID("tbl")},
-						{cmd: cmdUpdate, rowID: i * r + j,
+						{cmd: cmdUpdate, rowID: i*r + j,
 							updates: []sql.ColumnUpdate{{Index: 1, Value: sql.Int64Value(j * j)}}},
 						{cmd: cmdCommit},
 					})
@@ -971,13 +989,15 @@ func incColumn(t *testing.T, d engine.Database, tctx interface{}, i int, name sq
 func RunStressTest(t *testing.T, e engine.Engine) {
 	t.Helper()
 
-	d, err := e.CreateDatabase(sql.ID("stress_test"), filepath.Join("testdata", "stress_test"),
-		nil)
+	var svcs services
+	svcs.Init()
+	d, err := e.CreateDatabase(&svcs, sql.ID("stress_test"),
+		filepath.Join("testdata", "stress_test"), nil)
 	if err != nil {
 		t.Fatal(err)
 	}
 
-	testTableLifecycle(t, d,
+	testTableLifecycle(t, d, &svcs,
 		[]cmd{
 			{cmd: cmdBegin},
 			{cmd: cmdCreateTable, name: sql.ID("tbl")},
@@ -987,7 +1007,7 @@ func RunStressTest(t *testing.T, e engine.Engine) {
 	const rcnt = 100
 
 	for i := 0; i < rcnt; i++ {
-		testTableLifecycle(t, d,
+		testTableLifecycle(t, d, &svcs,
 			[]cmd{
 				{cmd: cmdBegin},
 				{cmd: cmdLookupTable, name: sql.ID("tbl")},
@@ -1035,7 +1055,7 @@ func RunStressTest(t *testing.T, e engine.Engine) {
 			sql.StringValue(fmt.Sprintf("row %d", i))})
 	}
 
-	testTableLifecycle(t, d,
+	testTableLifecycle(t, d, &svcs,
 		[]cmd{
 			{cmd: cmdBegin},
 			{cmd: cmdLookupTable, name: sql.ID("tbl")},

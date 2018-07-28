@@ -44,16 +44,16 @@ func (te *testEngine) checkOps(t *testing.T, ops []testOp) {
 	te.ops = nil
 }
 
-func (te *testEngine) AttachDatabase(name sql.Identifier, path string, options Options) (Database,
-	error) {
+func (te *testEngine) AttachDatabase(svcs Services, name sql.Identifier, path string,
+	options Options) (Database, error) {
 
 	<-te.done
 	te.op("AttachDatabase", name.String(), path)
 	return &testDatabase{te}, nil
 }
 
-func (te *testEngine) CreateDatabase(name sql.Identifier, path string, options Options) (Database,
-	error) {
+func (te *testEngine) CreateDatabase(svcs Services, name sql.Identifier, path string,
+	options Options) (Database, error) {
 
 	te.op("CreateDatabase", name.String(), path)
 	return &testDatabase{te}, nil
