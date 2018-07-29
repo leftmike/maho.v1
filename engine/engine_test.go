@@ -155,7 +155,7 @@ func checkDatabaseState(t *testing.T, m *Manager, state databaseState, name sql.
 
 func registerEngine() (*Manager, *testEngine) {
 	te := &testEngine{}
-	m := NewManager(map[string]Engine{
+	m := NewManager("testdata", map[string]Engine{
 		"test": te,
 	})
 	return m, te

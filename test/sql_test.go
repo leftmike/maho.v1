@@ -50,7 +50,7 @@ func (_ mahoDialect) DriverName() string {
 func testSQL(t *testing.T, typ string, dbname sql.Identifier) {
 	t.Helper()
 
-	mgr := engine.NewManager(map[string]engine.Engine{
+	mgr := engine.NewManager("testdata", map[string]engine.Engine{
 		"basic":   basic.Engine{},
 		"memrows": memrows.Engine{},
 	})

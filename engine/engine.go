@@ -111,6 +111,7 @@ type TID uint64
 
 type Manager struct {
 	mutex         sync.RWMutex
+	dataDir       string
 	engines       map[string]Engine
 	databases     map[sql.Identifier]*databaseEntry
 	virtualTables TableMap
@@ -118,8 +119,9 @@ type Manager struct {
 	lockService   fatlock.Service
 }
 
-func NewManager(engines map[string]Engine) *Manager {
+func NewManager(dataDir string, engines map[string]Engine) *Manager {
 	m := Manager{
+		dataDir:       dataDir,
 		engines:       engines,
 		databases:     map[sql.Identifier]*databaseEntry{},
 		virtualTables: TableMap{},
@@ -166,7 +168,7 @@ func (m *Manager) newDatabaseEntry(eng string, name sql.Identifier, options Opti
 	}
 	path, ok := options[sql.PATH]
 	if !ok {
-		path = filepath.Join("testdata", name.String()) // XXX
+		path = filepath.Join(m.dataDir, name.String())
 	} else {
 		delete(options, sql.PATH)
 	}

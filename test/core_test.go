@@ -34,7 +34,7 @@ func TestValuesSimple(t *testing.T) {
 		},
 	}
 
-	mgr := engine.NewManager(map[string]engine.Engine{
+	mgr := engine.NewManager("testdata", map[string]engine.Engine{
 		"basic": basic.Engine{},
 	})
 	err := mgr.CreateDatabase("basic", sql.ID("core_test"), engine.Options{sql.WAIT: "true"})

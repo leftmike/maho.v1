@@ -132,7 +132,7 @@ var (
 	database = config.Var(new(string), "database").Usage("default `database`").String("maho")
 	eng      = config.Var(new(string), "engine").Usage("default `engine`").String("basic")
 	dataDir  = config.Var(new(string), "data_directory").
-			Flag("data", "`directory` containing databases").NoConfig().String("testdata")
+			Flag("data", "`directory` containing databases").NoModify().String("testdata")
 
 	configFile = flag.String("config-file", "", "`file` to load config from")
 	noConfig   = flag.Bool("no-config", false, "don't load config file")
@@ -175,7 +175,7 @@ func main() {
 		return
 	}
 
-	mgr := engine.NewManager(map[string]engine.Engine{
+	mgr := engine.NewManager(*dataDir, map[string]engine.Engine{
 		"basic":   basic.Engine{},
 		"memrows": memrows.Engine{},
 	})

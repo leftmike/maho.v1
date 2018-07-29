@@ -16,7 +16,7 @@ import (
 func startManager(t *testing.T) *engine.Manager {
 	t.Helper()
 
-	mgr := engine.NewManager(map[string]engine.Engine{
+	mgr := engine.NewManager("testdata", map[string]engine.Engine{
 		"basic": basic.Engine{},
 	})
 	err := mgr.CreateDatabase("basic", sql.ID("test"), engine.Options{sql.WAIT: "true"})
