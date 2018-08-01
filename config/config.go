@@ -47,7 +47,6 @@ type Variable struct {
 	env      []string
 	by       setBy
 	noConfig bool
-	noModify bool
 }
 
 var cfg = NewConfig(flag.CommandLine)
@@ -175,30 +174,6 @@ func Var(val interface{}, name string) *Variable {
 	return cfg.Var(val, name)
 }
 
-func (c *Config) Set(name, val string) error {
-	v, ok := c.vars[name]
-	if !ok {
-		return fmt.Errorf("config variable %s not found", name)
-	}
-	if v.noModify {
-		return fmt.Errorf("config variable %s can not be modified", name)
-	}
-	fv, ok := v.val.(flag.Value)
-	if !ok {
-		return fmt.Errorf("config variable %s can not be modified", name)
-	}
-	err := fv.Set(val)
-	if err != nil {
-		return err
-	}
-	v.by = bySet
-	return nil
-}
-
-func Set(name, val string) error {
-	return cfg.Set(name, val)
-}
-
 func (v *Variable) Name() string {
 	return v.name
 }
@@ -237,12 +212,6 @@ func (v *Variable) Env(vars ...string) *Variable {
 
 func (v *Variable) NoConfig() *Variable {
 	v.noConfig = true
-	v.noModify = true
-	return v
-}
-
-func (v *Variable) NoModify() *Variable {
-	v.noModify = true
 	return v
 }
 

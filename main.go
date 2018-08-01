@@ -11,8 +11,6 @@ To Do:
 - ALTER TABLE ...
 - memrows: tableImpl: add versioned metadata and use METADATA_MODIFY locking level
 
-- serialize access to config variables
-
 - track sessions and transactions; maybe just one table
 - improve interactive execution: prompt, interactive editing (client app?), multiple sessions
 - server: ssh interactive access
@@ -132,7 +130,7 @@ var (
 	database = config.Var(new(string), "database").Usage("default `database`").String("maho")
 	eng      = config.Var(new(string), "engine").Usage("default `engine`").String("basic")
 	dataDir  = config.Var(new(string), "data_directory").
-			Flag("data", "`directory` containing databases").NoModify().String("testdata")
+			Flag("data", "`directory` containing databases").String("testdata")
 
 	configFile = flag.String("config-file", "", "`file` to load config from")
 	noConfig   = flag.Bool("no-config", false, "don't load config file")

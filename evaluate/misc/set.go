@@ -3,7 +3,6 @@ package misc
 import (
 	"fmt"
 
-	"github.com/leftmike/maho/config"
 	"github.com/leftmike/maho/engine"
 	"github.com/leftmike/maho/evaluate"
 	"github.com/leftmike/maho/sql"
@@ -23,5 +22,5 @@ func (stmt *Set) Plan(ses evaluate.Session, tx *engine.Transaction) (interface{}
 }
 
 func (stmt *Set) Execute(ses evaluate.Session, tx *engine.Transaction) (int64, error) {
-	return -1, config.Set(stmt.Variable.String(), stmt.Value)
+	return -1, ses.Set(stmt.Variable, stmt.Value)
 }

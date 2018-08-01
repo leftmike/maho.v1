@@ -979,7 +979,13 @@ func (p *parser) parseSet() Stmt {
 	// SET variable ( TO | '=' ) <literal>
 	var s misc.Set
 
-	s.Variable = p.expectIdentifier("expected a config variable")
+	if p.optionalReserved(sql.DATABASE) {
+		s.Variable = sql.DATABASE
+	} else if p.optionalReserved(sql.ENGINE) {
+		s.Variable = sql.ENGINE
+	} else {
+		s.Variable = p.expectIdentifier("expected a config variable")
+	}
 	if !p.maybeToken(token.Equal) {
 		p.expectReserved(sql.TO)
 	}

@@ -10,17 +10,17 @@ import (
 )
 
 type Session struct {
-	mgr *engine.Manager
-	eng  string
-	name sql.Identifier
-	tx   *engine.Transaction
+	mgr             *engine.Manager
+	defaultEngine   string
+	defaultDatabase sql.Identifier
+	tx              *engine.Transaction
 }
 
 func NewSession(mgr *engine.Manager, eng string, name sql.Identifier) *Session {
 	return &Session{
-		mgr: mgr,
-		eng:  eng,
-		name: name,
+		mgr:             mgr,
+		defaultEngine:   eng,
+		defaultDatabase: name,
 	}
 }
 
@@ -29,11 +29,11 @@ func (ses *Session) Context() context.Context {
 }
 
 func (ses *Session) DefaultEngine() string {
-	return ses.eng
+	return ses.defaultEngine
 }
 
 func (ses *Session) DefaultDatabase() sql.Identifier {
-	return ses.name
+	return ses.defaultDatabase
 }
 
 func (ses *Session) Manager() *engine.Manager {
@@ -85,4 +85,15 @@ func (ses *Session) Run(stmt parser.Stmt,
 		err = tx.Commit(ses)
 	}
 	return err
+}
+
+func (ses *Session) Set(v sql.Identifier, s string) error {
+	if v == sql.DATABASE {
+		ses.defaultDatabase = sql.ID(s)
+	} else if v == sql.ENGINE {
+		ses.defaultEngine = s
+	} else {
+		return fmt.Errorf("set: %s not found", v)
+	}
+	return nil
 }

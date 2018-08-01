@@ -15,4 +15,5 @@ type Session interface {
 	Begin() error
 	Commit() error
 	Rollback() error
+	Set(v sql.Identifier, s string) error
 }
