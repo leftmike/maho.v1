@@ -12,13 +12,15 @@ To Do:
 - memrows: tableImpl: add versioned metadata and use METADATA_MODIFY locking level
 
 - track sessions and transactions; maybe just one table
+
 - server: ssh interactive access
 -- table for users + password --or-- authorized public key
 -- load authorized public keys from authorized_keys file (same format as used by OpenSSH)
 -- -ssh-authorized-keys [./authorized_keys]
 -- -authenticate: none, password, public-key (multiple)
-- server: logging
--- log (ssh) authorization
+-- log (ssh) authentication
+
+- move repl to a separate file
 
 - memrows engine: persistence
 - memcols engine (w/ mvcc)
@@ -32,11 +34,12 @@ import (
 	"flag"
 	"fmt"
 	"io"
-	"io/ioutil"
 	"os"
 	"path/filepath"
 	"strings"
 	"text/tabwriter"
+
+	log "github.com/sirupsen/logrus"
 
 	"github.com/leftmike/maho/config"
 	"github.com/leftmike/maho/engine"
@@ -138,6 +141,10 @@ var (
 			Usage("`flag` to control serving ssh (true)").Bool(true)
 	sshPort = config.Var(new(string), "ssh-port").Usage("`port` used to serve ssh (:8241)").
 		String(":8241")
+	logFile = config.Var(new(string), "log-file").Usage("`file` to use for logging (./maho.log)").
+		String("maho.log")
+	logLevel = config.Var(new(string), "log-level").
+			Usage("log level: debug, info, warn, error, fatal, or panic (info)").String("info")
 
 	configFile = flag.String("config-file", "", "`file` to load config from (./maho.cfg)")
 	noConfig   = flag.Bool("no-config", false, "don't load config file")
@@ -157,10 +164,19 @@ func (ss *stringSlice) String() string {
 }
 
 func main() {
+	log.SetFormatter(&log.TextFormatter{
+		DisableLevelTruncation: true,
+	})
+
 	var sqlArgs, hostKeys []string
 	flag.Var((*stringSlice)(&sqlArgs), "sql", "sql `query` to execute; multiple allowed")
 	flag.Var((*stringSlice)(&hostKeys), "ssh-host-key",
 		"`file` containing a ssh host key; multiple allowed (./id_rsa)")
+
+	var logStderr bool
+	for _, s := range []string{"log-stdout", "s"} {
+		flag.BoolVar(&logStderr, s, false, "`flag` to control logging to standard error (false)")
+	}
 
 	flag.Parse()
 	config.Env()
@@ -172,16 +188,45 @@ func main() {
 		}
 		err := config.Load(filename)
 		if err != nil {
-			fmt.Println(err)
+			fmt.Fprintf(os.Stderr, "config: %s: %s\n", *configFile, err)
 			return
 		}
 	}
 	if *listConfig {
 		for _, v := range config.Vars() {
-			fmt.Printf("[%s] %s = %s\n", v.By(), v.Name(), v.Val())
+			fmt.Fprintf(os.Stdout, "[%s] %s = %s\n", v.By(), v.Name(), v.Val())
 		}
 		return
 	}
+
+	if !logStderr && *logFile != "" {
+		f, err := os.OpenFile(*logFile, os.O_APPEND|os.O_CREATE|os.O_WRONLY, 0666)
+		if err != nil {
+			fmt.Fprintf(os.Stderr, "log file: %s\n", err)
+			return
+		}
+		defer f.Close()
+		log.SetOutput(f)
+	}
+
+	ll, ok := map[string]log.Level{
+		"panic": log.PanicLevel,
+		"fatal": log.FatalLevel,
+		"error": log.ErrorLevel,
+		"warn":  log.WarnLevel,
+		"info":  log.InfoLevel,
+		"debug": log.DebugLevel,
+	}[*logLevel]
+	if !ok {
+		fmt.Fprintf(os.Stderr, "log level: got %s; want debug, info, warn, error, fatal, or panic",
+			*logLevel)
+		return
+	}
+	log.SetLevel(ll)
+
+	log.WithFields(log.Fields{
+		"pid": os.Getpid(),
+	}).Info("maho starting")
 
 	mgr := engine.NewManager(*dataDir, map[string]engine.Engine{
 		"basic":   basic.Engine{},
@@ -190,7 +235,7 @@ func main() {
 
 	err := mgr.CreateDatabase(*eng, sql.ID(*database), engine.Options{sql.WAIT: "true"})
 	if err != nil {
-		fmt.Println(err)
+		fmt.Fprintf(os.Stderr, "create database: %s: %s\n", *database, err)
 		return
 	}
 
@@ -202,10 +247,10 @@ func main() {
 	for idx := 0; idx < len(args); idx++ {
 		f, err := os.Open(args[idx])
 		if err != nil {
-			fmt.Println(err)
+			fmt.Fprintf(os.Stderr, "sql file: %s\n", err)
 			return
 		}
-		replSQL(mgr, bufio.NewReader(f), args[idx], ioutil.Discard, "")
+		replSQL(mgr, bufio.NewReader(f), args[idx], os.Stderr, "")
 	}
 
 	if *sshServer {
@@ -214,7 +259,7 @@ func main() {
 		}
 		ss, err := server.NewSSHServer(mgr, *sshPort, hostKeys, prompt)
 		if err != nil {
-			fmt.Println(err)
+			fmt.Fprintf(os.Stderr, "ssh server: %s\n", err)
 			return
 		}
 		serve := func(c *server.Client) {
@@ -223,15 +268,18 @@ func main() {
 		}
 		if *repl {
 			go func() {
-				err := ss.ListenAndServe(server.HandlerFunc(serve))
-				fmt.Println(err)
+				fmt.Fprintf(os.Stderr, "ssh: %s\n", ss.ListenAndServe(server.HandlerFunc(serve)))
 			}()
 		} else {
-			fmt.Println(ss.ListenAndServe(server.HandlerFunc(serve)))
+			fmt.Fprintf(os.Stderr, "ssh: %s\n", ss.ListenAndServe(server.HandlerFunc(serve)))
 		}
 	}
 
 	if *repl || (!*sshServer && len(args) == 0 && len(sqlArgs) == 0) {
 		replSQL(mgr, bufio.NewReader(os.Stdin), "<console>", os.Stdout, prompt)
 	}
+
+	log.WithFields(log.Fields{
+		"pid": os.Getpid(),
+	}).Info("maho done")
 }
