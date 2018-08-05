@@ -17,8 +17,8 @@ To Do:
 -- table for users + password --or-- authorized public key
 -- load authorized public keys from authorized_keys file (same format as used by OpenSSH)
 -- -ssh-authorized-keys [./authorized_keys]
--- -authenticate: none, password, public-key (multiple)
--- log (ssh) authentication
+-- -auth-none (false), -auth-password (true), -auth-public-key (true)
+-- ssh banner: need maho version
 
 - memrows engine: persistence
 - memcols engine (w/ mvcc)
@@ -141,9 +141,7 @@ func main() {
 	}
 	log.SetLevel(ll)
 
-	log.WithFields(log.Fields{
-		"pid": os.Getpid(),
-	}).Info("maho starting")
+	log.WithField("pid", os.Getpid()).Info("maho starting")
 
 	mgr := engine.NewManager(*dataDir, map[string]engine.Engine{
 		"basic":   basic.Engine{},
@@ -196,7 +194,5 @@ func main() {
 		replSQL(mgr, bufio.NewReader(os.Stdin), "<console>", os.Stdout, prompt)
 	}
 
-	log.WithFields(log.Fields{
-		"pid": os.Getpid(),
-	}).Info("maho done")
+	log.WithField("pid", os.Getpid()).Info("maho done")
 }

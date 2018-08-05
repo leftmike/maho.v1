@@ -7,6 +7,7 @@ import (
 	"io/ioutil"
 	"net"
 
+	log "github.com/sirupsen/logrus"
 	"golang.org/x/crypto/ssh"
 	"golang.org/x/crypto/ssh/terminal"
 
@@ -26,24 +27,35 @@ func NewSSHServer(mgr *engine.Manager, port string, hostKeys []string, prompt st
 	cfg := ssh.ServerConfig{
 		//NoClientAuth: true, // XXX: remove this
 		PasswordCallback: func(md ssh.ConnMetadata, pass []byte) (*ssh.Permissions, error) {
-			fmt.Printf("user: %s password: %s\n", md.User(), pass)
+			log.WithFields(log.Fields{
+				"user":     md.User(),
+				"password": string(pass),
+				"addr":     md.RemoteAddr().String(),
+			}).Debug("ssh password callback")
 			return nil, nil
 		},
 		PublicKeyCallback: func(md ssh.ConnMetadata, key ssh.PublicKey) (*ssh.Permissions, error) {
-			fmt.Printf("user: %s public key: %s\n", md.User(), ssh.MarshalAuthorizedKey(key))
+			pk := ssh.MarshalAuthorizedKey(key)
+			log.WithFields(log.Fields{
+				"user":       md.User(),
+				"public key": pk,
+				"addr":       md.RemoteAddr().String(),
+			}).Debug("ssh public key callback")
 			if md.User() != "michael" {
 				return nil, fmt.Errorf("user must be michael")
 			}
 			return nil, nil
 		},
 		AuthLogCallback: func(md ssh.ConnMetadata, method string, err error) {
-			addr := md.RemoteAddr()
-			fmt.Printf("auth log: user: %s addr: %s:%s method: %s", md.User(), addr.Network(),
-				addr.String(), method)
+			l := log.WithFields(log.Fields{
+				"user":   md.User(),
+				"addr":   md.RemoteAddr().String(),
+				"method": method,
+			})
 			if err != nil {
-				fmt.Printf(" error: %s\n", err)
+				l.WithField("error", err.Error()).Error("authentication failed")
 			} else {
-				fmt.Println()
+				l.Info("authentication succeeded")
 			}
 		},
 		BannerCallback: func(md ssh.ConnMetadata) string {
@@ -81,27 +93,30 @@ func (ss *sshServer) ListenAndServe(handler Handler) error {
 	for {
 		tcp, err := listener.Accept()
 		if err != nil {
-			fmt.Printf("listener.Accept: %s\n", err)
+			log.WithField("error", err.Error()).Error("ssh accept")
 			continue
 		}
 		conn, chans, reqs, err := ssh.NewServerConn(tcp, ss.cfg)
 		if err != nil {
-			fmt.Printf("ssh.NewServerConn: %s\n", err)
+			log.WithField("error", err.Error()).Error("ssh new server connection")
 			continue
 		}
-		fmt.Printf("ssh connection: %s %s %s\n", conn.RemoteAddr(), conn.ClientVersion(),
-			conn.User())
+		entry := log.WithFields(log.Fields{
+			"user": conn.User(),
+			"addr": conn.RemoteAddr().String(),
+		})
+		entry.Info("ssh connection")
 
 		go ssh.DiscardRequests(reqs)
-		go ss.handleConn(conn, chans, handler)
+		go ss.handleConn(conn, chans, handler, entry)
 	}
 }
 
 func (ss *sshServer) handleConn(conn *ssh.ServerConn, chans <-chan ssh.NewChannel,
-	handler Handler) {
+	handler Handler, entry *log.Entry) {
 
 	for ch := range chans {
-		go ss.handleChannel(conn, ch, handler)
+		go ss.handleChannel(conn, ch, handler, entry)
 	}
 }
 
@@ -129,29 +144,36 @@ func (tr *termReader) Read(d []byte) (int, error) {
 	return n, nil
 }
 
-func (ss *sshServer) handleChannel(conn *ssh.ServerConn, nch ssh.NewChannel, handler Handler) {
+func (ss *sshServer) handleChannel(conn *ssh.ServerConn, nch ssh.NewChannel, handler Handler,
+	entry *log.Entry) {
+
 	typ := nch.ChannelType()
-	fmt.Printf("ssh channel type: %s\n", typ)
 	if typ != "session" {
 		nch.Reject(ssh.UnknownChannelType, typ)
+		entry.WithField("channel-type", typ).Error("unknown channel type")
 		return
 	}
+	entry.WithField("channel-type", typ).Debug("new channel")
 
 	ch, reqs, err := nch.Accept()
 	if err != nil {
-		fmt.Printf("nch.Accept: %s\n", err)
+		entry.WithField("error", err.Error()).Error("new channel accept")
 		return
 	}
 	defer ch.Close()
 
 	go func() {
 		for req := range reqs {
-			fmt.Printf("channel request: %s %v [%s]\n", req.Type, req.WantReply, req.Payload)
+			entry.WithFields(log.Fields{
+				"request-type": req.Type,
+				"want-reply":   req.WantReply,
+				"payload":      len(req.Payload),
+			}).Debug("channel request")
 			if req.WantReply {
 				req.Reply(true, nil)
 			}
 		}
-		fmt.Printf("channel requests done\n")
+		entry.Debug("channel requests done")
 	}()
 
 	t := terminal.NewTerminal(ch, ss.prompt)
