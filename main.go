@@ -12,26 +12,19 @@ To Do:
 - memrows: tableImpl: add versioned metadata and use METADATA_MODIFY locking level
 
 - track sessions and transactions; maybe just one table
-- improve interactive execution: prompt, interactive editing (client app?), multiple sessions
 - server: ssh interactive access
 -- table for users + password --or-- authorized public key
 -- load authorized public keys from authorized_keys file (same format as used by OpenSSH)
--- -ssh [true], -ssh-port [8261]
--- -repl [true], -sql (multiple)
--- -ssh-host-key [./id_rsa] (multiple), -ssh-authorized-keys [./authorized_keys]
+-- -ssh-authorized-keys [./authorized_keys]
+-- -authenticate: none, password, public-key (multiple)
 - server: logging
--- log ssh authorization
+-- log (ssh) authorization
 
 - memrows engine: persistence
 - memcols engine (w/ mvcc)
 - distributed memrows and/or memcols engine, using raft
 - boltdb engine
 - badger engine
-
-- godoc -http=:6060
-
-- server: ReplSQL, ssh, etc
-- main: tie it all together
 */
 
 import (
@@ -39,6 +32,7 @@ import (
 	"flag"
 	"fmt"
 	"io"
+	"io/ioutil"
 	"os"
 	"path/filepath"
 	"strings"
@@ -54,9 +48,14 @@ import (
 	"github.com/leftmike/maho/sql"
 )
 
-func replSQL(mgr *engine.Manager, p parser.Parser, w io.Writer) {
+func replSQL(mgr *engine.Manager, rr io.RuneReader, fn string, w io.Writer, prompt string) {
+	p := parser.NewParser(rr, fn)
 	ses := server.NewSession(mgr, *eng, sql.ID(*database))
 	for {
+		if prompt != "" {
+			io.WriteString(w, prompt)
+		}
+
 		stmt, err := p.Parse()
 		if err == io.EOF {
 			return
@@ -126,15 +125,24 @@ func replSQL(mgr *engine.Manager, p parser.Parser, w io.Writer) {
 	}
 }
 
-var (
-	database = config.Var(new(string), "database").Usage("default `database`").String("maho")
-	eng      = config.Var(new(string), "engine").Usage("default `engine`").String("basic")
-	dataDir  = config.Var(new(string), "data_directory").
-			Flag("data", "`directory` containing databases").String("testdata")
+const (
+	prompt = "maho> "
+)
 
-	configFile = flag.String("config-file", "", "`file` to load config from")
+var (
+	database = config.Var(new(string), "database").Usage("default `database` (maho)").String("maho")
+	eng      = config.Var(new(string), "engine").Usage("default `engine` (basic)").String("basic")
+	dataDir  = config.Var(new(string), "data_directory").
+			Flag("data", "`directory` containing databases (./testdata)").String("testdata")
+	sshServer = config.Var(new(bool), "ssh").
+			Usage("`flag` to control serving ssh (true)").Bool(true)
+	sshPort = config.Var(new(string), "ssh-port").Usage("`port` used to serve ssh (:8241)").
+		String(":8241")
+
+	configFile = flag.String("config-file", "", "`file` to load config from (./maho.cfg)")
 	noConfig   = flag.Bool("no-config", false, "don't load config file")
 	listConfig = flag.Bool("list-config", false, "list config and exit")
+	repl       = flag.Bool("repl", false, "`flag` to control the console repl (false)")
 )
 
 type stringSlice []string
@@ -149,8 +157,10 @@ func (ss *stringSlice) String() string {
 }
 
 func main() {
-	var sqlArgs stringSlice
-	flag.Var(&sqlArgs, "sql", "sql `query` to execute (may be specified more than once)")
+	var sqlArgs, hostKeys []string
+	flag.Var((*stringSlice)(&sqlArgs), "sql", "sql `query` to execute; multiple allowed")
+	flag.Var((*stringSlice)(&hostKeys), "ssh-host-key",
+		"`file` containing a ssh host key; multiple allowed (./id_rsa)")
 
 	flag.Parse()
 	config.Env()
@@ -185,22 +195,43 @@ func main() {
 	}
 
 	for idx, arg := range sqlArgs {
-		replSQL(mgr, parser.NewParser(strings.NewReader(arg), fmt.Sprintf("sql arg %d", idx+1)),
-			os.Stdout)
+		replSQL(mgr, strings.NewReader(arg), fmt.Sprintf("sql arg %d", idx+1), os.Stdout, "")
 	}
 
 	args := flag.Args()
-	if len(args) == 0 {
-		replSQL(mgr, parser.NewParser(bufio.NewReader(os.Stdin), "[Stdin]"), os.Stdout)
-	} else {
-		for idx := 0; idx < len(args); idx++ {
-			/*			f, err := os.Open(os.Args[idx])
-						if err != nil {
-							log.Fatal(err)
-						}
-						replSQL(e, bufio.NewReader(f), os.Args[idx])*/
-			replSQL(mgr, parser.NewParser(strings.NewReader(args[idx]),
-				fmt.Sprintf("os.Args[%d]", idx)), os.Stdout)
+	for idx := 0; idx < len(args); idx++ {
+		f, err := os.Open(args[idx])
+		if err != nil {
+			fmt.Println(err)
+			return
 		}
+		replSQL(mgr, bufio.NewReader(f), args[idx], ioutil.Discard, "")
+	}
+
+	if *sshServer {
+		if len(hostKeys) == 0 {
+			hostKeys = []string{"id_rsa"}
+		}
+		ss, err := server.NewSSHServer(mgr, *sshPort, hostKeys, prompt)
+		if err != nil {
+			fmt.Println(err)
+			return
+		}
+		serve := func(c *server.Client) {
+			replSQL(mgr, c.RuneReader, fmt.Sprintf("%s@%s:%s", c.User, c.Type, c.Addr), c.Writer,
+				"")
+		}
+		if *repl {
+			go func() {
+				err := ss.ListenAndServe(server.HandlerFunc(serve))
+				fmt.Println(err)
+			}()
+		} else {
+			fmt.Println(ss.ListenAndServe(server.HandlerFunc(serve)))
+		}
+	}
+
+	if *repl || (!*sshServer && len(args) == 0 && len(sqlArgs) == 0) {
+		replSQL(mgr, bufio.NewReader(os.Stdin), "<console>", os.Stdout, prompt)
 	}
 }
