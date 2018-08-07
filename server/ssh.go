@@ -21,45 +21,59 @@ type sshServer struct {
 	mgr    *engine.Manager
 }
 
-func NewSSHServer(mgr *engine.Manager, port string, hostKeys []string, prompt string) (Server,
-	error) {
+func NewSSHServer(mgr *engine.Manager, port string, hostKeys []string, prompt string,
+	authorizedBytes []byte, checkPassword func(user, password string) error) (Server, error) {
+
+	authorizedKeys := map[string]struct{}{}
+	for len(authorizedBytes) > 0 {
+		key, _, _, rest, err := ssh.ParseAuthorizedKey(authorizedBytes)
+		if err != nil {
+			return nil, err
+		}
+		authorizedKeys[string(key.Marshal())] = struct{}{}
+		authorizedBytes = rest
+	}
 
 	cfg := ssh.ServerConfig{
-		//NoClientAuth: true, // XXX: remove this
+		//NoClientAuth: true,
 		PasswordCallback: func(md ssh.ConnMetadata, pass []byte) (*ssh.Permissions, error) {
+			user := md.User()
+			password := string(pass)
 			log.WithFields(log.Fields{
-				"user":     md.User(),
-				"password": string(pass),
+				"user":     user,
+				"password": password,
 				"addr":     md.RemoteAddr().String(),
 			}).Debug("ssh password callback")
-			return nil, nil
+			return nil, checkPassword(user, password)
 		},
 		PublicKeyCallback: func(md ssh.ConnMetadata, key ssh.PublicKey) (*ssh.Permissions, error) {
-			pk := ssh.MarshalAuthorizedKey(key)
+			pk := string(key.Marshal())
 			log.WithFields(log.Fields{
 				"user":       md.User(),
 				"public key": pk,
 				"addr":       md.RemoteAddr().String(),
 			}).Debug("ssh public key callback")
-			if md.User() != "michael" {
-				return nil, fmt.Errorf("user must be michael")
+			if _, ok := authorizedKeys[pk]; !ok {
+				return nil, fmt.Errorf("unknown public key for %s", md.User())
 			}
 			return nil, nil
 		},
 		AuthLogCallback: func(md ssh.ConnMetadata, method string, err error) {
-			l := log.WithFields(log.Fields{
-				"user":   md.User(),
-				"addr":   md.RemoteAddr().String(),
-				"method": method,
-			})
-			if err != nil {
-				l.WithField("error", err.Error()).Error("authentication failed")
-			} else {
-				l.Info("authentication succeeded")
+			if method != "none" {
+				l := log.WithFields(log.Fields{
+					"user":   md.User(),
+					"addr":   md.RemoteAddr().String(),
+					"method": method,
+				})
+				if err != nil {
+					l.WithField("error", err.Error()).Error("authentication failed")
+				} else {
+					l.Info("authentication succeeded")
+				}
 			}
 		},
 		BannerCallback: func(md ssh.ConnMetadata) string {
-			return "maho <version>\n"
+			return "maho 0.1\n"
 		},
 	}
 

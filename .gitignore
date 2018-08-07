@@ -4,3 +4,4 @@ maho.log
 testdata/*.mahodb
 id_rsa
 id_rsa.pub
+authorized_keys

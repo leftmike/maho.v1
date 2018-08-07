@@ -13,12 +13,7 @@ To Do:
 
 - track sessions and transactions; maybe just one table
 
-- server: ssh interactive access
--- table for users + password --or-- authorized public key
--- load authorized public keys from authorized_keys file (same format as used by OpenSSH)
--- -ssh-authorized-keys [./authorized_keys]
--- -auth-none (false), -auth-password (true), -auth-public-key (true)
--- ssh banner: need maho version
+- test ssh server, password, and public key authentication
 
 - memrows engine: persistence
 - memcols engine (w/ mvcc)
@@ -31,6 +26,7 @@ import (
 	"bufio"
 	"flag"
 	"fmt"
+	"io/ioutil"
 	"os"
 	"path/filepath"
 	"strings"
@@ -52,16 +48,20 @@ const (
 var (
 	database = config.Var(new(string), "database").Usage("default `database` (maho)").String("maho")
 	eng      = config.Var(new(string), "engine").Usage("default `engine` (basic)").String("basic")
-	dataDir  = config.Var(new(string), "data_directory").
+	dataDir  = config.Var(new(string), "data-directory").
 			Flag("data", "`directory` containing databases (./testdata)").String("testdata")
 	sshServer = config.Var(new(bool), "ssh").
 			Usage("`flag` to control serving ssh (true)").Bool(true)
-	sshPort = config.Var(new(string), "ssh-port").Usage("`port` used to serve ssh (:8241)").
-		String(":8241")
+	sshPort = config.Var(new(string), "ssh-port").
+		Usage("`port` used to serve ssh (localhost:8241)").String("localhost:8241")
 	logFile = config.Var(new(string), "log-file").Usage("`file` to use for logging (./maho.log)").
 		String("maho.log")
 	logLevel = config.Var(new(string), "log-level").
 			Usage("log level: debug, info, warn, error, fatal, or panic (info)").String("info")
+	authorizedKeys = config.Var(new(string), "ssh-authorized-keys").
+			Usage("`file` containing authorized ssh keys").String("")
+
+	accounts = config.Var(new(config.Array), "accounts").Array()
 
 	configFile = flag.String("config-file", "", "`file` to load config from (./maho.cfg)")
 	noConfig   = flag.Bool("no-config", false, "don't load config file")
@@ -78,6 +78,27 @@ func (ss *stringSlice) Set(s string) error {
 
 func (ss *stringSlice) String() string {
 	return fmt.Sprintf("%v", *ss)
+}
+
+func parseAccounts(accounts config.Array) (map[string]string, bool) {
+	userPasswords := map[string]string{}
+	for _, a := range accounts {
+		account, ok := a.(config.Map)
+		if !ok {
+			return nil, false
+		}
+		user, ok := account["user"].(string)
+		if !ok {
+			return nil, false
+		}
+		password, ok := account["password"].(string)
+		if !ok {
+			return nil, false
+		}
+		userPasswords[user] = password
+	}
+
+	return userPasswords, true
 }
 
 func main() {
@@ -105,7 +126,7 @@ func main() {
 		}
 		err := config.Load(filename)
 		if err != nil {
-			fmt.Fprintf(os.Stderr, "config: %s: %s\n", *configFile, err)
+			fmt.Fprintf(os.Stderr, "maho: %s: %s\n", *configFile, err)
 			return
 		}
 	}
@@ -116,10 +137,18 @@ func main() {
 		return
 	}
 
+	userPasswords, ok := parseAccounts(*accounts)
+	if !ok {
+		fmt.Fprintf(os.Stderr,
+			"maho: %s: expected array of {user: <user>, password: <password>} for accounts\n",
+			*configFile)
+		return
+	}
+
 	if !logStderr && *logFile != "" {
 		f, err := os.OpenFile(*logFile, os.O_APPEND|os.O_CREATE|os.O_WRONLY, 0666)
 		if err != nil {
-			fmt.Fprintf(os.Stderr, "log file: %s\n", err)
+			fmt.Fprintf(os.Stderr, "maho: %s\n", err)
 			return
 		}
 		defer f.Close()
@@ -135,7 +164,8 @@ func main() {
 		"debug": log.DebugLevel,
 	}[*logLevel]
 	if !ok {
-		fmt.Fprintf(os.Stderr, "log level: got %s; want debug, info, warn, error, fatal, or panic",
+		fmt.Fprintf(os.Stderr,
+			"maho: got %s for log level; want debug, info, warn, error, fatal, or panic",
 			*logLevel)
 		return
 	}
@@ -150,7 +180,7 @@ func main() {
 
 	err := mgr.CreateDatabase(*eng, sql.ID(*database), engine.Options{sql.WAIT: "true"})
 	if err != nil {
-		fmt.Fprintf(os.Stderr, "create database: %s: %s\n", *database, err)
+		fmt.Fprintf(os.Stderr, "maho: %s: %s\n", *database, err)
 		return
 	}
 
@@ -162,7 +192,7 @@ func main() {
 	for idx := 0; idx < len(args); idx++ {
 		f, err := os.Open(args[idx])
 		if err != nil {
-			fmt.Fprintf(os.Stderr, "sql file: %s\n", err)
+			fmt.Fprintf(os.Stderr, "maho: sql file: %s\n", err)
 			return
 		}
 		replSQL(mgr, bufio.NewReader(f), args[idx], os.Stderr, "")
@@ -172,9 +202,29 @@ func main() {
 		if len(hostKeys) == 0 {
 			hostKeys = []string{"id_rsa"}
 		}
-		ss, err := server.NewSSHServer(mgr, *sshPort, hostKeys, prompt)
+
+		var bytes []byte
+		if *authorizedKeys != "" {
+			bytes, err = ioutil.ReadFile(*authorizedKeys)
+			if err != nil {
+				fmt.Fprintf(os.Stderr, "maho: authorized keys: %s\n", err)
+				return
+			}
+		}
+
+		ss, err := server.NewSSHServer(mgr, *sshPort, hostKeys, prompt, bytes,
+			func(user, password string) error {
+				pw, ok := userPasswords[user]
+				if !ok {
+					return fmt.Errorf("user %s not found", user)
+				}
+				if password != pw {
+					return fmt.Errorf("bad password for user %s", user)
+				}
+				return nil
+			})
 		if err != nil {
-			fmt.Fprintf(os.Stderr, "ssh server: %s\n", err)
+			fmt.Fprintf(os.Stderr, "maho: ssh server: %s\n", err)
 			return
 		}
 		serve := func(c *server.Client) {
@@ -183,10 +233,12 @@ func main() {
 		}
 		if *repl {
 			go func() {
-				fmt.Fprintf(os.Stderr, "ssh: %s\n", ss.ListenAndServe(server.HandlerFunc(serve)))
+				fmt.Fprintf(os.Stderr, "maho: ssh server: %s\n",
+					ss.ListenAndServe(server.HandlerFunc(serve)))
 			}()
 		} else {
-			fmt.Fprintf(os.Stderr, "ssh: %s\n", ss.ListenAndServe(server.HandlerFunc(serve)))
+			fmt.Fprintf(os.Stderr, "maho: ssh server: %s\n",
+				ss.ListenAndServe(server.HandlerFunc(serve)))
 		}
 	}
 
