@@ -12,7 +12,7 @@ func newConfig(bv bool, i64v int64, sv string) (*Config, *bool, *int64, *string)
 	c.Var(new(string), "good")
 	b := c.Var(new(bool), "bool_var").Bool(bv)
 	i64 := c.Var(new(int64), "int64_var").Int64(i64v)
-	s := c.Var(new(string), "string_var").String(sv)
+	s := c.Var(new(string), "string-var").String(sv)
 	return c, b, i64, s
 }
 
@@ -42,8 +42,8 @@ func TestLoadSimple(t *testing.T) {
 		{fail: true, cfg: `bool_var = 1234`},
 		{i64v: 1234, i64e: -5678, cfg: `int64_var = -5678`},
 		{fail: true, cfg: `int64_var = "a string"`},
-		{sv: "", se: "a string", cfg: "string_var = `a string`"},
-		{sv: "", se: "a string", cfg: `string_var = "a string"`},
+		{sv: "", se: "a string", cfg: "string-var = `a string`"},
+		{sv: "", se: "a string", cfg: `string-var = "a string"`},
 		{fail: true, cfg: `bool_var = {a: 10 b: 20, c:30}`},
 	}
 

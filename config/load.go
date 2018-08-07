@@ -117,7 +117,7 @@ func (c *Config) load(reader io.Reader) error {
 		if i == 0 {
 			return unicode.IsLetter(r)
 		}
-		return unicode.IsLetter(r) || unicode.IsDigit(r) || r == '_'
+		return unicode.IsLetter(r) || unicode.IsDigit(r) || r == '_' || r == '-'
 	}
 
 	for {
