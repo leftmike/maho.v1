@@ -212,8 +212,9 @@ func main() {
 			}
 		}
 
-		ss, err := server.NewSSHServer(mgr, *sshPort, hostKeys, prompt, bytes,
-			func(user, password string) error {
+		var checkPassword func(user, password string) error
+		if len(userPasswords) > 0 {
+			checkPassword = func(user, password string) error {
 				pw, ok := userPasswords[user]
 				if !ok {
 					return fmt.Errorf("user %s not found", user)
@@ -222,7 +223,10 @@ func main() {
 					return fmt.Errorf("bad password for user %s", user)
 				}
 				return nil
-			})
+			}
+		}
+
+		ss, err := server.NewSSHServer(*sshPort, hostKeys, prompt, bytes, checkPassword)
 		if err != nil {
 			fmt.Fprintf(os.Stderr, "maho: ssh server: %s\n", err)
 			return

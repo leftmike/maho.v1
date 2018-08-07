@@ -10,54 +10,18 @@ import (
 	log "github.com/sirupsen/logrus"
 	"golang.org/x/crypto/ssh"
 	"golang.org/x/crypto/ssh/terminal"
-
-	"github.com/leftmike/maho/engine"
 )
 
 type sshServer struct {
 	cfg    *ssh.ServerConfig
 	port   string
 	prompt string
-	mgr    *engine.Manager
 }
 
-func NewSSHServer(mgr *engine.Manager, port string, hostKeys []string, prompt string,
-	authorizedBytes []byte, checkPassword func(user, password string) error) (Server, error) {
-
-	authorizedKeys := map[string]struct{}{}
-	for len(authorizedBytes) > 0 {
-		key, _, _, rest, err := ssh.ParseAuthorizedKey(authorizedBytes)
-		if err != nil {
-			return nil, err
-		}
-		authorizedKeys[string(key.Marshal())] = struct{}{}
-		authorizedBytes = rest
-	}
+func NewSSHServer(port string, hostKeys []string, prompt string, authorizedBytes []byte,
+	checkPassword func(user, password string) error) (Server, error) {
 
 	cfg := ssh.ServerConfig{
-		//NoClientAuth: true,
-		PasswordCallback: func(md ssh.ConnMetadata, pass []byte) (*ssh.Permissions, error) {
-			user := md.User()
-			password := string(pass)
-			log.WithFields(log.Fields{
-				"user":     user,
-				"password": password,
-				"addr":     md.RemoteAddr().String(),
-			}).Debug("ssh password callback")
-			return nil, checkPassword(user, password)
-		},
-		PublicKeyCallback: func(md ssh.ConnMetadata, key ssh.PublicKey) (*ssh.Permissions, error) {
-			pk := string(key.Marshal())
-			log.WithFields(log.Fields{
-				"user":       md.User(),
-				"public key": pk,
-				"addr":       md.RemoteAddr().String(),
-			}).Debug("ssh public key callback")
-			if _, ok := authorizedKeys[pk]; !ok {
-				return nil, fmt.Errorf("unknown public key for %s", md.User())
-			}
-			return nil, nil
-		},
 		AuthLogCallback: func(md ssh.ConnMetadata, method string, err error) {
 			if method != "none" {
 				l := log.WithFields(log.Fields{
@@ -90,11 +54,57 @@ func NewSSHServer(mgr *engine.Manager, port string, hostKeys []string, prompt st
 		cfg.AddHostKey(key)
 	}
 
+	authorizedKeys := map[string]struct{}{}
+	for len(authorizedBytes) > 0 {
+		key, _, _, rest, err := ssh.ParseAuthorizedKey(authorizedBytes)
+		if err != nil {
+			return nil, err
+		}
+		authorizedKeys[string(key.Marshal())] = struct{}{}
+		authorizedBytes = rest
+	}
+
+	if checkPassword == nil && len(authorizedKeys) == 0 {
+		cfg.NoClientAuth = true
+		log.Warn("ssh client auth: NONE")
+	}
+
+	if checkPassword != nil {
+		cfg.PasswordCallback =
+			func(md ssh.ConnMetadata, pass []byte) (*ssh.Permissions, error) {
+				user := md.User()
+				password := string(pass)
+				log.WithFields(log.Fields{
+					"user":     user,
+					"password": password,
+					"addr":     md.RemoteAddr().String(),
+				}).Debug("ssh password callback")
+				return nil, checkPassword(user, password)
+			}
+		log.Info("ssh client auth: password")
+	}
+
+	if len(authorizedKeys) > 0 {
+		cfg.PublicKeyCallback =
+			func(md ssh.ConnMetadata, key ssh.PublicKey) (*ssh.Permissions, error) {
+				pk := string(key.Marshal())
+				log.WithFields(log.Fields{
+					"user":       md.User(),
+					"public key": pk,
+					"addr":       md.RemoteAddr().String(),
+				}).Debug("ssh public key callback")
+				if _, ok := authorizedKeys[pk]; !ok {
+					return nil, fmt.Errorf("unknown public key for %s", md.User())
+				}
+				return nil, nil
+			}
+		log.Info("ssh client auth: public key")
+	}
+
 	return &sshServer{
 		cfg:    &cfg,
 		port:   port,
 		prompt: prompt,
-		mgr:    mgr,
 	}, nil
 }
 
