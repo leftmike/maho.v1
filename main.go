@@ -13,8 +13,6 @@ To Do:
 
 - track sessions and transactions; maybe just one table
 
-- test ssh server, password, and public key authentication
-
 - memrows engine: persistence
 - memcols engine (w/ mvcc)
 - distributed memrows and/or memcols engine, using raft
@@ -109,7 +107,7 @@ func main() {
 	var sqlArgs, hostKeys []string
 	flag.Var((*stringSlice)(&sqlArgs), "sql", "sql `query` to execute; multiple allowed")
 	flag.Var((*stringSlice)(&hostKeys), "ssh-host-key",
-		"`file` containing a ssh host key; multiple allowed (./id_rsa)")
+		"`file` containing a ssh host key; multiple allowed (id_rsa)")
 
 	var logStderr bool
 	for _, s := range []string{"log-stdout", "s"} {
@@ -203,6 +201,16 @@ func main() {
 			hostKeys = []string{"id_rsa"}
 		}
 
+		var hostKeysBytes [][]byte
+		for _, hostKey := range hostKeys {
+			keyBytes, err := ioutil.ReadFile(hostKey)
+			if err != nil {
+				fmt.Fprintf(os.Stderr, "maho: host keys: %s\n", err)
+				return
+			}
+			hostKeysBytes = append(hostKeysBytes, keyBytes)
+		}
+
 		var bytes []byte
 		if *authorizedKeys != "" {
 			bytes, err = ioutil.ReadFile(*authorizedKeys)
@@ -226,7 +234,7 @@ func main() {
 			}
 		}
 
-		ss, err := server.NewSSHServer(*sshPort, hostKeys, prompt, bytes, checkPassword)
+		ss, err := server.NewSSHServer(*sshPort, hostKeysBytes, prompt, bytes, checkPassword)
 		if err != nil {
 			fmt.Fprintf(os.Stderr, "maho: ssh server: %s\n", err)
 			return

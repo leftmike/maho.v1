@@ -4,7 +4,6 @@ import (
 	"bufio"
 	"context"
 	"fmt"
-	"io/ioutil"
 	"net"
 
 	log "github.com/sirupsen/logrus"
@@ -18,7 +17,7 @@ type sshServer struct {
 	prompt string
 }
 
-func NewSSHServer(port string, hostKeys []string, prompt string, authorizedBytes []byte,
+func NewSSHServer(port string, hostKeysBytes [][]byte, prompt string, authorizedBytes []byte,
 	checkPassword func(user, password string) error) (Server, error) {
 
 	cfg := ssh.ServerConfig{
@@ -41,12 +40,7 @@ func NewSSHServer(port string, hostKeys []string, prompt string, authorizedBytes
 		},
 	}
 
-	for _, hostKey := range hostKeys {
-		keyBytes, err := ioutil.ReadFile(hostKey)
-		if err != nil {
-			return nil, err
-		}
-
+	for _, keyBytes := range hostKeysBytes {
 		key, err := ssh.ParsePrivateKey(keyBytes)
 		if err != nil {
 			return nil, err
