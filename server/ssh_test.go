@@ -84,11 +84,15 @@ func testSSHServer(t *testing.T, fail bool, cfg *ssh.ClientConfig, port int, aut
 		t.Fatalf("NewSSHServer() failed with %s", err)
 	}
 	served := make(chan struct{}, 1)
-	serve := func(c *server.Client) {
-		served <- struct{}{}
-	}
 	go func() {
-		t.Fatalf("ListenAndServe() returned with %s", ss.ListenAndServe(server.HandlerFunc(serve)))
+		err := ss.ListenAndServe(
+			server.HandlerFunc(
+				func(c *server.Client) {
+					served <- struct{}{}
+				}))
+		if err != server.ErrServerClosed {
+			t.Fatalf("ListenAndServe() returned with %s", err)
+		}
 	}()
 
 	cfg.User = "testing"
@@ -110,6 +114,7 @@ func testSSHServer(t *testing.T, fail bool, cfg *ssh.ClientConfig, port int, aut
 		sess.Close()
 		<-served
 	}
+	ss.Close()
 }
 
 func TestSSHServer(t *testing.T) {

@@ -2,9 +2,12 @@ package server
 
 import (
 	"context"
+	"errors"
 	"io"
 	"net"
 )
+
+var ErrServerClosed = errors.New("server: closed")
 
 type Client struct {
 	RuneReader io.RuneReader

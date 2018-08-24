@@ -5,6 +5,7 @@ import (
 	"context"
 	"fmt"
 	"net"
+	"sync"
 
 	log "github.com/sirupsen/logrus"
 	"golang.org/x/crypto/ssh"
@@ -12,9 +13,13 @@ import (
 )
 
 type sshServer struct {
-	cfg    *ssh.ServerConfig
-	port   string
-	prompt string
+	mutex      sync.Mutex
+	cfg        *ssh.ServerConfig
+	port       string
+	prompt     string
+	listener   net.Listener
+	activeConn map[*ssh.ServerConn]struct{}
+	done       bool
 }
 
 func NewSSHServer(port string, hostKeysBytes [][]byte, prompt string, authorizedBytes []byte,
@@ -96,23 +101,30 @@ func NewSSHServer(port string, hostKeysBytes [][]byte, prompt string, authorized
 	}
 
 	return &sshServer{
-		cfg:    &cfg,
-		port:   port,
-		prompt: prompt,
+		cfg:        &cfg,
+		port:       port,
+		prompt:     prompt,
+		activeConn: map[*ssh.ServerConn]struct{}{},
 	}, nil
 }
 
 func (ss *sshServer) ListenAndServe(handler Handler) error {
-	listener, err := net.Listen("tcp", ss.port)
+	var err error
+	ss.listener, err = net.Listen("tcp", ss.port)
 	if err != nil {
 		return err
 	}
 
 	for {
-		tcp, err := listener.Accept()
+		tcp, err := ss.listener.Accept()
 		if err != nil {
+			ss.mutex.Lock()
+			if ss.done {
+				err = ErrServerClosed
+			}
+			ss.mutex.Unlock()
 			log.WithField("error", err.Error()).Error("ssh accept")
-			continue
+			return err
 		}
 		conn, chans, reqs, err := ssh.NewServerConn(tcp, ss.cfg)
 		if err != nil {
@@ -130,11 +142,32 @@ func (ss *sshServer) ListenAndServe(handler Handler) error {
 	}
 }
 
+func (ss *sshServer) trackConn(conn *ssh.ServerConn, add bool) bool {
+	ss.mutex.Lock()
+	defer ss.mutex.Unlock()
+	if ss.done {
+		return false
+	}
+	if add {
+		ss.activeConn[conn] = struct{}{}
+	} else {
+		delete(ss.activeConn, conn)
+	}
+	return true
+}
+
 func (ss *sshServer) handleConn(conn *ssh.ServerConn, chans <-chan ssh.NewChannel,
 	handler Handler, entry *log.Entry) {
 
-	for ch := range chans {
-		go ss.handleChannel(conn, ch, handler, entry)
+	if ss.trackConn(conn, true) {
+		for ch := range chans {
+			go ss.handleChannel(conn, ch, handler, entry)
+		}
+		if ss.trackConn(conn, false) {
+			conn.Close()
+		}
+	} else {
+		conn.Close()
 	}
 }
 
@@ -208,7 +241,15 @@ func (ss *sshServer) handleChannel(conn *ssh.ServerConn, nch ssh.NewChannel, han
 }
 
 func (ss *sshServer) Close() error {
-	return fmt.Errorf("ssh server: close: not implemented yet") // XXX
+	ss.mutex.Lock()
+	defer ss.mutex.Unlock()
+	ss.done = true
+	err := ss.listener.Close()
+	for conn := range ss.activeConn {
+		conn.Close()
+		delete(ss.activeConn, conn)
+	}
+	return err
 }
 
 func (ss *sshServer) Shutdown(ctx context.Context) error {

@@ -211,9 +211,9 @@ func main() {
 			hostKeysBytes = append(hostKeysBytes, keyBytes)
 		}
 
-		var bytes []byte
+		var authorizedBytes []byte
 		if *authorizedKeys != "" {
-			bytes, err = ioutil.ReadFile(*authorizedKeys)
+			authorizedBytes, err = ioutil.ReadFile(*authorizedKeys)
 			if err != nil {
 				fmt.Fprintf(os.Stderr, "maho: authorized keys: %s\n", err)
 				return
@@ -234,7 +234,8 @@ func main() {
 			}
 		}
 
-		ss, err := server.NewSSHServer(*sshPort, hostKeysBytes, prompt, bytes, checkPassword)
+		ss, err := server.NewSSHServer(*sshPort, hostKeysBytes, prompt, authorizedBytes,
+			checkPassword)
 		if err != nil {
 			fmt.Fprintf(os.Stderr, "maho: ssh server: %s\n", err)
 			return
