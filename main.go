@@ -197,32 +197,34 @@ func main() {
 	}
 
 	if *sshServer {
+		sshCfg := server.SSHConfig{
+			Address: *sshPort,
+			Prompt:  prompt,
+		}
+
 		if len(hostKeys) == 0 {
 			hostKeys = []string{"id_rsa"}
 		}
 
-		var hostKeysBytes [][]byte
 		for _, hostKey := range hostKeys {
 			keyBytes, err := ioutil.ReadFile(hostKey)
 			if err != nil {
 				fmt.Fprintf(os.Stderr, "maho: host keys: %s\n", err)
 				return
 			}
-			hostKeysBytes = append(hostKeysBytes, keyBytes)
+			sshCfg.HostKeysBytes = append(sshCfg.HostKeysBytes, keyBytes)
 		}
 
-		var authorizedBytes []byte
 		if *authorizedKeys != "" {
-			authorizedBytes, err = ioutil.ReadFile(*authorizedKeys)
+			sshCfg.AuthorizedBytes, err = ioutil.ReadFile(*authorizedKeys)
 			if err != nil {
 				fmt.Fprintf(os.Stderr, "maho: authorized keys: %s\n", err)
 				return
 			}
 		}
 
-		var checkPassword func(user, password string) error
 		if len(userPasswords) > 0 {
-			checkPassword = func(user, password string) error {
+			sshCfg.CheckPassword = func(user, password string) error {
 				pw, ok := userPasswords[user]
 				if !ok {
 					return fmt.Errorf("user %s not found", user)
@@ -234,8 +236,7 @@ func main() {
 			}
 		}
 
-		ss, err := server.NewSSHServer(*sshPort, hostKeysBytes, prompt, authorizedBytes,
-			checkPassword)
+		ss, err := server.NewSSHServer(sshCfg)
 		if err != nil {
 			fmt.Fprintf(os.Stderr, "maho: ssh server: %s\n", err)
 			return

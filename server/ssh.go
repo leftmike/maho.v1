@@ -12,19 +12,25 @@ import (
 	"golang.org/x/crypto/ssh/terminal"
 )
 
+type SSHConfig struct {
+	Prompt          string
+	Address         string
+	HostKeysBytes   [][]byte
+	AuthorizedBytes []byte
+	CheckPassword   func(user, password string) error
+}
+
 type sshServer struct {
 	mutex      sync.Mutex
 	cfg        *ssh.ServerConfig
-	port       string
+	address    string
 	prompt     string
 	listener   net.Listener
 	activeConn map[*ssh.ServerConn]struct{}
 	done       bool
 }
 
-func NewSSHServer(port string, hostKeysBytes [][]byte, prompt string, authorizedBytes []byte,
-	checkPassword func(user, password string) error) (Server, error) {
-
+func NewSSHServer(sshCfg SSHConfig) (Server, error) {
 	cfg := ssh.ServerConfig{
 		AuthLogCallback: func(md ssh.ConnMetadata, method string, err error) {
 			if method != "none" {
@@ -45,7 +51,7 @@ func NewSSHServer(port string, hostKeysBytes [][]byte, prompt string, authorized
 		},
 	}
 
-	for _, keyBytes := range hostKeysBytes {
+	for _, keyBytes := range sshCfg.HostKeysBytes {
 		key, err := ssh.ParsePrivateKey(keyBytes)
 		if err != nil {
 			return nil, err
@@ -53,22 +59,24 @@ func NewSSHServer(port string, hostKeysBytes [][]byte, prompt string, authorized
 		cfg.AddHostKey(key)
 	}
 
+	bytes := sshCfg.AuthorizedBytes
 	authorizedKeys := map[string]struct{}{}
-	for len(authorizedBytes) > 0 {
-		key, _, _, rest, err := ssh.ParseAuthorizedKey(authorizedBytes)
+	for len(bytes) > 0 {
+		key, _, _, rest, err := ssh.ParseAuthorizedKey(bytes)
 		if err != nil {
 			return nil, err
 		}
 		authorizedKeys[string(key.Marshal())] = struct{}{}
-		authorizedBytes = rest
+		bytes = rest
 	}
 
-	if checkPassword == nil && len(authorizedKeys) == 0 {
+	if sshCfg.CheckPassword == nil && len(authorizedKeys) == 0 {
 		cfg.NoClientAuth = true
 		log.Warn("ssh client auth: NONE")
 	}
 
-	if checkPassword != nil {
+	if sshCfg.CheckPassword != nil {
+		checkPassword := sshCfg.CheckPassword
 		cfg.PasswordCallback =
 			func(md ssh.ConnMetadata, pass []byte) (*ssh.Permissions, error) {
 				user := md.User()
@@ -102,15 +110,15 @@ func NewSSHServer(port string, hostKeysBytes [][]byte, prompt string, authorized
 
 	return &sshServer{
 		cfg:        &cfg,
-		port:       port,
-		prompt:     prompt,
+		address:    sshCfg.Address,
+		prompt:     sshCfg.Prompt,
 		activeConn: map[*ssh.ServerConn]struct{}{},
 	}, nil
 }
 
 func (ss *sshServer) ListenAndServe(handler Handler) error {
 	var err error
-	ss.listener, err = net.Listen("tcp", ss.port)
+	ss.listener, err = net.Listen("tcp", ss.address)
 	if err != nil {
 		return err
 	}

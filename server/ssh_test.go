@@ -75,11 +75,17 @@ func testSSHServer(t *testing.T, fail bool, cfg *ssh.ClientConfig, port int, aut
 	checkPassword func(user, password string) error) {
 	t.Helper()
 
-	hostKeyBytes := [][]byte{([]byte)(id_rsa1)}
+	hostKeysBytes := [][]byte{([]byte)(id_rsa1)}
 	publicKey, _, _, _, _ := ssh.ParseAuthorizedKey(([]byte)(id_rsa1_pub))
 	addr := fmt.Sprintf("localhost:%d", port)
 
-	ss, err := server.NewSSHServer(addr, hostKeyBytes, "", authorizedBytes, checkPassword)
+	ss, err := server.NewSSHServer(
+		server.SSHConfig{
+			Address:         addr,
+			HostKeysBytes:   hostKeysBytes,
+			AuthorizedBytes: authorizedBytes,
+			CheckPassword:   checkPassword,
+		})
 	if err != nil {
 		t.Fatalf("NewSSHServer() failed with %s", err)
 	}
