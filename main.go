@@ -12,6 +12,8 @@ To Do:
 - memrows: tableImpl: add versioned metadata and use METADATA_MODIFY locking level
 
 - track sessions and transactions; maybe just one table
+- use ctrl-C signal to gracefully shutdown (twice means to just exit)
+- console should be part of server: maybe ListenAndServe(RuneReader, Writer)
 
 - memrows engine: persistence
 - memcols engine (w/ mvcc)

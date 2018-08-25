@@ -6,6 +6,8 @@ import (
 	"fmt"
 	"net"
 	"sync"
+	"sync/atomic"
+	"time"
 
 	log "github.com/sirupsen/logrus"
 	"golang.org/x/crypto/ssh"
@@ -27,6 +29,7 @@ type sshServer struct {
 	prompt     string
 	listener   net.Listener
 	activeConn map[*ssh.ServerConn]struct{}
+	connCount  int32
 	done       bool
 }
 
@@ -158,6 +161,7 @@ func (svr *Server) ListenAndServeSSH(sshCfg SSHConfig) error {
 func (ss *sshServer) trackConn(conn *ssh.ServerConn, add bool) bool {
 	ss.mutex.Lock()
 	defer ss.mutex.Unlock()
+
 	if ss.done {
 		return false
 	}
@@ -172,18 +176,20 @@ func (ss *sshServer) trackConn(conn *ssh.ServerConn, add bool) bool {
 func (ss *sshServer) handleConn(conn *ssh.ServerConn, chans <-chan ssh.NewChannel,
 	handler Handler, entry *log.Entry) {
 
+	atomic.AddInt32(&ss.connCount, 1)
+	defer atomic.AddInt32(&ss.connCount, -1)
+
 	if ss.trackConn(conn, true) {
 		for ch := range chans {
 			go ss.handleChannel(conn, ch, handler, entry)
 		}
 		if ss.trackConn(conn, false) {
 			conn.Close()
-			entry.Info("ssh disconnected")
 		}
 	} else {
 		conn.Close()
-		entry.Info("ssh disconnected")
 	}
+	entry.Info("ssh disconnected")
 }
 
 type termReader struct {
@@ -273,5 +279,17 @@ func (ss *sshServer) Close() error {
 }
 
 func (ss *sshServer) Shutdown(ctx context.Context) error {
-	return fmt.Errorf("ssh server: shutdown: not implemented yet") // XXX
+	var err error
+
+	ss.mutex.Lock()
+	if !ss.done {
+		ss.done = true
+		err = ss.listener.Close()
+	}
+	ss.mutex.Unlock()
+
+	for atomic.LoadInt32(&ss.connCount) > 0 {
+		time.Sleep(500 * time.Millisecond)
+	}
+	return err
 }
