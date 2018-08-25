@@ -176,6 +176,13 @@ func main() {
 		"memrows": memrows.Engine{},
 	})
 
+	svr := server.Server{
+		Handler: func(c *server.Client) {
+			replSQL(mgr, c.RuneReader, fmt.Sprintf("%s@%s:%s", c.User, c.Type, c.Addr), c.Writer,
+				"")
+		},
+	}
+
 	err := mgr.CreateDatabase(*eng, sql.ID(*database), engine.Options{sql.WAIT: "true"})
 	if err != nil {
 		fmt.Fprintf(os.Stderr, "maho: %s: %s\n", *database, err)
@@ -236,23 +243,12 @@ func main() {
 			}
 		}
 
-		ss, err := server.NewSSHServer(sshCfg)
-		if err != nil {
-			fmt.Fprintf(os.Stderr, "maho: ssh server: %s\n", err)
-			return
-		}
-		serve := func(c *server.Client) {
-			replSQL(mgr, c.RuneReader, fmt.Sprintf("%s@%s:%s", c.User, c.Type, c.Addr), c.Writer,
-				"")
-		}
 		if *repl {
 			go func() {
-				fmt.Fprintf(os.Stderr, "maho: ssh server: %s\n",
-					ss.ListenAndServe(server.HandlerFunc(serve)))
+				fmt.Fprintf(os.Stderr, "maho: server: %s\n", svr.ListenAndServeSSH(sshCfg))
 			}()
 		} else {
-			fmt.Fprintf(os.Stderr, "maho: ssh server: %s\n",
-				ss.ListenAndServe(server.HandlerFunc(serve)))
+			fmt.Fprintf(os.Stderr, "maho: server: %s\n", svr.ListenAndServeSSH(sshCfg))
 		}
 	}
 

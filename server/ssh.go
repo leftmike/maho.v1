@@ -30,7 +30,7 @@ type sshServer struct {
 	done       bool
 }
 
-func NewSSHServer(sshCfg SSHConfig) (Server, error) {
+func newSSHServer(sshCfg SSHConfig) (*sshServer, error) {
 	cfg := ssh.ServerConfig{
 		AuthLogCallback: func(md ssh.ConnMetadata, method string, err error) {
 			if method != "none" {
@@ -116,12 +116,17 @@ func NewSSHServer(sshCfg SSHConfig) (Server, error) {
 	}, nil
 }
 
-func (ss *sshServer) ListenAndServe(handler Handler) error {
-	var err error
+func (svr *Server) ListenAndServeSSH(sshCfg SSHConfig) error {
+	ss, err := newSSHServer(sshCfg)
+	if err != nil {
+		return err
+	}
+
 	ss.listener, err = net.Listen("tcp", ss.address)
 	if err != nil {
 		return err
 	}
+	svr.addServer(ss)
 
 	for {
 		tcp, err := ss.listener.Accept()
@@ -143,10 +148,10 @@ func (ss *sshServer) ListenAndServe(handler Handler) error {
 			"user": conn.User(),
 			"addr": conn.RemoteAddr().String(),
 		})
-		entry.Info("ssh connection")
+		entry.Info("ssh connected")
 
 		go ssh.DiscardRequests(reqs)
-		go ss.handleConn(conn, chans, handler, entry)
+		go ss.handleConn(conn, chans, svr.Handler, entry)
 	}
 }
 
@@ -173,9 +178,11 @@ func (ss *sshServer) handleConn(conn *ssh.ServerConn, chans <-chan ssh.NewChanne
 		}
 		if ss.trackConn(conn, false) {
 			conn.Close()
+			entry.Info("ssh disconnected")
 		}
 	} else {
 		conn.Close()
+		entry.Info("ssh disconnected")
 	}
 }
 
@@ -239,7 +246,7 @@ func (ss *sshServer) handleChannel(conn *ssh.ServerConn, nch ssh.NewChannel, han
 	tr := termReader{
 		term: t,
 	}
-	handler.Serve(&Client{
+	handler(&Client{
 		RuneReader: bufio.NewReader(&tr),
 		Writer:     t,
 		User:       conn.User(),
@@ -251,7 +258,12 @@ func (ss *sshServer) handleChannel(conn *ssh.ServerConn, nch ssh.NewChannel, han
 func (ss *sshServer) Close() error {
 	ss.mutex.Lock()
 	defer ss.mutex.Unlock()
+
+	if ss.done {
+		return nil
+	}
 	ss.done = true
+
 	err := ss.listener.Close()
 	for conn := range ss.activeConn {
 		conn.Close()

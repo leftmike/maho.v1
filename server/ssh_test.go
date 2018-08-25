@@ -79,23 +79,21 @@ func testSSHServer(t *testing.T, fail bool, cfg *ssh.ClientConfig, port int, aut
 	publicKey, _, _, _, _ := ssh.ParseAuthorizedKey(([]byte)(id_rsa1_pub))
 	addr := fmt.Sprintf("localhost:%d", port)
 
-	ss, err := server.NewSSHServer(
-		server.SSHConfig{
-			Address:         addr,
-			HostKeysBytes:   hostKeysBytes,
-			AuthorizedBytes: authorizedBytes,
-			CheckPassword:   checkPassword,
-		})
-	if err != nil {
-		t.Fatalf("NewSSHServer() failed with %s", err)
-	}
 	served := make(chan struct{}, 1)
+	s := server.Server{
+		Handler: func(c *server.Client) {
+			served <- struct{}{}
+		},
+	}
+
 	go func() {
-		err := ss.ListenAndServe(
-			server.HandlerFunc(
-				func(c *server.Client) {
-					served <- struct{}{}
-				}))
+		err := s.ListenAndServeSSH(
+			server.SSHConfig{
+				Address:         addr,
+				HostKeysBytes:   hostKeysBytes,
+				AuthorizedBytes: authorizedBytes,
+				CheckPassword:   checkPassword,
+			})
 		if err != server.ErrServerClosed {
 			t.Fatalf("ListenAndServe() returned with %s", err)
 		}
@@ -120,7 +118,7 @@ func testSSHServer(t *testing.T, fail bool, cfg *ssh.ClientConfig, port int, aut
 		sess.Close()
 		<-served
 	}
-	ss.Close()
+	s.Close()
 }
 
 func TestSSHServer(t *testing.T) {
