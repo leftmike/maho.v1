@@ -42,7 +42,7 @@ type groupRow struct {
 	aggregators []expr.Aggregator
 }
 
-func (gr *groupRows) group(ses evaluate.Session) error {
+func (gr *groupRows) group(ses *evaluate.Session) error {
 	gr.dest = make([]sql.Value, len(gr.rows.Columns()))
 	groups := map[string]groupRow{}
 	for {
@@ -104,7 +104,7 @@ func (gr *groupRows) group(ses evaluate.Session) error {
 	return nil
 }
 
-func (gr *groupRows) Next(ses evaluate.Session, dest []sql.Value) error {
+func (gr *groupRows) Next(ses *evaluate.Session, dest []sql.Value) error {
 	if gr.dest == nil {
 		err := gr.group(ses)
 		if err != nil {
@@ -120,11 +120,11 @@ func (gr *groupRows) Next(ses evaluate.Session, dest []sql.Value) error {
 	return io.EOF
 }
 
-func (_ *groupRows) Delete(ses evaluate.Session) error {
+func (_ *groupRows) Delete(ses *evaluate.Session) error {
 	return fmt.Errorf("group rows may not be deleted")
 }
 
-func (_ *groupRows) Update(ses evaluate.Session, updates []sql.ColumnUpdate) error {
+func (_ *groupRows) Update(ses *evaluate.Session, updates []sql.ColumnUpdate) error {
 	return fmt.Errorf("group rows may not be updated")
 }
 

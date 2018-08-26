@@ -10,7 +10,6 @@ import (
 	"github.com/leftmike/maho/evaluate/expr"
 	"github.com/leftmike/maho/evaluate/query"
 	"github.com/leftmike/maho/parser"
-	"github.com/leftmike/maho/server"
 	"github.com/leftmike/maho/sql"
 	"github.com/leftmike/maho/testutil"
 )
@@ -187,7 +186,7 @@ func TestInsert(t *testing.T) {
 	}
 
 	mgr := startManager(t)
-	ses := server.NewSession(mgr, "basic", sql.ID("test"))
+	ses := evaluate.NewSession(mgr, "basic", sql.ID("test"))
 	testInsert(t, mgr, ses, sql.ID("test"), sql.ID("t"), insertColumns1, insertColumnTypes1,
 		insertCases1)
 	testInsert(t, mgr, ses, sql.ID("test"), sql.ID("t2"), insertColumns2, insertColumnTypes2,
@@ -196,7 +195,7 @@ func TestInsert(t *testing.T) {
 		insertCases3)
 }
 
-func statement(ses evaluate.Session, tx *engine.Transaction, s string) error {
+func statement(ses *evaluate.Session, tx *engine.Transaction, s string) error {
 	p := parser.NewParser(strings.NewReader(s), "statement")
 	stmt, err := p.Parse()
 	if err != nil {
@@ -210,7 +209,7 @@ func statement(ses evaluate.Session, tx *engine.Transaction, s string) error {
 	return err
 }
 
-func allRows(ses evaluate.Session, rows engine.Rows) ([][]sql.Value, error) {
+func allRows(ses *evaluate.Session, rows engine.Rows) ([][]sql.Value, error) {
 	all := [][]sql.Value{}
 	l := len(rows.Columns())
 	for {
@@ -226,7 +225,7 @@ func allRows(ses evaluate.Session, rows engine.Rows) ([][]sql.Value, error) {
 	return all, nil
 }
 
-func testInsert(t *testing.T, mgr *engine.Manager, ses evaluate.Session, dbnam, nam sql.Identifier,
+func testInsert(t *testing.T, mgr *engine.Manager, ses *evaluate.Session, dbnam, nam sql.Identifier,
 	cols []sql.Identifier, colTypes []sql.ColumnType, cases []insertCase) {
 
 	for _, c := range cases {

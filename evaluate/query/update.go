@@ -52,7 +52,7 @@ func (up *updatePlan) EvalRef(idx int) sql.Value {
 	return up.dest[idx]
 }
 
-func (up *updatePlan) Execute(ses evaluate.Session, tx *engine.Transaction) (int64, error) {
+func (up *updatePlan) Execute(ses *evaluate.Session, tx *engine.Transaction) (int64, error) {
 	up.dest = make([]sql.Value, len(up.rows.Columns()))
 	cnt := int64(0)
 	updates := make([]sql.ColumnUpdate, len(up.updates))
@@ -85,7 +85,7 @@ func (up *updatePlan) Execute(ses evaluate.Session, tx *engine.Transaction) (int
 	}
 }
 
-func (stmt *Update) Plan(ses evaluate.Session, tx *engine.Transaction) (interface{}, error) {
+func (stmt *Update) Plan(ses *evaluate.Session, tx *engine.Transaction) (interface{}, error) {
 	dbname := stmt.Table.Database
 	if dbname == 0 {
 		dbname = ses.DefaultDatabase()

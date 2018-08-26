@@ -50,11 +50,11 @@ func (stmt *InsertValues) String() string {
 	return s
 }
 
-func (stmt *InsertValues) Plan(ses evaluate.Session, tx *engine.Transaction) (interface{}, error) {
+func (stmt *InsertValues) Plan(ses *evaluate.Session, tx *engine.Transaction) (interface{}, error) {
 	return stmt, nil
 }
 
-func (stmt *InsertValues) Execute(ses evaluate.Session, tx *engine.Transaction) (int64, error) {
+func (stmt *InsertValues) Execute(ses *evaluate.Session, tx *engine.Transaction) (int64, error) {
 	dbname := stmt.Table.Database
 	if dbname == 0 {
 		dbname = ses.DefaultDatabase()

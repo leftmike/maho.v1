@@ -13,7 +13,13 @@ To Do:
 
 - track sessions and transactions; maybe just one table
 - use ctrl-C signal to gracefully shutdown (twice means to just exit)
-- console should be part of server: maybe ListenAndServe(RuneReader, Writer)
+
+- server.Client --> evaluate.Session
+- add Session.Prompt
+- server.Handler(ses *evaluate.Session, rr, src, w)
+- add Server.Manager, Server.DefaultEngine, Server.DefaultDatabase
+- Server.Handle(rr io.RuneReader, src string, w io.Writer, interactive bool)
+- use Server.Handle for all calls to replSQL, including the console
 
 - memrows engine: persistence
 - memcols engine (w/ mvcc)

@@ -7,7 +7,7 @@ import (
 )
 
 // AllRows returns all of the rows from a Rows as slices of values.
-func AllRows(ses Session, rows Rows) ([][]sql.Value, error) {
+func AllRows(ses *Session, rows Rows) ([][]sql.Value, error) {
 	all := [][]sql.Value{}
 	l := len(rows.Columns())
 	for {

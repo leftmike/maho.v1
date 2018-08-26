@@ -6,7 +6,6 @@ import (
 	"github.com/leftmike/maho/evaluate"
 	"github.com/leftmike/maho/evaluate/expr"
 	"github.com/leftmike/maho/evaluate/query"
-	"github.com/leftmike/maho/server"
 	"github.com/leftmike/maho/sql"
 	"github.com/leftmike/maho/testutil"
 )
@@ -96,7 +95,7 @@ func TestSelect(t *testing.T) {
 	}
 
 	mgr := startManager(t)
-	ses := server.NewSession(mgr, "basic", sql.ID("test"))
+	ses := evaluate.NewSession(mgr, "basic", sql.ID("test"))
 	for _, c := range cases {
 		tx := mgr.Begin()
 		if c.stmt.String() != c.s {

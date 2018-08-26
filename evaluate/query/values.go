@@ -43,7 +43,7 @@ func (stmt *Values) String() string {
 	return s
 }
 
-func (stmt *Values) Plan(ses evaluate.Session, tx *engine.Transaction) (interface{}, error) {
+func (stmt *Values) Plan(ses *evaluate.Session, tx *engine.Transaction) (interface{}, error) {
 	return stmt.Rows(tx)
 }
 
@@ -81,7 +81,7 @@ func (v *values) Close() error {
 	return nil
 }
 
-func (v *values) Next(ses evaluate.Session, dest []sql.Value) error {
+func (v *values) Next(ses *evaluate.Session, dest []sql.Value) error {
 	if v.index == len(v.rows) {
 		return io.EOF
 	}
@@ -90,11 +90,11 @@ func (v *values) Next(ses evaluate.Session, dest []sql.Value) error {
 	return nil
 }
 
-func (_ *values) Delete(ses evaluate.Session) error {
+func (_ *values) Delete(ses *evaluate.Session) error {
 	return fmt.Errorf("values rows may not be deleted")
 }
 
-func (_ *values) Update(ses evaluate.Session, updates []sql.ColumnUpdate) error {
+func (_ *values) Update(ses *evaluate.Session, updates []sql.ColumnUpdate) error {
 	return fmt.Errorf("values rows may not be updated")
 }
 
@@ -119,7 +119,7 @@ func (fv FromValues) String() string {
 	return s
 }
 
-func (fv FromValues) rows(ses evaluate.Session, tx *engine.Transaction) (evaluate.Rows,
+func (fv FromValues) rows(ses *evaluate.Session, tx *engine.Transaction) (evaluate.Rows,
 	*fromContext, error) {
 
 	rows, err := fv.Values.Rows(tx)
@@ -137,7 +137,7 @@ func (fv FromValues) rows(ses evaluate.Session, tx *engine.Transaction) (evaluat
 }
 
 // TestRows is used for testing.
-func (fv FromValues) TestRows(ses evaluate.Session, tx *engine.Transaction) (evaluate.Rows,
+func (fv FromValues) TestRows(ses *evaluate.Session, tx *engine.Transaction) (evaluate.Rows,
 	*fromContext, error) {
 
 	return fv.rows(ses, tx)

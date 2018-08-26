@@ -9,13 +9,12 @@ import (
 	"github.com/leftmike/maho/engine"
 	"github.com/leftmike/maho/evaluate"
 	"github.com/leftmike/maho/parser"
-	"github.com/leftmike/maho/server"
 	"github.com/leftmike/maho/sql"
 )
 
 func replSQL(mgr *engine.Manager, rr io.RuneReader, fn string, w io.Writer, prompt string) {
 	p := parser.NewParser(rr, fn)
-	ses := server.NewSession(mgr, *eng, sql.ID(*database))
+	ses := evaluate.NewSession(mgr, *eng, sql.ID(*database))
 	for {
 		if prompt != "" {
 			io.WriteString(w, prompt)
@@ -31,7 +30,7 @@ func replSQL(mgr *engine.Manager, rr io.RuneReader, fn string, w io.Writer, prom
 		}
 
 		err = ses.Run(stmt,
-			func(tx *engine.Transaction, stmt parser.Stmt) error {
+			func(tx *engine.Transaction, stmt evaluate.Stmt) error {
 				ret, err2 := stmt.Plan(ses, tx)
 				if err2 != nil {
 					return err2

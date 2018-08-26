@@ -153,7 +153,7 @@ func (jr *joinRows) onUsing(dest []sql.Value) (bool, error) {
 	return true, nil
 }
 
-func (jr *joinRows) Next(ses evaluate.Session, dest []sql.Value) error {
+func (jr *joinRows) Next(ses *evaluate.Session, dest []sql.Value) error {
 	if jr.state == allDone {
 		return io.EOF
 	} else if jr.state == rightRemaining {
@@ -239,15 +239,15 @@ func (jr *joinRows) Next(ses evaluate.Session, dest []sql.Value) error {
 	}
 }
 
-func (_ *joinRows) Delete(ses evaluate.Session) error {
+func (_ *joinRows) Delete(ses *evaluate.Session) error {
 	return fmt.Errorf("join rows may not be deleted")
 }
 
-func (_ *joinRows) Update(ses evaluate.Session, updates []sql.ColumnUpdate) error {
+func (_ *joinRows) Update(ses *evaluate.Session, updates []sql.ColumnUpdate) error {
 	return fmt.Errorf("join rows may not be updated")
 }
 
-func (fj FromJoin) rows(ses evaluate.Session, tx *engine.Transaction) (evaluate.Rows, *fromContext,
+func (fj FromJoin) rows(ses *evaluate.Session, tx *engine.Transaction) (evaluate.Rows, *fromContext,
 	error) {
 
 	leftRows, leftCtx, err := fj.Left.rows(ses, tx)

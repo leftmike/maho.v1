@@ -25,11 +25,11 @@ func (stmt *DropTable) String() string {
 	return s
 }
 
-func (stmt *DropTable) Plan(ses evaluate.Session, tx *engine.Transaction) (interface{}, error) {
+func (stmt *DropTable) Plan(ses *evaluate.Session, tx *engine.Transaction) (interface{}, error) {
 	return stmt, nil
 }
 
-func (stmt *DropTable) Execute(ses evaluate.Session, tx *engine.Transaction) (int64, error) {
+func (stmt *DropTable) Execute(ses *evaluate.Session, tx *engine.Transaction) (int64, error) {
 	for _, tbl := range stmt.Tables {
 		dbname := tbl.Database
 		if dbname == 0 {

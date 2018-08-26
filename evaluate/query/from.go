@@ -11,7 +11,7 @@ import (
 
 type FromItem interface {
 	fmt.Stringer
-	rows(ses evaluate.Session, tx *engine.Transaction) (evaluate.Rows, *fromContext, error)
+	rows(ses *evaluate.Session, tx *engine.Transaction) (evaluate.Rows, *fromContext, error)
 }
 
 type FromTableAlias sql.TableAlias
@@ -32,19 +32,19 @@ func (er engineRows) Close() error {
 	return er.Rows.Close()
 }
 
-func (er engineRows) Next(ses evaluate.Session, dest []sql.Value) error {
+func (er engineRows) Next(ses *evaluate.Session, dest []sql.Value) error {
 	return er.Rows.Next(ses, dest)
 }
 
-func (er engineRows) Delete(ses evaluate.Session) error {
+func (er engineRows) Delete(ses *evaluate.Session) error {
 	return er.Rows.Delete(ses)
 }
 
-func (er engineRows) Update(ses evaluate.Session, updates []sql.ColumnUpdate) error {
+func (er engineRows) Update(ses *evaluate.Session, updates []sql.ColumnUpdate) error {
 	return er.Rows.Update(ses, updates)
 }
 
-func lookupRows(ses evaluate.Session, tx *engine.Transaction, dbname,
+func lookupRows(ses *evaluate.Session, tx *engine.Transaction, dbname,
 	tblname sql.Identifier) (evaluate.Rows, error) {
 
 	if dbname == 0 {
@@ -61,7 +61,7 @@ func lookupRows(ses evaluate.Session, tx *engine.Transaction, dbname,
 	return engineRows{rows}, nil
 }
 
-func (fta FromTableAlias) rows(ses evaluate.Session, tx *engine.Transaction) (evaluate.Rows,
+func (fta FromTableAlias) rows(ses *evaluate.Session, tx *engine.Transaction) (evaluate.Rows,
 	*fromContext, error) {
 
 	rows, err := lookupRows(ses, tx, fta.Database, fta.Table)

@@ -11,10 +11,10 @@ func (stmt *Begin) String() string {
 	return "BEGIN"
 }
 
-func (stmt *Begin) Plan(ses evaluate.Session, tx *engine.Transaction) (interface{}, error) {
+func (stmt *Begin) Plan(ses *evaluate.Session, tx *engine.Transaction) (interface{}, error) {
 	return stmt, nil
 }
 
-func (stmt *Begin) Execute(ses evaluate.Session, tx *engine.Transaction) (int64, error) {
+func (stmt *Begin) Execute(ses *evaluate.Session, tx *engine.Transaction) (int64, error) {
 	return -1, ses.Begin()
 }
