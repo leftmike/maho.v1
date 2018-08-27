@@ -21,8 +21,9 @@ type Server struct {
 	DefaultEngine   string
 	DefaultDatabase sql.Identifier
 
-	mutex   sync.Mutex
-	servers map[server]struct{}
+	mutex    sync.Mutex
+	servers  map[server]struct{}
+	sessions map[*evaluate.Session]struct{}
 }
 
 type server interface {
@@ -66,6 +67,23 @@ func (svr *Server) closeShutdown(cs func(s server) error) error {
 	return err
 }
 
+func (svr *Server) addSession(ses *evaluate.Session) {
+	svr.mutex.Lock()
+	defer svr.mutex.Unlock()
+
+	if svr.sessions == nil {
+		svr.sessions = map[*evaluate.Session]struct{}{}
+	}
+	svr.sessions[ses] = struct{}{}
+}
+
+func (svr *Server) removeSession(ses *evaluate.Session) {
+	svr.mutex.Lock()
+	defer svr.mutex.Unlock()
+
+	delete(svr.sessions, ses)
+}
+
 func (svr *Server) Handle(rr io.RuneReader, w io.Writer, user, typ, addr string, interactive bool) {
 	ses := &evaluate.Session{
 		Manager:         svr.Manager,
@@ -76,8 +94,9 @@ func (svr *Server) Handle(rr io.RuneReader, w io.Writer, user, typ, addr string,
 		Addr:            addr,
 		Interactive:     interactive,
 	}
-	// XXX: need to keep track of the session
+	svr.addSession(ses)
 	svr.Handler(ses, rr, w)
+	svr.removeSession(ses)
 }
 
 func (svr *Server) Close() error {

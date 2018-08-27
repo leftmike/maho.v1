@@ -15,8 +15,6 @@ To Do:
 - use ctrl-C signal to gracefully shutdown (twice means to just exit); only if not console repl,
 then ctrl-D does the close
 
-- Server keeps track of active sessions
-
 - memrows engine: persistence
 - memcols engine (w/ mvcc)
 - distributed memrows and/or memcols engine, using raft
