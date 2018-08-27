@@ -12,10 +12,10 @@ import (
 	"github.com/leftmike/maho/sql"
 )
 
-func replSQL(ses *evaluate.Session, p parser.Parser, w io.Writer, prompt string) {
+func replSQL(ses *evaluate.Session, p parser.Parser, w io.Writer) {
 	for {
-		if prompt != "" {
-			io.WriteString(w, prompt)
+		if ses.Interactive {
+			io.WriteString(w, "maho> ")
 		}
 
 		stmt, err := p.Parse()

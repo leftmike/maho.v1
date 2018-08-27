@@ -15,6 +15,7 @@ type Session struct {
 	User            string
 	Type            string
 	Addr            string
+	Interactive     bool
 	tx              *engine.Transaction
 }
 

@@ -37,7 +37,7 @@ func TestMain(t *testing.T) {
 		ses := &evaluate.Session{
 			Manager: mgr,
 		}
-		replSQL(ses, parser.NewParser(strings.NewReader(c.s), fmt.Sprintf("cases[%d]", i)), &b, "")
+		replSQL(ses, parser.NewParser(strings.NewReader(c.s), fmt.Sprintf("cases[%d]", i)), &b)
 		if b.String() != c.r {
 			t.Errorf("parse(%q) got\n%s\nwant\n%s", c.s, b.String(), c.r)
 		}

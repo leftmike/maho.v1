@@ -66,7 +66,7 @@ func (svr *Server) closeShutdown(cs func(s server) error) error {
 	return err
 }
 
-func (svr *Server) Handle(rr io.RuneReader, w io.Writer, user, typ, addr string) {
+func (svr *Server) Handle(rr io.RuneReader, w io.Writer, user, typ, addr string, interactive bool) {
 	ses := &evaluate.Session{
 		Manager:         svr.Manager,
 		DefaultEngine:   svr.DefaultEngine,
@@ -74,6 +74,7 @@ func (svr *Server) Handle(rr io.RuneReader, w io.Writer, user, typ, addr string)
 		User:            user,
 		Type:            typ,
 		Addr:            addr,
+		Interactive:     interactive,
 	}
 	// XXX: need to keep track of the session
 	svr.Handler(ses, rr, w)

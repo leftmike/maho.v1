@@ -15,7 +15,6 @@ import (
 )
 
 type SSHConfig struct {
-	Prompt          string
 	Address         string
 	HostKeysBytes   [][]byte
 	AuthorizedBytes []byte
@@ -26,7 +25,6 @@ type sshServer struct {
 	mutex      sync.Mutex
 	cfg        *ssh.ServerConfig
 	address    string
-	prompt     string
 	listener   net.Listener
 	activeConn map[*ssh.ServerConn]struct{}
 	connCount  int32
@@ -114,7 +112,6 @@ func newSSHServer(sshCfg SSHConfig) (*sshServer, error) {
 	return &sshServer{
 		cfg:        &cfg,
 		address:    sshCfg.Address,
-		prompt:     sshCfg.Prompt,
 		activeConn: map[*ssh.ServerConn]struct{}{},
 	}, nil
 }
@@ -248,11 +245,11 @@ func (ss *sshServer) handleChannel(conn *ssh.ServerConn, nch ssh.NewChannel, svr
 		entry.Debug("channel requests done")
 	}()
 
-	t := terminal.NewTerminal(ch, ss.prompt)
+	t := terminal.NewTerminal(ch, "")
 	tr := termReader{
 		term: t,
 	}
-	svr.Handle(bufio.NewReader(&tr), t, conn.User(), "ssh", conn.RemoteAddr().String())
+	svr.Handle(bufio.NewReader(&tr), t, conn.User(), "ssh", conn.RemoteAddr().String(), true)
 }
 
 func (ss *sshServer) Close() error {

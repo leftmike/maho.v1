@@ -15,9 +15,7 @@ To Do:
 - use ctrl-C signal to gracefully shutdown (twice means to just exit); only if not console repl,
 then ctrl-D does the close
 
-- add Session.Prompt; maybe also need interactive bool
-- use Server.Handle for all calls to replSQL, including the console
-- Session is part of evaluate; Server keeps track of active sessions
+- Server keeps track of active sessions
 
 - memrows engine: persistence
 - memcols engine (w/ mvcc)
@@ -46,10 +44,6 @@ import (
 	"github.com/leftmike/maho/parser"
 	"github.com/leftmike/maho/server"
 	"github.com/leftmike/maho/sql"
-)
-
-const (
-	prompt = "maho> "
 )
 
 var (
@@ -188,7 +182,7 @@ func main() {
 	svr := server.Server{
 		Handler: func(ses *evaluate.Session, rr io.RuneReader, w io.Writer) {
 			replSQL(ses,
-				parser.NewParser(rr, fmt.Sprintf("%s@%s:%s", ses.User, ses.Type, ses.Addr)), w, "")
+				parser.NewParser(rr, fmt.Sprintf("%s@%s:%s", ses.User, ses.Type, ses.Addr)), w)
 		},
 		Manager:         mgr,
 		DefaultEngine:   *eng,
@@ -202,7 +196,8 @@ func main() {
 	}
 
 	for idx, arg := range sqlArgs {
-		svr.Handle(strings.NewReader(arg), os.Stdout, "startup", "arg", fmt.Sprintf("%d", idx))
+		svr.Handle(strings.NewReader(arg), os.Stdout, "startup", "sql-arg", fmt.Sprintf("%d", idx),
+			false)
 	}
 
 	args := flag.Args()
@@ -212,13 +207,12 @@ func main() {
 			fmt.Fprintf(os.Stderr, "maho: sql file: %s\n", err)
 			return
 		}
-		svr.Handle(bufio.NewReader(f), os.Stderr, "startup", "sqlfile", args[idx])
+		svr.Handle(bufio.NewReader(f), os.Stderr, "startup", "sql-file", args[idx], false)
 	}
 
 	if *sshServer {
 		sshCfg := server.SSHConfig{
 			Address: *sshPort,
-			Prompt:  prompt,
 		}
 
 		if len(hostKeys) == 0 {
@@ -265,7 +259,7 @@ func main() {
 	}
 
 	if *repl || (!*sshServer && len(args) == 0 && len(sqlArgs) == 0) {
-		svr.Handle(bufio.NewReader(os.Stdin), os.Stdout, "console", "console", "console")
+		svr.Handle(bufio.NewReader(os.Stdin), os.Stdout, "console", "console", "console", true)
 	}
 
 	log.WithField("pid", os.Getpid()).Info("maho done")
