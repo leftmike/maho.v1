@@ -88,9 +88,9 @@ func (up *updatePlan) Execute(ses *evaluate.Session, tx *engine.Transaction) (in
 func (stmt *Update) Plan(ses *evaluate.Session, tx *engine.Transaction) (interface{}, error) {
 	dbname := stmt.Table.Database
 	if dbname == 0 {
-		dbname = ses.DefaultDatabase()
+		dbname = ses.DefaultDatabase
 	}
-	tbl, err := ses.Manager().LookupTable(ses, tx, dbname, stmt.Table.Table)
+	tbl, err := ses.Manager.LookupTable(ses, tx, dbname, stmt.Table.Table)
 	if err != nil {
 		return nil, err
 	}

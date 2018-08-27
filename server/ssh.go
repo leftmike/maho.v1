@@ -154,7 +154,7 @@ func (svr *Server) ListenAndServeSSH(sshCfg SSHConfig) error {
 		entry.Info("ssh connected")
 
 		go ssh.DiscardRequests(reqs)
-		go ss.handleConn(conn, chans, svr.Handler, entry)
+		go ss.handleConn(conn, chans, svr, entry)
 	}
 }
 
@@ -174,14 +174,14 @@ func (ss *sshServer) trackConn(conn *ssh.ServerConn, add bool) bool {
 }
 
 func (ss *sshServer) handleConn(conn *ssh.ServerConn, chans <-chan ssh.NewChannel,
-	handler Handler, entry *log.Entry) {
+	svr *Server, entry *log.Entry) {
 
 	atomic.AddInt32(&ss.connCount, 1)
 	defer atomic.AddInt32(&ss.connCount, -1)
 
 	if ss.trackConn(conn, true) {
 		for ch := range chans {
-			go ss.handleChannel(conn, ch, handler, entry)
+			go ss.handleChannel(conn, ch, svr, entry)
 		}
 		if ss.trackConn(conn, false) {
 			conn.Close()
@@ -216,7 +216,7 @@ func (tr *termReader) Read(d []byte) (int, error) {
 	return n, nil
 }
 
-func (ss *sshServer) handleChannel(conn *ssh.ServerConn, nch ssh.NewChannel, handler Handler,
+func (ss *sshServer) handleChannel(conn *ssh.ServerConn, nch ssh.NewChannel, svr *Server,
 	entry *log.Entry) {
 
 	typ := nch.ChannelType()
@@ -252,13 +252,7 @@ func (ss *sshServer) handleChannel(conn *ssh.ServerConn, nch ssh.NewChannel, han
 	tr := termReader{
 		term: t,
 	}
-	handler(&Client{
-		RuneReader: bufio.NewReader(&tr),
-		Writer:     t,
-		User:       conn.User(),
-		Type:       "ssh",
-		Addr:       conn.RemoteAddr(),
-	})
+	svr.Handle(bufio.NewReader(&tr), t, conn.User(), "ssh", conn.RemoteAddr().String())
 }
 
 func (ss *sshServer) Close() error {

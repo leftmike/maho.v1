@@ -12,14 +12,12 @@ To Do:
 - memrows: tableImpl: add versioned metadata and use METADATA_MODIFY locking level
 
 - track sessions and transactions; maybe just one table
-- use ctrl-C signal to gracefully shutdown (twice means to just exit)
+- use ctrl-C signal to gracefully shutdown (twice means to just exit); only if not console repl,
+then ctrl-D does the close
 
-- server.Client --> evaluate.Session
-- add Session.Prompt
-- server.Handler(ses *evaluate.Session, rr, src, w)
-- add Server.Manager, Server.DefaultEngine, Server.DefaultDatabase
-- Server.Handle(rr io.RuneReader, src string, w io.Writer, interactive bool)
+- add Session.Prompt; maybe also need interactive bool
 - use Server.Handle for all calls to replSQL, including the console
+- Session is part of evaluate; Server keeps track of active sessions
 
 - memrows engine: persistence
 - memcols engine (w/ mvcc)
@@ -32,6 +30,7 @@ import (
 	"bufio"
 	"flag"
 	"fmt"
+	"io"
 	"io/ioutil"
 	"os"
 	"path/filepath"
@@ -43,6 +42,8 @@ import (
 	"github.com/leftmike/maho/engine"
 	"github.com/leftmike/maho/engine/basic"
 	"github.com/leftmike/maho/engine/memrows"
+	"github.com/leftmike/maho/evaluate"
+	"github.com/leftmike/maho/parser"
 	"github.com/leftmike/maho/server"
 	"github.com/leftmike/maho/sql"
 )
@@ -185,10 +186,13 @@ func main() {
 	})
 
 	svr := server.Server{
-		Handler: func(c *server.Client) {
-			replSQL(mgr, c.RuneReader, fmt.Sprintf("%s@%s:%s", c.User, c.Type, c.Addr), c.Writer,
-				"")
+		Handler: func(ses *evaluate.Session, rr io.RuneReader, w io.Writer) {
+			replSQL(ses,
+				parser.NewParser(rr, fmt.Sprintf("%s@%s:%s", ses.User, ses.Type, ses.Addr)), w, "")
 		},
+		Manager:         mgr,
+		DefaultEngine:   *eng,
+		DefaultDatabase: sql.ID(*database),
 	}
 
 	err := mgr.CreateDatabase(*eng, sql.ID(*database), engine.Options{sql.WAIT: "true"})
@@ -198,7 +202,7 @@ func main() {
 	}
 
 	for idx, arg := range sqlArgs {
-		replSQL(mgr, strings.NewReader(arg), fmt.Sprintf("sql arg %d", idx+1), os.Stdout, "")
+		svr.Handle(strings.NewReader(arg), os.Stdout, "startup", "arg", fmt.Sprintf("%d", idx))
 	}
 
 	args := flag.Args()
@@ -208,7 +212,7 @@ func main() {
 			fmt.Fprintf(os.Stderr, "maho: sql file: %s\n", err)
 			return
 		}
-		replSQL(mgr, bufio.NewReader(f), args[idx], os.Stderr, "")
+		svr.Handle(bufio.NewReader(f), os.Stderr, "startup", "sqlfile", args[idx])
 	}
 
 	if *sshServer {
@@ -261,7 +265,7 @@ func main() {
 	}
 
 	if *repl || (!*sshServer && len(args) == 0 && len(sqlArgs) == 0) {
-		replSQL(mgr, bufio.NewReader(os.Stdin), "<console>", os.Stdout, prompt)
+		svr.Handle(bufio.NewReader(os.Stdin), os.Stdout, "console", "console", "console")
 	}
 
 	log.WithField("pid", os.Getpid()).Info("maho done")

@@ -12,9 +12,7 @@ import (
 	"github.com/leftmike/maho/sql"
 )
 
-func replSQL(mgr *engine.Manager, rr io.RuneReader, fn string, w io.Writer, prompt string) {
-	p := parser.NewParser(rr, fn)
-	ses := evaluate.NewSession(mgr, *eng, sql.ID(*database))
+func replSQL(ses *evaluate.Session, p parser.Parser, w io.Writer, prompt string) {
 	for {
 		if prompt != "" {
 			io.WriteString(w, prompt)

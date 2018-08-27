@@ -33,9 +33,9 @@ func (stmt *DropTable) Execute(ses *evaluate.Session, tx *engine.Transaction) (i
 	for _, tbl := range stmt.Tables {
 		dbname := tbl.Database
 		if dbname == 0 {
-			dbname = ses.DefaultDatabase()
+			dbname = ses.DefaultDatabase
 		}
-		err := ses.Manager().DropTable(ses, tx, dbname, tbl.Table, stmt.IfExists)
+		err := ses.Manager.DropTable(ses, tx, dbname, tbl.Table, stmt.IfExists)
 		if err != nil {
 			return -1, err
 		}

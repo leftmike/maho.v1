@@ -60,8 +60,8 @@ func testSQL(t *testing.T, typ string, dbname sql.Identifier) {
 	}
 
 	run := test.Runner{
-		Mgr:      mgr,
-		Type:     typ,
+		Manager:  mgr,
+		Engine:   typ,
 		Database: dbname,
 	}
 	var rptr reporter

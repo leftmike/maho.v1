@@ -2,10 +2,12 @@ package server_test
 
 import (
 	"fmt"
+	"io"
 	"testing"
 
 	"golang.org/x/crypto/ssh"
 
+	"github.com/leftmike/maho/evaluate"
 	"github.com/leftmike/maho/server"
 )
 
@@ -81,7 +83,7 @@ func testSSHServer(t *testing.T, fail bool, cfg *ssh.ClientConfig, port int, aut
 
 	served := make(chan struct{}, 1)
 	s := server.Server{
-		Handler: func(c *server.Client) {
+		Handler: func(ses *evaluate.Session, rr io.RuneReader, w io.Writer) {
 			served <- struct{}{}
 		},
 	}

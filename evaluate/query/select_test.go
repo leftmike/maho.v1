@@ -95,7 +95,11 @@ func TestSelect(t *testing.T) {
 	}
 
 	mgr := startManager(t)
-	ses := evaluate.NewSession(mgr, "basic", sql.ID("test"))
+	ses := &evaluate.Session{
+		Manager:         mgr,
+		DefaultEngine:   "basic",
+		DefaultDatabase: sql.ID("test"),
+	}
 	for _, c := range cases {
 		tx := mgr.Begin()
 		if c.stmt.String() != c.s {

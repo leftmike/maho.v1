@@ -41,7 +41,11 @@ func TestValuesSimple(t *testing.T) {
 		// If the test is run multiple times, then the database will already exist.
 	}
 
-	ses := evaluate.NewSession(mgr, "basic", sql.ID("core_test"))
+	ses := &evaluate.Session{
+		Manager:         mgr,
+		DefaultEngine:   "basic",
+		DefaultDatabase: sql.ID("core_test"),
+	}
 	for i, c := range cases {
 		p := parser.NewParser(strings.NewReader(c.sql), fmt.Sprintf("tests[%d]", i))
 		stmt, err := p.Parse()

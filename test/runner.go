@@ -14,15 +14,19 @@ import (
 )
 
 type Runner struct {
-	Type     string
+	Manager  *engine.Manager
+	Engine   string
 	Database sql.Identifier
-	Mgr      *engine.Manager
 	ses      *evaluate.Session
 }
 
 func (run *Runner) RunExec(tst *sqltest.Test) error {
 	if run.ses == nil {
-		run.ses = evaluate.NewSession(run.Mgr, run.Type, run.Database)
+		run.ses = &evaluate.Session{
+			Manager:         run.Manager,
+			DefaultEngine:   run.Engine,
+			DefaultDatabase: run.Database,
+		}
 	}
 	p := parser.NewParser(strings.NewReader(tst.Test),
 		fmt.Sprintf("%s:%d", tst.Filename, tst.LineNumber))
@@ -57,7 +61,11 @@ func (run *Runner) RunExec(tst *sqltest.Test) error {
 
 func (run *Runner) RunQuery(tst *sqltest.Test) ([]string, [][]string, error) {
 	if run.ses == nil {
-		run.ses = evaluate.NewSession(run.Mgr, run.Type, run.Database)
+		run.ses = &evaluate.Session{
+			Manager:         run.Manager,
+			DefaultEngine:   run.Engine,
+			DefaultDatabase: run.Database,
+		}
 	}
 	p := parser.NewParser(strings.NewReader(tst.Test),
 		fmt.Sprintf("%s:%d", tst.Filename, tst.LineNumber))

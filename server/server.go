@@ -4,24 +4,23 @@ import (
 	"context"
 	"errors"
 	"io"
-	"net"
 	"sync"
+
+	"github.com/leftmike/maho/engine"
+	"github.com/leftmike/maho/evaluate"
+	"github.com/leftmike/maho/sql"
 )
 
 var ErrServerClosed = errors.New("server: closed")
 
-type Client struct {
-	RuneReader io.RuneReader
-	Writer     io.Writer
-	User       string
-	Type       string
-	Addr       net.Addr
-}
-
-type Handler func(c *Client)
+type Handler func(ses *evaluate.Session, rr io.RuneReader, w io.Writer)
 
 type Server struct {
-	Handler Handler
+	Handler         Handler
+	Manager         *engine.Manager
+	DefaultEngine   string
+	DefaultDatabase sql.Identifier
+
 	mutex   sync.Mutex
 	servers map[server]struct{}
 }
@@ -65,6 +64,19 @@ func (svr *Server) closeShutdown(cs func(s server) error) error {
 	}
 
 	return err
+}
+
+func (svr *Server) Handle(rr io.RuneReader, w io.Writer, user, typ, addr string) {
+	ses := &evaluate.Session{
+		Manager:         svr.Manager,
+		DefaultEngine:   svr.DefaultEngine,
+		DefaultDatabase: svr.DefaultDatabase,
+		User:            user,
+		Type:            typ,
+		Addr:            addr,
+	}
+	// XXX: need to keep track of the session
+	svr.Handler(ses, rr, w)
 }
 
 func (svr *Server) Close() error {

@@ -7,6 +7,8 @@ import (
 	"testing"
 
 	"github.com/leftmike/maho/engine"
+	"github.com/leftmike/maho/evaluate"
+	"github.com/leftmike/maho/parser"
 )
 
 func TestMain(t *testing.T) {
@@ -32,7 +34,10 @@ func TestMain(t *testing.T) {
 
 	for i, c := range cases {
 		var b bytes.Buffer
-		replSQL(mgr, strings.NewReader(c.s), fmt.Sprintf("cases[%d]", i), &b, "")
+		ses := &evaluate.Session{
+			Manager: mgr,
+		}
+		replSQL(ses, parser.NewParser(strings.NewReader(c.s), fmt.Sprintf("cases[%d]", i)), &b, "")
 		if b.String() != c.r {
 			t.Errorf("parse(%q) got\n%s\nwant\n%s", c.s, b.String(), c.r)
 		}

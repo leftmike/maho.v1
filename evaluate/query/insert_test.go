@@ -186,7 +186,11 @@ func TestInsert(t *testing.T) {
 	}
 
 	mgr := startManager(t)
-	ses := evaluate.NewSession(mgr, "basic", sql.ID("test"))
+	ses := &evaluate.Session{
+		Manager:         mgr,
+		DefaultEngine:   "basic",
+		DefaultDatabase: sql.ID("test"),
+	}
 	testInsert(t, mgr, ses, sql.ID("test"), sql.ID("t"), insertColumns1, insertColumnTypes1,
 		insertCases1)
 	testInsert(t, mgr, ses, sql.ID("test"), sql.ID("t2"), insertColumns2, insertColumnTypes2,

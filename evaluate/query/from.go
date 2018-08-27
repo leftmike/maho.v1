@@ -48,9 +48,9 @@ func lookupRows(ses *evaluate.Session, tx *engine.Transaction, dbname,
 	tblname sql.Identifier) (evaluate.Rows, error) {
 
 	if dbname == 0 {
-		dbname = ses.DefaultDatabase()
+		dbname = ses.DefaultDatabase
 	}
-	tbl, err := ses.Manager().LookupTable(ses, tx, dbname, tblname)
+	tbl, err := ses.Manager.LookupTable(ses, tx, dbname, tblname)
 	if err != nil {
 		return nil, err
 	}

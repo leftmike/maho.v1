@@ -8,55 +8,25 @@ import (
 	"github.com/leftmike/maho/sql"
 )
 
-/*
-type Session interface {
-	Context() context.Context
-	DefaultEngine() string
-	DefaultDatabase() sql.Identifier
-	Manager() *engine.Manager
-	Begin() error
-	Commit() error
-	Rollback() error
-	Set(v sql.Identifier, s string) error
-}
-*/
-
 type Session struct {
-	mgr             *engine.Manager
-	defaultEngine   string
-	defaultDatabase sql.Identifier
+	Manager         *engine.Manager
+	DefaultEngine   string
+	DefaultDatabase sql.Identifier
+	User            string
+	Type            string
+	Addr            string
 	tx              *engine.Transaction
-}
-
-func NewSession(mgr *engine.Manager, eng string, name sql.Identifier) *Session {
-	return &Session{
-		mgr:             mgr,
-		defaultEngine:   eng,
-		defaultDatabase: name,
-	}
 }
 
 func (ses *Session) Context() context.Context {
 	return nil
 }
 
-func (ses *Session) DefaultEngine() string {
-	return ses.defaultEngine
-}
-
-func (ses *Session) DefaultDatabase() sql.Identifier {
-	return ses.defaultDatabase
-}
-
-func (ses *Session) Manager() *engine.Manager {
-	return ses.mgr
-}
-
 func (ses *Session) Begin() error {
 	if ses.tx != nil {
 		return fmt.Errorf("execute: session already has active transaction")
 	}
-	ses.tx = ses.mgr.Begin()
+	ses.tx = ses.Manager.Begin()
 	return nil
 }
 
@@ -85,7 +55,7 @@ func (ses *Session) Run(stmt Stmt, run func(tx *engine.Transaction, stmt Stmt) e
 		return run(ses.tx, stmt)
 	}
 
-	tx := ses.mgr.Begin()
+	tx := ses.Manager.Begin()
 	err := run(tx, stmt)
 	if err != nil {
 		rerr := tx.Rollback()
@@ -100,9 +70,9 @@ func (ses *Session) Run(stmt Stmt, run func(tx *engine.Transaction, stmt Stmt) e
 
 func (ses *Session) Set(v sql.Identifier, s string) error {
 	if v == sql.DATABASE {
-		ses.defaultDatabase = sql.ID(s)
+		ses.DefaultDatabase = sql.ID(s)
 	} else if v == sql.ENGINE {
-		ses.defaultEngine = s
+		ses.DefaultEngine = s
 	} else {
 		return fmt.Errorf("set: %s not found", v)
 	}
