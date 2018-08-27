@@ -3,6 +3,7 @@ package server
 import (
 	"context"
 	"errors"
+	"fmt"
 	"io"
 	"sync"
 
@@ -73,6 +74,7 @@ func (svr *Server) addSession(ses *evaluate.Session) {
 
 	if svr.sessions == nil {
 		svr.sessions = map[*evaluate.Session]struct{}{}
+		svr.Manager.CreateSystemTable(sql.ID("sessions"), svr.makeSessionsVirtual)
 	}
 	svr.sessions[ses] = struct{}{}
 }
@@ -82,6 +84,32 @@ func (svr *Server) removeSession(ses *evaluate.Session) {
 	defer svr.mutex.Unlock()
 
 	delete(svr.sessions, ses)
+}
+
+func (svr *Server) makeSessionsVirtual(ses engine.Session, tctx interface{}, d engine.Database,
+	dbname, tblname sql.Identifier) (engine.Table, error) {
+
+	svr.mutex.Lock()
+	defer svr.mutex.Unlock()
+
+	values := [][]sql.Value{}
+	for ses := range svr.sessions {
+		values = append(values, []sql.Value{
+			sql.StringValue(ses.User),
+			sql.StringValue(ses.Type),
+			sql.StringValue(ses.Addr),
+			sql.BoolValue(ses.Interactive),
+		})
+	}
+
+	return &engine.VirtualTable{
+		Name: fmt.Sprintf("%s.%s", dbname, tblname),
+		Cols: []sql.Identifier{sql.ID("user"), sql.ID("type"), sql.ID("address"),
+			sql.ID("interactive")},
+		ColTypes: []sql.ColumnType{sql.IdColType, sql.IdColType, sql.StringColType,
+			sql.BoolColType},
+		Values: values,
+	}, nil
 }
 
 func (svr *Server) Handle(rr io.RuneReader, w io.Writer, user, typ, addr string, interactive bool) {

@@ -28,6 +28,14 @@ type ColumnType struct {
 	Default Expr
 }
 
+var (
+	IdColType     = ColumnType{Type: CharacterType, Size: MaxIdentifier, NotNull: true}
+	Int32ColType  = ColumnType{Type: IntegerType, Size: 4, NotNull: true}
+	Int64ColType  = ColumnType{Type: IntegerType, Size: 8, NotNull: true}
+	BoolColType   = ColumnType{Type: BooleanType, NotNull: true}
+	StringColType = ColumnType{Type: CharacterType, Size: 4096, NotNull: true}
+)
+
 func (ct ColumnType) DataType() string {
 	switch ct.Type {
 	case BooleanType:

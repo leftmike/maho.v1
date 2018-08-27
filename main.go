@@ -11,9 +11,10 @@ To Do:
 - ALTER TABLE ...
 - memrows: tableImpl: add versioned metadata and use METADATA_MODIFY locking level
 
-- track sessions and transactions; maybe just one table
+- track transactions
 - use ctrl-C signal to gracefully shutdown (twice means to just exit); only if not console repl,
 then ctrl-D does the close
+- need better name for root user than 'console'; use for both 'console' and 'startup'
 
 - memrows engine: persistence
 - memcols engine (w/ mvcc)

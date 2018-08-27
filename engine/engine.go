@@ -115,6 +115,7 @@ type Manager struct {
 	engines       map[string]Engine
 	databases     map[sql.Identifier]*databaseEntry
 	virtualTables TableMap
+	systemTables  TableMap
 	lastTID       TID
 	lockService   fatlock.Service
 }
@@ -126,18 +127,19 @@ func NewManager(dataDir string, engines map[string]Engine) *Manager {
 		databases:     map[sql.Identifier]*databaseEntry{},
 		virtualTables: TableMap{},
 	}
-
-	m.lockService.Init()
-
-	m.CreateVirtualTable(sql.ID("db$tables"), m.makeTablesVirtual)
-	m.CreateVirtualTable(sql.ID("db$columns"), m.makeColumnsVirtual)
-	m.CreateVirtualDatabase(sql.ID("system"), TableMap{
+	m.systemTables = TableMap{
 		sql.ID("databases"):   m.makeDatabasesVirtual,
 		sql.ID("identifiers"): makeIdentifiersVirtual,
 		sql.ID("config"):      makeConfigVirtual,
 		sql.ID("engines"):     m.makeEnginesVirtual,
 		sql.ID("locks"):       m.makeLocksVirtual,
-	})
+	}
+
+	m.lockService.Init()
+
+	m.CreateVirtualTable(sql.ID("db$tables"), m.makeTablesVirtual)
+	m.CreateVirtualTable(sql.ID("db$columns"), m.makeColumnsVirtual)
+	m.CreateVirtualDatabase(sql.ID("system"), m.systemTables)
 
 	return &m
 }
