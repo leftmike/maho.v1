@@ -11,10 +11,10 @@ To Do:
 - ALTER TABLE ...
 - memrows: tableImpl: add versioned metadata and use METADATA_MODIFY locking level
 
-- track transactions
+- track transactions in system.transactions
+- sessions need an id so transactions can be related to sessions
 - use ctrl-C signal to gracefully shutdown (twice means to just exit); only if not console repl,
 then ctrl-D does the close
-- need better name for root user than 'console'; use for both 'console' and 'startup'
 
 - memrows engine: persistence
 - memcols engine (w/ mvcc)
@@ -180,8 +180,12 @@ func main() {
 
 	svr := server.Server{
 		Handler: func(ses *evaluate.Session, rr io.RuneReader, w io.Writer) {
+			src := fmt.Sprintf("%s@%s", ses.User, ses.Type)
+			if ses.Addr != "" {
+				src = fmt.Sprintf("%s:%s", src, ses.Addr)
+			}
 			replSQL(ses,
-				parser.NewParser(rr, fmt.Sprintf("%s@%s:%s", ses.User, ses.Type, ses.Addr)), w)
+				parser.NewParser(rr, src), w)
 		},
 		Manager:         mgr,
 		DefaultEngine:   *eng,
@@ -258,7 +262,7 @@ func main() {
 	}
 
 	if *repl || (!*sshServer && len(args) == 0 && len(sqlArgs) == 0) {
-		svr.Handle(bufio.NewReader(os.Stdin), os.Stdout, "console", "console", "console", true)
+		svr.Handle(bufio.NewReader(os.Stdin), os.Stdout, "startup", "console", "", true)
 	}
 
 	log.WithField("pid", os.Getpid()).Info("maho done")

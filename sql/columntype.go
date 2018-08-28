@@ -29,11 +29,13 @@ type ColumnType struct {
 }
 
 var (
-	IdColType     = ColumnType{Type: CharacterType, Size: MaxIdentifier, NotNull: true}
-	Int32ColType  = ColumnType{Type: IntegerType, Size: 4, NotNull: true}
-	Int64ColType  = ColumnType{Type: IntegerType, Size: 8, NotNull: true}
-	BoolColType   = ColumnType{Type: BooleanType, NotNull: true}
-	StringColType = ColumnType{Type: CharacterType, Size: 4096, NotNull: true}
+	IdColType         = ColumnType{Type: CharacterType, Size: MaxIdentifier, NotNull: true}
+	Int32ColType      = ColumnType{Type: IntegerType, Size: 4, NotNull: true}
+	Int64ColType      = ColumnType{Type: IntegerType, Size: 8, NotNull: true}
+	NullInt64ColType  = ColumnType{Type: IntegerType, Size: 8}
+	BoolColType       = ColumnType{Type: BooleanType, NotNull: true}
+	StringColType     = ColumnType{Type: CharacterType, Size: 4096, NotNull: true}
+	NullStringColType = ColumnType{Type: CharacterType, Size: 4096}
 )
 
 func (ct ColumnType) DataType() string {

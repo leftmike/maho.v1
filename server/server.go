@@ -94,10 +94,14 @@ func (svr *Server) makeSessionsVirtual(ses engine.Session, tctx interface{}, d e
 
 	values := [][]sql.Value{}
 	for ses := range svr.sessions {
+		var addr sql.Value
+		if ses.Addr != "" {
+			addr = sql.StringValue(ses.Addr)
+		}
 		values = append(values, []sql.Value{
 			sql.StringValue(ses.User),
 			sql.StringValue(ses.Type),
-			sql.StringValue(ses.Addr),
+			addr,
 			sql.BoolValue(ses.Interactive),
 		})
 	}
@@ -106,7 +110,7 @@ func (svr *Server) makeSessionsVirtual(ses engine.Session, tctx interface{}, d e
 		Name: fmt.Sprintf("%s.%s", dbname, tblname),
 		Cols: []sql.Identifier{sql.ID("user"), sql.ID("type"), sql.ID("address"),
 			sql.ID("interactive")},
-		ColTypes: []sql.ColumnType{sql.IdColType, sql.IdColType, sql.StringColType,
+		ColTypes: []sql.ColumnType{sql.IdColType, sql.IdColType, sql.NullStringColType,
 			sql.BoolColType},
 		Values: values,
 	}, nil
