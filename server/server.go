@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"io"
 	"sync"
+	"unsafe"
 
 	"github.com/leftmike/maho/engine"
 	"github.com/leftmike/maho/evaluate"
@@ -99,6 +100,7 @@ func (svr *Server) makeSessionsVirtual(ses engine.Session, tctx interface{}, d e
 			addr = sql.StringValue(ses.Addr)
 		}
 		values = append(values, []sql.Value{
+			sql.Int64Value((int64)((uintptr)(unsafe.Pointer(ses)))),
 			sql.StringValue(ses.User),
 			sql.StringValue(ses.Type),
 			addr,
@@ -108,10 +110,10 @@ func (svr *Server) makeSessionsVirtual(ses engine.Session, tctx interface{}, d e
 
 	return &engine.VirtualTable{
 		Name: fmt.Sprintf("%s.%s", dbname, tblname),
-		Cols: []sql.Identifier{sql.ID("user"), sql.ID("type"), sql.ID("address"),
+		Cols: []sql.Identifier{sql.ID("session"), sql.ID("user"), sql.ID("type"), sql.ID("address"),
 			sql.ID("interactive")},
-		ColTypes: []sql.ColumnType{sql.IdColType, sql.IdColType, sql.NullStringColType,
-			sql.BoolColType},
+		ColTypes: []sql.ColumnType{sql.Int64ColType, sql.IdColType, sql.IdColType,
+			sql.NullStringColType, sql.BoolColType},
 		Values: values,
 	}, nil
 }
