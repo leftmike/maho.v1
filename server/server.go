@@ -6,7 +6,6 @@ import (
 	"fmt"
 	"io"
 	"sync"
-	"unsafe"
 
 	"github.com/leftmike/maho/engine"
 	"github.com/leftmike/maho/evaluate"
@@ -26,6 +25,7 @@ type Server struct {
 	mutex    sync.Mutex
 	servers  map[server]struct{}
 	sessions map[*evaluate.Session]struct{}
+	lastSID  uint64
 }
 
 type server interface {
@@ -78,6 +78,8 @@ func (svr *Server) addSession(ses *evaluate.Session) {
 		svr.Manager.CreateSystemTable(sql.ID("sessions"), svr.makeSessionsVirtual)
 	}
 	svr.sessions[ses] = struct{}{}
+	svr.lastSID += 1
+	ses.SetSID(svr.lastSID)
 }
 
 func (svr *Server) removeSession(ses *evaluate.Session) {
@@ -100,7 +102,7 @@ func (svr *Server) makeSessionsVirtual(ses engine.Session, tctx interface{}, d e
 			addr = sql.StringValue(ses.Addr)
 		}
 		values = append(values, []sql.Value{
-			sql.Int64Value((int64)((uintptr)(unsafe.Pointer(ses)))),
+			sql.StringValue(ses.String()),
 			sql.StringValue(ses.User),
 			sql.StringValue(ses.Type),
 			addr,
@@ -112,7 +114,7 @@ func (svr *Server) makeSessionsVirtual(ses engine.Session, tctx interface{}, d e
 		Name: fmt.Sprintf("%s.%s", dbname, tblname),
 		Cols: []sql.Identifier{sql.ID("session"), sql.ID("user"), sql.ID("type"), sql.ID("address"),
 			sql.ID("interactive")},
-		ColTypes: []sql.ColumnType{sql.Int64ColType, sql.IdColType, sql.IdColType,
+		ColTypes: []sql.ColumnType{sql.StringColType, sql.IdColType, sql.IdColType,
 			sql.NullStringColType, sql.BoolColType},
 		Values: values,
 	}, nil

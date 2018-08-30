@@ -201,7 +201,7 @@ func TestDatabase(t *testing.T) {
 		{op: "CreateDatabase", args: []string{db, filepath.Join("testdata", db)}},
 	})
 
-	tx := m.Begin()
+	tx := m.Begin(0)
 	ses := session{}
 	err = m.CreateTable(ses, tx, sql.ID(db), sql.ID("table1"), nil, nil)
 	if err != nil {
@@ -221,7 +221,7 @@ func TestDatabase(t *testing.T) {
 		{op: "Commit"},
 	})
 
-	tx = m.Begin()
+	tx = m.Begin(0)
 	ses = session{}
 	_, err = m.LookupTable(ses, tx, sql.ID(db), sql.ID("table1"))
 	if err != nil {

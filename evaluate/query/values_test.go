@@ -73,7 +73,7 @@ func TestValues(t *testing.T) {
 		DefaultDatabase: sql.ID("test"),
 	}
 	for _, c := range cases {
-		tx := mgr.Begin()
+		tx := mgr.Begin(0)
 		if c.values.String() != c.s {
 			t.Errorf("(%v).String() got %q want %q", c.values, c.values.String(), c.s)
 			continue
@@ -163,7 +163,7 @@ func TestFromValues(t *testing.T) {
 			t.Errorf("(%v).String() got %q want %q", c.from, c.from.String(), c.s)
 			continue
 		}
-		tx := mgr.Begin()
+		tx := mgr.Begin(0)
 		rows, fctx, err := c.from.TestRows(ses, tx)
 		if err != nil {
 			t.Errorf("(%v).Rows() failed with %s", c.from, err)

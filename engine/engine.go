@@ -107,8 +107,6 @@ type databaseEntry struct {
 	err      error
 }
 
-type TID uint64
-
 type Manager struct {
 	mutex         sync.RWMutex
 	dataDir       string
@@ -116,8 +114,9 @@ type Manager struct {
 	databases     map[sql.Identifier]*databaseEntry
 	virtualTables TableMap
 	systemTables  TableMap
-	lastTID       TID
+	lastTID       uint64
 	lockService   fatlock.Service
+	transactions  map[*Transaction]struct{}
 }
 
 func NewManager(dataDir string, engines map[string]Engine) *Manager {
@@ -126,13 +125,15 @@ func NewManager(dataDir string, engines map[string]Engine) *Manager {
 		engines:       engines,
 		databases:     map[sql.Identifier]*databaseEntry{},
 		virtualTables: TableMap{},
+		transactions:  map[*Transaction]struct{}{},
 	}
 	m.systemTables = TableMap{
-		sql.ID("databases"):   m.makeDatabasesVirtual,
-		sql.ID("identifiers"): makeIdentifiersVirtual,
-		sql.ID("config"):      makeConfigVirtual,
-		sql.ID("engines"):     m.makeEnginesVirtual,
-		sql.ID("locks"):       m.makeLocksVirtual,
+		sql.ID("databases"):    m.makeDatabasesVirtual,
+		sql.ID("identifiers"):  makeIdentifiersVirtual,
+		sql.ID("config"):       makeConfigVirtual,
+		sql.ID("engines"):      m.makeEnginesVirtual,
+		sql.ID("locks"):        m.makeLocksVirtual,
+		sql.ID("transactions"): m.makeTransactionsVirtual,
 	}
 
 	m.lockService.Init()
@@ -240,25 +241,36 @@ func (m *Manager) DetachDatabase(name sql.Identifier) error {
 }
 
 type Transaction struct {
+	m           *Manager
 	lockerState fatlock.LockerState
 	lockService *fatlock.Service
 	contexts    map[Database]interface{}
-	tid         TID
-	name        string
+	tid         uint64
+	sid         uint64
+}
+
+func (m *Manager) removeTransaction(tx *Transaction) {
+	m.mutex.Lock()
+	defer m.mutex.Unlock()
+
+	delete(m.transactions, tx)
 }
 
 // Begin a new transaction.
-func (m *Manager) Begin() *Transaction {
+func (m *Manager) Begin(sid uint64) *Transaction {
 	m.mutex.Lock()
 	defer m.mutex.Unlock()
 
 	m.lastTID += 1
-	return &Transaction{
+	tx := &Transaction{
+		m:           m,
 		lockService: &m.lockService,
 		contexts:    map[Database]interface{}{},
 		tid:         m.lastTID,
-		name:        fmt.Sprintf("transaction-%d", m.lastTID),
+		sid:         sid,
 	}
+	m.transactions[tx] = struct{}{}
+	return tx
 }
 
 func (tx *Transaction) LockerState() *fatlock.LockerState {
@@ -266,7 +278,7 @@ func (tx *Transaction) LockerState() *fatlock.LockerState {
 }
 
 func (tx *Transaction) String() string {
-	return tx.name
+	return fmt.Sprintf("transaction-%d", tx.tid)
 }
 
 func (tx *Transaction) forContexts(fn func(d Database, tctx interface{}) error) error {
@@ -294,6 +306,7 @@ func (tx *Transaction) Commit(ses Session) error {
 	})
 	tx.contexts = nil
 	tx.lockService.ReleaseLocks(tx)
+	tx.m.removeTransaction(tx)
 	return err
 }
 
@@ -303,6 +316,7 @@ func (tx *Transaction) Rollback() error {
 	})
 	tx.contexts = nil
 	tx.lockService.ReleaseLocks(tx)
+	tx.m.removeTransaction(tx)
 	return err
 }
 

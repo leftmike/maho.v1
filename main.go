@@ -11,7 +11,6 @@ To Do:
 - ALTER TABLE ...
 - memrows: tableImpl: add versioned metadata and use METADATA_MODIFY locking level
 
-- track transactions in system.transactions
 - use ctrl-C signal to gracefully shutdown (twice means to just exit); only if not console repl,
 then ctrl-D does the close
 

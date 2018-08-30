@@ -53,7 +53,7 @@ func TestValuesSimple(t *testing.T) {
 			t.Errorf("Parse(%q) failed with %s", c.sql, err)
 			continue
 		}
-		tx := mgr.Begin()
+		tx := mgr.Begin(0)
 		ret, err := stmt.Plan(ses, tx)
 		if c.fail {
 			if err == nil {

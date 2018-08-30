@@ -101,7 +101,7 @@ func TestSelect(t *testing.T) {
 		DefaultDatabase: sql.ID("test"),
 	}
 	for _, c := range cases {
-		tx := mgr.Begin()
+		tx := mgr.Begin(0)
 		if c.stmt.String() != c.s {
 			t.Errorf("(%v).String() got %q want %q", c.stmt, c.stmt.String(), c.s)
 			continue

@@ -191,9 +191,6 @@ func (m *Manager) listTables(ses Session, tctx interface{}, d Database) ([]Table
 func (m *Manager) makeTablesVirtual(ses Session, tctx interface{}, d Database, dbname,
 	tblname sql.Identifier) (Table, error) {
 
-	m.mutex.RLock()
-	defer m.mutex.RUnlock()
-
 	tbls, err := m.listTables(ses, tctx, d)
 	if err != nil {
 		return nil, err
@@ -231,9 +228,6 @@ var (
 
 func (m *Manager) makeColumnsVirtual(ses Session, tctx interface{}, d Database, dbname,
 	tblname sql.Identifier) (Table, error) {
-
-	m.mutex.RLock()
-	defer m.mutex.RUnlock()
 
 	tbls, err := m.listTables(ses, tctx, d)
 	if err != nil {
@@ -290,9 +284,6 @@ func (m *Manager) makeColumnsVirtual(ses Session, tctx interface{}, d Database, 
 
 func (m *Manager) makeDatabasesVirtual(ses Session, tctx interface{}, d Database, dbname,
 	tblname sql.Identifier) (Table, error) {
-
-	m.mutex.RLock()
-	defer m.mutex.RUnlock()
 
 	values := [][]sql.Value{}
 	for id, de := range m.databases {
@@ -413,5 +404,25 @@ func (m *Manager) makeLocksVirtual(ses Session, tctx interface{}, d Database, db
 		ColTypes: []sql.ColumnType{sql.IdColType, sql.IdColType, sql.IdColType, sql.BoolColType,
 			sql.NullInt64ColType},
 		Values: values,
+	}, nil
+}
+
+func (m *Manager) makeTransactionsVirtual(ses Session, tctx interface{}, d Database, dbname,
+	tblname sql.Identifier) (Table, error) {
+
+	values := [][]sql.Value{}
+
+	for tx := range m.transactions {
+		values = append(values, []sql.Value{
+			sql.StringValue(fmt.Sprintf("transaction-%d", tx.tid)),
+			sql.StringValue(fmt.Sprintf("session-%d", tx.sid)),
+		})
+	}
+
+	return &VirtualTable{
+		Name:     fmt.Sprintf("%s.%s", dbname, tblname),
+		Cols:     []sql.Identifier{sql.ID("transaction"), sql.ID("session")},
+		ColTypes: []sql.ColumnType{sql.StringColType, sql.StringColType},
+		Values:   values,
 	}, nil
 }

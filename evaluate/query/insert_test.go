@@ -233,7 +233,7 @@ func testInsert(t *testing.T, mgr *engine.Manager, ses *evaluate.Session, dbnam,
 	cols []sql.Identifier, colTypes []sql.ColumnType, cases []insertCase) {
 
 	for _, c := range cases {
-		tx := mgr.Begin()
+		tx := mgr.Begin(0)
 		err := mgr.CreateTable(ses, tx, dbnam, nam, cols, colTypes)
 		if err != nil {
 			t.Error(err)
