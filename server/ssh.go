@@ -28,7 +28,8 @@ type sshServer struct {
 	listener   net.Listener
 	activeConn map[*ssh.ServerConn]struct{}
 	connCount  int32
-	done       bool
+	shutdown   bool
+	closed     bool
 }
 
 func newSSHServer(sshCfg SSHConfig) (*sshServer, error) {
@@ -132,7 +133,7 @@ func (svr *Server) ListenAndServeSSH(sshCfg SSHConfig) error {
 		tcp, err := ss.listener.Accept()
 		if err != nil {
 			ss.mutex.Lock()
-			if ss.done {
+			if ss.shutdown {
 				err = ErrServerClosed
 			}
 			ss.mutex.Unlock()
@@ -159,7 +160,7 @@ func (ss *sshServer) trackConn(conn *ssh.ServerConn, add bool) bool {
 	ss.mutex.Lock()
 	defer ss.mutex.Unlock()
 
-	if ss.done {
+	if ss.closed {
 		return false
 	}
 	if add {
@@ -256,12 +257,17 @@ func (ss *sshServer) Close() error {
 	ss.mutex.Lock()
 	defer ss.mutex.Unlock()
 
-	if ss.done {
+	if ss.closed {
 		return nil
 	}
-	ss.done = true
+	ss.closed = true
 
-	err := ss.listener.Close()
+	var err error
+	if !ss.shutdown {
+		err = ss.listener.Close()
+		ss.shutdown = true
+	}
+
 	for conn := range ss.activeConn {
 		conn.Close()
 		delete(ss.activeConn, conn)
@@ -273,13 +279,30 @@ func (ss *sshServer) Shutdown(ctx context.Context) error {
 	var err error
 
 	ss.mutex.Lock()
-	if !ss.done {
-		ss.done = true
+	if ss.closed {
+		ss.mutex.Unlock()
+		return nil
+	}
+	if !ss.shutdown {
 		err = ss.listener.Close()
+		ss.shutdown = true
 	}
 	ss.mutex.Unlock()
 
-	for atomic.LoadInt32(&ss.connCount) > 0 {
+	last := int32(-1)
+	for {
+		cc := atomic.LoadInt32(&ss.connCount)
+		if cc == 0 {
+			break
+		}
+		if cc != last {
+			p := ""
+			if cc > 1 {
+				p = "s"
+			}
+			fmt.Printf("%d active connection%s\n", cc, p)
+			last = cc
+		}
 		time.Sleep(500 * time.Millisecond)
 	}
 	return err

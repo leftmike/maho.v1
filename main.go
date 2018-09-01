@@ -11,9 +11,6 @@ To Do:
 - ALTER TABLE ...
 - memrows: tableImpl: add versioned metadata and use METADATA_MODIFY locking level
 
-- use ctrl-C signal to gracefully shutdown (twice means to just exit); only if not console repl,
-then ctrl-D does the close
-
 - memrows engine: persistence
 - memcols engine (w/ mvcc)
 - distributed memrows and/or memcols engine, using raft
@@ -23,11 +20,13 @@ then ctrl-D does the close
 
 import (
 	"bufio"
+	"context"
 	"flag"
 	"fmt"
 	"io"
 	"io/ioutil"
 	"os"
+	"os/signal"
 	"path/filepath"
 	"strings"
 
@@ -250,17 +249,25 @@ func main() {
 			}
 		}
 
-		if *repl {
-			go func() {
-				fmt.Fprintf(os.Stderr, "maho: server: %s\n", svr.ListenAndServeSSH(sshCfg))
-			}()
-		} else {
-			fmt.Fprintf(os.Stderr, "maho: server: %s\n", svr.ListenAndServeSSH(sshCfg))
-		}
+		go func() {
+			fmt.Fprintf(os.Stderr, "maho: %s\n", svr.ListenAndServeSSH(sshCfg))
+		}()
 	}
 
 	if *repl || (!*sshServer && len(args) == 0 && len(sqlArgs) == 0) {
 		svr.Handle(bufio.NewReader(os.Stdin), os.Stdout, "startup", "console", "", true)
+	} else {
+		ch := make(chan os.Signal, 1)
+		signal.Notify(ch, os.Interrupt)
+
+		fmt.Println("maho: waiting for ^C to shutdown")
+		<-ch
+		go func() {
+			<-ch
+			os.Exit(0)
+		}()
+		fmt.Println("maho: shutting down")
+		svr.Shutdown(context.Background())
 	}
 
 	log.WithField("pid", os.Getpid()).Info("maho done")

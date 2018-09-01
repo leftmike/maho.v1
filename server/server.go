@@ -43,32 +43,6 @@ func (svr *Server) addServer(s server) {
 	svr.servers[s] = struct{}{}
 }
 
-func (svr *Server) closeShutdown(cs func(s server) error) error {
-	svr.mutex.Lock()
-	defer svr.mutex.Unlock()
-
-	cnt := len(svr.servers)
-	errors := make(chan error, cnt)
-
-	for s := range svr.servers {
-		go func(s server) {
-			errors <- cs(s)
-		}(s)
-		delete(svr.servers, s)
-	}
-
-	var err error
-	for cnt > 0 {
-		var e error = <-errors
-		if e != nil && err == nil {
-			err = e
-		}
-		cnt -= 1
-	}
-
-	return err
-}
-
 func (svr *Server) addSession(ses *evaluate.Session) {
 	svr.mutex.Lock()
 	defer svr.mutex.Unlock()
@@ -87,6 +61,60 @@ func (svr *Server) removeSession(ses *evaluate.Session) {
 	defer svr.mutex.Unlock()
 
 	delete(svr.sessions, ses)
+}
+
+func (svr *Server) Handle(rr io.RuneReader, w io.Writer, user, typ, addr string, interactive bool) {
+	ses := &evaluate.Session{
+		Manager:         svr.Manager,
+		DefaultEngine:   svr.DefaultEngine,
+		DefaultDatabase: svr.DefaultDatabase,
+		User:            user,
+		Type:            typ,
+		Addr:            addr,
+		Interactive:     interactive,
+	}
+	svr.addSession(ses)
+	svr.Handler(ses, rr, w)
+	svr.removeSession(ses)
+}
+
+func (svr *Server) closeShutdown(cs func(s server) error) error {
+	svr.mutex.Lock()
+	cnt := len(svr.servers)
+	errors := make(chan error, cnt)
+
+	for s := range svr.servers {
+		go func(s server) {
+			errors <- cs(s)
+		}(s)
+		delete(svr.servers, s)
+	}
+	svr.mutex.Unlock()
+
+	var err error
+	for cnt > 0 {
+		var e error = <-errors
+		if e != nil && err == nil {
+			err = e
+		}
+		cnt -= 1
+	}
+
+	return err
+}
+
+func (svr *Server) Close() error {
+	return svr.closeShutdown(
+		func(s server) error {
+			return s.Close()
+		})
+}
+
+func (svr *Server) Shutdown(ctx context.Context) error {
+	return svr.closeShutdown(
+		func(s server) error {
+			return s.Shutdown(ctx)
+		})
 }
 
 func (svr *Server) makeSessionsVirtual(ses engine.Session, tctx interface{}, d engine.Database,
@@ -118,33 +146,4 @@ func (svr *Server) makeSessionsVirtual(ses engine.Session, tctx interface{}, d e
 			sql.NullStringColType, sql.BoolColType},
 		Values: values,
 	}, nil
-}
-
-func (svr *Server) Handle(rr io.RuneReader, w io.Writer, user, typ, addr string, interactive bool) {
-	ses := &evaluate.Session{
-		Manager:         svr.Manager,
-		DefaultEngine:   svr.DefaultEngine,
-		DefaultDatabase: svr.DefaultDatabase,
-		User:            user,
-		Type:            typ,
-		Addr:            addr,
-		Interactive:     interactive,
-	}
-	svr.addSession(ses)
-	svr.Handler(ses, rr, w)
-	svr.removeSession(ses)
-}
-
-func (svr *Server) Close() error {
-	return svr.closeShutdown(
-		func(s server) error {
-			return s.Close()
-		})
-}
-
-func (svr *Server) Shutdown(ctx context.Context) error {
-	return svr.closeShutdown(
-		func(s server) error {
-			return s.Shutdown(ctx)
-		})
 }
