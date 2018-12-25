@@ -91,7 +91,9 @@ func scanValue(s *scanner.Scanner, tok rune) (interface{}, error) {
 	case scanner.Int:
 	case scanner.Float:
 	case scanner.String:
-		val = strings.Trim(val, "\"`")
+		val = strings.Trim(val, `"`)
+	case scanner.RawString:
+		val = strings.Trim(val, "`")
 	case '-':
 		tok = s.Scan()
 		if tok != scanner.Int && tok != scanner.Float {

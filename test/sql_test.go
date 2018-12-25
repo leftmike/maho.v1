@@ -67,7 +67,7 @@ func testSQL(t *testing.T, typ string, dbname sql.Identifier) {
 	var rptr reporter
 	err = sqltest.RunTests(*testData, &run, &rptr, mahoDialect{}, *update)
 	if err != nil {
-		t.Errorf("RunTests(%q) failed with %s", testData, err)
+		t.Errorf("RunTests(%q) failed with %s", *testData, err)
 		return
 	}
 	for _, report := range rptr {

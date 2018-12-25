@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"io"
 	"testing"
+	"time"
 
 	"golang.org/x/crypto/ssh"
 
@@ -112,6 +113,11 @@ func testSSHServer(t *testing.T, fail bool, cfg *ssh.ClientConfig, port int, aut
 			t.Fatal("Dial() did not fail")
 		}
 	} else {
+		if err != nil {
+			time.Sleep(10 * time.Millisecond)
+			conn, err = ssh.Dial("tcp", addr, cfg)
+		}
+
 		if err != nil {
 			t.Fatalf("Dial() failed with %s", err)
 		}
