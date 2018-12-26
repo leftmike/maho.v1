@@ -60,7 +60,7 @@ var (
 
 	accounts = config.Var(new(config.Array), "accounts").Array()
 
-	configFile = flag.String("config-file", "", "`file` to load config from (./maho.cfg)")
+	configFile = flag.String("config-file", "", "`file` to load config from (./maho.hcl)")
 	noConfig   = flag.Bool("no-config", false, "don't load config file")
 	listConfig = flag.Bool("list-config", false, "list config and exit")
 	repl       = flag.Bool("repl", false, "`flag` to control the console repl (false)")
@@ -80,7 +80,7 @@ func (ss *stringSlice) String() string {
 func parseAccounts(accounts config.Array) (map[string]string, bool) {
 	userPasswords := map[string]string{}
 	for _, a := range accounts {
-		account, ok := a.(config.Map)
+		account, ok := a.(map[string]interface{})
 		if !ok {
 			return nil, false
 		}
@@ -117,7 +117,7 @@ func main() {
 	config.Env()
 
 	if *noConfig == false {
-		filename := filepath.Join(".", "maho.cfg")
+		filename := filepath.Join(".", "maho.hcl")
 		if *configFile != "" {
 			filename = *configFile
 		}

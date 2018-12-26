@@ -2,14 +2,14 @@ package config
 
 import (
 	"flag"
+	"fmt"
 	"reflect"
-	"strings"
 	"testing"
 )
 
 func newConfig(bv bool, i64v int64, sv string) (*Config, *bool, *int64, *string) {
 	c := NewConfig(flag.NewFlagSet("test", flag.PanicOnError))
-	c.Var(new(string), "good")
+	c.Var(new(int), "good")
 	b := c.Var(new(bool), "bool_var").Bool(bv)
 	i64 := c.Var(new(int64), "int64_var").Int64(i64v)
 	s := c.Var(new(string), "string-var").String(sv)
@@ -25,8 +25,6 @@ func TestLoadSimple(t *testing.T) {
 		cfg        string
 	}{
 		{fail: true, cfg: `good`},
-		{fail: true, cfg: `good=`},
-		{fail: true, cfg: `good =`},
 		{fail: true, cfg: `bad = 123`},
 		{cfg: `good=123`},
 		{cfg: `/* comment */ good // comment
@@ -42,8 +40,8 @@ func TestLoadSimple(t *testing.T) {
 		{fail: true, cfg: `bool_var = 1234`},
 		{i64v: 1234, i64e: -5678, cfg: `int64_var = -5678`},
 		{fail: true, cfg: `int64_var = "a string"`},
-		{sv: "", se: "a string", cfg: "string-var = `a string`"},
 		{sv: "", se: "a string", cfg: `string-var = "a string"`},
+		{fail: true, cfg: "string-var = string"},
 		{fail: true, cfg: `bool_var = {a: 10 b: 20, c:30}`},
 	}
 
@@ -52,7 +50,7 @@ func TestLoadSimple(t *testing.T) {
 		if *b != tc.bv || *i64 != tc.i64v || *s != tc.sv {
 			t.Errorf("NewConfig(%d) defaults not correctly set", i)
 		}
-		err := c.load(strings.NewReader(tc.cfg))
+		err := c.load([]byte(tc.cfg))
 		if tc.fail {
 			if err == nil {
 				t.Errorf("load(%q) did not fail", tc.cfg)
@@ -69,23 +67,22 @@ func TestLoadSimple(t *testing.T) {
 
 func TestLoadArray(t *testing.T) {
 	cases := []struct {
-		a    []interface{}
+		a    Array
 		fail bool
 		cfg  string
 	}{
 		{fail: true, cfg: `array=[`},
-		{fail: true, cfg: `array=[,]`},
 		{fail: true, cfg: `array=,]`},
 		{fail: true, cfg: `array=]`},
 		{fail: true, cfg: `array=[abc,, def]`},
-		{a: []interface{}{"abc"}, cfg: `array=["abc"]`},
-		{a: []interface{}{"abc", "def", "ghi"}, cfg: `array=[abc, def ghi]`},
+		{a: Array{"abc"}, cfg: `array=["abc"]`},
+		{a: Array{"abc", "def", "ghi"}, cfg: `array=["abc", "def", "ghi"]`},
 	}
 
 	for _, tc := range cases {
 		c := NewConfig(flag.NewFlagSet("test", flag.PanicOnError))
 		a := c.Var(new(Array), "array").Array()
-		err := c.load(strings.NewReader(tc.cfg))
+		err := c.load([]byte(tc.cfg))
 		if tc.fail {
 			if err == nil {
 				t.Errorf("load(%q) did not fail", tc.cfg)
@@ -93,7 +90,8 @@ func TestLoadArray(t *testing.T) {
 		} else {
 			if err != nil {
 				t.Errorf("load(%q) failed with %s", tc.cfg, err)
-			} else if reflect.DeepEqual(tc.a, *a) {
+			} else if !reflect.DeepEqual(tc.a, *a) {
+				fmt.Printf("%T: %v\n%T: %v\n", tc.a, tc.a, *a, *a)
 				t.Errorf("load(%q) variables not updated correctly", tc.cfg)
 			}
 		}
@@ -112,13 +110,13 @@ func TestLoadMap(t *testing.T) {
 		{fail: true, cfg: `map=}`},
 		{fail: true, cfg: `map={abc: 1,, def: 2}`},
 		{fail: true, cfg: `map={abc 1 def 2}`},
-		{m: Map{"abc": 1, "def": 2, "ghi": 3}, cfg: `map={abc:1,"def":2 ghi : 3}`},
+		{m: Map{"abc": 1, "def": 2, "ghi": 3}, cfg: `map={abc = 1,def=2 ghi = 3}`},
 	}
 
 	for _, tc := range cases {
 		c := NewConfig(flag.NewFlagSet("test", flag.PanicOnError))
 		m := c.Var(make(Map), "map").Map()
-		err := c.load(strings.NewReader(tc.cfg))
+		err := c.load([]byte(tc.cfg))
 		if tc.fail {
 			if err == nil {
 				t.Errorf("load(%q) did not fail", tc.cfg)
@@ -126,7 +124,7 @@ func TestLoadMap(t *testing.T) {
 		} else {
 			if err != nil {
 				t.Errorf("load(%q) failed with %s", tc.cfg, err)
-			} else if reflect.DeepEqual(tc.m, m) {
+			} else if !reflect.DeepEqual(tc.m, m) {
 				t.Errorf("load(%q) variables not updated correctly", tc.cfg)
 			}
 		}

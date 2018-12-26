@@ -26,7 +26,7 @@ ssh-keygen -t rsa -f id_rsa
 
 Authorization of remote clients is done using an `authorized_keys` file and / or a list of
 usernames and passwords. The list of usernames and passwords are specified in the config file;
-the default is `maho.cfg` in the current directory.
+the default is `maho.hcl` in the current directory.
 
 ```
 // maho config

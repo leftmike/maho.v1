@@ -17,11 +17,12 @@ func (b *boolValue) Set(s string) error {
 }
 
 func (b *boolValue) SetValue(v interface{}) error {
-	s, ok := v.(string)
+	bv, ok := v.(bool)
 	if !ok {
 		return fmt.Errorf("parsing %v: invalid syntax", v)
 	}
-	return b.Set(s)
+	*b = boolValue(bv)
+	return nil
 }
 
 func (b *boolValue) String() string {
@@ -37,11 +38,12 @@ func (i *intValue) Set(s string) error {
 }
 
 func (i *intValue) SetValue(v interface{}) error {
-	s, ok := v.(string)
+	iv, ok := v.(int)
 	if !ok {
 		return fmt.Errorf("parsing %v: invalid syntax", v)
 	}
-	return i.Set(s)
+	*i = intValue(iv)
+	return nil
 }
 
 func (i *intValue) String() string {
@@ -57,11 +59,12 @@ func (i *int64Value) Set(s string) error {
 }
 
 func (i *int64Value) SetValue(v interface{}) error {
-	s, ok := v.(string)
+	iv, ok := v.(int)
 	if !ok {
 		return fmt.Errorf("parsing %v: invalid syntax", v)
 	}
-	return i.Set(s)
+	*i = int64Value(iv)
+	return nil
 }
 
 func (i *int64Value) String() string {
@@ -77,11 +80,12 @@ func (u *uintValue) Set(s string) error {
 }
 
 func (u *uintValue) SetValue(v interface{}) error {
-	s, ok := v.(string)
-	if !ok {
+	iv, ok := v.(int)
+	if !ok || iv < 0 {
 		return fmt.Errorf("parsing %v: invalid syntax", v)
 	}
-	return u.Set(s)
+	*u = uintValue(iv)
+	return nil
 }
 
 func (u *uintValue) String() string {
@@ -97,11 +101,12 @@ func (u *uint64Value) Set(s string) error {
 }
 
 func (u *uint64Value) SetValue(v interface{}) error {
-	s, ok := v.(string)
-	if !ok {
+	iv, ok := v.(int)
+	if !ok || iv < 0 {
 		return fmt.Errorf("parsing %v: invalid syntax", v)
 	}
-	return u.Set(s)
+	*u = uint64Value(iv)
+	return nil
 }
 
 func (u *uint64Value) String() string {
@@ -136,11 +141,12 @@ func (f *float64Value) Set(s string) error {
 }
 
 func (f *float64Value) SetValue(v interface{}) error {
-	s, ok := v.(string)
+	fv, ok := v.(float64)
 	if !ok {
 		return fmt.Errorf("parsing %v: invalid syntax", v)
 	}
-	return f.Set(s)
+	*f = float64Value(fv)
+	return nil
 }
 
 func (f *float64Value) String() string {
@@ -156,18 +162,19 @@ func (d *durationValue) Set(s string) error {
 }
 
 func (d *durationValue) SetValue(v interface{}) error {
-	s, ok := v.(string)
+	iv, ok := v.(int)
 	if !ok {
 		return fmt.Errorf("parsing %v: invalid syntax", v)
 	}
-	return d.Set(s)
+	*d = durationValue(iv)
+	return nil
 }
 
 func (d *durationValue) String() string {
 	return (*time.Duration)(d).String()
 }
 
-type Array []interface{} // string, Map, or Array
+type Array []interface{} // int, float64, bool, string, []interface{}, map[string]interface{}
 
 func (a *Array) Set(s string) error {
 	*a = append(*a, s)
@@ -175,11 +182,11 @@ func (a *Array) Set(s string) error {
 }
 
 func (a *Array) SetValue(v interface{}) error {
-	av, ok := v.(Array)
+	av, ok := v.([]interface{})
 	if !ok {
 		return fmt.Errorf("parsing %v: invalid syntax", v)
 	}
-	*a = av
+	*a = Array(av)
 	return nil
 }
 
@@ -187,14 +194,14 @@ func (a *Array) String() string {
 	return fmt.Sprintf("%v", *a)
 }
 
-type Map map[string]interface{} // string, Map, or Array
+type Map map[string]interface{} // int, float64, bool, string, []interface{}, map[string]interface{}
 
 func (m Map) SetValue(v interface{}) error {
-	mv, ok := v.(Map)
-	if !ok {
+	mv, ok := v.([]map[string]interface{})
+	if !ok || len(mv) != 1 {
 		return fmt.Errorf("parsing %v: invalid syntax", v)
 	}
-	for k, v := range mv {
+	for k, v := range mv[0] {
 		m[k] = v
 	}
 	return nil

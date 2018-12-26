@@ -1,9 +1,9 @@
 package config
 
 import (
-	"bufio"
 	"flag"
 	"fmt"
+	"io/ioutil"
 	"os"
 	"time"
 )
@@ -107,12 +107,11 @@ func (c *Config) Load(filename string) error {
 	}
 	c.flagVars()
 
-	f, err := os.Open(filename)
+	b, err := ioutil.ReadFile(filename)
 	if err != nil {
 		return err
 	}
-	defer f.Close()
-	return c.load(bufio.NewReader(f))
+	return c.load(b)
 }
 
 func Load(filename string) error {
