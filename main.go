@@ -48,7 +48,7 @@ var (
 	dataDir  = config.Var(new(string), "data-directory").
 			Flag("data", "`directory` containing databases (./testdata)").String("testdata")
 	sshServer = config.Var(new(bool), "ssh").
-			Usage("`flag` to control serving ssh (true)").Bool(true)
+			Usage("`flag` to control serving ssh (false)").Bool(false)
 	sshPort = config.Var(new(string), "ssh-port").
 		Usage("`port` used to serve ssh (localhost:8241)").String("localhost:8241")
 	logFile = config.Var(new(string), "log-file").Usage("`file` to use for logging (./maho.log)").
@@ -256,7 +256,7 @@ func main() {
 
 	if *repl || (!*sshServer && len(args) == 0 && len(sqlArgs) == 0) {
 		svr.Handle(bufio.NewReader(os.Stdin), os.Stdout, "startup", "console", "", true)
-	} else {
+	} else if *sshServer {
 		ch := make(chan os.Signal, 1)
 		signal.Notify(ch, os.Interrupt)
 
@@ -266,9 +266,11 @@ func main() {
 			<-ch
 			os.Exit(0)
 		}()
+	}
+
+	if *sshServer {
 		fmt.Println("maho: shutting down")
 		svr.Shutdown(context.Background())
 	}
-
 	log.WithField("pid", os.Getpid()).Info("maho done")
 }
