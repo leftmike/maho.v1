@@ -1,22 +1,51 @@
 # Maho
 Maho is a partial implementation of a basic SQL server.
 
-# Goals (Motivations)
+## Goals (Motivations)
 * Learn [Go](https://golang.org/) and SQL.
 * Mostly [PostgreSQL](https://www.postgresql.org/) compatible; see [sqltest](https://github.com/leftmike/sqltest) for SQL compatibility tests.
 
-# Features
+## Features
 * Parse and execute SQL statements.
+* Authentication for remote access using SSH.
 
-# Missing
+## Missing
 * Most SQL statements.
-* An actual server.
 * Persistence.
 * Indexes.
-* Transactions.
 * Etc.
 
-# Supported SQL
+## Remote Access
+
+To run an ssh server, maho needs a ssh host key; by default it uses `id_rsa` in the current
+directory. Generate it if necessary.
+
+```
+ssh-keygen -t rsa -f id_rsa
+```
+
+Authorization of remote clients is done using an `authorized_keys` file and / or a list of
+usernames and passwords. The list of usernames and passwords are specified in the config file;
+the default is `maho.cfg` in the current directory.
+
+```
+// maho config
+database = maho
+engine = memrows
+accounts = [
+    {user: "michael", password: "password"}
+    {user: "test", password: "secret"}
+    {
+        user: setup
+        password: default
+    }
+]
+```
+
+Run maho: `maho -ssh=1`. And then in another terminal, connect using ssh:
+`ssh -p 8241 test@localhost`; using the config above, the password will be `secret`.
+
+## Supported SQL
 ```
 ATTACH DATABASE database
     [WITH
