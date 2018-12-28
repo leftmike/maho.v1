@@ -27,7 +27,6 @@ import (
 	"io/ioutil"
 	"os"
 	"os/signal"
-	"path/filepath"
 	"strings"
 
 	log "github.com/sirupsen/logrus"
@@ -46,12 +45,12 @@ var (
 	database = config.Var(new(string), "database").Usage("default `database` (maho)").String("maho")
 	eng      = config.Var(new(string), "engine").Usage("default `engine` (basic)").String("basic")
 	dataDir  = config.Var(new(string), "data-directory").
-			Flag("data", "`directory` containing databases (./testdata)").String("testdata")
+			Flag("data", "`directory` containing databases (testdata)").String("testdata")
 	sshServer = config.Var(new(bool), "ssh").
 			Usage("`flag` to control serving ssh (false)").Bool(false)
 	sshPort = config.Var(new(string), "ssh-port").
 		Usage("`port` used to serve ssh (localhost:8241)").String("localhost:8241")
-	logFile = config.Var(new(string), "log-file").Usage("`file` to use for logging (./maho.log)").
+	logFile = config.Var(new(string), "log-file").Usage("`file` to use for logging (maho.log)").
 		String("maho.log")
 	logLevel = config.Var(new(string), "log-level").
 			Usage("log level: debug, info, warn, error, fatal, or panic (info)").String("info")
@@ -60,7 +59,7 @@ var (
 
 	accounts = config.Var(new(config.Array), "accounts").Array()
 
-	configFile = flag.String("config-file", "", "`file` to load config from (./maho.hcl)")
+	configFile = flag.String("config-file", "", "`file` to load config from (maho.hcl)")
 	noConfig   = flag.Bool("no-config", false, "don't load config file")
 	listConfig = flag.Bool("list-config", false, "list config and exit")
 	repl       = flag.Bool("repl", false, "`flag` to control the console repl (false)")
@@ -117,7 +116,7 @@ func main() {
 	config.Env()
 
 	if *noConfig == false {
-		filename := filepath.Join(".", "maho.hcl")
+		filename := "maho.hcl"
 		if *configFile != "" {
 			filename = *configFile
 		}

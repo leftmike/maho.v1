@@ -3,6 +3,7 @@ package test_test
 import (
 	"flag"
 	"fmt"
+	"path/filepath"
 	"testing"
 
 	"github.com/leftmike/sqltest/pkg/sqltest"
@@ -36,7 +37,8 @@ func (r *reporter) Report(test string, err error) error {
 
 var (
 	update   = flag.Bool("update", false, "update expected to output")
-	testData = flag.String("testdata", "../../sqltest/sql/testdata", "directory of testdata")
+	testData = flag.String("testdata",
+		filepath.Join("..", "..", "sqltest", "sql", "testdata"), "directory of testdata")
 )
 
 type mahoDialect struct {
