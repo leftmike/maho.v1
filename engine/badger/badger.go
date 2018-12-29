@@ -1,6 +1,8 @@
 package badger
 
 import (
+	"os"
+
 	"github.com/dgraph-io/badger"
 
 	"github.com/leftmike/maho/engine/kv"
@@ -26,6 +28,7 @@ type iterator struct {
 }
 
 func (Engine) Open(path string) (kv.DB, error) {
+	os.MkdirAll(path, 0755)
 	opts := badger.DefaultOptions
 	opts.Dir = path
 	opts.ValueDir = path
@@ -48,11 +51,11 @@ func (db database) Close() error {
 	return db.db.Close()
 }
 
-func (rtx readTx) Commit() error {
-	return rtx.tx.Commit()
+func (rtx readTx) Discard() {
+	rtx.tx.Discard()
 }
 
-func buildKey(key1 []byte, key2 []byte, key3 []byte) []byte {
+func buildKey(key1 string, key2 string, key3 []byte) []byte {
 	key := make([]byte, 0, len(key1)+len(key2)+len(key3)+2)
 	key = append(key, key1...)
 	key = append(key, '/')
@@ -62,7 +65,7 @@ func buildKey(key1 []byte, key2 []byte, key3 []byte) []byte {
 	return key
 }
 
-func (rtx readTx) Get(key1 []byte, key2 []byte, key3 []byte, vf func(val []byte) error) error {
+func (rtx readTx) Get(key1 string, key2 string, key3 []byte, vf func(val []byte) error) error {
 	item, err := rtx.tx.Get(buildKey(key1, key2, key3))
 	if err == badger.ErrKeyNotFound {
 		return kv.ErrKeyNotFound
@@ -72,7 +75,7 @@ func (rtx readTx) Get(key1 []byte, key2 []byte, key3 []byte, vf func(val []byte)
 	return item.Value(vf)
 }
 
-func (rtx readTx) Iterate(key1 []byte, key2 []byte) (kv.Iterator, error) {
+func (rtx readTx) Iterate(key1 string, key2 string) (kv.Iterator, error) {
 	prefix := buildKey(key1, key2, []byte{})
 	opts := badger.DefaultIteratorOptions
 	opts.Prefix = prefix
@@ -82,11 +85,15 @@ func (rtx readTx) Iterate(key1 []byte, key2 []byte) (kv.Iterator, error) {
 	}, nil
 }
 
-func (wtx writeTx) Delete(key1 []byte, key2 []byte, key3 []byte) error {
+func (wtx writeTx) Commit() error {
+	return wtx.tx.Commit()
+}
+
+func (wtx writeTx) Delete(key1 string, key2 string, key3 []byte) error {
 	return wtx.tx.Delete(buildKey(key1, key2, key3))
 }
 
-func (wtx writeTx) DeleteAll(key1 []byte, key2 []byte) error {
+func (wtx writeTx) DeleteAll(key1 string, key2 string) error {
 	prefix := buildKey(key1, key2, []byte{})
 	opts := badger.DefaultIteratorOptions
 	opts.Prefix = prefix
@@ -102,13 +109,8 @@ func (wtx writeTx) DeleteAll(key1 []byte, key2 []byte) error {
 	return nil
 }
 
-func (wtx writeTx) Set(key1 []byte, key2 []byte, key3 []byte, val []byte) error {
+func (wtx writeTx) Set(key1 string, key2 string, key3 []byte, val []byte) error {
 	return wtx.tx.Set(buildKey(key1, key2, key3), val)
-}
-
-func (wtx writeTx) Rollback() error {
-	wtx.tx.Discard()
-	return nil
 }
 
 func (it *iterator) Close() {

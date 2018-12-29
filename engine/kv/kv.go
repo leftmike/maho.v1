@@ -19,17 +19,17 @@ type DB interface {
 }
 
 type ReadTx interface {
-	Commit() error
-	Get(key1 []byte, key2 []byte, key3 []byte, vf func(val []byte) error) error
-	Iterate(key1 []byte, key2 []byte) (Iterator, error)
+	Discard()
+	Get(key1 string, key2 string, key3 []byte, vf func(val []byte) error) error
+	Iterate(key1 string, key2 string) (Iterator, error)
 }
 
 type WriteTx interface {
 	ReadTx
-	Delete(key1 []byte, key2 []byte, key3 []byte) error
-	DeleteAll(key1 []byte, key2 []byte) error
-	Set(key1 []byte, key2 []byte, key3 []byte, val []byte) error
-	Rollback() error
+	Commit() error
+	Delete(key1 string, key2 string, key3 []byte) error
+	DeleteAll(key1 string, key2 string) error
+	Set(key1 string, key2 string, key3 []byte, val []byte) error
 }
 
 type Iterator interface {

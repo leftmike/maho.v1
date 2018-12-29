@@ -1,7 +1,7 @@
 package bbolt
 
 import (
-	"os"
+	"fmt"
 
 	"go.etcd.io/bbolt"
 
@@ -29,7 +29,7 @@ type iterator struct {
 }
 
 func (Engine) Open(path string) (kv.DB, error) {
-	db, err := bbolt.Open(path, os.ModePerm, nil)
+	db, err := bbolt.Open(path, 0644, nil)
 	if err != nil {
 		return nil, err
 	}
@@ -56,19 +56,22 @@ func (db database) Close() error {
 	return db.db.Close()
 }
 
-func (rtx readTx) Commit() error {
-	return rtx.tx.Commit()
+func (rtx readTx) Discard() {
+	err := rtx.tx.Rollback()
+	if err != nil {
+		panic(fmt.Sprintf("bbolt.Rollback() failed"))
+	}
 }
 
-func getBucket(tx *bbolt.Tx, key1 []byte, key2 []byte) *bbolt.Bucket {
-	bkt := tx.Bucket(key1)
+func getBucket(tx *bbolt.Tx, key1 string, key2 string) *bbolt.Bucket {
+	bkt := tx.Bucket([]byte(key1))
 	if bkt == nil {
 		return nil
 	}
-	return bkt.Bucket(key2)
+	return bkt.Bucket([]byte(key2))
 }
 
-func (rtx readTx) Get(key1 []byte, key2 []byte, key3 []byte, vf func(val []byte) error) error {
+func (rtx readTx) Get(key1 string, key2 string, key3 []byte, vf func(val []byte) error) error {
 	bkt := getBucket(rtx.tx, key1, key2)
 	if bkt == nil {
 		return kv.ErrKeyNotFound
@@ -80,7 +83,7 @@ func (rtx readTx) Get(key1 []byte, key2 []byte, key3 []byte, vf func(val []byte)
 	return vf(val)
 }
 
-func (rtx readTx) Iterate(key1 []byte, key2 []byte) (kv.Iterator, error) {
+func (rtx readTx) Iterate(key1 string, key2 string) (kv.Iterator, error) {
 	bkt := getBucket(rtx.tx, key1, key2)
 	if bkt == nil {
 		return nil, kv.ErrKeyNotFound
@@ -90,7 +93,11 @@ func (rtx readTx) Iterate(key1 []byte, key2 []byte) (kv.Iterator, error) {
 	}, nil
 }
 
-func (wtx writeTx) Delete(key1 []byte, key2 []byte, key3 []byte) error {
+func (wtx writeTx) Commit() error {
+	return wtx.tx.Commit()
+}
+
+func (wtx writeTx) Delete(key1 string, key2 string, key3 []byte) error {
 	bkt := getBucket(wtx.tx, key1, key2)
 	if bkt == nil {
 		return kv.ErrKeyNotFound
@@ -98,28 +105,24 @@ func (wtx writeTx) Delete(key1 []byte, key2 []byte, key3 []byte) error {
 	return bkt.Delete(key3)
 }
 
-func (wtx writeTx) DeleteAll(key1 []byte, key2 []byte) error {
-	bkt := wtx.tx.Bucket(key1)
+func (wtx writeTx) DeleteAll(key1 string, key2 string) error {
+	bkt := wtx.tx.Bucket([]byte(key1))
 	if bkt == nil {
 		return kv.ErrKeyNotFound
 	}
-	return bkt.DeleteBucket(key2)
+	return bkt.DeleteBucket([]byte(key2))
 }
 
-func (wtx writeTx) Set(key1 []byte, key2 []byte, key3 []byte, val []byte) error {
-	bkt, err := wtx.tx.CreateBucketIfNotExists(key1)
+func (wtx writeTx) Set(key1 string, key2 string, key3 []byte, val []byte) error {
+	bkt, err := wtx.tx.CreateBucketIfNotExists([]byte(key1))
 	if err != nil {
 		return err
 	}
-	bkt, err = bkt.CreateBucketIfNotExists(key2)
+	bkt, err = bkt.CreateBucketIfNotExists([]byte(key2))
 	if err != nil {
 		return err
 	}
 	return bkt.Put(key3, val)
-}
-
-func (wtx writeTx) Rollback() error {
-	return wtx.tx.Rollback()
 }
 
 func (it *iterator) Close() {
