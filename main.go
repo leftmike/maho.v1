@@ -172,6 +172,8 @@ func main() {
 	mgr := engine.NewManager(*dataDir, map[string]engine.Engine{
 		"basic":   basic.Engine{},
 		"memrows": memrows.Engine{},
+		// "badger": kvrows.Engine{badger.Engine{}},
+		// "bolt": kvrows.Engine{bbolt.Engine{[]byte("maho")}},
 	})
 
 	svr := server.Server{
