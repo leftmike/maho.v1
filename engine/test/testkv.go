@@ -170,6 +170,23 @@ func getRange(t *testing.T, db kv.DB, key1 string, key2 string, first, last, ste
 		})
 }
 
+func getValueRange(t *testing.T, db kv.DB, key1 string, key2 string, first, last, step int64) {
+	t.Helper()
+
+	readKeyRange(t, db, first, last, step,
+		func(tx kv.ReadTx, n int64, key []byte) error {
+			val, err := tx.GetValue(key1, key2, key)
+			want := fmt.Sprintf("%d", n)
+			if string(val) != want {
+				return fmt.Errorf("GetValue(%d) got %s want %s", n, string(val), want)
+			}
+			if err != nil {
+				return fmt.Errorf("GetValue(%d) failed with %s", n, err)
+			}
+			return nil
+		})
+}
+
 func notFoundRange(t *testing.T, db kv.DB, key1 string, key2 string, first, last, step int64) {
 	t.Helper()
 
@@ -305,6 +322,7 @@ func runTest1(t *testing.T, db kv.DB) {
 	notFoundGet(t, db, "test1", "test-one", []byte("key"))
 
 	getRange(t, db, "test1", "test-one", 0, 100, 1)
+	getValueRange(t, db, "test1", "test-one", 0, 100, 1)
 	seekRange(t, db, "test1", "test-one", 0, 100, 1)
 	seekRange(t, db, "test1", "test-one", 20, 100, 1)
 	rewindRange(t, db, "test1", "test-one", 0, 100, 1)
@@ -330,6 +348,7 @@ func runTest2(t *testing.T, db kv.DB) {
 	t.Helper()
 
 	getRange(t, db, "test1", "test-one", 1, 99, 2)
+	getValueRange(t, db, "test1", "test-one", 1, 99, 2)
 	notFoundRange(t, db, "test1", "test-one", 0, 100, 2)
 	notFoundRange(t, db, "test1", "test-two", 1, 1000, 1)
 	seekRange(t, db, "test1", "test-one", 10000, 9999, 1) // no keys found

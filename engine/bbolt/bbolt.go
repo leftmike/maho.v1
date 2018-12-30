@@ -72,15 +72,23 @@ func getBucket(tx *bbolt.Tx, key1 string, key2 string) *bbolt.Bucket {
 }
 
 func (rtx readTx) Get(key1 string, key2 string, key3 []byte, vf func(val []byte) error) error {
+	val, err := rtx.GetValue(key1, key2, key3)
+	if err != nil {
+		return err
+	}
+	return vf(val)
+}
+
+func (rtx readTx) GetValue(key1 string, key2 string, key3 []byte) ([]byte, error) {
 	bkt := getBucket(rtx.tx, key1, key2)
 	if bkt == nil {
-		return kv.ErrKeyNotFound
+		return nil, kv.ErrKeyNotFound
 	}
 	val := bkt.Get(key3)
 	if val == nil {
-		return kv.ErrKeyNotFound
+		return nil, kv.ErrKeyNotFound
 	}
-	return vf(val)
+	return val, nil
 }
 
 func (rtx readTx) Iterate(key1 string, key2 string) (kv.Iterator, error) {

@@ -75,6 +75,16 @@ func (rtx readTx) Get(key1 string, key2 string, key3 []byte, vf func(val []byte)
 	return item.Value(vf)
 }
 
+func (rtx readTx) GetValue(key1 string, key2 string, key3 []byte) ([]byte, error) {
+	item, err := rtx.tx.Get(buildKey(key1, key2, key3))
+	if err == badger.ErrKeyNotFound {
+		return nil, kv.ErrKeyNotFound
+	} else if err != nil {
+		return nil, err
+	}
+	return item.ValueCopy(nil)
+}
+
 func (rtx readTx) Iterate(key1 string, key2 string) (kv.Iterator, error) {
 	prefix := buildKey(key1, key2, []byte{})
 	opts := badger.DefaultIteratorOptions
