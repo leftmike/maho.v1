@@ -15,7 +15,8 @@ type database struct {
 }
 
 type readTx struct {
-	tx *bbolt.Tx
+	tx        *bbolt.Tx
+	discarded bool
 }
 
 type writeTx struct {
@@ -41,7 +42,7 @@ func (db database) ReadTx() (kv.ReadTx, error) {
 	if err != nil {
 		return nil, err
 	}
-	return readTx{tx}, nil
+	return &readTx{tx: tx}, nil
 }
 
 func (db database) WriteTx() (kv.WriteTx, error) {
@@ -49,17 +50,20 @@ func (db database) WriteTx() (kv.WriteTx, error) {
 	if err != nil {
 		return nil, err
 	}
-	return writeTx{readTx{tx}}, nil
+	return &writeTx{readTx{tx: tx}}, nil
 }
 
 func (db database) Close() error {
 	return db.db.Close()
 }
 
-func (rtx readTx) Discard() {
-	err := rtx.tx.Rollback()
-	if err != nil {
-		panic(fmt.Sprintf("bbolt.Rollback() failed"))
+func (rtx *readTx) Discard() {
+	if !rtx.discarded {
+		rtx.discarded = true
+		err := rtx.tx.Rollback()
+		if err != nil {
+			panic(fmt.Sprintf("bbolt.Rollback() failed"))
+		}
 	}
 }
 
@@ -71,7 +75,7 @@ func getBucket(tx *bbolt.Tx, key1 string, key2 string) *bbolt.Bucket {
 	return bkt.Bucket([]byte(key2))
 }
 
-func (rtx readTx) Get(key1 string, key2 string, key3 []byte, vf func(val []byte) error) error {
+func (rtx *readTx) Get(key1 string, key2 string, key3 []byte, vf func(val []byte) error) error {
 	val, err := rtx.GetValue(key1, key2, key3)
 	if err != nil {
 		return err
@@ -79,7 +83,7 @@ func (rtx readTx) Get(key1 string, key2 string, key3 []byte, vf func(val []byte)
 	return vf(val)
 }
 
-func (rtx readTx) GetValue(key1 string, key2 string, key3 []byte) ([]byte, error) {
+func (rtx *readTx) GetValue(key1 string, key2 string, key3 []byte) ([]byte, error) {
 	bkt := getBucket(rtx.tx, key1, key2)
 	if bkt == nil {
 		return nil, kv.ErrKeyNotFound
@@ -91,7 +95,7 @@ func (rtx readTx) GetValue(key1 string, key2 string, key3 []byte) ([]byte, error
 	return val, nil
 }
 
-func (rtx readTx) Iterate(key1 string, key2 string) (kv.Iterator, error) {
+func (rtx *readTx) Iterate(key1 string, key2 string) (kv.Iterator, error) {
 	bkt := getBucket(rtx.tx, key1, key2)
 	if bkt == nil {
 		return nil, kv.ErrKeyNotFound
@@ -101,11 +105,14 @@ func (rtx readTx) Iterate(key1 string, key2 string) (kv.Iterator, error) {
 	}, nil
 }
 
-func (wtx writeTx) Commit() error {
+func (wtx *writeTx) Commit() error {
+	if wtx.discarded {
+		return nil
+	}
 	return wtx.tx.Commit()
 }
 
-func (wtx writeTx) Delete(key1 string, key2 string, key3 []byte) error {
+func (wtx *writeTx) Delete(key1 string, key2 string, key3 []byte) error {
 	bkt := getBucket(wtx.tx, key1, key2)
 	if bkt == nil {
 		return kv.ErrKeyNotFound
@@ -113,7 +120,7 @@ func (wtx writeTx) Delete(key1 string, key2 string, key3 []byte) error {
 	return bkt.Delete(key3)
 }
 
-func (wtx writeTx) DeleteAll(key1 string, key2 string) error {
+func (wtx *writeTx) DeleteAll(key1 string, key2 string) error {
 	bkt := wtx.tx.Bucket([]byte(key1))
 	if bkt == nil {
 		return kv.ErrKeyNotFound
@@ -121,7 +128,7 @@ func (wtx writeTx) DeleteAll(key1 string, key2 string) error {
 	return bkt.DeleteBucket([]byte(key2))
 }
 
-func (wtx writeTx) Set(key1 string, key2 string, key3 []byte, val []byte) error {
+func (wtx *writeTx) Set(key1 string, key2 string, key3 []byte, val []byte) error {
 	bkt, err := wtx.tx.CreateBucketIfNotExists([]byte(key1))
 	if err != nil {
 		return err
