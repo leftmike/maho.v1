@@ -1,11 +1,16 @@
 package bbolt
 
 import (
+	"bytes"
 	"fmt"
 
 	"go.etcd.io/bbolt"
 
 	"github.com/leftmike/maho/engine/kv"
+)
+
+var (
+	bucketName = []byte("kv")
 )
 
 type Engine struct{}
@@ -15,8 +20,8 @@ type database struct {
 }
 
 type readTx struct {
-	tx        *bbolt.Tx
-	discarded bool
+	tx   *bbolt.Tx
+	done bool
 }
 
 type writeTx struct {
@@ -25,6 +30,7 @@ type writeTx struct {
 
 type iterator struct {
 	cursor *bbolt.Cursor
+	prefix []byte
 	key    []byte
 	val    []byte
 }
@@ -58,86 +64,76 @@ func (db database) Close() error {
 }
 
 func (rtx *readTx) Discard() {
-	if !rtx.discarded {
-		rtx.discarded = true
-		err := rtx.tx.Rollback()
-		if err != nil {
-			panic(fmt.Sprintf("bbolt.Rollback() failed"))
-		}
+	if rtx.done {
+		return
+	}
+	rtx.done = true
+	err := rtx.tx.Rollback()
+	if err != nil {
+		panic(fmt.Sprintf("bbolt.Rollback() failed"))
 	}
 }
 
-func getBucket(tx *bbolt.Tx, key1 string, key2 string) *bbolt.Bucket {
-	bkt := tx.Bucket([]byte(key1))
-	if bkt == nil {
-		return nil
-	}
-	return bkt.Bucket([]byte(key2))
-}
-
-func (rtx *readTx) Get(key1 string, key2 string, key3 []byte, vf func(val []byte) error) error {
-	val, err := rtx.GetValue(key1, key2, key3)
+func (rtx *readTx) Get(key []byte, vf func(val []byte) error) error {
+	val, err := rtx.GetValue(key)
 	if err != nil {
 		return err
 	}
 	return vf(val)
 }
 
-func (rtx *readTx) GetValue(key1 string, key2 string, key3 []byte) ([]byte, error) {
-	bkt := getBucket(rtx.tx, key1, key2)
+func getBucket(tx *bbolt.Tx) *bbolt.Bucket {
+	return tx.Bucket(bucketName)
+}
+
+func (rtx *readTx) GetValue(key []byte) ([]byte, error) {
+	bkt := getBucket(rtx.tx)
 	if bkt == nil {
 		return nil, kv.ErrKeyNotFound
 	}
-	val := bkt.Get(key3)
+	val := bkt.Get(key)
 	if val == nil {
 		return nil, kv.ErrKeyNotFound
 	}
 	return val, nil
 }
 
-func (rtx *readTx) Iterate(key1 string, key2 string) (kv.Iterator, error) {
-	bkt := getBucket(rtx.tx, key1, key2)
+func (rtx *readTx) Iterate(prefix []byte) kv.Iterator {
+	var cursor *bbolt.Cursor
+	bkt := getBucket(rtx.tx)
 	if bkt == nil {
-		return nil, kv.ErrKeyNotFound
+		cursor = rtx.tx.Cursor()
+	} else {
+		cursor = bkt.Cursor()
 	}
 	return &iterator{
-		cursor: bkt.Cursor(),
-	}, nil
+		cursor: cursor,
+		prefix: prefix,
+	}
 }
 
 func (wtx *writeTx) Commit() error {
-	if wtx.discarded {
+	if wtx.done {
 		return nil
 	}
+	wtx.done = true
 	return wtx.tx.Commit()
 }
 
-func (wtx *writeTx) Delete(key1 string, key2 string, key3 []byte) error {
-	bkt := getBucket(wtx.tx, key1, key2)
+func (wtx *writeTx) Delete(key []byte) error {
+	bkt := getBucket(wtx.tx)
 	if bkt == nil {
 		return kv.ErrKeyNotFound
 	}
-	return bkt.Delete(key3)
+	return bkt.Delete(key)
 }
 
-func (wtx *writeTx) DeleteAll(key1 string, key2 string) error {
-	bkt := wtx.tx.Bucket([]byte(key1))
-	if bkt == nil {
-		return kv.ErrKeyNotFound
-	}
-	return bkt.DeleteBucket([]byte(key2))
-}
-
-func (wtx *writeTx) Set(key1 string, key2 string, key3 []byte, val []byte) error {
-	bkt, err := wtx.tx.CreateBucketIfNotExists([]byte(key1))
+func (wtx *writeTx) Set(key []byte, val []byte) error {
+	bkt, err := wtx.tx.CreateBucketIfNotExists(bucketName)
 	if err != nil {
 		return err
 	}
-	bkt, err = bkt.CreateBucketIfNotExists([]byte(key2))
-	if err != nil {
-		return err
-	}
-	return bkt.Put(key3, val)
+	return bkt.Put(key, val)
 }
 
 func (it *iterator) Close() {
@@ -148,20 +144,33 @@ func (it *iterator) Key() []byte {
 	return it.key
 }
 
+func (it *iterator) KeyCopy() []byte {
+	return it.key
+}
+
+func (it *iterator) setKeyVal(key, val []byte) {
+	if key != nil && bytes.HasPrefix(key, it.prefix) {
+		it.key = key
+		it.val = val
+	} else {
+		it.key = nil
+	}
+}
+
 func (it *iterator) Next() {
-	it.key, it.val = it.cursor.Next()
+	it.setKeyVal(it.cursor.Next())
 }
 
 func (it *iterator) Rewind() {
-	it.key, it.val = it.cursor.First()
+	it.setKeyVal(it.cursor.Seek(it.prefix))
 }
 
 func (it *iterator) Seek(key []byte) {
-	it.key, it.val = it.cursor.Seek(key)
+	it.setKeyVal(it.cursor.Seek(key))
 }
 
 func (it *iterator) Valid() bool {
-	return it.key != nil && it.val != nil
+	return it.key != nil
 }
 
 func (it *iterator) Value(vf func(val []byte) error) error {

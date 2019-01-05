@@ -2,7 +2,6 @@ package kv
 
 import (
 	"errors"
-	"strings"
 )
 
 var (
@@ -21,32 +20,22 @@ type DB interface {
 
 type ReadTx interface {
 	Discard()
-	Get(key1 string, key2 string, key3 []byte, vf func(val []byte) error) error
-	GetValue(key1 string, key2 string, key3 []byte) ([]byte, error)
-	Iterate(key1 string, key2 string) (Iterator, error)
-}
-
-func Get(tx ReadTx, path string, key []byte) ([]byte, error) {
-	keys := strings.SplitN(path, "/", 2)
-	return tx.GetValue(keys[0], keys[1], key)
-}
-
-func Set(tx WriteTx, path string, key []byte, val []byte) error {
-	keys := strings.SplitN(path, "/", 2)
-	return tx.Set(keys[0], keys[1], key, val)
+	Get(key []byte, vf func(val []byte) error) error
+	GetValue(key []byte) ([]byte, error)
+	Iterate(prefix []byte) Iterator
 }
 
 type WriteTx interface {
 	ReadTx
 	Commit() error
-	Delete(key1 string, key2 string, key3 []byte) error
-	DeleteAll(key1 string, key2 string) error
-	Set(key1 string, key2 string, key3 []byte, val []byte) error
+	Delete(key []byte) error
+	Set(key []byte, val []byte) error
 }
 
 type Iterator interface {
 	Close()
 	Key() []byte
+	KeyCopy() []byte
 	Next()
 	Rewind()
 	Seek(key []byte)

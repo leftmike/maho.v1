@@ -95,14 +95,13 @@ func writeKeyRange(t *testing.T, db kv.DB, commit bool, first, last, step int64,
 		})
 }
 
-func setRange(t *testing.T, db kv.DB, commit bool, key1 string, key2 string,
-	first, last, step int64) {
+func setRange(t *testing.T, db kv.DB, commit bool, prefix string, first, last, step int64) {
 
 	t.Helper()
 
 	writeKeyRange(t, db, commit, first, last, step,
 		func(tx kv.WriteTx, n int64, key []byte) error {
-			err := tx.Set(key1, key2, key, []byte(fmt.Sprintf("%d", n)))
+			err := tx.Set(append([]byte(prefix), key...), []byte(fmt.Sprintf("%d", n)))
 			if err != nil {
 				return fmt.Errorf("Set(%d) failed with %s", n, err)
 			}
@@ -110,14 +109,13 @@ func setRange(t *testing.T, db kv.DB, commit bool, key1 string, key2 string,
 		})
 }
 
-func deleteRange(t *testing.T, db kv.DB, commit bool, key1 string, key2 string,
-	first, last, step int64) {
+func deleteRange(t *testing.T, db kv.DB, commit bool, prefix string, first, last, step int64) {
 
 	t.Helper()
 
 	writeKeyRange(t, db, commit, first, last, step,
 		func(tx kv.WriteTx, n int64, key []byte) error {
-			err := tx.Delete(key1, key2, key)
+			err := tx.Delete(append([]byte(prefix), key...))
 			if err != nil {
 				return fmt.Errorf("Delete(%d) failed with %s", n, err)
 			}
@@ -125,7 +123,7 @@ func deleteRange(t *testing.T, db kv.DB, commit bool, key1 string, key2 string,
 		})
 }
 
-func deleteAll(t *testing.T, db kv.DB, commit bool, key1 string, key2 string) {
+func deleteAll(t *testing.T, db kv.DB, commit bool, prefix string) {
 	t.Helper()
 
 	tx, err := db.WriteTx()
@@ -144,18 +142,27 @@ func deleteAll(t *testing.T, db kv.DB, commit bool, key1 string, key2 string) {
 		}
 	}()
 
-	err = tx.DeleteAll(key1, key2)
-	if err != nil {
-		t.Errorf("DeleteAll() failed with %s", err)
+	it := tx.Iterate([]byte(prefix))
+	defer it.Close()
+
+	it.Rewind()
+	for it.Valid() {
+		key := it.KeyCopy()
+		err := tx.Delete(key)
+		if err != nil {
+			t.Errorf("Delete() failed with %s", err)
+			return
+		}
+		it.Next()
 	}
 }
 
-func getRange(t *testing.T, db kv.DB, key1 string, key2 string, first, last, step int64) {
+func getRange(t *testing.T, db kv.DB, prefix string, first, last, step int64) {
 	t.Helper()
 
 	readKeyRange(t, db, first, last, step,
 		func(tx kv.ReadTx, n int64, key []byte) error {
-			err := tx.Get(key1, key2, key,
+			err := tx.Get(append([]byte(prefix), key...),
 				func(val []byte) error {
 					want := fmt.Sprintf("%d", n)
 					if string(val) != want {
@@ -170,12 +177,12 @@ func getRange(t *testing.T, db kv.DB, key1 string, key2 string, first, last, ste
 		})
 }
 
-func getValueRange(t *testing.T, db kv.DB, key1 string, key2 string, first, last, step int64) {
+func getValueRange(t *testing.T, db kv.DB, prefix string, first, last, step int64) {
 	t.Helper()
 
 	readKeyRange(t, db, first, last, step,
 		func(tx kv.ReadTx, n int64, key []byte) error {
-			val, err := tx.GetValue(key1, key2, key)
+			val, err := tx.GetValue(append([]byte(prefix), key...))
 			want := fmt.Sprintf("%d", n)
 			if string(val) != want {
 				return fmt.Errorf("GetValue(%d) got %s want %s", n, string(val), want)
@@ -187,12 +194,12 @@ func getValueRange(t *testing.T, db kv.DB, key1 string, key2 string, first, last
 		})
 }
 
-func notFoundRange(t *testing.T, db kv.DB, key1 string, key2 string, first, last, step int64) {
+func notFoundRange(t *testing.T, db kv.DB, prefix string, first, last, step int64) {
 	t.Helper()
 
 	readKeyRange(t, db, first, last, step,
 		func(tx kv.ReadTx, n int64, key []byte) error {
-			err := tx.Get(key1, key2, key,
+			err := tx.Get(append([]byte(prefix), key...),
 				func(val []byte) error {
 					return errors.New("key found")
 				})
@@ -203,7 +210,7 @@ func notFoundRange(t *testing.T, db kv.DB, key1 string, key2 string, first, last
 		})
 }
 
-func iterateRange(t *testing.T, db kv.DB, key1 string, key2 string, first, last, step int64,
+func iterateRange(t *testing.T, db kv.DB, prefix string, first, last, step int64,
 	fn func(it kv.Iterator)) {
 
 	t.Helper()
@@ -222,11 +229,7 @@ func iterateRange(t *testing.T, db kv.DB, key1 string, key2 string, first, last,
 		cnt += 1
 	}
 
-	it, err := tx.Iterate(key1, key2)
-	if err != nil {
-		t.Errorf("Iterate() failed with %s", err)
-		return
-	}
+	it := tx.Iterate([]byte(prefix))
 	defer it.Close()
 
 	fn(it)
@@ -235,6 +238,7 @@ func iterateRange(t *testing.T, db kv.DB, key1 string, key2 string, first, last,
 	for it.Valid() {
 		wantKey := make([]byte, 8)
 		binary.BigEndian.PutUint64(wantKey, uint64(n))
+		wantKey = append([]byte(prefix), wantKey...)
 		if !bytes.Equal(it.Key(), wantKey) {
 			t.Errorf("Key() got %v want %v", it.Key(), wantKey)
 		}
@@ -261,30 +265,30 @@ func iterateRange(t *testing.T, db kv.DB, key1 string, key2 string, first, last,
 	}
 }
 
-func seekRange(t *testing.T, db kv.DB, key1 string, key2 string, first, last, step int64) {
+func seekRange(t *testing.T, db kv.DB, prefix string, first, last, step int64) {
 	t.Helper()
 
-	iterateRange(t, db, key1, key2, first, last, step,
+	iterateRange(t, db, prefix, first, last, step,
 		func(it kv.Iterator) {
-			it.Seek(makeKey(first))
+			it.Seek(append([]byte(prefix), makeKey(first)...))
 		})
 }
 
-func rewindRange(t *testing.T, db kv.DB, key1 string, key2 string, first, last, step int64) {
+func rewindRange(t *testing.T, db kv.DB, prefix string, first, last, step int64) {
 	t.Helper()
 
-	iterateRange(t, db, key1, key2, first, last, step,
+	iterateRange(t, db, prefix, first, last, step,
 		func(it kv.Iterator) {
 			it.Rewind()
 		})
 }
 
-func notFoundGet(t *testing.T, db kv.DB, key1 string, key2 string, key3 []byte) {
+func notFoundGet(t *testing.T, db kv.DB, key string) {
 	t.Helper()
 
 	withReadTx(t, db,
 		func(tx kv.ReadTx) error {
-			err := tx.Get(key1, key2, key3,
+			err := tx.Get([]byte(key),
 				func(val []byte) error {
 					return nil
 				})
@@ -315,43 +319,43 @@ func withDB(t *testing.T, e kv.Engine, path string, fn func(t *testing.T, db kv.
 func runTest1(t *testing.T, db kv.DB) {
 	t.Helper()
 
-	notFoundGet(t, db, "this", "that", []byte("key"))
+	notFoundGet(t, db, "this that")
 
-	notFoundRange(t, db, "test1", "test-one", 0, 100, 1)
-	setRange(t, db, true, "test1", "test-one", 0, 100, 1)
-	notFoundGet(t, db, "test1", "test-one", []byte("key"))
+	notFoundRange(t, db, "test1-one", 0, 100, 1)
+	setRange(t, db, true, "test1-one", 0, 100, 1)
+	notFoundGet(t, db, "test1-one-key")
 
-	getRange(t, db, "test1", "test-one", 0, 100, 1)
-	getValueRange(t, db, "test1", "test-one", 0, 100, 1)
-	seekRange(t, db, "test1", "test-one", 0, 100, 1)
-	seekRange(t, db, "test1", "test-one", 20, 100, 1)
-	rewindRange(t, db, "test1", "test-one", 0, 100, 1)
-	deleteRange(t, db, true, "test1", "test-one", 0, 100, 2)
-	seekRange(t, db, "test1", "test-one", 1, 99, 2)
-	getRange(t, db, "test1", "test-one", 1, 99, 2)
-	notFoundRange(t, db, "test1", "test-one", 0, 100, 2)
+	getRange(t, db, "test1-one", 0, 100, 1)
+	getValueRange(t, db, "test1-one", 0, 100, 1)
+	seekRange(t, db, "test1-one", 0, 100, 1)
+	rewindRange(t, db, "test1-one", 0, 100, 1)
+	seekRange(t, db, "test1-one", 20, 100, 1)
+	deleteRange(t, db, true, "test1-one", 0, 100, 2)
+	seekRange(t, db, "test1-one", 1, 99, 2)
+	getRange(t, db, "test1-one", 1, 99, 2)
+	notFoundRange(t, db, "test1-one", 0, 100, 2)
 
-	setRange(t, db, false, "test1", "test-one", 200, 300, 1)
-	notFoundRange(t, db, "test1", "test-one", 200, 300, 1)
+	setRange(t, db, false, "test1-one", 200, 300, 1)
+	notFoundRange(t, db, "test1-one", 200, 300, 1)
 
-	setRange(t, db, true, "test1", "test-two", 1, 1000, 1)
-	getRange(t, db, "test1", "test-two", 1, 1000, 1)
-	deleteAll(t, db, true, "test1", "test-two")
-	notFoundRange(t, db, "test1", "test-two", 1, 1000, 1)
-	getRange(t, db, "test1", "test-one", 1, 99, 2)
+	setRange(t, db, true, "test1-two", 1, 1000, 1)
+	getRange(t, db, "test1-two", 1, 1000, 1)
+	deleteAll(t, db, true, "test1-two")
+	notFoundRange(t, db, "test1-two", 1, 1000, 1)
+	getRange(t, db, "test1-one", 1, 99, 2)
 
-	deleteAll(t, db, false, "test1", "test-one")
-	getRange(t, db, "test1", "test-one", 1, 99, 2)
+	deleteAll(t, db, false, "test1-one")
+	getRange(t, db, "test1-one", 1, 99, 2)
 }
 
 func runTest2(t *testing.T, db kv.DB) {
 	t.Helper()
 
-	getRange(t, db, "test1", "test-one", 1, 99, 2)
-	getValueRange(t, db, "test1", "test-one", 1, 99, 2)
-	notFoundRange(t, db, "test1", "test-one", 0, 100, 2)
-	notFoundRange(t, db, "test1", "test-two", 1, 1000, 1)
-	seekRange(t, db, "test1", "test-one", 10000, 9999, 1) // no keys found
+	getRange(t, db, "test1-one", 1, 99, 2)
+	getValueRange(t, db, "test1-one", 1, 99, 2)
+	notFoundRange(t, db, "test1-one", 0, 100, 2)
+	notFoundRange(t, db, "test1-two", 1, 1000, 1)
+	seekRange(t, db, "test1-one", 10000, 9999, 1) // no keys found
 }
 
 func RunKVTest(t *testing.T, e kv.Engine) {
