@@ -2,6 +2,8 @@ package kv
 
 import (
 	"errors"
+	"fmt"
+	"path/filepath"
 )
 
 var (
@@ -41,4 +43,14 @@ type Iterator interface {
 	Seek(key []byte)
 	Valid() bool
 	Value(vf func(val []byte) error) error
+}
+
+func FixPath(path, ext, who string) (string, error) {
+	if path == "" {
+		return "", fmt.Errorf("%s: missing filename", who)
+	}
+	if filepath.Ext(path) == "" {
+		return path + ext, nil
+	}
+	return path, nil
 }

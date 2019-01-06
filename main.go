@@ -8,9 +8,6 @@ To Do:
 
 - fuzzing: parser.Parse
 
-- DROP DATABASE [ IF EXISTS ] <name> [WITH [WAIT ['='] (true | false)]]
-- add [WITH [WAIT ['='] (true | false)]] to DETACH DATABASE
-
 - ALTER TABLE ...
 - memrows: tableImpl: add versioned metadata and use METADATA_MODIFY locking level
 

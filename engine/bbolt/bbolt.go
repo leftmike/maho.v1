@@ -36,6 +36,10 @@ type iterator struct {
 }
 
 func (Engine) Open(path string) (kv.DB, error) {
+	path, err := kv.FixPath(path, ".mahobbolt", "bbolt")
+	if err != nil {
+		return nil, err
+	}
 	db, err := bbolt.Open(path, 0644, nil)
 	if err != nil {
 		return nil, err

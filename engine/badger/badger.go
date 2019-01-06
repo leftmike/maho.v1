@@ -28,6 +28,10 @@ type iterator struct {
 }
 
 func (Engine) Open(path string) (kv.DB, error) {
+	path, err := kv.FixPath(path, ".mahobadger", "badger")
+	if err != nil {
+		return nil, err
+	}
 	os.MkdirAll(path, 0755)
 	opts := badger.DefaultOptions
 	opts.Dir = path
