@@ -22,18 +22,6 @@ func (_ session) Context() context.Context {
 	return nil
 }
 
-type services struct {
-	lockService fatlock.Service
-}
-
-func (svcs *services) Init() {
-	svcs.lockService.Init()
-}
-
-func (svcs *services) LockService() fatlock.LockService {
-	return &svcs.lockService
-}
-
 var (
 	int32ColType  = sql.ColumnType{Type: sql.IntegerType, Size: 4, NotNull: true}
 	int64ColType  = sql.ColumnType{Type: sql.IntegerType, Size: 8, NotNull: true}
@@ -114,7 +102,7 @@ func allRows(t *testing.T, ses engine.Session, rows engine.Rows) [][]sql.Value {
 	return all
 }
 
-func testTableLifecycle(t *testing.T, d engine.Database, svcs *services, cmds []cmd) {
+func testTableLifecycle(t *testing.T, d engine.Database, svcs *Services, cmds []cmd) {
 	sessions := [4]sessionState{}
 	state := &sessions[0]
 
@@ -304,7 +292,7 @@ func testTableLifecycle(t *testing.T, d engine.Database, svcs *services, cmds []
 func RunDatabaseTest(t *testing.T, e engine.Engine) {
 	t.Helper()
 
-	var svcs services
+	var svcs Services
 	svcs.Init()
 	d, err := e.CreateDatabase(&svcs, sql.ID("database_test"),
 		filepath.Join("testdata", "database_test"), nil)
@@ -528,7 +516,7 @@ func RunDatabaseTest(t *testing.T, e engine.Engine) {
 func RunTableTest(t *testing.T, e engine.Engine) {
 	t.Helper()
 
-	var svcs services
+	var svcs Services
 	svcs.Init()
 	d, err := e.CreateDatabase(&svcs, sql.ID("table_test"),
 		filepath.Join("testdata", "table_test"), nil)
@@ -907,7 +895,7 @@ func RunTableTest(t *testing.T, e engine.Engine) {
 func RunParallelTest(t *testing.T, e engine.Engine) {
 	t.Helper()
 
-	var svcs services
+	var svcs Services
 	svcs.Init()
 	d, err := e.CreateDatabase(&svcs, sql.ID("parallel_test"),
 		filepath.Join("testdata", "parallel_test"), nil)
@@ -989,7 +977,7 @@ func incColumn(t *testing.T, d engine.Database, tctx interface{}, i int, name sq
 func RunStressTest(t *testing.T, e engine.Engine) {
 	t.Helper()
 
-	var svcs services
+	var svcs Services
 	svcs.Init()
 	d, err := e.CreateDatabase(&svcs, sql.ID("stress_test"),
 		filepath.Join("testdata", "stress_test"), nil)
