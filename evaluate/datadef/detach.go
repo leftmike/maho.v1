@@ -10,10 +10,18 @@ import (
 
 type DetachDatabase struct {
 	Database sql.Identifier
+	Options  map[sql.Identifier]string
 }
 
 func (stmt *DetachDatabase) String() string {
-	return fmt.Sprintf("DETACH DATABASE %s", stmt.Database)
+	s := fmt.Sprintf("DETACH DATABASE %s", stmt.Database)
+	if len(stmt.Options) > 0 {
+		s += " WITH"
+		for opt, val := range stmt.Options {
+			s = fmt.Sprintf("%s %s = %s", s, opt, val)
+		}
+	}
+	return s
 }
 
 func (stmt *DetachDatabase) Plan(ses *evaluate.Session, tx *engine.Transaction) (interface{},
@@ -23,5 +31,5 @@ func (stmt *DetachDatabase) Plan(ses *evaluate.Session, tx *engine.Transaction) 
 }
 
 func (stmt *DetachDatabase) Execute(ses *evaluate.Session, tx *engine.Transaction) (int64, error) {
-	return -1, ses.Manager.DetachDatabase(stmt.Database)
+	return -1, ses.Manager.DetachDatabase(stmt.Database, stmt.Options)
 }

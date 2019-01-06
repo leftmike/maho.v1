@@ -41,9 +41,11 @@ const (
 	Attaching databaseState = iota
 	Creating
 	Detaching
+	Dropping
 	ErrorAttaching
 	ErrorCreating
 	ErrorDetaching
+	ErrorDropping
 	Running
 )
 
@@ -55,10 +57,16 @@ func (ds databaseState) String() string {
 		return "creating"
 	case Detaching:
 		return "detaching"
+	case Dropping:
+		return "dropping"
 	case ErrorAttaching:
 		return "error attaching"
 	case ErrorCreating:
 		return "error creating"
+	case ErrorDetaching:
+		return "error detaching"
+	case ErrorDropping:
+		return "error dropping"
 	case Running:
 		return "running"
 	default:
@@ -96,6 +104,8 @@ type Database interface {
 	Commit(ses Session, tctx interface{}) error
 	Rollback(tctx interface{}) error
 	NextStmt(tctx interface{})
+	CanClose(drop bool) bool
+	Close(drop bool) error
 }
 
 type databaseEntry struct {
@@ -149,7 +159,7 @@ func (m *Manager) LockService() fatlock.LockService {
 	return &m.lockService
 }
 
-func (m *Manager) newDatabaseEntry(eng string, name sql.Identifier, options Options,
+func (m *Manager) canSetupDatabase(eng string, name sql.Identifier, options Options,
 	state databaseState) (Engine, *databaseEntry, error) {
 
 	m.mutex.Lock()
@@ -209,10 +219,10 @@ func (m *Manager) setupDatabase(e Engine, de *databaseEntry, options Options) {
 	}
 }
 
-func (m *Manager) prepareDatabase(eng string, name sql.Identifier, options Options,
+func (m *Manager) trySetupDatabase(eng string, name sql.Identifier, options Options,
 	state databaseState) error {
 
-	e, de, err := m.newDatabaseEntry(eng, name, options, state)
+	e, de, err := m.canSetupDatabase(eng, name, options, state)
 	if err != nil {
 		return err
 	}
@@ -229,15 +239,88 @@ func (m *Manager) prepareDatabase(eng string, name sql.Identifier, options Optio
 }
 
 func (m *Manager) AttachDatabase(eng string, name sql.Identifier, options Options) error {
-	return m.prepareDatabase(eng, name, options, Attaching)
+	return m.trySetupDatabase(eng, name, options, Attaching)
 }
 
 func (m *Manager) CreateDatabase(eng string, name sql.Identifier, options Options) error {
-	return m.prepareDatabase(eng, name, options, Creating)
+	return m.trySetupDatabase(eng, name, options, Creating)
 }
 
-func (m *Manager) DetachDatabase(name sql.Identifier) error {
-	return nil // XXX
+func (m *Manager) canCloseDatabase(name sql.Identifier, exists bool, options Options,
+	state databaseState) (*databaseEntry, error) {
+
+	m.mutex.Lock()
+	defer m.mutex.Unlock()
+
+	de, ok := m.databases[name]
+	if !ok {
+		if exists {
+			return nil, nil
+		}
+		return nil, fmt.Errorf("engine: database %s not found", name)
+	}
+
+	if de.state == Attaching || de.state == Creating || de.state == Detaching ||
+		de.state == Dropping {
+
+		return nil, fmt.Errorf(
+			"engine: database %s is already attaching, creating, detaching, or dropping", name)
+	}
+
+	if de.state == Running {
+		if !de.database.CanClose(state == Dropping) {
+			return nil, fmt.Errorf("engine: database %s can not be closed", name)
+		}
+		de.state = state
+		return de, nil
+	} else {
+		delete(m.databases, name)
+	}
+
+	return nil, nil
+}
+
+func (m *Manager) closeDatabase(name sql.Identifier, de *databaseEntry) {
+	de.err = de.database.Close(de.state == Dropping)
+
+	m.mutex.Lock()
+	defer m.mutex.Unlock()
+
+	if de.err == nil {
+		delete(m.databases, name)
+	} else {
+		if de.state == Detaching {
+			de.state = ErrorDetaching
+		} else {
+			de.state = ErrorDropping
+		}
+	}
+}
+
+func (m *Manager) tryCloseDatabase(name sql.Identifier, exists bool, options Options,
+	state databaseState) error {
+
+	de, err := m.canCloseDatabase(name, exists, options, state)
+	if de == nil || err != nil {
+		return err
+	}
+
+	_, ok := options[sql.WAIT]
+	if ok {
+		m.closeDatabase(name, de)
+		return de.err
+	}
+
+	go m.closeDatabase(name, de)
+	return nil
+}
+
+func (m *Manager) DetachDatabase(name sql.Identifier, options Options) error {
+	return m.tryCloseDatabase(name, false, options, Detaching)
+}
+
+func (m *Manager) DropDatabase(name sql.Identifier, exists bool, options Options) error {
+	return m.tryCloseDatabase(name, exists, options, Dropping)
 }
 
 type Transaction struct {

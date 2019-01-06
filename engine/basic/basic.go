@@ -129,6 +129,14 @@ func (bdb *database) Rollback(tctx interface{}) error {
 
 func (bdb *database) NextStmt(tctx interface{}) {}
 
+func (bdb *database) CanClose(drop bool) bool {
+	return true
+}
+
+func (bdb *database) Close(drop bool) error {
+	return nil
+}
+
 func (bt *table) Columns(ses engine.Session) []sql.Identifier {
 	return bt.columns
 }

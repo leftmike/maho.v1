@@ -342,6 +342,14 @@ func (mdb *database) NextStmt(tx interface{}) {
 	tctx.cid += 1
 }
 
+func (mdb *database) CanClose(drop bool) bool {
+	return true
+}
+
+func (mdb *database) Close(drop bool) error {
+	return nil // XXX: don't return until all transactions are done
+}
+
 func (mt *table) Columns(ses engine.Session) []sql.Identifier {
 	return mt.table.getColumns(mt.tctx)
 }

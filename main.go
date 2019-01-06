@@ -8,6 +8,9 @@ To Do:
 
 - fuzzing: parser.Parse
 
+- DROP DATABASE [ IF EXISTS ] <name> [WITH [WAIT ['='] (true | false)]]
+- add [WITH [WAIT ['='] (true | false)]] to DETACH DATABASE
+
 - ALTER TABLE ...
 - memrows: tableImpl: add versioned metadata and use METADATA_MODIFY locking level
 
@@ -172,8 +175,8 @@ func main() {
 	mgr := engine.NewManager(*dataDir, map[string]engine.Engine{
 		"basic":   basic.Engine{},
 		"memrows": memrows.Engine{},
-		// "badger": kvrows.Engine{badger.Engine{}},
-		// "bolt": kvrows.Engine{bbolt.Engine{[]byte("maho")}},
+		//"badger":  kvrows.Engine{Engine: badger.Engine{}},
+		//"bolt":    kvrows.Engine{Engine: bbolt.Engine{}},
 	})
 
 	svr := server.Server{

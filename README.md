@@ -101,6 +101,12 @@ DELETE FROM [database '.'] table [WHERE <expr>]
 
 ```
 DETACH DATABASE database
+    [WITH WAIT ['='] (true | false)]
+```
+
+```
+DROP DATABASE [IF EXISTS] database
+    [WITH WAIT ['='] (true | false)]
 ```
 
 ```

@@ -116,6 +116,14 @@ func (vdb *virtualDatabase) Rollback(tctx interface{}) error {
 
 func (vdb *virtualDatabase) NextStmt(tctx interface{}) {}
 
+func (vdb *virtualDatabase) CanClose(drop bool) bool {
+	return false
+}
+
+func (vdb *virtualDatabase) Close(drop bool) error {
+	return nil
+}
+
 type VirtualTable struct {
 	Name     string
 	Cols     []sql.Identifier
