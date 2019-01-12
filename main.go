@@ -49,7 +49,10 @@ import (
 
 	"github.com/leftmike/maho/config"
 	"github.com/leftmike/maho/engine"
+	"github.com/leftmike/maho/engine/badger"
 	"github.com/leftmike/maho/engine/basic"
+	"github.com/leftmike/maho/engine/bbolt"
+	"github.com/leftmike/maho/engine/kvrows"
 	"github.com/leftmike/maho/engine/memrows"
 	"github.com/leftmike/maho/evaluate"
 	"github.com/leftmike/maho/parser"
@@ -188,8 +191,8 @@ func main() {
 	mgr := engine.NewManager(*dataDir, map[string]engine.Engine{
 		"basic":   basic.Engine{},
 		"memrows": memrows.Engine{},
-		//"badger":  kvrows.Engine{Engine: badger.Engine{}},
-		//"bolt":    kvrows.Engine{Engine: bbolt.Engine{}},
+		"badger":  kvrows.Engine{Engine: badger.Engine{}},
+		"bolt":    kvrows.Engine{Engine: bbolt.Engine{}},
 	})
 
 	svr := server.Server{

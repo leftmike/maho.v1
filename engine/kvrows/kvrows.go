@@ -27,7 +27,7 @@ var (
 	databaseOpens   = "database/opens"
 	kvrowsVersion   = uint32(1)
 
-	errNotImplemented = errors.New("kvrows: attach database not implemented")
+	errNotImplemented = errors.New("kvrows: not implemented")
 )
 
 type Engine struct {
@@ -62,6 +62,35 @@ func (e Engine) AttachDatabase(svcs engine.Services, name sql.Identifier, path s
 	return nil, errNotImplemented
 }
 
+func (e Engine) initializeDB(db kv.DB, name sql.Identifier, path string,
+	options engine.Options) error {
+
+	wtx, err := db.WriteTx()
+	if err != nil {
+		return err
+	}
+	defer wtx.Discard()
+
+	err = setString(wtx, databaseName, name.String())
+	if err != nil {
+		return err
+	}
+	err = setUInt32(wtx, databaseVersion, kvrowsVersion)
+	if err != nil {
+		return err
+	}
+	err = setUInt32(wtx, databaseOpens, 1)
+	if err != nil {
+		return err
+	}
+
+	err = wtx.Commit()
+	if err != nil {
+		return err
+	}
+	return nil
+}
+
 func (e Engine) CreateDatabase(svcs engine.Services, name sql.Identifier, path string,
 	options engine.Options) (engine.Database, error) {
 
@@ -75,30 +104,12 @@ func (e Engine) CreateDatabase(svcs engine.Services, name sql.Identifier, path s
 		return nil, err
 	}
 
-	wtx, err := db.WriteTx()
+	err = e.initializeDB(db, name, path, options)
 	if err != nil {
+		// XXX: close and cleanup db
 		return nil, err
 	}
-	defer wtx.Discard()
-
-	err = setString(wtx, databaseName, name.String())
-	if err != nil {
-		return nil, err
-	}
-	err = setUInt32(wtx, databaseVersion, kvrowsVersion)
-	if err != nil {
-		return nil, err
-	}
-	err = setUInt32(wtx, databaseOpens, 1)
-	if err != nil {
-		return nil, err
-	}
-
-	err = wtx.Commit()
-	if err != nil {
-		return nil, err
-	}
-	return nil, errNotImplemented
+	return &database{}, nil
 }
 
 func (kvdb *database) Message() string {
@@ -141,7 +152,11 @@ func (kvdb *database) Rollback(tctx interface{}) error {
 
 func (kvdb *database) NextStmt(tctx interface{}) {}
 
-func (kvdb *database) Close() error {
+func (kvdb *database) CanClose(drop bool) bool {
+	return true
+}
+
+func (kvdb *database) Close(drop bool) error {
 	return errNotImplemented
 }
 
