@@ -1,0 +1,39 @@
+syntax = "proto3";
+
+option go_package = "encoding";
+
+message DatabaseMetadata {
+    uint32 Version = 1;
+    string Name = 2;
+    uint32 Opens = 3;
+    uint32 NextTableID = 4;
+}
+
+message TableMetadata {
+    uint32 ID = 1;
+    repeated ColumnMetadata Columns = 2;
+}
+
+// These need to match the values in maho/sql/datatype.go
+enum DataType {
+    Unknown = 0;
+    Boolean = 1;
+    Character = 2;
+    Float = 3;
+    Integer = 4;
+}
+
+message ColumnMetadata {
+    string Name = 1;
+    uint32 Index = 2;
+
+    DataType Type = 3;
+
+    // Size of the column in bytes for integers and in characters for character columns
+    uint32 Size = 4;
+    bool Fixed = 5; // fixed sized character column
+    bool Binary = 6; // binary character column
+
+    bool NotNull = 7; // not allowed to be NULL
+    string Default = 8;
+}

@@ -11,33 +11,29 @@ package kvrows
 -- allow both layers to be distributed / remote / sharded
 -- https://github.com/cockroachdb/cockroach/blob/master/docs/RFCS/20181209_lazy_txn_record_creation.md
 
-database/name
-database/version
-database/opens
-
 table/<id>/<primary-key>:<row>
-table 1 is table of tables
-table 2 is table of columns
+table/1/<name>:<id> // map of table name to id
+table/2/<id>:<metadata> // metadata about each table
+first user table is at 1000
 */
 
 import (
 	"errors"
 	"fmt"
 	"os"
+	"sync"
 
+	"github.com/golang/protobuf/proto"
 	"github.com/leftmike/maho/engine"
 	"github.com/leftmike/maho/engine/fatlock"
 	"github.com/leftmike/maho/engine/kv"
+	"github.com/leftmike/maho/engine/kvrows/encoding"
 	"github.com/leftmike/maho/sql"
 )
 
 var (
-	databaseName    = "database/name"
-	databaseVersion = "database/version"
-	databaseOpens   = "database/opens"
-	kvrowsVersion   = uint32(1)
-
-	errNotImplemented = errors.New("kvrows: not implemented")
+	databaseKey   = []byte("database")
+	kvrowsVersion = uint32(1)
 )
 
 type Engine struct {
@@ -45,14 +41,50 @@ type Engine struct {
 }
 
 type database struct {
-	name sql.Identifier
-	db   kv.DB
+	lockService   fatlock.LockService
+	mutex         sync.Mutex
+	metadata      *encoding.DatabaseMetadata
+	name          sql.Identifier
+	path          string
+	db            kv.DB
+	tableMetadata map[sql.Identifier]*encoding.TableMetadata
+}
+
+type tcontext struct {
+	locker fatlock.Locker
+	tables map[sql.Identifier]*table
 }
 
 type table struct {
+	db          *database
+	name        sql.Identifier
+	metadata    *encoding.TableMetadata
+	columns     []sql.Identifier
+	columnTypes []sql.ColumnType
+	created     bool
+	dropped     bool
 }
 
 type rows struct {
+}
+
+func openDB(db kv.DB, name sql.Identifier) (*encoding.DatabaseMetadata, error) {
+	rtx, err := db.ReadTx()
+	if err != nil {
+		return nil, err
+	}
+	defer rtx.Discard()
+
+	var md encoding.DatabaseMetadata
+	err = rtx.Get(databaseKey,
+		func(val []byte) error {
+			return nil
+		})
+	if err != nil {
+		return nil, err
+	}
+
+	return &md, nil
 }
 
 func (e Engine) AttachDatabase(svcs engine.Services, name sql.Identifier, path string,
@@ -68,12 +100,41 @@ func (e Engine) AttachDatabase(svcs engine.Services, name sql.Identifier, path s
 		return nil, err
 	}
 
-	_ = db
-	return nil, errNotImplemented
+	md, err := openDB(db, name)
+	if err != nil {
+		db.Close() // Ignore any error from close, since we can't do much about it.
+		return nil, err
+	}
+
+	if md.Version != kvrowsVersion {
+		return nil, fmt.Errorf("kvrows: %s: unsupported version: %d", path, md.Version)
+	}
+	if md.Name != name.String() {
+		return nil, fmt.Errorf("kvrows: %s: need %s for database name", path, md.Name)
+	}
+
+	md.Opens += 1
+	err = setMetadata(db, md)
+	if err != nil {
+		db.Close() // As above, ignore any error from close.
+		return nil, err
+	}
+
+	return &database{
+		lockService:   svcs.LockService(),
+		metadata:      md,
+		name:          name,
+		path:          path,
+		db:            db,
+		tableMetadata: map[sql.Identifier]*encoding.TableMetadata{},
+	}, nil
 }
 
-func (e Engine) initializeDB(db kv.DB, name sql.Identifier, path string,
-	options engine.Options) error {
+func setMetadata(db kv.DB, md *encoding.DatabaseMetadata) error {
+	val, err := proto.Marshal(md)
+	if err != nil {
+		return err
+	}
 
 	wtx, err := db.WriteTx()
 	if err != nil {
@@ -81,15 +142,7 @@ func (e Engine) initializeDB(db kv.DB, name sql.Identifier, path string,
 	}
 	defer wtx.Discard()
 
-	err = setString(wtx, databaseName, name.String())
-	if err != nil {
-		return err
-	}
-	err = setUInt32(wtx, databaseVersion, kvrowsVersion)
-	if err != nil {
-		return err
-	}
-	err = setUInt32(wtx, databaseOpens, 1)
+	err = wtx.Set(databaseKey, val)
 	if err != nil {
 		return err
 	}
@@ -99,6 +152,22 @@ func (e Engine) initializeDB(db kv.DB, name sql.Identifier, path string,
 		return err
 	}
 	return nil
+}
+
+func initializeDB(db kv.DB, name sql.Identifier) (*encoding.DatabaseMetadata, error) {
+
+	md := encoding.DatabaseMetadata{
+		Version:     kvrowsVersion,
+		Name:        name.String(),
+		Opens:       1,
+		NextTableID: 1000,
+	}
+
+	err := setMetadata(db, &md)
+	if err != nil {
+		return nil, err
+	}
+	return &md, nil
 }
 
 func (e Engine) CreateDatabase(svcs engine.Services, name sql.Identifier, path string,
@@ -114,50 +183,263 @@ func (e Engine) CreateDatabase(svcs engine.Services, name sql.Identifier, path s
 		return nil, err
 	}
 
-	err = e.initializeDB(db, name, path, options)
+	md, err := initializeDB(db, name)
 	if err != nil {
-		// XXX: close and cleanup db
+		os.RemoveAll(path)
 		return nil, err
 	}
-	return &database{}, nil
+	return &database{
+		lockService:   svcs.LockService(),
+		metadata:      md,
+		name:          name,
+		path:          path,
+		db:            db,
+		tableMetadata: map[sql.Identifier]*encoding.TableMetadata{},
+	}, nil
 }
 
 func (kvdb *database) Message() string {
 	return ""
 }
 
-func (kvdb *database) LookupTable(ses engine.Session, tctx interface{},
+func (kvdb *database) lookupTableMetadata(tblname sql.Identifier) (*encoding.TableMetadata, error) {
+	md, ok := kvdb.tableMetadata[tblname]
+	if ok {
+		return md, nil
+	}
+
+	// XXX: need to lookup table metadata from kv
+
+	return nil, fmt.Errorf("kvdb: table %s.%s not found", kvdb.name, tblname)
+}
+
+func (kvdb *database) LookupTable(ses engine.Session, tx interface{},
 	tblname sql.Identifier) (engine.Table, error) {
 
-	return nil, errNotImplemented
+	tctx := tx.(*tcontext)
+	tbl, ok := tctx.tables[tblname]
+	if ok {
+		if tbl.dropped && !tbl.created {
+			return nil, fmt.Errorf("kvdb: table %s.%s not found", kvdb.name, tblname)
+		}
+		return tbl, nil
+	}
+
+	err := kvdb.lockService.LockTable(ses, tctx.locker, kvdb.name, tblname, fatlock.ACCESS)
+	if err != nil {
+		return nil, err
+	}
+
+	kvdb.mutex.Lock()
+	defer kvdb.mutex.Unlock()
+
+	md, err := kvdb.lookupTableMetadata(tblname)
+	if err != nil {
+		return nil, err
+	}
+
+	return kvdb.makeTableContext(tctx, tblname, md)
 }
 
-func (kvdb *database) CreateTable(ses engine.Session, tctx interface{}, tblname sql.Identifier,
+func (kvdb *database) makeTableContext(tctx *tcontext, tblname sql.Identifier,
+	md *encoding.TableMetadata) (*table, error) {
+
+	tbl := table{
+		db:       kvdb,
+		name:     tblname,
+		metadata: md,
+	}
+	for _, col := range md.Columns {
+		tbl.columns = append(tbl.columns, sql.QuotedID(col.Name))
+		dt, ok := encoding.ToDataType(col.Type)
+		if !ok {
+			return nil, fmt.Errorf("kvrows: table %s.%s: unexpected encoded column data type: %d",
+				kvdb.name, tblname, col.Type)
+		}
+		tbl.columnTypes = append(tbl.columnTypes, sql.ColumnType{
+			Type:    dt,
+			Size:    col.Size,
+			Fixed:   col.Fixed,
+			Binary:  col.Binary,
+			NotNull: col.NotNull,
+			//Default: col.Default, // XXX: Expr <-> string
+		})
+	}
+
+	tctx.tables[tblname] = &tbl
+	return &tbl, nil
+}
+
+func (kvdb *database) newTableID() (uint32, error) {
+	id := kvdb.metadata.NextTableID
+	kvdb.metadata.NextTableID += 1
+	err := setMetadata(kvdb.db, kvdb.metadata)
+	if err != nil {
+		return 0, err
+	}
+	return id, nil
+}
+
+func (kvdb *database) CreateTable(ses engine.Session, tx interface{}, tblname sql.Identifier,
 	cols []sql.Identifier, colTypes []sql.ColumnType) error {
 
-	return errNotImplemented
+	tctx := tx.(*tcontext)
+	err := kvdb.lockService.LockTable(ses, tctx.locker, kvdb.name, tblname, fatlock.EXCLUSIVE)
+	if err != nil {
+		return err
+	}
+
+	var dropped bool
+	if tbl, ok := tctx.tables[tblname]; ok {
+		if tbl.dropped && !tbl.created {
+			dropped = true
+		} else {
+			return fmt.Errorf("kvdb: table %s.%s already exists", kvdb.name, tblname)
+		}
+	}
+
+	kvdb.mutex.Lock()
+	defer kvdb.mutex.Unlock()
+
+	if !dropped {
+		if _, err := kvdb.lookupTableMetadata(tblname); err == nil {
+			return fmt.Errorf("kvdb: table %s.%s already exists", kvdb.name, tblname)
+		}
+	}
+
+	id, err := kvdb.newTableID()
+	if err != nil {
+		return err
+	}
+
+	md := encoding.TableMetadata{
+		ID: id,
+	}
+
+	for idx := range cols {
+		md.Columns = append(md.Columns, &encoding.ColumnMetadata{
+			Name:    cols[idx].String(),
+			Index:   uint32(idx),
+			Type:    encoding.FromDataType(colTypes[idx].Type),
+			Size:    colTypes[idx].Size,
+			Fixed:   colTypes[idx].Fixed,
+			Binary:  colTypes[idx].Binary,
+			NotNull: colTypes[idx].NotNull,
+			//Default: colTypes[idx].Default, // XXX: Expr
+		})
+	}
+
+	tbl, err := kvdb.makeTableContext(tctx, tblname, &md)
+	if err != nil {
+		return err
+	}
+	tbl.dropped = dropped
+	tbl.created = true
+	return nil
 }
 
-func (kvdb *database) DropTable(ses engine.Session, tctx interface{}, tblname sql.Identifier,
+func (kvdb *database) DropTable(ses engine.Session, tx interface{}, tblname sql.Identifier,
 	exists bool) error {
 
-	return errNotImplemented
+	tctx := tx.(*tcontext)
+	err := kvdb.lockService.LockTable(ses, tctx.locker, kvdb.name, tblname, fatlock.EXCLUSIVE)
+	if err != nil {
+		return err
+	}
+
+	if tbl, ok := tctx.tables[tblname]; ok {
+		if tbl.created {
+			// The table was created in this transaction so dropping the table now means that
+			// even if this transaction committed, the table will never be visible: just go
+			// ahead and discard it from the transaction context.
+			delete(tctx.tables, tblname)
+			return nil
+		} else if tbl.dropped {
+			if exists {
+				return nil
+			}
+			return fmt.Errorf("kvrows: table %s.%s does not exist", kvdb.name, tblname)
+		}
+		tbl.dropped = true
+		return nil
+	}
+
+	kvdb.mutex.Lock()
+	defer kvdb.mutex.Unlock()
+
+	_, ok := kvdb.tableMetadata[tblname]
+	if !ok {
+		if exists {
+			return nil
+		}
+		return fmt.Errorf("kvrows: table %s.%s does not exist", kvdb.name, tblname)
+	}
+
+	tctx.tables[tblname] = &table{
+		db:      kvdb,
+		name:    tblname,
+		dropped: true,
+	}
+
+	// XXX: also need to delete the persistent state: name, metadata, and rows => at commit time
+
+	return nil
 }
 
-func (kvdb *database) ListTables(ses engine.Session, tctx interface{}) ([]engine.TableEntry, error) {
-	return nil, errNotImplemented
+func (kvdb *database) ListTables(ses engine.Session, tx interface{}) ([]engine.TableEntry, error) {
+	var tbls []engine.TableEntry
+
+	tctx := tx.(*tcontext)
+	for _, tbl := range tctx.tables {
+		if !tbl.dropped {
+			tbls = append(tbls, engine.TableEntry{
+				Name: tbl.name,
+				Type: engine.PhysicalType,
+			})
+		}
+	}
+
+	kvdb.mutex.Lock()
+	defer kvdb.mutex.Unlock()
+
+	for name := range kvdb.tableMetadata {
+		if _, ok := tctx.tables[name]; !ok {
+			tbls = append(tbls, engine.TableEntry{
+				Name: name,
+				Type: engine.PhysicalType,
+			})
+		}
+	}
+	return tbls, nil
 }
 
 func (kvdb *database) Begin(lkr fatlock.Locker) interface{} {
-	return errNotImplemented
+	return &tcontext{
+		locker: lkr,
+		tables: map[sql.Identifier]*table{},
+	}
 }
 
-func (kvdb *database) Commit(ses engine.Session, tctx interface{}) error {
-	return errNotImplemented
+func (kvdb *database) Commit(ses engine.Session, tx interface{}) error {
+	tctx := tx.(*tcontext)
+
+	kvdb.mutex.Lock()
+	defer kvdb.mutex.Unlock()
+
+	for _, tbl := range tctx.tables {
+		if tbl.dropped {
+			delete(kvdb.tableMetadata, tbl.name)
+		}
+		if tbl.created {
+			kvdb.tableMetadata[tbl.name] = tbl.metadata
+		}
+	}
+	return nil
 }
 
 func (kvdb *database) Rollback(tctx interface{}) error {
-	return errNotImplemented
+	// XXX: handle rolling back changes to rows
+	return nil
 }
 
 func (kvdb *database) NextStmt(tctx interface{}) {}
@@ -167,23 +449,32 @@ func (kvdb *database) CanClose(drop bool) bool {
 }
 
 func (kvdb *database) Close(drop bool) error {
-	return errNotImplemented
+	// XXX: wait until all transactions are done
+
+	err := kvdb.db.Close()
+	if err != nil {
+		return err
+	}
+	if drop {
+		return os.RemoveAll(kvdb.path)
+	}
+	return nil
 }
 
 func (kvt *table) Columns(ses engine.Session) []sql.Identifier {
-	return nil
+	return kvt.columns
 }
 
 func (kvt *table) ColumnTypes(ses engine.Session) []sql.ColumnType {
-	return nil
+	return kvt.columnTypes
 }
 
 func (kvt *table) Rows(ses engine.Session) (engine.Rows, error) {
-	return nil, errNotImplemented
+	return nil, errors.New("kvrows: Rows: not implemented")
 }
 
 func (kvt *table) Insert(ses engine.Session, row []sql.Value) error {
-	return errNotImplemented
+	return errors.New("kvrows: Insert: not implemented")
 }
 
 func (kvr *rows) Columns() []sql.Identifier {
@@ -191,17 +482,17 @@ func (kvr *rows) Columns() []sql.Identifier {
 }
 
 func (kvr *rows) Close() error {
-	return errNotImplemented
+	return errors.New("kvrows: Close: not implemented")
 }
 
 func (kvr *rows) Next(ses engine.Session, dest []sql.Value) error {
-	return errNotImplemented
+	return errors.New("kvrows: Next: not implemented")
 }
 
 func (kvr *rows) Delete(ses engine.Session) error {
-	return errNotImplemented
+	return errors.New("kvrows: Delete: not implemented")
 }
 
 func (kvr *rows) Update(ses engine.Session, updates []sql.ColumnUpdate) error {
-	return errNotImplemented
+	return errors.New("kvrows: Update: not implemented")
 }

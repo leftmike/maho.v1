@@ -103,10 +103,12 @@ func allRows(t *testing.T, ses engine.Session, rows engine.Rows) [][]sql.Value {
 }
 
 func testTableLifecycle(t *testing.T, d engine.Database, svcs *Services, cmds []cmd) {
+	t.Helper()
+
 	sessions := [4]sessionState{}
 	state := &sessions[0]
 
-	for _, cmd := range cmds {
+	for idx, cmd := range cmds {
 		switch cmd.cmd {
 		case cmdSession:
 		case cmdNextStmt:
@@ -119,7 +121,7 @@ func testTableLifecycle(t *testing.T, d engine.Database, svcs *Services, cmds []
 			if state.rows != nil {
 				err := state.rows.Close()
 				if err != nil {
-					t.Errorf("rows.Close() failed with %s", err)
+					t.Errorf("%d: rows.Close() failed with %s", idx, err)
 				}
 				state.rows = nil
 			}
@@ -141,10 +143,10 @@ func testTableLifecycle(t *testing.T, d engine.Database, svcs *Services, cmds []
 			err := d.Commit(state.ses, state.tctx)
 			if cmd.fail {
 				if err == nil {
-					t.Errorf("Commit() did not fail")
+					t.Errorf("%d: Commit() did not fail", idx)
 				}
 			} else if err != nil {
-				t.Errorf("Commit() failed with %s", err)
+				t.Errorf("%d: Commit() failed with %s", idx, err)
 			}
 			state.tctx = nil
 			svcs.lockService.ReleaseLocks(state.locker)
@@ -152,10 +154,10 @@ func testTableLifecycle(t *testing.T, d engine.Database, svcs *Services, cmds []
 			err := d.Rollback(state.tctx)
 			if cmd.fail {
 				if err == nil {
-					t.Errorf("Rollback() did not fail")
+					t.Errorf("%d: Rollback() did not fail", idx)
 				}
 			} else if err != nil {
-				t.Errorf("Rollback() failed with %s", err)
+				t.Errorf("%d: Rollback() failed with %s", idx, err)
 			}
 			state.tctx = nil
 			svcs.lockService.ReleaseLocks(state.locker)
@@ -166,42 +168,42 @@ func testTableLifecycle(t *testing.T, d engine.Database, svcs *Services, cmds []
 			state.tbl, err = d.LookupTable(state.ses, state.tctx, cmd.name)
 			if cmd.fail {
 				if err == nil {
-					t.Errorf("LookupTable(%s) did not fail", cmd.name)
+					t.Errorf("%d: LookupTable(%s) did not fail", idx, cmd.name)
 				}
 			} else if err != nil {
-				t.Errorf("LookupTable(%s) failed with %s", cmd.name, err)
+				t.Errorf("%d: LookupTable(%s) failed with %s", idx, cmd.name, err)
 			} else {
 				cols := state.tbl.Columns(state.ses)
 				if !reflect.DeepEqual(cols, columns) {
-					t.Errorf("tbl.Columns() got %v want %v", cols, columns)
+					t.Errorf("%d: tbl.Columns() got %v want %v", idx, cols, columns)
 				}
 				colTypes := state.tbl.ColumnTypes(state.ses)
 				if !reflect.DeepEqual(colTypes, columnTypes) {
-					t.Errorf("tbl.ColumnTypes() got %v want %v", colTypes, columnTypes)
+					t.Errorf("%d: tbl.ColumnTypes() got %v want %v", idx, colTypes, columnTypes)
 				}
 			}
 		case cmdCreateTable:
 			err := d.CreateTable(state.ses, state.tctx, cmd.name, columns, columnTypes)
 			if cmd.fail {
 				if err == nil {
-					t.Errorf("CreateTable(%s) did not fail", cmd.name)
+					t.Errorf("%d: CreateTable(%s) did not fail", idx, cmd.name)
 				}
 			} else if err != nil {
-				t.Errorf("CreateTable(%s) failed with %s", cmd.name, err)
+				t.Errorf("%d: CreateTable(%s) failed with %s", idx, cmd.name, err)
 			}
 		case cmdDropTable:
 			err := d.DropTable(state.ses, state.tctx, cmd.name, cmd.exists)
 			if cmd.fail {
 				if err == nil {
-					t.Errorf("DropTable(%s) did not fail", cmd.name)
+					t.Errorf("%d: DropTable(%s) did not fail", idx, cmd.name)
 				}
 			} else if err != nil {
-				t.Errorf("DropTable(%s) failed with %s", cmd.name, err)
+				t.Errorf("%d: DropTable(%s) failed with %s", idx, cmd.name, err)
 			}
 		case cmdListTables:
 			entries, err := d.ListTables(state.ses, state.tctx)
 			if err != nil {
-				t.Errorf("ListTables() failed with %s", err)
+				t.Errorf("%d: ListTables() failed with %s", idx, err)
 			} else {
 				var ret []string
 				for _, te := range entries {
@@ -209,39 +211,39 @@ func testTableLifecycle(t *testing.T, d engine.Database, svcs *Services, cmds []
 				}
 				sort.Strings(ret)
 				if !reflect.DeepEqual(cmd.list, ret) {
-					t.Errorf("ListTables() got %v want %v", ret, cmd.list)
+					t.Errorf("%d: ListTables() got %v want %v", idx, ret, cmd.list)
 				}
 			}
 		case cmdRows:
 			var err error
 			state.rows, err = state.tbl.Rows(state.ses)
 			if err != nil {
-				t.Errorf("table.Rows() failed with %s", err)
+				t.Errorf("%d: table.Rows() failed with %s", idx, err)
 			} else {
 				vals := allRows(t, state.ses, state.rows)
 				if vals != nil {
 					testutil.SortValues(vals)
 					if !reflect.DeepEqual(vals, cmd.values) {
-						t.Errorf("table.Rows() got %v want %v", vals, cmd.values)
+						t.Errorf("%d: table.Rows() got %v want %v", idx, vals, cmd.values)
 					}
 				}
 			}
 		case cmdInsert:
 			err := state.tbl.Insert(state.ses, cmd.row)
 			if err != nil {
-				t.Errorf("table.Insert() failed with %s", err)
+				t.Errorf("%d: table.Insert() failed with %s", idx, err)
 			}
 		case cmdUpdate:
 			rows, err := state.tbl.Rows(state.ses)
 			if err != nil {
-				t.Errorf("table.Rows() failed with %s", err)
+				t.Errorf("%d: table.Rows() failed with %s", idx, err)
 			} else {
 				dest := make([]sql.Value, len(rows.Columns()))
 				for {
 					err = rows.Next(state.ses, dest)
 					if err != nil {
 						if !cmd.fail {
-							t.Errorf("rows.Next() failed with %s", err)
+							t.Errorf("%d: rows.Next() failed with %s", idx, err)
 						}
 						break
 					}
@@ -249,10 +251,10 @@ func testTableLifecycle(t *testing.T, d engine.Database, svcs *Services, cmds []
 						err = rows.Update(state.ses, cmd.updates)
 						if cmd.fail {
 							if err == nil {
-								t.Errorf("rows.Update() did not fail")
+								t.Errorf("%d: rows.Update() did not fail", idx)
 							}
 						} else if err != nil {
-							t.Errorf("rows.Update() failed with %s", err)
+							t.Errorf("%d: rows.Update() failed with %s", idx, err)
 						}
 						break
 					}
@@ -261,14 +263,14 @@ func testTableLifecycle(t *testing.T, d engine.Database, svcs *Services, cmds []
 		case cmdDelete:
 			rows, err := state.tbl.Rows(state.ses)
 			if err != nil {
-				t.Errorf("table.Rows() failed with %s", err)
+				t.Errorf("%d: table.Rows() failed with %s", idx, err)
 			} else {
 				dest := make([]sql.Value, len(rows.Columns()))
 				for {
 					err = rows.Next(state.ses, dest)
 					if err != nil {
 						if !cmd.fail {
-							t.Errorf("rows.Next() failed with %s", err)
+							t.Errorf("%d: rows.Next() failed with %s", idx, err)
 						}
 						break
 					}
@@ -276,10 +278,10 @@ func testTableLifecycle(t *testing.T, d engine.Database, svcs *Services, cmds []
 						err = rows.Delete(state.ses)
 						if cmd.fail {
 							if err == nil {
-								t.Errorf("rows.Delete() did not fail")
+								t.Errorf("%d: rows.Delete() did not fail", idx)
 							}
 						} else if err != nil {
-							t.Errorf("rows.Delete() failed with %s", err)
+							t.Errorf("%d: rows.Delete() failed with %s", idx, err)
 						}
 						break
 					}
@@ -290,8 +292,6 @@ func testTableLifecycle(t *testing.T, d engine.Database, svcs *Services, cmds []
 }
 
 func RunDatabaseTest(t *testing.T, e engine.Engine) {
-	t.Helper()
-
 	var svcs Services
 	svcs.Init()
 	d, err := e.CreateDatabase(&svcs, sql.ID("database_test"),
@@ -514,8 +514,6 @@ func RunDatabaseTest(t *testing.T, e engine.Engine) {
 }
 
 func RunTableTest(t *testing.T, e engine.Engine) {
-	t.Helper()
-
 	var svcs Services
 	svcs.Init()
 	d, err := e.CreateDatabase(&svcs, sql.ID("table_test"),
@@ -893,8 +891,6 @@ func RunTableTest(t *testing.T, e engine.Engine) {
 }
 
 func RunParallelTest(t *testing.T, e engine.Engine) {
-	t.Helper()
-
 	var svcs Services
 	svcs.Init()
 	d, err := e.CreateDatabase(&svcs, sql.ID("parallel_test"),
@@ -943,6 +939,8 @@ func RunParallelTest(t *testing.T, e engine.Engine) {
 }
 
 func incColumn(t *testing.T, d engine.Database, tctx interface{}, i int, name sql.Identifier) bool {
+	t.Helper()
+
 	tbl, err := d.LookupTable(session{}, tctx, name)
 	if err != nil {
 		t.Fatalf("LookupTable(%s) failed with %s", name, err)
@@ -975,8 +973,6 @@ func incColumn(t *testing.T, d engine.Database, tctx interface{}, i int, name sq
 }
 
 func RunStressTest(t *testing.T, e engine.Engine) {
-	t.Helper()
-
 	var svcs Services
 	svcs.Init()
 	d, err := e.CreateDatabase(&svcs, sql.ID("stress_test"),

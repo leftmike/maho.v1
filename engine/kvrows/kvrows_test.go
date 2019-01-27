@@ -38,8 +38,21 @@ func testKVRows(t *testing.T, e engine.Engine) {
 }
 
 func TestKVRows(t *testing.T) {
-	// XXX: engine/test
+	badgerEngine := kvrows.Engine{Engine: badger.Engine{}}
+	bboltEngine := kvrows.Engine{Engine: bbolt.Engine{}}
+	testKVRows(t, badgerEngine)
+	testKVRows(t, bboltEngine)
 
-	testKVRows(t, kvrows.Engine{Engine: badger.Engine{}})
-	testKVRows(t, kvrows.Engine{Engine: bbolt.Engine{}})
+	test.RunDatabaseTest(t, badgerEngine)
+	test.RunDatabaseTest(t, bboltEngine)
+
+	// XXX
+	//test.RunTableTest(t, badgerEngine)
+	//test.RunTableTest(t, bboltEngine)
+
+	//test.RunParallelTest(t, badgerEngine)
+	//test.RunParallelTest(t, bboltEngine)
+
+	//test.RunStressTest(t, badgerEngine)
+	//test.RunStressTest(t, bboltEngine)
 }
