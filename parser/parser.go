@@ -975,7 +975,7 @@ func (p *parser) parseUpdate() evaluate.Stmt {
 }
 
 func (p *parser) parseSet() evaluate.Stmt {
-	// SET variable ( TO | '=' ) <literal>
+	// SET <variable> ( TO | '=' ) <literal>
 	var s misc.Set
 
 	if p.optionalReserved(sql.DATABASE) {
