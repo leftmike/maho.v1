@@ -9,13 +9,15 @@ import (
 )
 
 const (
-	boolKeyTag        = 128
-	stringKeyTag      = 130
-	float64NaNKeyTag  = 140
-	float64NegKeyTag  = 141
-	float64ZeroKeyTag = 142
-	float64PosKeyTag  = 143
-	int64KeyTag       = 150
+	NullKeyTag        = 128
+	BoolKeyTag        = 129
+	Int64NegKeyTag    = 130
+	Int64NotNegKeyTag = 131
+	Float64NaNKeyTag  = 140
+	Float64NegKeyTag  = 141
+	Float64ZeroKeyTag = 142
+	Float64PosKeyTag  = 143
+	StringKeyTag      = 150
 )
 
 func MakeKey(tid, iid uint32, vals ...sql.Value) []byte {
@@ -26,35 +28,43 @@ func MakeKey(tid, iid uint32, vals ...sql.Value) []byte {
 	for _, val := range vals {
 		switch val := val.(type) {
 		case sql.BoolValue:
-			key = append(key, boolKeyTag)
+			key = append(key, BoolKeyTag)
 			if val {
 				key = append(key, 1)
 			} else {
 				key = append(key, 0)
 			}
 		case sql.StringValue:
-			key = append(key, stringKeyTag)
+			key = append(key, StringKeyTag)
 			key = encodeBytes(key, []byte(val))
 		case sql.Float64Value:
 			if math.IsNaN(float64(val)) {
-				key = append(key, float64NaNKeyTag)
+				key = append(key, Float64NaNKeyTag)
 			} else if val == 0 {
-				key = append(key, float64ZeroKeyTag)
+				key = append(key, Float64ZeroKeyTag)
 			} else {
 				u := math.Float64bits(float64(val))
 				if u&(1<<63) != 0 {
 					u = ^u
-					key = append(key, float64NegKeyTag)
+					key = append(key, Float64NegKeyTag)
 				} else {
-					key = append(key, float64PosKeyTag)
+					key = append(key, Float64PosKeyTag)
 				}
 				key = encodeUInt64(key, u)
 			}
 		case sql.Int64Value:
-			key = append(key, int64KeyTag)
+			if val < 0 {
+				key = append(key, Int64NegKeyTag)
+			} else {
+				key = append(key, Int64NotNegKeyTag)
+			}
 			key = encodeUInt64(key, uint64(val))
 		default:
-			panic(fmt.Sprintf("unexpected type for sql.Value: %T: %v", val, val))
+			if val == nil {
+				key = append(key, NullKeyTag)
+			} else {
+				panic(fmt.Sprintf("unexpected type for sql.Value: %T: %v", val, val))
+			}
 		}
 	}
 	return key
@@ -89,10 +99,13 @@ func decodeBytes(key []byte) ([]byte, []byte, bool) {
 	for idx, b := range key {
 		if esc {
 			bytes = append(bytes, b)
+			esc = false
 		} else if b == 0 {
-			return key[idx:], bytes, true
+			return key[idx+1:], bytes, true
 		} else if b == 1 {
 			esc = true
+		} else {
+			bytes = append(bytes, b)
 		}
 	}
 	return nil, nil, false
@@ -110,7 +123,10 @@ func ParseKey(key []byte, tid, iid uint32) ([]sql.Value, bool) {
 	var vals []sql.Value
 	for len(key) > 0 {
 		switch key[0] {
-		case boolKeyTag:
+		case NullKeyTag:
+			vals = append(vals, nil)
+			key = key[1:]
+		case BoolKeyTag:
 			if len(key) < 1 {
 				return nil, false
 			}
@@ -120,7 +136,7 @@ func ParseKey(key []byte, tid, iid uint32) ([]sql.Value, bool) {
 				vals = append(vals, sql.BoolValue(true))
 			}
 			key = key[2:]
-		case stringKeyTag:
+		case StringKeyTag:
 			var s []byte
 			var ok bool
 			key, s, ok = decodeBytes(key[1:])
@@ -128,10 +144,10 @@ func ParseKey(key []byte, tid, iid uint32) ([]sql.Value, bool) {
 				return nil, false
 			}
 			vals = append(vals, sql.StringValue(s))
-		case float64NaNKeyTag:
+		case Float64NaNKeyTag:
 			vals = append(vals, sql.Float64Value(math.NaN()))
 			key = key[1:]
-		case float64NegKeyTag:
+		case Float64NegKeyTag:
 			var u uint64
 			var ok bool
 			key, u, ok = decodeUInt64(key[1:])
@@ -140,10 +156,10 @@ func ParseKey(key []byte, tid, iid uint32) ([]sql.Value, bool) {
 			}
 			u = ^u
 			vals = append(vals, sql.Float64Value(math.Float64frombits(u)))
-		case float64ZeroKeyTag:
+		case Float64ZeroKeyTag:
 			vals = append(vals, sql.Float64Value(0.0))
 			key = key[1:]
-		case float64PosKeyTag:
+		case Float64PosKeyTag:
 			var u uint64
 			var ok bool
 			key, u, ok = decodeUInt64(key[1:])
@@ -151,7 +167,7 @@ func ParseKey(key []byte, tid, iid uint32) ([]sql.Value, bool) {
 				return nil, false
 			}
 			vals = append(vals, sql.Float64Value(math.Float64frombits(u)))
-		case int64KeyTag:
+		case Int64NegKeyTag, Int64NotNegKeyTag:
 			var u uint64
 			var ok bool
 			key, u, ok = decodeUInt64(key[1:])
@@ -181,7 +197,11 @@ func FormatKey(key []byte) string {
 
 	s := fmt.Sprintf("/%d/%d", tid, iid)
 	for _, val := range vals {
-		s = fmt.Sprintf("%s/%s", s, sql.Format(val))
+		if sv, ok := val.(sql.StringValue); ok {
+			s = fmt.Sprintf("%s/%s", s, string(sv))
+		} else {
+			s = fmt.Sprintf("%s/%s", s, sql.Format(val))
+		}
 	}
 	return s
 }
