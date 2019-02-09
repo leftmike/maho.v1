@@ -11,9 +11,11 @@ package kvrows
 -- allow both layers to be distributed / remote / sharded
 -- https://github.com/cockroachdb/cockroach/blob/master/docs/RFCS/20181209_lazy_txn_record_creation.md
 
-table/<id>/<primary-key>:<row>
-table/1/<name>:<id> // map of table name to id
-table/2/<id>:<metadata> // metadata about each table
+- change database to 1/1/metadata
+
+<tid>/<iid>/<primary-key>:<row>
+2/1/<name>:<tid> // map of table name to id
+3/1/<id>:<metadata> // metadata about each table
 first user table is at 1000
 */
 
@@ -114,7 +116,7 @@ func (e Engine) AttachDatabase(svcs engine.Services, name sql.Identifier, path s
 	}
 
 	md.Opens += 1
-	err = setMetadata(db, md)
+	err = setDatabaseMetadata(db, md)
 	if err != nil {
 		db.Close() // As above, ignore any error from close.
 		return nil, err
@@ -130,7 +132,7 @@ func (e Engine) AttachDatabase(svcs engine.Services, name sql.Identifier, path s
 	}, nil
 }
 
-func setMetadata(db kv.DB, md *encoding.DatabaseMetadata) error {
+func setDatabaseMetadata(db kv.DB, md *encoding.DatabaseMetadata) error {
 	val, err := proto.Marshal(md)
 	if err != nil {
 		return err
@@ -163,7 +165,7 @@ func initializeDB(db kv.DB, name sql.Identifier) (*encoding.DatabaseMetadata, er
 		NextTableID: 1000,
 	}
 
-	err := setMetadata(db, &md)
+	err := setDatabaseMetadata(db, &md)
 	if err != nil {
 		return nil, err
 	}
@@ -273,7 +275,7 @@ func (kvdb *database) makeTableContext(tctx *tcontext, tblname sql.Identifier,
 func (kvdb *database) newTableID() (uint32, error) {
 	id := kvdb.metadata.NextTableID
 	kvdb.metadata.NextTableID += 1
-	err := setMetadata(kvdb.db, kvdb.metadata)
+	err := setDatabaseMetadata(kvdb.db, kvdb.metadata)
 	if err != nil {
 		return 0, err
 	}
@@ -434,6 +436,9 @@ func (kvdb *database) Commit(ses engine.Session, tx interface{}) error {
 			kvdb.tableMetadata[tbl.name] = tbl.metadata
 		}
 	}
+
+	// XXX: persist changes to the metadata
+
 	return nil
 }
 
