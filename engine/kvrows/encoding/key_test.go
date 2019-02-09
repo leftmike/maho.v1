@@ -274,8 +274,38 @@ func TestEncodedKeyOrdering(t *testing.T) {
 			vals: []sql.Value{sql.StringValue("bc")},
 		},
 
-		// XXX: test ordering with multiple keys
-		// XXX: test ordering with different tid and iid
+		{
+			tid: 1, iid: 0, s: "/1/0",
+		},
+		{
+			tid: 1, iid: 1, s: "/1/1",
+		},
+		{
+			tid: 1, iid: 2, s: "/1/2",
+		},
+		{
+			tid: 1, iid: 2, s: "/1/2/3",
+			vals: []sql.Value{sql.Int64Value(3)},
+		},
+		{
+			tid: 1, iid: 3, s: "/1/3",
+		},
+		{
+			tid: 2, iid: 0, s: "/2/0",
+		},
+
+		{
+			tid: 2, iid: 0, s: "/2/0/123/abc",
+			vals: []sql.Value{sql.Int64Value(123), sql.StringValue("abc")},
+		},
+		{
+			tid: 2, iid: 0, s: "/2/0/123/def",
+			vals: []sql.Value{sql.Int64Value(123), sql.StringValue("def")},
+		},
+		{
+			tid: 2, iid: 0, s: "/2/0/456/abc",
+			vals: []sql.Value{sql.Int64Value(456), sql.StringValue("abc")},
+		},
 	}
 
 	prevKey := encoding.MakeKey(0, 0)
