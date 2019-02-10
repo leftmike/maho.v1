@@ -36,7 +36,7 @@ func MakeKey(tid, iid uint32, vals ...sql.Value) []byte {
 			}
 		case sql.StringValue:
 			key = append(key, StringKeyTag)
-			key = encodeBytes(key, []byte(val))
+			key = encodeKeyBytes(key, []byte(val))
 		case sql.Float64Value:
 			if math.IsNaN(float64(val)) {
 				key = append(key, Float64NaNKeyTag)
@@ -83,7 +83,7 @@ func decodeUInt64(key []byte) ([]byte, uint64, bool) {
 		uint64(key[3])<<32 | uint64(key[2])<<40 | uint64(key[1])<<48 | uint64(key[0])<<56, true
 }
 
-func encodeBytes(key []byte, bytes []byte) []byte {
+func encodeKeyBytes(key []byte, bytes []byte) []byte {
 	for _, b := range bytes {
 		if b == 0 || b == 1 {
 			key = append(key, 1)
@@ -93,7 +93,7 @@ func encodeBytes(key []byte, bytes []byte) []byte {
 	return append(key, 0)
 }
 
-func decodeBytes(key []byte) ([]byte, []byte, bool) {
+func decodeKeyBytes(key []byte) ([]byte, []byte, bool) {
 	var bytes []byte
 	var esc bool
 	for idx, b := range key {
@@ -139,7 +139,7 @@ func ParseKey(key []byte, tid, iid uint32) ([]sql.Value, bool) {
 		case StringKeyTag:
 			var s []byte
 			var ok bool
-			key, s, ok = decodeBytes(key[1:])
+			key, s, ok = decodeKeyBytes(key[1:])
 			if !ok {
 				return nil, false
 			}

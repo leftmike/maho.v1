@@ -2,16 +2,27 @@ syntax = "proto3";
 
 option go_package = "encoding";
 
+enum Type {
+    option allow_alias = true;
+
+    UnknownType = 0;
+    DatabaseMetadataType = 1;
+    TableMetadataType = 2;
+    MaximumType = 2; // Must always be the maximum.
+}
+
 message DatabaseMetadata {
-    uint32 Version = 1;
-    string Name = 2;
-    uint32 Opens = 3;
-    uint32 NextTableID = 4;
+    uint32 Type = 1; // = DatabaseMetadataType
+    uint32 Version = 2;
+    string Name = 3;
+    uint32 Opens = 4;
+    uint32 NextTableID = 5;
 }
 
 message TableMetadata {
-    uint32 ID = 1;
-    repeated ColumnMetadata Columns = 2;
+    uint32 Type = 1; // = TableMetadataType
+    uint32 ID = 2;
+    repeated ColumnMetadata Columns = 3;
 }
 
 // These need to match the values in maho/sql/datatype.go

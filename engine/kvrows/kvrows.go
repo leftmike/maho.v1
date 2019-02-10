@@ -6,7 +6,7 @@ package kvrows
 -- transaction record: active, committed, aborted
 -- table/<id>/<primary-key><version>:<columns>
 -- table/<id>/<primary-key>0:<tid><cid><columns> or table/<id>/<primary-key><tid><cid>:<columns>
--- <columns> in value: non-null and not in key>
+-- <columns> in value: non-null and not in key
 -- implement simple sql layer in terms of enhanced kv layer
 -- allow both layers to be distributed / remote / sharded
 -- https://github.com/cockroachdb/cockroach/blob/master/docs/RFCS/20181209_lazy_txn_record_creation.md
@@ -26,6 +26,7 @@ import (
 	"sync"
 
 	"github.com/golang/protobuf/proto"
+
 	"github.com/leftmike/maho/engine"
 	"github.com/leftmike/maho/engine/fatlock"
 	"github.com/leftmike/maho/engine/kv"
