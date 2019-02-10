@@ -2,6 +2,7 @@ package encoding
 
 import (
 	"fmt"
+	"math"
 
 	"github.com/golang/protobuf/proto"
 
@@ -16,6 +17,7 @@ const (
 	int64ValueTag   = 2
 	float64ValueTag = 3
 	stringValueTag  = 4
+	// Tags must be less than 16.
 )
 
 func EncodeVarint(buf []byte, n uint64) []byte {
@@ -53,6 +55,7 @@ func EncodeZigzag64(buf []byte, n int64) []byte {
 }
 
 func DecodeZigzag64(buf []byte) ([]byte, int64, bool) {
+	// Copied from github.com/golang/protobuf/proto/decode.go
 	buf, n, ok := DecodeVarint(buf)
 	if !ok {
 		return nil, 0, false
@@ -61,7 +64,7 @@ func DecodeZigzag64(buf []byte) ([]byte, int64, bool) {
 }
 
 func encodeCdxValueTag(buf []byte, cdx int, tag byte) []byte {
-	if cdx <= 0 {
+	if cdx == 0 {
 		buf = append(buf, tag)
 	} else if cdx < 16 {
 		buf = append(buf, byte(cdx<<4)|tag)
@@ -87,11 +90,16 @@ func MakeRowValue(row []sql.Value) []byte {
 				buf = append(buf, 0)
 			}
 		case sql.StringValue:
-			// XXX
+			b := []byte(val)
+			buf = encodeCdxValueTag(buf, cdx, stringValueTag)
+			buf = EncodeVarint(buf, uint64(len(b)))
+			buf = append(buf, b...)
 		case sql.Float64Value:
-			// XXX
+			buf = encodeCdxValueTag(buf, cdx, float64ValueTag)
+			buf = encodeUInt64(buf, math.Float64bits(float64(val)))
 		case sql.Int64Value:
-			// XXX
+			buf = encodeCdxValueTag(buf, cdx, int64ValueTag)
+			buf = EncodeZigzag64(buf, int64(val))
 		default:
 			panic(fmt.Sprintf("unexpected type for sql.Value: %T: %v", val, val))
 		}
@@ -122,15 +130,79 @@ func IsRowValue(buf []byte) bool {
 }
 
 func IsProtobufValue(buf []byte) bool {
-	return len(buf) > 0 && buf[0] == valueIsProtobuf
+	// The Type field is required, so there always must be at least 2 bytes.
+	return len(buf) > 1 && buf[0] == valueIsProtobuf
+}
+
+func setRowResult(ret []sql.Value, cdx int, val sql.Value) []sql.Value {
+	for len(ret) <= cdx {
+		ret = append(ret, nil)
+	}
+	ret[cdx] = val
+	return ret
 }
 
 func ParseRowValue(buf []byte) ([]sql.Value, bool) {
-	if !IsRowValue(buf) {
+	if len(buf) < 1 || buf[0] != valueIsRow {
 		return nil, false
 	}
-	// XXX
-	return nil, false
+	buf = buf[1:]
+
+	var ok bool
+	var u uint64
+	var ret []sql.Value
+
+	for len(buf) > 0 {
+		tag := buf[0] & 0x0F
+		cdx := int(buf[0] >> 4)
+		buf = buf[1:]
+		if cdx == 16 {
+			buf, u, ok = DecodeVarint(buf)
+			if !ok {
+				return nil, false
+			}
+			cdx = int(u)
+		}
+		switch tag {
+		case boolValueTag:
+			if len(buf) < 1 {
+				return nil, false
+			}
+			if buf[0] == 0 {
+				ret = setRowResult(ret, cdx, sql.BoolValue(false))
+			} else {
+				ret = setRowResult(ret, cdx, sql.BoolValue(true))
+			}
+			buf = buf[1:]
+		case stringValueTag:
+			buf, u, ok = DecodeVarint(buf)
+			if !ok {
+				return nil, false
+			}
+			if len(buf) < int(u) {
+				return nil, false
+			}
+			ret = setRowResult(ret, cdx, sql.StringValue(buf[:u]))
+			buf = buf[u:]
+		case float64ValueTag:
+			buf, u, ok = decodeUInt64(buf)
+			if !ok {
+				return nil, false
+			}
+			ret = setRowResult(ret, cdx, sql.Float64Value(math.Float64frombits(u)))
+		case int64ValueTag:
+			var n int64
+			buf, n, ok = DecodeZigzag64(buf)
+			if !ok {
+				return nil, false
+			}
+			ret = setRowResult(ret, cdx, sql.Int64Value(n))
+		default:
+			return nil, false
+		}
+	}
+
+	return ret, true
 }
 
 func ParseProtobufValue(buf []byte, pb proto.Message) bool {
@@ -140,7 +212,53 @@ func ParseProtobufValue(buf []byte, pb proto.Message) bool {
 	return proto.Unmarshal(buf, pb) == nil
 }
 
+func formatBadValue(msg string, buf []byte) string {
+	if len(buf) > 30 {
+		return fmt.Sprintf("%s: %v...", msg, buf[:30])
+	}
+	return fmt.Sprintf("%s: %v", msg, buf)
+}
+
+func formatProtobufValue(buf []byte) string {
+	switch Type(buf[1]) {
+	case Type_DatabaseMetadataType:
+		md := DatabaseMetadata{}
+		if ParseProtobufValue(buf, &md) {
+			return fmt.Sprintf("%v", md)
+		}
+	case Type_TableMetadataType:
+		td := TableMetadata{}
+		if ParseProtobufValue(buf, &td) {
+			return fmt.Sprintf("%v", td)
+		}
+	}
+	return formatBadValue("bad protobuf value", buf)
+}
+
 func FormatValue(buf []byte) string {
-	// XXX
-	return ""
+	if IsRowValue(buf) {
+		vals, ok := ParseRowValue(buf)
+		if !ok {
+			return formatBadValue("bad row value", buf)
+		}
+
+		var s string
+		for cdx, val := range vals {
+			if cdx > 0 {
+				s += ", "
+			}
+			s += sql.Format(val)
+		}
+		return s
+	} else if IsProtobufValue(buf) {
+		return formatProtobufValue(buf)
+	}
+
+	return formatBadValue("bad value", buf)
+}
+
+func init() {
+	if Type_MaximumType != Type_TableMetadataType {
+		panic("new Type added to metadata.proto without updating formatProtobufValue")
+	}
 }
