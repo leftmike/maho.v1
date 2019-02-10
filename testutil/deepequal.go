@@ -3,13 +3,15 @@ package testutil
 import (
 	"fmt"
 	"reflect"
+	"strings"
 )
 
 func deepValueEqual(v1, v2 reflect.Value) (bool, string) {
 	if !v1.IsValid() || !v2.IsValid() {
 		return v1.IsValid() == v2.IsValid(), ""
 	}
-	if v1.Type() != v2.Type() {
+	t1 := v1.Type()
+	if t1 != v2.Type() {
 		return false, fmt.Sprintf("%#v.Type() != %#v.Type()\n", v1, v2)
 	}
 
@@ -49,6 +51,11 @@ func deepValueEqual(v1, v2 reflect.Value) (bool, string) {
 		return deepValueEqual(v1.Elem(), v2.Elem())
 	case reflect.Struct:
 		for i, n := 0, v1.NumField(); i < n; i++ {
+			sf := t1.Field(i)
+			if strings.HasPrefix(sf.Name, "XXX_") {
+				// protobuf uses XXX_* fields; skip comparing them
+				continue
+			}
 			if ok, err := deepValueEqual(v1.Field(i), v2.Field(i)); !ok {
 				return false, fmt.Sprintf("%s%#v != %#v\n", err, v1, v2)
 			}

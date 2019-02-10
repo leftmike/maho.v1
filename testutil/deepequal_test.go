@@ -7,6 +7,17 @@ import (
 	"github.com/leftmike/maho/testutil"
 )
 
+type testStruct struct {
+	N int
+	S string
+}
+
+type xxxStruct struct {
+	N       int
+	S       string
+	XXX_xxx bool
+}
+
 func TestDeepEqual(t *testing.T) {
 	cases := []struct {
 		a, b interface{}
@@ -19,6 +30,17 @@ func TestDeepEqual(t *testing.T) {
 		{sql.ID("id"), sql.ID("di"), false},
 		{[]sql.Value{}, []sql.Value{}, true},
 		{[][]sql.Value{}, [][]sql.Value{}, true},
+		{testStruct{1, "abc"}, testStruct{1, "abc"}, true},
+		{testStruct{2, "abc"}, testStruct{1, "abc"}, false},
+		{testStruct{1, "abc"}, testStruct{1, "def"}, false},
+		{testStruct{1, "abc"}, &testStruct{1, "abc"}, false},
+		{&testStruct{1, "abc"}, &testStruct{1, "abc"}, true},
+		{&testStruct{2, "abc"}, &testStruct{1, "abc"}, false},
+		{&testStruct{1, "abc"}, &testStruct{1, "def"}, false},
+		{testStruct{1, "abc"}, xxxStruct{N: 1, S: "abc"}, false},
+		{xxxStruct{N: 1, S: "abc"}, xxxStruct{N: 1, S: "abc"}, true},
+		{xxxStruct{N: 1, S: "abc"}, xxxStruct{N: 1, S: "abc", XXX_xxx: true}, true},
+		{xxxStruct{N: 2, S: "abc"}, xxxStruct{N: 1, S: "abc", XXX_xxx: true}, false},
 	}
 
 	for _, c := range cases {
