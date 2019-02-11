@@ -321,3 +321,17 @@ func TestEncodedKeyOrdering(t *testing.T) {
 		prevKey = key
 	}
 }
+
+func TestMakeKey(t *testing.T) {
+	testPanic(t, "MakeKey",
+		func() {
+			encoding.MakeKey(9999, 1)
+		})
+}
+
+func TestMakeVersionKey(t *testing.T) {
+	testPanic(t, "MakeVersionKey",
+		func() {
+			encoding.MakeVersionKey(99, 1, 1111)
+		})
+}

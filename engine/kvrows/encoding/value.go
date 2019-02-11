@@ -1,6 +1,7 @@
 package encoding
 
 import (
+	"encoding/binary"
 	"fmt"
 	"math"
 
@@ -185,11 +186,12 @@ func ParseRowValue(buf []byte) ([]sql.Value, bool) {
 			ret = setRowResult(ret, cdx, sql.StringValue(buf[:u]))
 			buf = buf[u:]
 		case float64ValueTag:
-			buf, u, ok = decodeUInt64(buf)
-			if !ok {
+			if len(buf) < 8 {
 				return nil, false
 			}
+			u = binary.BigEndian.Uint64(buf)
 			ret = setRowResult(ret, cdx, sql.Float64Value(math.Float64frombits(u)))
+			buf = buf[8:]
 		case int64ValueTag:
 			var n int64
 			buf, n, ok = DecodeZigzag64(buf)

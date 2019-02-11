@@ -18,9 +18,14 @@ const (
 	Float64ZeroKeyTag = 142
 	Float64PosKeyTag  = 143
 	StringKeyTag      = 150
+
+	ProposalVersion = Version(math.MaxUint64)
+	MinVersionedTID = 1000
 )
 
-func MakeKey(tid, iid uint32, vals ...sql.Value) []byte {
+type Version uint64
+
+func makeKey(tid, iid uint32, vals ...sql.Value) []byte {
 	key := make([]byte, 8)
 	binary.BigEndian.PutUint32(key, tid)
 	binary.BigEndian.PutUint32(key[4:], iid)
@@ -70,27 +75,35 @@ func MakeKey(tid, iid uint32, vals ...sql.Value) []byte {
 	return key
 }
 
-func encodeUInt64(key []byte, u uint64) []byte {
-	return append(key, byte(u>>56), byte(u>>48), byte(u>>40), byte(u>>32),
+func MakeKey(tid, iid uint32, vals ...sql.Value) []byte {
+	if tid >= MinVersionedTID {
+		panic(fmt.Sprintf("tid must be < %d for keys without a version; %d", MinVersionedTID, tid))
+	}
+	return makeKey(tid, iid, vals...)
+}
+
+func MakeVersionKey(tid, iid uint32, ver Version, vals ...sql.Value) []byte {
+	if tid < MinVersionedTID {
+		panic(fmt.Sprintf("tid must be >= %d for keys with a version; %d", MinVersionedTID, tid))
+	}
+	key := makeKey(tid, iid, vals...)
+	return encodeUInt64(key, uint64(ver))
+}
+
+func encodeUInt64(buf []byte, u uint64) []byte {
+	// Use binary.BigEndian.Uint64 to decode.
+	return append(buf, byte(u>>56), byte(u>>48), byte(u>>40), byte(u>>32),
 		byte(u>>24), byte(u>>16), byte(u>>8), byte(u))
 }
 
-func decodeUInt64(key []byte) ([]byte, uint64, bool) {
-	if len(key) < 8 {
-		return nil, 0, false
-	}
-	return key[8:], uint64(key[7]) | uint64(key[6])<<8 | uint64(key[5])<<16 | uint64(key[4])<<24 |
-		uint64(key[3])<<32 | uint64(key[2])<<40 | uint64(key[1])<<48 | uint64(key[0])<<56, true
-}
-
-func encodeKeyBytes(key []byte, bytes []byte) []byte {
+func encodeKeyBytes(buf []byte, bytes []byte) []byte {
 	for _, b := range bytes {
 		if b == 0 || b == 1 {
-			key = append(key, 1)
+			buf = append(buf, 1)
 		}
-		key = append(key, b)
+		buf = append(buf, b)
 	}
-	return append(key, 0)
+	return append(buf, 0)
 }
 
 func decodeKeyBytes(key []byte) ([]byte, []byte, bool) {
@@ -111,7 +124,7 @@ func decodeKeyBytes(key []byte) ([]byte, []byte, bool) {
 	return nil, nil, false
 }
 
-func ParseKey(key []byte, tid, iid uint32) ([]sql.Value, bool) {
+func parseKey(key []byte, tid, iid uint32) ([]sql.Value, bool) {
 	if len(key) < 8 {
 		return nil, false
 	}
@@ -149,38 +162,59 @@ func ParseKey(key []byte, tid, iid uint32) ([]sql.Value, bool) {
 			key = key[1:]
 		case Float64NegKeyTag:
 			var u uint64
-			var ok bool
-			key, u, ok = decodeUInt64(key[1:])
-			if !ok {
+			if len(key) < 9 {
 				return nil, false
 			}
-			u = ^u
+			u = ^binary.BigEndian.Uint64(key[1:])
 			vals = append(vals, sql.Float64Value(math.Float64frombits(u)))
+			key = key[9:]
 		case Float64ZeroKeyTag:
 			vals = append(vals, sql.Float64Value(0.0))
 			key = key[1:]
 		case Float64PosKeyTag:
 			var u uint64
-			var ok bool
-			key, u, ok = decodeUInt64(key[1:])
-			if !ok {
+			if len(key) < 9 {
 				return nil, false
 			}
+			u = binary.BigEndian.Uint64(key[1:])
 			vals = append(vals, sql.Float64Value(math.Float64frombits(u)))
+			key = key[9:]
 		case Int64NegKeyTag, Int64NotNegKeyTag:
 			var u uint64
-			var ok bool
-			key, u, ok = decodeUInt64(key[1:])
-			if !ok {
+			if len(key) < 9 {
 				return nil, false
 			}
+			u = binary.BigEndian.Uint64(key[1:])
 			vals = append(vals, sql.Int64Value(u))
+			key = key[9:]
 		default:
 			return nil, false
 		}
 	}
 
 	return vals, true
+}
+
+func ParseKey(key []byte, tid, iid uint32) ([]sql.Value, bool) {
+	if tid >= MinVersionedTID {
+		panic(fmt.Sprintf("tid must be < %d for keys without a version; %d", MinVersionedTID, tid))
+	}
+	return parseKey(key, tid, iid)
+}
+
+func ParseVersionKey(key []byte, tid, iid uint32) ([]sql.Value, Version, bool) {
+	if tid < MinVersionedTID {
+		panic(fmt.Sprintf("tid must be >= %d for keys with a version; %d", MinVersionedTID, tid))
+	}
+	if len(key) < 8 {
+		return nil, 0, false
+	}
+	vals, ok := parseKey(key[:len(key)-8], tid, iid)
+	if !ok {
+		return nil, 0, false
+	}
+	ver := binary.BigEndian.Uint64(key[len(key)-8:])
+	return vals, Version(ver), true
 }
 
 func FormatKey(key []byte) string {
@@ -190,6 +224,7 @@ func FormatKey(key []byte) string {
 
 	tid := binary.BigEndian.Uint32(key)
 	iid := binary.BigEndian.Uint32(key[4:])
+	// XXX: handle versioned keys
 	vals, ok := ParseKey(key, tid, iid)
 	if !ok {
 		return fmt.Sprintf("bad key: %v", key)
