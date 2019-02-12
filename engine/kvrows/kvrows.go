@@ -35,15 +35,12 @@ package kvrows
   rewritten with commit version
 - a table either uses versions, or it does not: tid > 0 && tid < 1000: no version; tid >= 1000
   has version; user tables start at 2000
-- version = 0xF...F is proposal
-- version = 0xFFFFFFFFFFnnnnnn is proposed write, where nnnnnn is the stmt id (cmd id or cid)
-- version = 0xnnnnnnFFFFFFFFFF is a transaction record, where nnnnnn is part of the transaction id
 - Proposal points to a transaction
 - ProposedWrite is a write corresponding to the Proposal
 
 - func ProposedWriteVersion(cid uint32) Version
 - add Transaction protobuf and Proposal protobuf
-- test MakeVersionKey, ParseVersionKey, and FormatKey (w/ version keys)
+- test version.go
 
 - need higher level operations on kvrows
 */

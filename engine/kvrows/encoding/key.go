@@ -18,12 +18,7 @@ const (
 	Float64ZeroKeyTag = 142
 	Float64PosKeyTag  = 143
 	StringKeyTag      = 150
-
-	ProposalVersion = Version(math.MaxUint64)
-	MinVersionedTID = 1000
 )
-
-type Version uint64
 
 func makeKey(tid, iid uint32, vals ...sql.Value) []byte {
 	key := make([]byte, 8)
