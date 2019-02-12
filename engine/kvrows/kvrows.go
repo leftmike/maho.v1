@@ -11,12 +11,41 @@ package kvrows
 -- allow both layers to be distributed / remote / sharded
 -- https://github.com/cockroachdb/cockroach/blob/master/docs/RFCS/20181209_lazy_txn_record_creation.md
 
-- change database to 1/1/metadata
+- change database to 1/1/
 
-<tid>/<iid>/<primary-key>:<row>
+- <table-id>/<index-id>/<primary-key>:<row>|<protobuf>
+- everything is a table; store indexes close to the table
+- first user table is at 2000
+1/1/<version>:<database-metadata>
 2/1/<name>:<tid> // map of table name to id
 3/1/<id>:<metadata> // metadata about each table
-first user table is at 1000
+
+- tid/iid: 1/1: PRIMARY KEY: version: value is database metadata
+- tid/iid: 2/1: PRIMARY KEY: table name; value is tid
+- tid/iid: 3/1: PRIMARY KEY: tid; value is table metadata
+- tid/iid: 4/1: PRIMARY KEY: sequence name; value is sid
+- tid/iid: 5/1: PRIMARY KEY: sid; value is sequence metadata
+
+- things in a table: rows, proposed write, pointer to transaction of proposed write,
+  transaction record
+- transaction records live close to the first write, which is optimal in distributed store
+- rows have versions which need to be last part of key ordered descending
+- proposed write + transaction pointer need to sort to top of key
+- separating proposed write from transaction pointer means value does not change when write is
+  rewritten with commit version
+- a table either uses versions, or it does not: tid > 0 && tid < 1000: no version; tid >= 1000
+  has version; user tables start at 2000
+- version = 0xF...F is proposal
+- version = 0xFFFFFFFFFFnnnnnn is proposed write, where nnnnnn is the stmt id (cmd id or cid)
+- version = 0xnnnnnnFFFFFFFFFF is a transaction record, where nnnnnn is part of the transaction id
+- Proposal points to a transaction
+- ProposedWrite is a write corresponding to the Proposal
+
+- func ProposedWriteVersion(cid uint32) Version
+- add Transaction protobuf and Proposal protobuf
+- test MakeVersionKey, ParseVersionKey, and FormatKey (w/ version keys)
+
+- need higher level operations on kvrows
 */
 
 import (

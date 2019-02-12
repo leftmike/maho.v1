@@ -87,7 +87,7 @@ func MakeVersionKey(tid, iid uint32, ver Version, vals ...sql.Value) []byte {
 		panic(fmt.Sprintf("tid must be >= %d for keys with a version; %d", MinVersionedTID, tid))
 	}
 	key := makeKey(tid, iid, vals...)
-	return encodeUInt64(key, uint64(ver))
+	return encodeUInt64(key, ^uint64(ver))
 }
 
 func encodeUInt64(buf []byte, u uint64) []byte {
@@ -213,7 +213,7 @@ func ParseVersionKey(key []byte, tid, iid uint32) ([]sql.Value, Version, bool) {
 	if !ok {
 		return nil, 0, false
 	}
-	ver := binary.BigEndian.Uint64(key[len(key)-8:])
+	ver := ^binary.BigEndian.Uint64(key[len(key)-8:])
 	return vals, Version(ver), true
 }
 
@@ -224,8 +224,17 @@ func FormatKey(key []byte) string {
 
 	tid := binary.BigEndian.Uint32(key)
 	iid := binary.BigEndian.Uint32(key[4:])
-	// XXX: handle versioned keys
-	vals, ok := ParseKey(key, tid, iid)
+
+	var ver uint64
+	if tid >= MinVersionedTID {
+		if len(key) < 8 {
+			return fmt.Sprintf("bad key: %v", key)
+		}
+		ver = ^binary.BigEndian.Uint64(key[len(key)-8:])
+		key = key[:len(key)-8]
+	}
+
+	vals, ok := parseKey(key, tid, iid)
 	if !ok {
 		return fmt.Sprintf("bad key: %v", key)
 	}
@@ -237,6 +246,10 @@ func FormatKey(key []byte) string {
 		} else {
 			s = fmt.Sprintf("%s/%s", s, sql.Format(val))
 		}
+	}
+
+	if tid >= MinVersionedTID {
+		s = fmt.Sprintf("%s:%d", s, ver)
 	}
 	return s
 }
