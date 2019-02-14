@@ -244,7 +244,7 @@ func FormatKey(key []byte) string {
 	}
 
 	if tid >= MinVersionedTID {
-		s = fmt.Sprintf("%s:%d", s, ver)
+		s = fmt.Sprintf("%s@%d", s, ver)
 	}
 	return s
 }

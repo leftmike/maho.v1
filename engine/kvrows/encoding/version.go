@@ -8,8 +8,7 @@ const (
 	ProposalVersion         = Version(math.MaxUint64)
 	MinVersionedTID         = 1000
 	maxTransactionVersion   = math.MaxUint32
-	maxProposedWriteVersion = Version(math.MaxUint64 - 1)
-	minProposedWriteVersion = Version(math.MaxUint64 - math.MaxUint32)
+	minProposedWriteVersion = Version(math.MaxUint64 - math.MaxUint32 - 1)
 )
 
 type Version uint64
@@ -19,15 +18,15 @@ func IsProposal(ver Version) bool {
 }
 
 func MakeProposedWriteVersion(sid uint32) Version {
-	return maxProposedWriteVersion - Version(sid)
+	return minProposedWriteVersion + Version(sid)
 }
 
 func IsProposedWrite(ver Version) bool {
-	return ver <= maxProposedWriteVersion && ver >= minProposedWriteVersion
+	return ver < ProposalVersion && ver >= minProposedWriteVersion
 }
 
 func ProposedWriteStmtID(ver Version) uint32 {
-	return uint32(maxProposedWriteVersion - ver)
+	return uint32(ver - minProposedWriteVersion)
 }
 
 func MakeTransactionVersion(txid uint32) Version {
