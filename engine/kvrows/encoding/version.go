@@ -6,7 +6,7 @@ import (
 
 const (
 	ProposalVersion         = Version(math.MaxUint64)
-	MinVersionedTID         = 1000
+	MinVersionedTID         = 4096
 	maxTransactionVersion   = math.MaxUint32
 	minProposedWriteVersion = Version(math.MaxUint64 - math.MaxUint32 - 1)
 )

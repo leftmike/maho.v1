@@ -15,7 +15,7 @@ package kvrows
 
 - <table-id>/<index-id>/<primary-key>:<row>|<protobuf>
 - everything is a table; store indexes close to the table
-- first user table is at 2000
+- first user table is at 4096
 1/1/<version>:<database-metadata>
 2/1/<name>:<tid> // map of table name to id
 3/1/<id>:<metadata> // metadata about each table
@@ -38,9 +38,7 @@ package kvrows
 - Proposal points to a transaction
 - ProposedWrite is a write corresponding to the Proposal
 
-- func ProposedWriteVersion(cid uint32) Version
 - add Transaction protobuf and Proposal protobuf
-- test version.go
 
 - need higher level operations on kvrows
 */
