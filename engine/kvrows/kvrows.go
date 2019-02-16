@@ -2,23 +2,12 @@ package kvrows
 
 /*
 - enhanced kv layer that incorporates mvcc:
--- row version or tid + cid (write intent, tid: pointer to transaction record)
--- transaction record: active, committed, aborted
--- table/<id>/<primary-key><version>:<columns>
--- table/<id>/<primary-key>0:<tid><cid><columns> or table/<id>/<primary-key><tid><cid>:<columns>
--- <columns> in value: non-null and not in key
 -- implement simple sql layer in terms of enhanced kv layer
 -- allow both layers to be distributed / remote / sharded
 -- https://github.com/cockroachdb/cockroach/blob/master/docs/RFCS/20181209_lazy_txn_record_creation.md
+-- need higher level operations on kvrows
 
-- change database to 1/1/
-
-- <table-id>/<index-id>/<primary-key>:<row>|<protobuf>
-- everything is a table; store indexes close to the table
-- first user table is at 4096
-1/1/<version>:<database-metadata>
-2/1/<name>:<tid> // map of table name to id
-3/1/<id>:<metadata> // metadata about each table
+- <table-id>/<index-id>/<primary-key>[@<version>]:<row>|<protobuf>
 
 - tid/iid: 1/1: PRIMARY KEY: version: value is database metadata
 - tid/iid: 2/1: PRIMARY KEY: table name; value is tid
@@ -33,14 +22,11 @@ package kvrows
 - proposed write + transaction pointer need to sort to top of key
 - separating proposed write from transaction pointer means value does not change when write is
   rewritten with commit version
-- a table either uses versions, or it does not: tid > 0 && tid < 1000: no version; tid >= 1000
-  has version; user tables start at 2000
 - Proposal points to a transaction
 - ProposedWrite is a write corresponding to the Proposal
 
-- add Transaction protobuf and Proposal protobuf
-
-- need higher level operations on kvrows
+- move table access locking to tableName table
+- create table: allocate and commit tableMetadata at create; set tableName on commit
 */
 
 import (
@@ -48,8 +34,6 @@ import (
 	"fmt"
 	"os"
 	"sync"
-
-	"github.com/golang/protobuf/proto"
 
 	"github.com/leftmike/maho/engine"
 	"github.com/leftmike/maho/engine/fatlock"
@@ -59,7 +43,12 @@ import (
 )
 
 var (
-	databaseKey   = []byte("database")
+	primaryIID          = uint32(1)
+	databaseMetadataTID = uint32(1) // :database-metadata
+	tableNameTID        = uint32(2) // name:tid
+	tableMetadataTID    = uint32(3) // tid:table-metadata
+
+	databaseKey   = encoding.MakeKey(databaseMetadataTID, primaryIID)
 	kvrowsVersion = uint32(1)
 )
 
@@ -105,6 +94,9 @@ func openDB(db kv.DB, name sql.Identifier) (*encoding.DatabaseMetadata, error) {
 	var md encoding.DatabaseMetadata
 	err = rtx.Get(databaseKey,
 		func(val []byte) error {
+			if !encoding.ParseProtobufValue(val, &md) {
+				return fmt.Errorf("kvrows: database metadata corrupted in %s", name)
+			}
 			return nil
 		})
 	if err != nil {
@@ -158,17 +150,13 @@ func (e Engine) AttachDatabase(svcs engine.Services, name sql.Identifier, path s
 }
 
 func setDatabaseMetadata(db kv.DB, md *encoding.DatabaseMetadata) error {
-	val, err := proto.Marshal(md)
-	if err != nil {
-		return err
-	}
-
 	wtx, err := db.WriteTx()
 	if err != nil {
 		return err
 	}
 	defer wtx.Discard()
 
+	val := encoding.MakeProtobufValue(md)
 	err = wtx.Set(databaseKey, val)
 	if err != nil {
 		return err
@@ -182,12 +170,15 @@ func setDatabaseMetadata(db kv.DB, md *encoding.DatabaseMetadata) error {
 }
 
 func initializeDB(db kv.DB, name sql.Identifier) (*encoding.DatabaseMetadata, error) {
-
 	md := encoding.DatabaseMetadata{
+		Type:        uint32(encoding.Type_DatabaseMetadataType),
 		Version:     kvrowsVersion,
 		Name:        name.String(),
 		Opens:       1,
-		NextTableID: 1000,
+		NextTableID: encoding.MinVersionedTID * 2, // Leave space for versioned system tables.
+
+		// XXX: replace with primary keys, indexes, and fall back to a sequence
+		NextRowID: 1,
 	}
 
 	err := setDatabaseMetadata(db, &md)

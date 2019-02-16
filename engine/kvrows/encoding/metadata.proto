@@ -8,15 +8,18 @@ enum Type {
     UnknownType = 0;
     DatabaseMetadataType = 1;
     TableMetadataType = 2;
-    MaximumType = 2; // Must always be the maximum.
+    TransactionType = 3;
+    ProposalType = 4;
+    MaximumType = 4; // Must always be the maximum.
 }
 
 message DatabaseMetadata {
     uint32 Type = 1; // = DatabaseMetadataType
     uint32 Version = 2;
     string Name = 3;
-    uint32 Opens = 4;
+    uint64 Opens = 4;
     uint32 NextTableID = 5;
+    uint64 NextRowID = 6;
 }
 
 message TableMetadata {
@@ -47,4 +50,21 @@ message ColumnMetadata {
 
     bool NotNull = 7; // not allowed to be NULL
     string Default = 8;
+}
+
+enum TransactionState {
+    Active = 0;
+    Committed = 1;
+    Aborted = 2;
+}
+
+message Transaction {
+    uint32 Type = 1; // = TransactionType
+    uint32 State = 2;
+    uint64 WhichOpen = 3; // Used to detect stale transactions from previous opens of the database.
+}
+
+message Proposal {
+    uint32 Type = 1; // = ProposalType
+    bytes TransactionKey = 2; // Which transaction this proposed write is part of.
 }

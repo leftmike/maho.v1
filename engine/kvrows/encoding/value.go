@@ -233,6 +233,16 @@ func formatProtobufValue(buf []byte) string {
 		if ParseProtobufValue(buf, &td) {
 			return fmt.Sprintf("%v", td)
 		}
+	case Type_TransactionType:
+		tx := Transaction{}
+		if ParseProtobufValue(buf, &tx) {
+			return fmt.Sprintf("%v", tx)
+		}
+	case Type_ProposalType:
+		pr := Proposal{}
+		if ParseProtobufValue(buf, &pr) {
+			return fmt.Sprintf("%v", pr)
+		}
 	}
 	return formatBadValue("bad protobuf value", buf)
 }
@@ -260,7 +270,7 @@ func FormatValue(buf []byte) string {
 }
 
 func init() {
-	if Type_MaximumType != Type_TableMetadataType {
+	if Type_MaximumType != Type_ProposalType {
 		panic("new Type added to metadata.proto without updating formatProtobufValue")
 	}
 }
