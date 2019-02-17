@@ -215,7 +215,8 @@ func TestEncodingKeys(t *testing.T) {
 			t.Errorf("ParseVersionKey(%v, %d, %d): got %d want %d", key, tid, c.iid, ver, c.ver)
 		}
 		s := encoding.FormatKey(key)
-		r := fmt.Sprintf("/%d/%s@%d", tid, strings.SplitN(c.s, "/", 3)[2], c.ver)
+		r := fmt.Sprintf("/%d/%s@%d", tid, strings.SplitN(c.s, "/", 3)[2],
+			c.ver-encoding.MinVersion)
 		if s != r {
 			t.Errorf("FormatKey(%d, %d): got %s want %s", tid, c.iid, s, r)
 		}

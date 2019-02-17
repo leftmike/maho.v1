@@ -226,22 +226,53 @@ func formatProtobufValue(buf []byte) string {
 	case Type_DatabaseMetadataType:
 		md := DatabaseMetadata{}
 		if ParseProtobufValue(buf, &md) {
-			return fmt.Sprintf("database metadata: %v", md)
+			return fmt.Sprintf(
+				"database metadata: %d name: %s opens: %d next tid: %d version: %d next row id: %d",
+				md.DatabaseVersion, md.Name, md.Opens, md.NextTableID, md.Version, md.NextRowID)
 		}
 	case Type_TableMetadataType:
 		td := TableMetadata{}
 		if ParseProtobufValue(buf, &td) {
-			return fmt.Sprintf("table metadata: %v", td)
+			s := fmt.Sprintf("table metadata: tid: %d columns: [", td.ID)
+			for idx, col := range td.Columns {
+				if idx > 0 {
+					s += ", "
+				}
+				typ, ok := map[DataType]string{
+					DataType_Unknown:   "unknown",
+					DataType_Boolean:   "boolean",
+					DataType_Character: "character",
+					DataType_Float:     "float",
+					DataType_Integer:   "integer",
+				}[DataType(col.Type)]
+				if !ok {
+					typ = "unknown"
+				}
+				s += fmt.Sprintf(
+					"{name: %s index: %d type: %s size: %d fixed: %t binary: %t not null: %t}",
+					col.Name, col.Index, typ, col.Size, col.Fixed, col.Binary, col.NotNull)
+			}
+			s += "]"
+			return s
 		}
 	case Type_TransactionType:
 		tx := Transaction{}
 		if ParseProtobufValue(buf, &tx) {
-			return fmt.Sprintf("transaction: %v", tx)
+			state, ok := map[TransactionState]string{
+				TransactionState_Active:    "active",
+				TransactionState_Committed: "committed",
+				TransactionState_Aborted:   "aborted",
+			}[TransactionState(tx.State)]
+			if !ok {
+				state = "unknown"
+			}
+
+			return fmt.Sprintf("transaction: state: %s at: %d version: %d", state, tx.At, tx.Version)
 		}
 	case Type_ProposalType:
 		pr := Proposal{}
 		if ParseProtobufValue(buf, &pr) {
-			return fmt.Sprintf("proposal: %v", pr)
+			return fmt.Sprintf("proposal: %s", FormatKey(pr.TransactionKey))
 		}
 	}
 	return formatBadValue("bad protobuf value", buf)

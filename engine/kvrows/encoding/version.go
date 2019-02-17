@@ -1,6 +1,7 @@
 package encoding
 
 import (
+	"fmt"
 	"math"
 )
 
@@ -40,4 +41,16 @@ func IsTransaction(ver Version) bool {
 
 func TransactionID(ver Version) uint32 {
 	return uint32(ver)
+}
+
+func (ver Version) String() string {
+	if IsProposal(ver) {
+		return "proposal"
+	} else if IsProposedWrite(ver) {
+		return fmt.Sprintf("stmt(%d)", ProposedWriteStmtID(ver))
+	} else if IsTransaction(ver) {
+		return fmt.Sprintf("txid(%d)", TransactionID(ver))
+	} else {
+		return fmt.Sprintf("%d", ver-MinVersion)
+	}
 }

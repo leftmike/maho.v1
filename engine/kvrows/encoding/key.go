@@ -244,15 +244,7 @@ func FormatKey(key []byte) string {
 	}
 
 	if tid >= MinVersionedTID {
-		if IsProposal(ver) {
-			s = fmt.Sprintf("%s@proposal", s)
-		} else if IsProposedWrite(ver) {
-			s = fmt.Sprintf("%s@stmt(%d)", s, ProposedWriteStmtID(ver))
-		} else if IsTransaction(ver) {
-			s = fmt.Sprintf("%s@txid(%d)", s, TransactionID(ver))
-		} else {
-			s = fmt.Sprintf("%s@%d", s, ver)
-		}
+		s = fmt.Sprintf("%s@%s", s, ver)
 	}
 	return s
 }

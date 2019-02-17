@@ -70,12 +70,14 @@ type database struct {
 }
 
 type tcontext struct {
-	locker    fatlock.Locker
-	whichOpen uint64
-	txid      uint32
-	sid       uint32
-	txKey     []byte
-	tables    map[sql.Identifier]*table
+	locker fatlock.Locker
+
+	// At which open; used to detect stale transactions from previous opens of the database.
+	at     uint64
+	txid   uint32
+	sid    uint32
+	txKey  []byte
+	tables map[sql.Identifier]*table
 }
 
 type table struct {
@@ -182,7 +184,7 @@ func initializeDB(db kv.DB, name sql.Identifier) (*encoding.DatabaseMetadata, er
 		Name:            name.String(),
 		Opens:           1,
 		NextTableID:     encoding.MinVersionedTID * 2, // Leave space for versioned system tables.
-		NextVersion:     encoding.MinVersion,
+		Version:         encoding.MinVersion,
 
 		// XXX: replace with primary keys, indexes, and fall back to a sequence
 		NextRowID: 1,
@@ -458,17 +460,23 @@ func (kvdb *database) Begin(lkr fatlock.Locker) interface{} {
 	txid := kvdb.nextTransactionID
 	kvdb.nextTransactionID += 1
 	return &tcontext{
-		locker:    lkr,
-		whichOpen: kvdb.metadata.Opens,
-		txid:      txid,
-		tables:    map[sql.Identifier]*table{},
+		locker: lkr,
+		at:     kvdb.metadata.Opens,
+		txid:   txid,
+		tables: map[sql.Identifier]*table{},
 	}
 }
 
 func (kvdb *database) Commit(ses engine.Session, tx interface{}) error {
-	kvdb.Dump() // XXX
+	//	kvdb.Dump() // XXX
 
 	tctx := tx.(*tcontext)
+	/* XXX: not yet; drop table needs to use proposeValue as well
+	if tctx.txKey == nil {
+		// No writes were ever proposed, so nothing to do.
+		return nil
+	}
+	*/
 
 	kvdb.mutex.Lock()
 	defer kvdb.mutex.Unlock()
@@ -487,7 +495,9 @@ func (kvdb *database) Commit(ses engine.Session, tx interface{}) error {
 	return nil
 }
 
-func (kvdb *database) Rollback(tctx interface{}) error {
+func (kvdb *database) Rollback(tx interface{}) error {
+	tctx := tx.(*tcontext)
+	_ = tctx
 	// XXX: handle rolling back changes to rows
 	return nil
 }
@@ -551,9 +561,9 @@ func (tctx *tcontext) proposeValue(db kv.DB, tid, iid uint32, kvals []sql.Value,
 	if txKey == nil {
 		txKey = encoding.MakeVersionKey(tid, iid, kvals, encoding.MakeTransactionVersion(tctx.txid))
 		td := encoding.Transaction{
-			Type:      uint32(encoding.Type_TransactionType),
-			State:     uint32(encoding.TransactionState_Active),
-			WhichOpen: tctx.whichOpen,
+			Type:  uint32(encoding.Type_TransactionType),
+			State: uint32(encoding.TransactionState_Active),
+			At:    tctx.at,
 		}
 		err = wtx.Set(txKey, encoding.MakeProtobufValue(&td))
 		if err != nil {

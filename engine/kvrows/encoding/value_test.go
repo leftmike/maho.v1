@@ -204,11 +204,11 @@ func TestProtobufValues(t *testing.T) {
 				Name:            "test_database",
 				Opens:           10000,
 				NextTableID:     5001,
-				NextVersion:     987654321,
+				Version:         987654321,
 				NextRowID:       12345,
 			},
 			ret: &encoding.DatabaseMetadata{},
-			s:   `database metadata: {1 555 test_database 10000 5001 987654321 12345 {} [] 0}`,
+			s:   `database metadata: 555 name: test_database opens: 10000 next tid: 5001 version: 987654321 next row id: 12345`,
 		},
 		{
 			pb: &encoding.TableMetadata{
@@ -234,24 +234,26 @@ func TestProtobufValues(t *testing.T) {
 				},
 			},
 			ret: &encoding.TableMetadata{},
-			s:   `table metadata: {2 5000 [Name:"firstColumn" Type:Character Size:6000 Binary:true NotNull:true Default:"this is the default value"  Name:"second_column" Index:59 Type:Boolean Default:"true" ] {} [] 0}`,
+			s:   `table metadata: tid: 5000 columns: [{name: firstColumn index: 0 type: character size: 6000 fixed: false binary: true not null: true}, {name: second_column index: 59 type: boolean size: 0 fixed: false binary: false not null: false}]`,
 		},
 		{
 			pb: &encoding.Transaction{
-				Type:      uint32(encoding.Type_TransactionType),
-				State:     uint32(encoding.TransactionState_Aborted),
-				WhichOpen: 4567890,
+				Type:    uint32(encoding.Type_TransactionType),
+				State:   uint32(encoding.TransactionState_Active),
+				At:      890,
+				Version: 123,
 			},
 			ret: &encoding.Transaction{},
-			s:   `transaction: {3 2 4567890 {} [] 0}`,
+			s:   `transaction: state: active at: 890 version: 123`,
 		},
 		{
 			pb: &encoding.Proposal{
-				Type:           uint32(encoding.Type_ProposalType),
-				TransactionKey: []byte("abcd"),
+				Type: uint32(encoding.Type_ProposalType),
+				TransactionKey: encoding.MakeVersionKey(5000, 1,
+					[]sql.Value{sql.StringValue("abcd")}, encoding.MakeTransactionVersion(456)),
 			},
 			ret: &encoding.Proposal{},
-			s:   `proposal: {4 [97 98 99 100] {} [] 0}`,
+			s:   `proposal: /5000/1/abcd@txid(456)`,
 		},
 	}
 

@@ -19,7 +19,7 @@ message DatabaseMetadata {
     string Name = 3;
     uint64 Opens = 4;
     uint32 NextTableID = 5;
-    uint64 NextVersion = 6;
+    uint64 Version = 6;
     uint64 NextRowID = 7;
 }
 
@@ -62,7 +62,10 @@ enum TransactionState {
 message Transaction {
     uint32 Type = 1; // = TransactionType
     uint32 State = 2;
-    uint64 WhichOpen = 3; // Used to detect stale transactions from previous opens of the database.
+
+    // At which open; used to detect stale transactions from previous opens of the database
+    uint64 At = 3;
+    uint64 Version = 4; // Version the transaction was committed at.
 }
 
 message Proposal {
