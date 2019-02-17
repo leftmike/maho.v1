@@ -103,6 +103,10 @@ func TestRowValues(t *testing.T) {
 		s   string
 	}{
 		{
+			row: nil,
+			s:   "",
+		},
+		{
 			row: []sql.Value{sql.BoolValue(true)},
 			s:   "true",
 		},
@@ -269,5 +273,15 @@ func TestProtobufValues(t *testing.T) {
 		if s != c.s {
 			t.Errorf("FormatValue: got %s want %s", s, c.s)
 		}
+	}
+}
+
+func TestTombstoneValue(t *testing.T) {
+	val := encoding.MakeTombstoneValue()
+	if encoding.IsRowValue(val) || encoding.IsProtobufValue(val) || !encoding.IsTombstoneValue(val) {
+		t.Errorf("MakeTombstoneValue: not a tombstone: %v", val)
+	}
+	if encoding.FormatValue(val) != "tombstone" {
+		t.Errorf("FormatValue(%v): got %s want tombstone", val, encoding.FormatValue(val))
 	}
 }

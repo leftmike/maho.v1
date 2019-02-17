@@ -11,8 +11,9 @@ import (
 )
 
 const (
-	valueIsRow      = 1
-	valueIsProtobuf = 8 // If the first field of a protobuf is a varint, the first byte is 8.
+	valueIsTombstone = 0
+	valueIsRow       = 1
+	valueIsProtobuf  = 8 // If the first field of a protobuf is a varint, the first byte is 8.
 
 	boolValueTag    = 1
 	int64ValueTag   = 2
@@ -126,13 +127,21 @@ func MakeProtobufValue(pb proto.Message) []byte {
 	return buf
 }
 
+func MakeTombstoneValue() []byte {
+	return []byte{valueIsTombstone}
+}
+
 func IsRowValue(buf []byte) bool {
-	return len(buf) > 0 && buf[0] == valueIsRow
+	return len(buf) == 0 || buf[0] == valueIsRow
 }
 
 func IsProtobufValue(buf []byte) bool {
 	// The Type field is required, so there always must be at least 2 bytes.
 	return len(buf) > 1 && buf[0] == valueIsProtobuf
+}
+
+func IsTombstoneValue(buf []byte) bool {
+	return len(buf) == 1 && buf[0] == valueIsTombstone
 }
 
 func setRowResult(ret []sql.Value, cdx int, val sql.Value) []sql.Value {
@@ -144,7 +153,9 @@ func setRowResult(ret []sql.Value, cdx int, val sql.Value) []sql.Value {
 }
 
 func ParseRowValue(buf []byte) ([]sql.Value, bool) {
-	if len(buf) < 1 || buf[0] != valueIsRow {
+	if len(buf) == 0 {
+		return nil, true
+	} else if buf[0] != valueIsRow {
 		return nil, false
 	}
 	buf = buf[1:]
@@ -295,6 +306,8 @@ func FormatValue(buf []byte) string {
 		return s
 	} else if IsProtobufValue(buf) {
 		return formatProtobufValue(buf)
+	} else if IsTombstoneValue(buf) {
+		return "tombstone"
 	}
 
 	return formatBadValue("bad value", buf)
