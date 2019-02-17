@@ -9,6 +9,7 @@ const (
 	MinVersionedTID         = 4096
 	maxTransactionVersion   = math.MaxUint32
 	minProposedWriteVersion = Version(math.MaxUint64 - math.MaxUint32 - 1)
+	MinVersion              = maxTransactionVersion + 1
 )
 
 type Version uint64

@@ -183,7 +183,7 @@ func TestEncodingKeys(t *testing.T) {
 	}
 
 	for _, c := range cases {
-		key := encoding.MakeKey(c.tid, c.iid, c.vals...)
+		key := encoding.MakeKey(c.tid, c.iid, c.vals)
 		if !testutil.DeepEqual(key, c.key) {
 			t.Errorf("MakeKey(%d, %d, %v): got %v want %v", c.tid, c.iid, c.vals, key, c.key)
 		}
@@ -201,7 +201,7 @@ func TestEncodingKeys(t *testing.T) {
 
 	for _, c := range cases {
 		tid := c.tid + encoding.MinVersionedTID
-		key := encoding.MakeVersionKey(tid, c.iid, c.ver, c.vals...)
+		key := encoding.MakeVersionKey(tid, c.iid, c.vals, c.ver)
 		if !testutil.DeepEqual(key[4:len(key)-8], c.key[4:]) {
 			t.Errorf("MakeVersionKey(%d, %d, %v): got %v want %v", tid, c.iid, c.vals,
 				key[4:len(key)-8], c.key[4:])
@@ -353,193 +353,193 @@ func TestEncodedKeyOrdering(t *testing.T) {
 		},
 
 		{
-			tid: 4096, iid: 1, s: "/4096/1/NULL@1",
+			tid: 4096, iid: 1, s: "/4096/1/NULL@txid(1)",
 			vals: []sql.Value{nil},
 			ver:  1,
 		},
 		{
-			tid: 4096, iid: 1, s: "/4096/1/false@1",
+			tid: 4096, iid: 1, s: "/4096/1/false@txid(1)",
 			vals: []sql.Value{sql.BoolValue(false)},
 			ver:  1,
 		},
 		{
-			tid: 4096, iid: 1, s: "/4096/1/true@1",
+			tid: 4096, iid: 1, s: "/4096/1/true@txid(1)",
 			vals: []sql.Value{sql.BoolValue(true)},
 			ver:  1,
 		},
 		{
-			tid: 4096, iid: 1, s: "/4096/1/@1",
+			tid: 4096, iid: 1, s: "/4096/1/@txid(1)",
 			vals: []sql.Value{sql.StringValue("")},
 			ver:  1,
 		},
 		{
-			tid: 4096, iid: 2, s: "/4096/2//NULL@1",
+			tid: 4096, iid: 2, s: "/4096/2//NULL@txid(1)",
 			vals: []sql.Value{sql.StringValue(""), nil},
 			ver:  1,
 		},
 		{
-			tid: 4096, iid: 2, s: "/4096/2//@1",
+			tid: 4096, iid: 2, s: "/4096/2//@txid(1)",
 			vals: []sql.Value{sql.StringValue(""), sql.StringValue("")},
 			ver:  1,
 		},
 
 		{
-			tid: 4096, iid: 3, s: "/4096/3/-3456@1",
+			tid: 4096, iid: 3, s: "/4096/3/-3456@txid(1)",
 			vals: []sql.Value{sql.Int64Value(-3456)},
 			ver:  1,
 		},
 		{
-			tid: 4096, iid: 3, s: "/4096/3/-345@1",
+			tid: 4096, iid: 3, s: "/4096/3/-345@txid(1)",
 			vals: []sql.Value{sql.Int64Value(-345)},
 			ver:  1,
 		},
 		{
-			tid: 4096, iid: 3, s: "/4096/3/0@1",
+			tid: 4096, iid: 3, s: "/4096/3/0@txid(1)",
 			vals: []sql.Value{sql.Int64Value(0)},
 			ver:  1,
 		},
 		{
-			tid: 4096, iid: 3, s: "/4096/3/34@1",
+			tid: 4096, iid: 3, s: "/4096/3/34@txid(1)",
 			vals: []sql.Value{sql.Int64Value(34)},
 			ver:  1,
 		},
 		{
-			tid: 4096, iid: 3, s: "/4096/3/345@1",
+			tid: 4096, iid: 3, s: "/4096/3/345@txid(1)",
 			vals: []sql.Value{sql.Int64Value(345)},
 			ver:  1,
 		},
 		{
-			tid: 4096, iid: 3, s: "/4096/3/NaN@1",
+			tid: 4096, iid: 3, s: "/4096/3/NaN@txid(1)",
 			vals: []sql.Value{sql.Float64Value(math.NaN())},
 			ver:  1,
 		},
 		{
-			tid: 4096, iid: 3, s: "/4096/3/-123456.789@1",
+			tid: 4096, iid: 3, s: "/4096/3/-123456.789@txid(1)",
 			vals: []sql.Value{sql.Float64Value(-123456.789)},
 			ver:  1,
 		},
 		{
-			tid: 4096, iid: 3, s: "/4096/3/-0.0012345@1",
+			tid: 4096, iid: 3, s: "/4096/3/-0.0012345@txid(1)",
 			vals: []sql.Value{sql.Float64Value(-0.0012345)},
 			ver:  1,
 		},
 		{
-			tid: 4096, iid: 3, s: "/4096/3/0@1",
+			tid: 4096, iid: 3, s: "/4096/3/0@txid(1)",
 			vals: []sql.Value{sql.Float64Value(0.0)},
 			ver:  1,
 		},
 		{
-			tid: 4096, iid: 3, s: "/4096/3/12.345@1",
+			tid: 4096, iid: 3, s: "/4096/3/12.345@txid(1)",
 			vals: []sql.Value{sql.Float64Value(12.345)},
 			ver:  1,
 		},
 		{
-			tid: 4096, iid: 3, s: "/4096/3/1.23456789e+12@1",
+			tid: 4096, iid: 3, s: "/4096/3/1.23456789e+12@txid(1)",
 			vals: []sql.Value{sql.Float64Value(1234567890000)},
 			ver:  1,
 		},
 		{
-			tid: 4096, iid: 3, s: "/4096/3/@1",
+			tid: 4096, iid: 3, s: "/4096/3/@txid(1)",
 			vals: []sql.Value{sql.StringValue("")},
 			ver:  1,
 		},
 		{
-			tid: 4096, iid: 3, s: "/4096/3/abc@1",
+			tid: 4096, iid: 3, s: "/4096/3/abc@txid(1)",
 			vals: []sql.Value{sql.StringValue("abc")},
 			ver:  1,
 		},
 		{
-			tid: 4096, iid: 3, s: "/4096/3/abcd@1",
+			tid: 4096, iid: 3, s: "/4096/3/abcd@txid(1)",
 			vals: []sql.Value{sql.StringValue("abcd")},
 			ver:  1,
 		},
 		{
-			tid: 4096, iid: 3, s: "/4096/3/bc@1",
+			tid: 4096, iid: 3, s: "/4096/3/bc@txid(1)",
 			vals: []sql.Value{sql.StringValue("bc")},
 			ver:  1,
 		},
 
 		{
-			tid: 4097, iid: 0, s: "/4097/0@1",
+			tid: 4097, iid: 0, s: "/4097/0@txid(1)",
 			ver: 1,
 		},
 		{
-			tid: 4097, iid: 1, s: "/4097/1@1",
+			tid: 4097, iid: 1, s: "/4097/1@txid(1)",
 			ver: 1,
 		},
 		{
-			tid: 4097, iid: 2, s: "/4097/2@1",
+			tid: 4097, iid: 2, s: "/4097/2@txid(1)",
 			ver: 1,
 		},
 		{
-			tid: 4097, iid: 3, s: "/4097/3/4@1",
+			tid: 4097, iid: 3, s: "/4097/3/4@txid(1)",
 			vals: []sql.Value{sql.Int64Value(4)},
 			ver:  1,
 		},
 		{
-			tid: 4097, iid: 4, s: "/4097/4@1",
+			tid: 4097, iid: 4, s: "/4097/4@txid(1)",
 			ver: 1,
 		},
 		{
-			tid: 4098, iid: 0, s: "/4098/0@1",
+			tid: 4098, iid: 0, s: "/4098/0@txid(1)",
 			ver: 1,
 		},
 
 		{
-			tid: 4098, iid: 1, s: "/4098/1/123/abc@1",
+			tid: 4098, iid: 1, s: "/4098/1/123/abc@txid(1)",
 			vals: []sql.Value{sql.Int64Value(123), sql.StringValue("abc")},
 			ver:  1,
 		},
 		{
-			tid: 4098, iid: 1, s: "/4098/1/123/def@1",
+			tid: 4098, iid: 1, s: "/4098/1/123/def@txid(1)",
 			vals: []sql.Value{sql.Int64Value(123), sql.StringValue("def")},
 			ver:  1,
 		},
 		{
-			tid: 4098, iid: 1, s: "/4098/1/456/abc@1",
+			tid: 4098, iid: 1, s: "/4098/1/456/abc@txid(1)",
 			vals: []sql.Value{sql.Int64Value(456), sql.StringValue("abc")},
 			ver:  1,
 		},
 
 		{
-			tid: 4099, iid: 2, s: "/4099/2/1@18446744073709551615",
+			tid: 4099, iid: 2, s: "/4099/2/1@proposal",
 			vals: []sql.Value{sql.Int64Value(1)},
 			ver:  0xFFFFFFFFFFFFFFFF,
 		},
 		{
-			tid: 4099, iid: 2, s: "/4099/2/1@18446744073709551614",
+			tid: 4099, iid: 2, s: "/4099/2/1@stmt(4294967295)",
 			vals: []sql.Value{sql.Int64Value(1)},
 			ver:  0xFFFFFFFFFFFFFFFE,
 		},
 		{
-			tid: 4099, iid: 2, s: "/4099/2/1@18446744073709551600",
+			tid: 4099, iid: 2, s: "/4099/2/1@stmt(4294967281)",
 			vals: []sql.Value{sql.Int64Value(1)},
 			ver:  0xFFFFFFFFFFFFFFF0,
 		},
 		{
-			tid: 4099, iid: 2, s: "/4099/2/1@18446744069414584320",
+			tid: 4099, iid: 2, s: "/4099/2/1@stmt(1)",
 			vals: []sql.Value{sql.Int64Value(1)},
 			ver:  0xFFFFFFFF00000000,
 		},
 		{
-			tid: 4099, iid: 2, s: "/4099/2/1@4294967295",
+			tid: 4099, iid: 2, s: "/4099/2/1@txid(4294967295)",
 			vals: []sql.Value{sql.Int64Value(1)},
 			ver:  0xFFFFFFFF,
 		},
 		{
-			tid: 4099, iid: 2, s: "/4099/2/1@12345",
+			tid: 4099, iid: 2, s: "/4099/2/1@txid(12345)",
 			vals: []sql.Value{sql.Int64Value(1)},
 			ver:  12345,
 		},
 	}
 
-	prevKey := encoding.MakeKey(0, 0)
+	prevKey := encoding.MakeKey(0, 0, nil)
 	for _, k := range keys {
 		var key []byte
 		if k.ver > 0 {
-			key = encoding.MakeVersionKey(k.tid, k.iid, k.ver, k.vals...)
+			key = encoding.MakeVersionKey(k.tid, k.iid, k.vals, k.ver)
 		} else {
-			key = encoding.MakeKey(k.tid, k.iid, k.vals...)
+			key = encoding.MakeKey(k.tid, k.iid, k.vals)
 		}
 		s := encoding.FormatKey(key)
 		if s != k.s {
@@ -555,13 +555,13 @@ func TestEncodedKeyOrdering(t *testing.T) {
 func TestMakeKey(t *testing.T) {
 	testPanic(t, "MakeKey",
 		func() {
-			encoding.MakeKey(9999, 1)
+			encoding.MakeKey(9999, 1, nil)
 		})
 }
 
 func TestMakeVersionKey(t *testing.T) {
 	testPanic(t, "MakeVersionKey",
 		func() {
-			encoding.MakeVersionKey(99, 1, 1111)
+			encoding.MakeVersionKey(99, 1, nil, 1111)
 		})
 }

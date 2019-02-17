@@ -20,7 +20,7 @@ const (
 	StringKeyTag      = 150
 )
 
-func makeKey(tid, iid uint32, vals ...sql.Value) []byte {
+func makeKey(tid, iid uint32, vals []sql.Value) []byte {
 	key := make([]byte, 8)
 	binary.BigEndian.PutUint32(key, tid)
 	binary.BigEndian.PutUint32(key[4:], iid)
@@ -70,18 +70,18 @@ func makeKey(tid, iid uint32, vals ...sql.Value) []byte {
 	return key
 }
 
-func MakeKey(tid, iid uint32, vals ...sql.Value) []byte {
+func MakeKey(tid, iid uint32, vals []sql.Value) []byte {
 	if tid >= MinVersionedTID {
 		panic(fmt.Sprintf("tid must be < %d for keys without a version; %d", MinVersionedTID, tid))
 	}
-	return makeKey(tid, iid, vals...)
+	return makeKey(tid, iid, vals)
 }
 
-func MakeVersionKey(tid, iid uint32, ver Version, vals ...sql.Value) []byte {
+func MakeVersionKey(tid, iid uint32, vals []sql.Value, ver Version) []byte {
 	if tid < MinVersionedTID {
 		panic(fmt.Sprintf("tid must be >= %d for keys with a version; %d", MinVersionedTID, tid))
 	}
-	key := makeKey(tid, iid, vals...)
+	key := makeKey(tid, iid, vals)
 	return encodeUInt64(key, ^uint64(ver))
 }
 
@@ -220,12 +220,12 @@ func FormatKey(key []byte) string {
 	tid := binary.BigEndian.Uint32(key)
 	iid := binary.BigEndian.Uint32(key[4:])
 
-	var ver uint64
+	var ver Version
 	if tid >= MinVersionedTID {
 		if len(key) < 8 {
 			return fmt.Sprintf("bad key: %v", key)
 		}
-		ver = ^binary.BigEndian.Uint64(key[len(key)-8:])
+		ver = Version(^binary.BigEndian.Uint64(key[len(key)-8:]))
 		key = key[:len(key)-8]
 	}
 
@@ -244,7 +244,15 @@ func FormatKey(key []byte) string {
 	}
 
 	if tid >= MinVersionedTID {
-		s = fmt.Sprintf("%s@%d", s, ver)
+		if IsProposal(ver) {
+			s = fmt.Sprintf("%s@proposal", s)
+		} else if IsProposedWrite(ver) {
+			s = fmt.Sprintf("%s@stmt(%d)", s, ProposedWriteStmtID(ver))
+		} else if IsTransaction(ver) {
+			s = fmt.Sprintf("%s@txid(%d)", s, TransactionID(ver))
+		} else {
+			s = fmt.Sprintf("%s@%d", s, ver)
+		}
 	}
 	return s
 }

@@ -226,22 +226,22 @@ func formatProtobufValue(buf []byte) string {
 	case Type_DatabaseMetadataType:
 		md := DatabaseMetadata{}
 		if ParseProtobufValue(buf, &md) {
-			return fmt.Sprintf("%v", md)
+			return fmt.Sprintf("database metadata: %v", md)
 		}
 	case Type_TableMetadataType:
 		td := TableMetadata{}
 		if ParseProtobufValue(buf, &td) {
-			return fmt.Sprintf("%v", td)
+			return fmt.Sprintf("table metadata: %v", td)
 		}
 	case Type_TransactionType:
 		tx := Transaction{}
 		if ParseProtobufValue(buf, &tx) {
-			return fmt.Sprintf("%v", tx)
+			return fmt.Sprintf("transaction: %v", tx)
 		}
 	case Type_ProposalType:
 		pr := Proposal{}
 		if ParseProtobufValue(buf, &pr) {
-			return fmt.Sprintf("%v", pr)
+			return fmt.Sprintf("proposal: %v", pr)
 		}
 	}
 	return formatBadValue("bad protobuf value", buf)

@@ -15,11 +15,12 @@ enum Type {
 
 message DatabaseMetadata {
     uint32 Type = 1; // = DatabaseMetadataType
-    uint32 Version = 2;
+    uint32 DatabaseVersion = 2;
     string Name = 3;
     uint64 Opens = 4;
     uint32 NextTableID = 5;
-    uint64 NextRowID = 6;
+    uint64 NextVersion = 6;
+    uint64 NextRowID = 7;
 }
 
 message TableMetadata {

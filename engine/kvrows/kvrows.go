@@ -25,11 +25,14 @@ package kvrows
 - Proposal points to a transaction
 - ProposedWrite is a write corresponding to the Proposal
 
-- move table access locking to tableName table
-- create table: allocate and commit tableMetadata at create; set tableName on commit
+- future: add tableLock and move table access locking there; add a comment for now
+- future: move DatabaseMetadata.NextTableID to be a sequence
+
+- tableMetadata needs to be a versioned table: name:metadata
 */
 
 import (
+	"bytes"
 	"errors"
 	"fmt"
 	"os"
@@ -44,11 +47,10 @@ import (
 
 var (
 	primaryIID          = uint32(1)
-	databaseMetadataTID = uint32(1) // :database-metadata
-	tableNameTID        = uint32(2) // name:tid
-	tableMetadataTID    = uint32(3) // tid:table-metadata
+	databaseMetadataTID = uint32(1)                        // :database-metadata
+	tableMetadataTID    = uint32(encoding.MinVersionedTID) // name:table-metadata
 
-	databaseKey   = encoding.MakeKey(databaseMetadataTID, primaryIID)
+	databaseKey   = encoding.MakeKey(databaseMetadataTID, primaryIID, nil)
 	kvrowsVersion = uint32(1)
 )
 
@@ -57,18 +59,23 @@ type Engine struct {
 }
 
 type database struct {
-	lockService   fatlock.LockService
-	mutex         sync.Mutex
-	metadata      *encoding.DatabaseMetadata
-	name          sql.Identifier
-	path          string
-	db            kv.DB
-	tableMetadata map[sql.Identifier]*encoding.TableMetadata
+	lockService       fatlock.LockService
+	mutex             sync.Mutex
+	metadata          *encoding.DatabaseMetadata
+	name              sql.Identifier
+	path              string
+	db                kv.DB
+	nextTransactionID uint32
+	tableMetadata     map[sql.Identifier]*encoding.TableMetadata
 }
 
 type tcontext struct {
-	locker fatlock.Locker
-	tables map[sql.Identifier]*table
+	locker    fatlock.Locker
+	whichOpen uint64
+	txid      uint32
+	sid       uint32
+	txKey     []byte
+	tables    map[sql.Identifier]*table
 }
 
 type table struct {
@@ -125,15 +132,15 @@ func (e Engine) AttachDatabase(svcs engine.Services, name sql.Identifier, path s
 		return nil, err
 	}
 
-	if md.Version != kvrowsVersion {
-		return nil, fmt.Errorf("kvrows: %s: unsupported version: %d", path, md.Version)
+	if md.DatabaseVersion != kvrowsVersion {
+		return nil, fmt.Errorf("kvrows: %s: unsupported version: %d", path, md.DatabaseVersion)
 	}
 	if md.Name != name.String() {
 		return nil, fmt.Errorf("kvrows: %s: need %s for database name", path, md.Name)
 	}
 
 	md.Opens += 1
-	err = setDatabaseMetadata(db, md)
+	err = setValue(db, databaseKey, encoding.MakeProtobufValue(md))
 	if err != nil {
 		db.Close() // As above, ignore any error from close.
 		return nil, err
@@ -149,15 +156,14 @@ func (e Engine) AttachDatabase(svcs engine.Services, name sql.Identifier, path s
 	}, nil
 }
 
-func setDatabaseMetadata(db kv.DB, md *encoding.DatabaseMetadata) error {
+func setValue(db kv.DB, key, val []byte) error {
 	wtx, err := db.WriteTx()
 	if err != nil {
 		return err
 	}
 	defer wtx.Discard()
 
-	val := encoding.MakeProtobufValue(md)
-	err = wtx.Set(databaseKey, val)
+	err = wtx.Set(key, val)
 	if err != nil {
 		return err
 	}
@@ -171,17 +177,18 @@ func setDatabaseMetadata(db kv.DB, md *encoding.DatabaseMetadata) error {
 
 func initializeDB(db kv.DB, name sql.Identifier) (*encoding.DatabaseMetadata, error) {
 	md := encoding.DatabaseMetadata{
-		Type:        uint32(encoding.Type_DatabaseMetadataType),
-		Version:     kvrowsVersion,
-		Name:        name.String(),
-		Opens:       1,
-		NextTableID: encoding.MinVersionedTID * 2, // Leave space for versioned system tables.
+		Type:            uint32(encoding.Type_DatabaseMetadataType),
+		DatabaseVersion: kvrowsVersion,
+		Name:            name.String(),
+		Opens:           1,
+		NextTableID:     encoding.MinVersionedTID * 2, // Leave space for versioned system tables.
+		NextVersion:     encoding.MinVersion,
 
 		// XXX: replace with primary keys, indexes, and fall back to a sequence
 		NextRowID: 1,
 	}
 
-	err := setDatabaseMetadata(db, &md)
+	err := setValue(db, databaseKey, encoding.MakeProtobufValue(&md))
 	if err != nil {
 		return nil, err
 	}
@@ -291,7 +298,8 @@ func (kvdb *database) makeTableContext(tctx *tcontext, tblname sql.Identifier,
 func (kvdb *database) newTableID() (uint32, error) {
 	id := kvdb.metadata.NextTableID
 	kvdb.metadata.NextTableID += 1
-	err := setDatabaseMetadata(kvdb.db, kvdb.metadata)
+
+	err := setValue(kvdb.db, databaseKey, encoding.MakeProtobufValue(kvdb.metadata))
 	if err != nil {
 		return 0, err
 	}
@@ -325,13 +333,14 @@ func (kvdb *database) CreateTable(ses engine.Session, tx interface{}, tblname sq
 		}
 	}
 
-	id, err := kvdb.newTableID()
+	tid, err := kvdb.newTableID()
 	if err != nil {
 		return err
 	}
 
 	md := encoding.TableMetadata{
-		ID: id,
+		Type: uint32(encoding.Type_TableMetadataType),
+		ID:   tid,
 	}
 
 	for idx := range cols {
@@ -347,12 +356,23 @@ func (kvdb *database) CreateTable(ses engine.Session, tx interface{}, tblname sq
 		})
 	}
 
-	tbl, err := kvdb.makeTableContext(tctx, tblname, &md)
+	err = tctx.proposeValue(kvdb.db, tid, primaryIID,
+		[]sql.Value{sql.StringValue(tblname.String())}, encoding.MakeProtobufValue(&md))
 	if err != nil {
 		return err
 	}
+
+	tbl := table{
+		db:          kvdb,
+		name:        tblname,
+		metadata:    &md,
+		columns:     cols,
+		columnTypes: colTypes,
+	}
 	tbl.dropped = dropped
 	tbl.created = true
+
+	tctx.tables[tblname] = &tbl
 	return nil
 }
 
@@ -432,13 +452,22 @@ func (kvdb *database) ListTables(ses engine.Session, tx interface{}) ([]engine.T
 }
 
 func (kvdb *database) Begin(lkr fatlock.Locker) interface{} {
+	kvdb.mutex.Lock()
+	defer kvdb.mutex.Unlock()
+
+	txid := kvdb.nextTransactionID
+	kvdb.nextTransactionID += 1
 	return &tcontext{
-		locker: lkr,
-		tables: map[sql.Identifier]*table{},
+		locker:    lkr,
+		whichOpen: kvdb.metadata.Opens,
+		txid:      txid,
+		tables:    map[sql.Identifier]*table{},
 	}
 }
 
 func (kvdb *database) Commit(ses engine.Session, tx interface{}) error {
+	kvdb.Dump() // XXX
+
 	tctx := tx.(*tcontext)
 
 	kvdb.mutex.Lock()
@@ -463,7 +492,10 @@ func (kvdb *database) Rollback(tctx interface{}) error {
 	return nil
 }
 
-func (kvdb *database) NextStmt(tctx interface{}) {}
+func (kvdb *database) NextStmt(tx interface{}) {
+	tctx := tx.(*tcontext)
+	tctx.sid += 1
+}
 
 func (kvdb *database) CanClose(drop bool) bool {
 	return true
@@ -479,6 +511,96 @@ func (kvdb *database) Close(drop bool) error {
 	if drop {
 		return os.RemoveAll(kvdb.path)
 	}
+	return nil
+}
+
+func (kvdb *database) Dump() error {
+	rtx, err := kvdb.db.ReadTx()
+	if err != nil {
+		return err
+	}
+	defer rtx.Discard()
+
+	it := rtx.Iterate(nil)
+	defer it.Close()
+
+	it.Rewind()
+	for it.Valid() {
+		it.Value(func(val []byte) error {
+			fmt.Printf("%s:%s\n", encoding.FormatKey(it.Key()),
+				encoding.FormatValue(val))
+			return nil
+		})
+		it.Next()
+	}
+
+	fmt.Println()
+	fmt.Println()
+	return nil
+}
+
+func (tctx *tcontext) proposeValue(db kv.DB, tid, iid uint32, kvals []sql.Value, val []byte) error {
+	wtx, err := db.WriteTx()
+	if err != nil {
+		return err
+	}
+	defer wtx.Discard()
+
+	// Make sure that a transaction has been started.
+	txKey := tctx.txKey
+	if txKey == nil {
+		txKey = encoding.MakeVersionKey(tid, iid, kvals, encoding.MakeTransactionVersion(tctx.txid))
+		td := encoding.Transaction{
+			Type:      uint32(encoding.Type_TransactionType),
+			State:     uint32(encoding.TransactionState_Active),
+			WhichOpen: tctx.whichOpen,
+		}
+		err = wtx.Set(txKey, encoding.MakeProtobufValue(&td))
+		if err != nil {
+			return err
+		}
+	}
+
+	// Might be the first write to this key for this transaction.
+	var pd encoding.Proposal
+	proposalKey := encoding.MakeVersionKey(tid, iid, kvals, encoding.ProposalVersion)
+	err = wtx.Get(proposalKey,
+		func(val []byte) error {
+			if !encoding.ParseProtobufValue(val, &pd) {
+				panic(fmt.Sprintf("kvrows: proposal corrupted for key %s",
+					encoding.FormatKey(proposalKey)))
+			}
+			return nil
+		})
+	if err == nil {
+		if !bytes.Equal(txKey, pd.TransactionKey) {
+			return fmt.Errorf("kvrows: conflicting change for key %s",
+				encoding.FormatKey(proposalKey))
+		}
+	} else {
+		pd = encoding.Proposal{
+			Type:           uint32(encoding.Type_ProposalType),
+			TransactionKey: txKey,
+		}
+		err = wtx.Set(proposalKey, encoding.MakeProtobufValue(&pd))
+		if err != nil {
+			return err
+		}
+	}
+
+	// Finally, make the proposed write.
+	key := encoding.MakeVersionKey(tid, iid, kvals, encoding.MakeProposedWriteVersion(tctx.sid))
+	err = wtx.Set(key, val)
+	if err != nil {
+		return err
+	}
+
+	err = wtx.Commit()
+	if err != nil {
+		return err
+	}
+
+	tctx.txKey = txKey
 	return nil
 }
 

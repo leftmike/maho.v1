@@ -199,15 +199,16 @@ func TestProtobufValues(t *testing.T) {
 	}{
 		{
 			pb: &encoding.DatabaseMetadata{
-				Type:        uint32(encoding.Type_DatabaseMetadataType),
-				Version:     555,
-				Name:        "test_database",
-				Opens:       10000,
-				NextTableID: 5001,
-				NextRowID:   12345,
+				Type:            uint32(encoding.Type_DatabaseMetadataType),
+				DatabaseVersion: 555,
+				Name:            "test_database",
+				Opens:           10000,
+				NextTableID:     5001,
+				NextVersion:     987654321,
+				NextRowID:       12345,
 			},
 			ret: &encoding.DatabaseMetadata{},
-			s:   `{1 555 test_database 10000 5001 12345 {} [] 0}`,
+			s:   `database metadata: {1 555 test_database 10000 5001 987654321 12345 {} [] 0}`,
 		},
 		{
 			pb: &encoding.TableMetadata{
@@ -233,7 +234,7 @@ func TestProtobufValues(t *testing.T) {
 				},
 			},
 			ret: &encoding.TableMetadata{},
-			s:   `{2 5000 [Name:"firstColumn" Type:Character Size:6000 Binary:true NotNull:true Default:"this is the default value"  Name:"second_column" Index:59 Type:Boolean Default:"true" ] {} [] 0}`,
+			s:   `table metadata: {2 5000 [Name:"firstColumn" Type:Character Size:6000 Binary:true NotNull:true Default:"this is the default value"  Name:"second_column" Index:59 Type:Boolean Default:"true" ] {} [] 0}`,
 		},
 		{
 			pb: &encoding.Transaction{
@@ -242,7 +243,7 @@ func TestProtobufValues(t *testing.T) {
 				WhichOpen: 4567890,
 			},
 			ret: &encoding.Transaction{},
-			s:   `{3 2 4567890 {} [] 0}`,
+			s:   `transaction: {3 2 4567890 {} [] 0}`,
 		},
 		{
 			pb: &encoding.Proposal{
@@ -250,7 +251,7 @@ func TestProtobufValues(t *testing.T) {
 				TransactionKey: []byte("abcd"),
 			},
 			ret: &encoding.Proposal{},
-			s:   `{4 [97 98 99 100] {} [] 0}`,
+			s:   `proposal: {4 [97 98 99 100] {} [] 0}`,
 		},
 	}
 
