@@ -1,6 +1,12 @@
 package kvrows
 
 /*
+To Do:
+- add tableLock and move table access locking there
+- move DatabaseMetadata.NextTableID to be a sequence
+- change tableMetadata to be a versioned table: name:metadata
+- cache table metadata
+
 - enhanced kv layer that incorporates mvcc:
 -- implement simple sql layer in terms of enhanced kv layer
 -- allow both layers to be distributed / remote / sharded
@@ -9,26 +15,11 @@ package kvrows
 
 - <table-id>/<index-id>/<primary-key>[@<version>]:<row>|<protobuf>
 
-- tid/iid: 1/1: PRIMARY KEY: version: value is database metadata
-- tid/iid: 2/1: PRIMARY KEY: table name; value is tid
-- tid/iid: 3/1: PRIMARY KEY: tid; value is table metadata
-- tid/iid: 4/1: PRIMARY KEY: sequence name; value is sid
-- tid/iid: 5/1: PRIMARY KEY: sid; value is sequence metadata
-
-- things in a table: rows, proposed write, pointer to transaction of proposed write,
-  transaction record
+- things in a table: rows, proposed write, proposal, transaction record
 - transaction records live close to the first write, which is optimal in distributed store
 - rows have versions which need to be last part of key ordered descending
-- proposed write + transaction pointer need to sort to top of key
-- separating proposed write from transaction pointer means value does not change when write is
-  rewritten with commit version
 - Proposal points to a transaction
 - ProposedWrite is a write corresponding to the Proposal
-
-- future: add tableLock and move table access locking there; add a comment for now
-- future: move DatabaseMetadata.NextTableID to be a sequence
-
-- tableMetadata needs to be a versioned table: name:metadata
 */
 
 import (
@@ -38,6 +29,7 @@ import (
 	"os"
 	"sync"
 
+	"github.com/golang/protobuf/proto"
 	"github.com/leftmike/maho/engine"
 	"github.com/leftmike/maho/engine/fatlock"
 	"github.com/leftmike/maho/engine/kv"
@@ -47,8 +39,9 @@ import (
 
 var (
 	primaryIID          = uint32(1)
-	databaseMetadataTID = uint32(1)                        // :database-metadata
-	tableMetadataTID    = uint32(encoding.MinVersionedTID) // name:table-metadata
+	databaseMetadataTID = uint32(1) // :database-metadata
+	tableMetadataTID    = uint32(2) // name:table-metadata
+	// XXX: tableMetadataTID = uint32(encoding.MinVersionedTID)
 
 	databaseKey   = encoding.MakeKey(databaseMetadataTID, primaryIID, nil)
 	kvrowsVersion = uint32(1)
@@ -66,7 +59,6 @@ type database struct {
 	path              string
 	db                kv.DB
 	nextTransactionID uint32
-	tableMetadata     map[sql.Identifier]*encoding.TableMetadata
 }
 
 type tcontext struct {
@@ -93,28 +85,6 @@ type table struct {
 type rows struct {
 }
 
-func openDB(db kv.DB, name sql.Identifier) (*encoding.DatabaseMetadata, error) {
-	rtx, err := db.ReadTx()
-	if err != nil {
-		return nil, err
-	}
-	defer rtx.Discard()
-
-	var md encoding.DatabaseMetadata
-	err = rtx.Get(databaseKey,
-		func(val []byte) error {
-			if !encoding.ParseProtobufValue(val, &md) {
-				return fmt.Errorf("kvrows: database metadata corrupted in %s", name)
-			}
-			return nil
-		})
-	if err != nil {
-		return nil, err
-	}
-
-	return &md, nil
-}
-
 func (e Engine) AttachDatabase(svcs engine.Services, name sql.Identifier, path string,
 	options engine.Options) (engine.Database, error) {
 
@@ -128,7 +98,8 @@ func (e Engine) AttachDatabase(svcs engine.Services, name sql.Identifier, path s
 		return nil, err
 	}
 
-	md, err := openDB(db, name)
+	var md encoding.DatabaseMetadata
+	err = getProtobufValue(db, databaseKey, &md)
 	if err != nil {
 		db.Close() // Ignore any error from close, since we can't do much about it.
 		return nil, err
@@ -142,20 +113,41 @@ func (e Engine) AttachDatabase(svcs engine.Services, name sql.Identifier, path s
 	}
 
 	md.Opens += 1
-	err = setValue(db, databaseKey, encoding.MakeProtobufValue(md))
+	err = setValue(db, databaseKey, encoding.MakeProtobufValue(&md))
 	if err != nil {
 		db.Close() // As above, ignore any error from close.
 		return nil, err
 	}
 
 	return &database{
-		lockService:   svcs.LockService(),
-		metadata:      md,
-		name:          name,
-		path:          path,
-		db:            db,
-		tableMetadata: map[sql.Identifier]*encoding.TableMetadata{},
+		lockService: svcs.LockService(),
+		metadata:    &md,
+		name:        name,
+		path:        path,
+		db:          db,
 	}, nil
+}
+
+func getProtobufValue(db kv.DB, key []byte, pb proto.Message) error {
+	rtx, err := db.ReadTx()
+	if err != nil {
+		return err
+	}
+	defer rtx.Discard()
+
+	err = rtx.Get(key,
+		func(val []byte) error {
+			if !encoding.ParseProtobufValue(val, pb) {
+				return fmt.Errorf("kvrows: unable to parse protobuf at %s",
+					encoding.FormatKey(key))
+			}
+			return nil
+		})
+	if err != nil {
+		return err
+	}
+
+	return nil
 }
 
 func setValue(db kv.DB, key, val []byte) error {
@@ -174,6 +166,30 @@ func setValue(db kv.DB, key, val []byte) error {
 	if err != nil {
 		return err
 	}
+	return nil
+}
+
+func keyValueScan(db kv.DB, prefix []byte, kvf func(key, val []byte) error) error {
+	rtx, err := db.ReadTx()
+	if err != nil {
+		return err
+	}
+	defer rtx.Discard()
+
+	it := rtx.Iterate(prefix)
+	defer it.Close()
+
+	it.Rewind()
+	for it.Valid() {
+		err := it.Value(func(val []byte) error {
+			return kvf(it.Key(), val)
+		})
+		if err != nil {
+			return err
+		}
+		it.Next()
+	}
+
 	return nil
 }
 
@@ -216,12 +232,11 @@ func (e Engine) CreateDatabase(svcs engine.Services, name sql.Identifier, path s
 		return nil, err
 	}
 	return &database{
-		lockService:   svcs.LockService(),
-		metadata:      md,
-		name:          name,
-		path:          path,
-		db:            db,
-		tableMetadata: map[sql.Identifier]*encoding.TableMetadata{},
+		lockService: svcs.LockService(),
+		metadata:    md,
+		name:        name,
+		path:        path,
+		db:          db,
 	}, nil
 }
 
@@ -230,14 +245,13 @@ func (kvdb *database) Message() string {
 }
 
 func (kvdb *database) lookupTableMetadata(tblname sql.Identifier) (*encoding.TableMetadata, error) {
-	md, ok := kvdb.tableMetadata[tblname]
-	if ok {
-		return md, nil
+	var md encoding.TableMetadata
+	err := getProtobufValue(kvdb.db, makeTableKey(tblname), &md)
+	if err != nil {
+		return nil, fmt.Errorf("kvdb: table %s.%s not found", kvdb.name, tblname)
 	}
 
-	// XXX: need to lookup table metadata from kv
-
-	return nil, fmt.Errorf("kvdb: table %s.%s not found", kvdb.name, tblname)
+	return &md, nil
 }
 
 func (kvdb *database) LookupTable(ses engine.Session, tx interface{},
@@ -308,6 +322,17 @@ func (kvdb *database) newTableID() (uint32, error) {
 	return id, nil
 }
 
+func (kvdb *database) newVersion() (uint64, error) {
+	ver := kvdb.metadata.Version
+	kvdb.metadata.Version += 1
+
+	err := setValue(kvdb.db, databaseKey, encoding.MakeProtobufValue(kvdb.metadata))
+	if err != nil {
+		return 0, err
+	}
+	return ver, nil
+}
+
 func (kvdb *database) CreateTable(ses engine.Session, tx interface{}, tblname sql.Identifier,
 	cols []sql.Identifier, colTypes []sql.ColumnType) error {
 
@@ -358,12 +383,6 @@ func (kvdb *database) CreateTable(ses engine.Session, tx interface{}, tblname sq
 		})
 	}
 
-	err = tctx.proposeValue(kvdb.db, tid, primaryIID,
-		[]sql.Value{sql.StringValue(tblname.String())}, encoding.MakeProtobufValue(&md))
-	if err != nil {
-		return err
-	}
-
 	tbl := table{
 		db:          kvdb,
 		name:        tblname,
@@ -407,8 +426,8 @@ func (kvdb *database) DropTable(ses engine.Session, tx interface{}, tblname sql.
 	kvdb.mutex.Lock()
 	defer kvdb.mutex.Unlock()
 
-	_, ok := kvdb.tableMetadata[tblname]
-	if !ok {
+	_, err = kvdb.lookupTableMetadata(tblname)
+	if err != nil {
 		if exists {
 			return nil
 		}
@@ -420,8 +439,6 @@ func (kvdb *database) DropTable(ses engine.Session, tx interface{}, tblname sql.
 		name:    tblname,
 		dropped: true,
 	}
-
-	// XXX: also need to delete the persistent state: name, metadata, and rows => at commit time
 
 	return nil
 }
@@ -439,17 +456,30 @@ func (kvdb *database) ListTables(ses engine.Session, tx interface{}) ([]engine.T
 		}
 	}
 
-	kvdb.mutex.Lock()
-	defer kvdb.mutex.Unlock()
+	err := keyValueScan(kvdb.db, encoding.MakeKey(tableMetadataTID, primaryIID, nil),
+		func(key, val []byte) error {
+			vals, ok := encoding.ParseKey(key, tableMetadataTID, primaryIID)
+			if !ok || len(vals) != 1 || encoding.IsTombstoneValue(val) {
+				return nil
+			}
+			s, ok := vals[0].(sql.StringValue)
+			if ok {
+				tblname := sql.ID(string(s))
+				if _, ok = tctx.tables[tblname]; ok {
+					return nil
+				}
 
-	for name := range kvdb.tableMetadata {
-		if _, ok := tctx.tables[name]; !ok {
-			tbls = append(tbls, engine.TableEntry{
-				Name: name,
-				Type: engine.PhysicalType,
-			})
-		}
+				tbls = append(tbls, engine.TableEntry{
+					Name: tblname,
+					Type: engine.PhysicalType,
+				})
+			}
+			return nil
+		})
+	if err != nil {
+		return nil, err
 	}
+
 	return tbls, nil
 }
 
@@ -467,6 +497,11 @@ func (kvdb *database) Begin(lkr fatlock.Locker) interface{} {
 	}
 }
 
+func makeTableKey(tblname sql.Identifier) []byte {
+	return encoding.MakeKey(tableMetadataTID, primaryIID,
+		[]sql.Value{sql.StringValue(tblname.String())})
+}
+
 func (kvdb *database) Commit(ses engine.Session, tx interface{}) error {
 	//	kvdb.Dump() // XXX
 
@@ -481,24 +516,69 @@ func (kvdb *database) Commit(ses engine.Session, tx interface{}) error {
 	kvdb.mutex.Lock()
 	defer kvdb.mutex.Unlock()
 
+	/* XXX:
+	if tctx.txKey != nil { // XXX: unnecessary once check is done above
+		state := encoding.TransactionState_Committed
+		ver, err := kvdb.newVersion()
+		if err != nil {
+			state = encoding.TransactionState_Aborted
+		}
+
+		if setTransactionState(kvdb.db, tctx.txKey, state, ver) !=
+			encoding.TransactionState_Committed {
+
+			err = kvdb.rollback(tctx)
+			if err != nil {
+				return err
+			}
+			return fmt.Errorf("kvrows: transaction rolled back")
+		}
+	}
+	*/
+
 	for _, tbl := range tctx.tables {
 		if tbl.dropped {
-			delete(kvdb.tableMetadata, tbl.name)
+			err := setValue(kvdb.db, makeTableKey(tbl.name), encoding.MakeTombstoneValue())
+			if err != nil {
+				return err
+			}
+			// XXX: also need to delete the rows
 		}
 		if tbl.created {
-			kvdb.tableMetadata[tbl.name] = tbl.metadata
+			err := setValue(kvdb.db, makeTableKey(tbl.name),
+				encoding.MakeProtobufValue(tbl.metadata))
+			if err != nil {
+				return err
+			}
 		}
 	}
 
 	// XXX: persist changes to the metadata
+	/* XXX
+	err = tctx.proposeValue(kvdb.db, tid, primaryIID,
+		[]sql.Value{sql.StringValue(tblname.String())}, encoding.MakeProtobufValue(&md))
+	if err != nil {
+		return err
+	}
+
+	err = tctx.proposeValue(kvdb.db, md.ID, primaryIID,
+		[]sql.Value{sql.StringValue(tblname.String())}, encoding.MakeTombstoneValue())
+	if err != nil {
+		return err
+	}
+	*/
 
 	return nil
 }
 
 func (kvdb *database) Rollback(tx interface{}) error {
 	tctx := tx.(*tcontext)
-	_ = tctx
-	// XXX: handle rolling back changes to rows
+
+	if tctx.txKey == nil {
+		// No writes were ever proposed, so nothing to do.
+		return nil
+	}
+
 	return nil
 }
 
@@ -547,6 +627,44 @@ func (kvdb *database) Dump() error {
 	fmt.Println()
 	fmt.Println()
 	return nil
+}
+
+func setTransactionState(db kv.DB, txKey []byte, state encoding.TransactionState,
+	ver uint64) encoding.TransactionState {
+
+	wtx, err := db.WriteTx()
+	if err != nil {
+		return encoding.TransactionState_Aborted
+	}
+	defer wtx.Discard()
+
+	var td encoding.Transaction
+	err = wtx.Get(txKey,
+		func(val []byte) error {
+			if !encoding.ParseProtobufValue(val, &td) {
+				return fmt.Errorf("kvrows: unable to parse protobuf at %s",
+					encoding.FormatKey(txKey))
+			}
+			return nil
+		})
+	if err != nil {
+		return encoding.TransactionState_Aborted
+	}
+
+	if td.State == uint32(encoding.TransactionState_Active) {
+		td.State = uint32(state)
+		td.Version = ver
+		err = wtx.Set(txKey, encoding.MakeProtobufValue(&td))
+		if err != nil {
+			return encoding.TransactionState_Aborted
+		}
+		err = wtx.Commit()
+		if err != nil {
+			return encoding.TransactionState_Aborted
+		}
+	}
+
+	return encoding.TransactionState(td.State)
 }
 
 func (tctx *tcontext) proposeValue(db kv.DB, tid, iid uint32, kvals []sql.Value, val []byte) error {
