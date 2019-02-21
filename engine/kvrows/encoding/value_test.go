@@ -253,8 +253,8 @@ func TestProtobufValues(t *testing.T) {
 		{
 			pb: &encoding.Proposal{
 				Type: uint32(encoding.Type_ProposalType),
-				TransactionKey: encoding.MakeVersionKey(5000, 1,
-					[]sql.Value{sql.StringValue("abcd")}, encoding.MakeTransactionVersion(456)),
+				TransactionKey: encoding.MakeTransactionKey(5000, 1,
+					[]sql.Value{sql.StringValue("abcd")}, 456),
 			},
 			ret: &encoding.Proposal{},
 			s:   `proposal: /5000/1/abcd@txid(456)`,

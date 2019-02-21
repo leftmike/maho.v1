@@ -6,6 +6,7 @@ To Do:
 - move DatabaseMetadata.NextTableID to be a sequence
 - change tableMetadata to be a versioned table: name:metadata
 - cache table metadata
+- change keys to have a typed suffix
 
 - enhanced kv layer that incorporates mvcc:
 -- implement simple sql layer in terms of enhanced kv layer
@@ -37,13 +38,16 @@ import (
 	"github.com/leftmike/maho/sql"
 )
 
+const (
+	MinUserTableID = uint32(4096)
+)
+
 var (
 	primaryIID          = uint32(1)
 	databaseMetadataTID = uint32(1) // :database-metadata
 	tableMetadataTID    = uint32(2) // name:table-metadata
-	// XXX: tableMetadataTID = uint32(encoding.MinVersionedTID)
 
-	databaseKey   = encoding.MakeKey(databaseMetadataTID, primaryIID, nil)
+	databaseKey   = encoding.MakeBareKey(databaseMetadataTID, primaryIID, nil)
 	kvrowsVersion = uint32(1)
 )
 
@@ -199,8 +203,8 @@ func initializeDB(db kv.DB, name sql.Identifier) (*encoding.DatabaseMetadata, er
 		DatabaseVersion: kvrowsVersion,
 		Name:            name.String(),
 		Opens:           1,
-		NextTableID:     encoding.MinVersionedTID * 2, // Leave space for versioned system tables.
-		Version:         encoding.MinVersion,
+		NextTableID:     MinUserTableID,
+		Version:         0,
 
 		// XXX: replace with primary keys, indexes, and fall back to a sequence
 		NextRowID: 1,
@@ -456,9 +460,10 @@ func (kvdb *database) ListTables(ses engine.Session, tx interface{}) ([]engine.T
 		}
 	}
 
-	err := keyValueScan(kvdb.db, encoding.MakeKey(tableMetadataTID, primaryIID, nil),
+	err := keyValueScan(kvdb.db, encoding.MakePrefixKey(tableMetadataTID, primaryIID, nil),
 		func(key, val []byte) error {
-			vals, ok := encoding.ParseKey(key, tableMetadataTID, primaryIID)
+			fmt.Printf("key: %v\n", key)
+			_, _, vals, _, ok := encoding.ParseKey(key)
 			if !ok || len(vals) != 1 || encoding.IsTombstoneValue(val) {
 				return nil
 			}
@@ -498,7 +503,7 @@ func (kvdb *database) Begin(lkr fatlock.Locker) interface{} {
 }
 
 func makeTableKey(tblname sql.Identifier) []byte {
-	return encoding.MakeKey(tableMetadataTID, primaryIID,
+	return encoding.MakeBareKey(tableMetadataTID, primaryIID,
 		[]sql.Value{sql.StringValue(tblname.String())})
 }
 
@@ -677,7 +682,7 @@ func (tctx *tcontext) proposeValue(db kv.DB, tid, iid uint32, kvals []sql.Value,
 	// Make sure that a transaction has been started.
 	txKey := tctx.txKey
 	if txKey == nil {
-		txKey = encoding.MakeVersionKey(tid, iid, kvals, encoding.MakeTransactionVersion(tctx.txid))
+		txKey = encoding.MakeTransactionKey(tid, iid, kvals, tctx.txid)
 		td := encoding.Transaction{
 			Type:  uint32(encoding.Type_TransactionType),
 			State: uint32(encoding.TransactionState_Active),
@@ -691,7 +696,7 @@ func (tctx *tcontext) proposeValue(db kv.DB, tid, iid uint32, kvals []sql.Value,
 
 	// Might be the first write to this key for this transaction.
 	var pd encoding.Proposal
-	proposalKey := encoding.MakeVersionKey(tid, iid, kvals, encoding.ProposalVersion)
+	proposalKey := encoding.MakeProposalKey(tid, iid, kvals)
 	err = wtx.Get(proposalKey,
 		func(val []byte) error {
 			if !encoding.ParseProtobufValue(val, &pd) {
@@ -717,7 +722,7 @@ func (tctx *tcontext) proposeValue(db kv.DB, tid, iid uint32, kvals []sql.Value,
 	}
 
 	// Finally, make the proposed write.
-	key := encoding.MakeVersionKey(tid, iid, kvals, encoding.MakeProposedWriteVersion(tctx.sid))
+	key := encoding.MakeProposedWriteKey(tid, iid, kvals, tctx.sid)
 	err = wtx.Set(key, val)
 	if err != nil {
 		return err

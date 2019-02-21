@@ -8,7 +8,15 @@ import (
 	"github.com/leftmike/maho/sql"
 )
 
+// Keys look like <table-id><index-id>[<sql-value>...][<suffix>]<type>, where
+// <table-id> and <index-id> are uint32s, <sql-value> are zero or more SQL
+// values encoded to sort properly as binary strings, <type> is a single byte
+// which specifies the type of key, <suffix> is optional depending upon the
+// type.
+
 const (
+	// The SQL values are encoded as a tag followed by a binary representation
+	// of the value.
 	NullKeyTag        = 128
 	BoolKeyTag        = 129
 	Int64NegKeyTag    = 130
@@ -18,9 +26,22 @@ const (
 	Float64ZeroKeyTag = 142
 	Float64PosKeyTag  = 143
 	StringKeyTag      = 150
+
+	// Using these key types and suffixes means that for a given bare key, the
+	// keys will be ordered as proposal, proposed writes, and finally versions.
+	// The statement ids and versions are encoded so they sort in descending
+	// order; ie. higher statement ids and versions will come before lower ones.
+	BareKeyType          = KeyType(0) // No suffix
+	ProposalKeyType      = KeyType(1) // No suffix
+	ProposedWriteKeyType = KeyType(2) // Suffix: 2 <statement-id>
+	VersionKeyType       = KeyType(3) // Suffix: 3 <version>
+	TransactionKeyType   = KeyType(4) // Suffix: <transaction-id>
 )
 
-func makeKey(tid, iid uint32, vals []sql.Value) []byte {
+type KeyType byte
+type Version uint64
+
+func MakePrefixKey(tid, iid uint32, vals []sql.Value) []byte {
 	key := make([]byte, 8)
 	binary.BigEndian.PutUint32(key, tid)
 	binary.BigEndian.PutUint32(key[4:], iid)
@@ -28,6 +49,7 @@ func makeKey(tid, iid uint32, vals []sql.Value) []byte {
 	for _, val := range vals {
 		switch val := val.(type) {
 		case sql.BoolValue:
+
 			key = append(key, BoolKeyTag)
 			if val {
 				key = append(key, 1)
@@ -70,25 +92,43 @@ func makeKey(tid, iid uint32, vals []sql.Value) []byte {
 	return key
 }
 
-func MakeKey(tid, iid uint32, vals []sql.Value) []byte {
-	if tid >= MinVersionedTID {
-		panic(fmt.Sprintf("tid must be < %d for keys without a version; %d", MinVersionedTID, tid))
-	}
-	return makeKey(tid, iid, vals)
+func MakeBareKey(tid, iid uint32, vals []sql.Value) []byte {
+	return append(MakePrefixKey(tid, iid, vals), byte(BareKeyType))
+}
+
+func MakeProposalKey(tid, iid uint32, vals []sql.Value) []byte {
+	return append(MakePrefixKey(tid, iid, vals), byte(ProposalKeyType))
+}
+
+func MakeProposedWriteKey(tid, iid uint32, vals []sql.Value, stmtid uint32) []byte {
+	key := MakePrefixKey(tid, iid, vals)
+	key = append(key, byte(ProposedWriteKeyType))
+	key = encodeUInt32(key, ^stmtid) // Sort in descending order.
+	return append(key, byte(ProposedWriteKeyType))
+}
+
+func MakeTransactionKey(tid, iid uint32, vals []sql.Value, txid uint32) []byte {
+	key := MakePrefixKey(tid, iid, vals)
+	key = encodeUInt32(key, txid)
+	return append(key, byte(TransactionKeyType))
 }
 
 func MakeVersionKey(tid, iid uint32, vals []sql.Value, ver Version) []byte {
-	if tid < MinVersionedTID {
-		panic(fmt.Sprintf("tid must be >= %d for keys with a version; %d", MinVersionedTID, tid))
-	}
-	key := makeKey(tid, iid, vals)
-	return encodeUInt64(key, ^uint64(ver))
+	key := MakePrefixKey(tid, iid, vals)
+	key = append(key, byte(VersionKeyType))
+	key = encodeUInt64(key, ^uint64(ver)) // Sort in descending order.
+	return append(key, byte(VersionKeyType))
 }
 
 func encodeUInt64(buf []byte, u uint64) []byte {
 	// Use binary.BigEndian.Uint64 to decode.
 	return append(buf, byte(u>>56), byte(u>>48), byte(u>>40), byte(u>>32),
 		byte(u>>24), byte(u>>16), byte(u>>8), byte(u))
+}
+
+func encodeUInt32(buf []byte, u uint32) []byte {
+	// Use binary.BigEndian.Uint32 to decode.
+	return append(buf, byte(u>>24), byte(u>>16), byte(u>>8), byte(u))
 }
 
 func encodeKeyBytes(buf []byte, bytes []byte) []byte {
@@ -119,14 +159,36 @@ func decodeKeyBytes(key []byte) ([]byte, []byte, bool) {
 	return nil, nil, false
 }
 
-func parseKey(key []byte, tid, iid uint32) ([]sql.Value, bool) {
-	if len(key) < 8 {
-		return nil, false
+func ParseKey(key []byte) (uint32, uint32, []sql.Value, KeyType, bool) {
+	if len(key) < 9 {
+		return 0, 0, nil, 0, false
 	}
-	if binary.BigEndian.Uint32(key) != tid || binary.BigEndian.Uint32(key[4:]) != iid {
-		return nil, false
+	tid := binary.BigEndian.Uint32(key)
+	iid := binary.BigEndian.Uint32(key[4:])
+	kt := KeyType(key[len(key)-1])
+	switch kt {
+	case BareKeyType:
+		key = key[8 : len(key)-1]
+	case ProposalKeyType:
+		key = key[8 : len(key)-1]
+	case ProposedWriteKeyType:
+		if KeyType(key[len(key)-6]) != ProposedWriteKeyType {
+			return 0, 0, nil, 0, false
+		}
+		// 2 uint32 2
+		key = key[8 : len(key)-6]
+	case VersionKeyType:
+		if KeyType(key[len(key)-10]) != VersionKeyType {
+			return 0, 0, nil, 0, false
+		}
+		// 3 uint64 3
+		key = key[8 : len(key)-10]
+	case TransactionKeyType:
+		// uint32 4
+		key = key[8 : len(key)-5]
+	default:
+		return 0, 0, nil, 0, false
 	}
-	key = key[8:]
 
 	var vals []sql.Value
 	for len(key) > 0 {
@@ -136,7 +198,7 @@ func parseKey(key []byte, tid, iid uint32) ([]sql.Value, bool) {
 			key = key[1:]
 		case BoolKeyTag:
 			if len(key) < 1 {
-				return nil, false
+				return 0, 0, nil, 0, false
 			}
 			if key[1] == 0 {
 				vals = append(vals, sql.BoolValue(false))
@@ -149,7 +211,7 @@ func parseKey(key []byte, tid, iid uint32) ([]sql.Value, bool) {
 			var ok bool
 			key, s, ok = decodeKeyBytes(key[1:])
 			if !ok {
-				return nil, false
+				return 0, 0, nil, 0, false
 			}
 			vals = append(vals, sql.StringValue(s))
 		case Float64NaNKeyTag:
@@ -158,7 +220,7 @@ func parseKey(key []byte, tid, iid uint32) ([]sql.Value, bool) {
 		case Float64NegKeyTag:
 			var u uint64
 			if len(key) < 9 {
-				return nil, false
+				return 0, 0, nil, 0, false
 			}
 			u = ^binary.BigEndian.Uint64(key[1:])
 			vals = append(vals, sql.Float64Value(math.Float64frombits(u)))
@@ -169,7 +231,7 @@ func parseKey(key []byte, tid, iid uint32) ([]sql.Value, bool) {
 		case Float64PosKeyTag:
 			var u uint64
 			if len(key) < 9 {
-				return nil, false
+				return 0, 0, nil, 0, false
 			}
 			u = binary.BigEndian.Uint64(key[1:])
 			vals = append(vals, sql.Float64Value(math.Float64frombits(u)))
@@ -177,59 +239,50 @@ func parseKey(key []byte, tid, iid uint32) ([]sql.Value, bool) {
 		case Int64NegKeyTag, Int64NotNegKeyTag:
 			var u uint64
 			if len(key) < 9 {
-				return nil, false
+				return 0, 0, nil, 0, false
 			}
 			u = binary.BigEndian.Uint64(key[1:])
 			vals = append(vals, sql.Int64Value(u))
 			key = key[9:]
 		default:
-			return nil, false
+			return 0, 0, nil, 0, false
 		}
 	}
 
-	return vals, true
+	return tid, iid, vals, kt, true
 }
 
-func ParseKey(key []byte, tid, iid uint32) ([]sql.Value, bool) {
-	if tid >= MinVersionedTID {
-		panic(fmt.Sprintf("tid must be < %d for keys without a version; %d", MinVersionedTID, tid))
-	}
-	return parseKey(key, tid, iid)
+func GetKeyType(key []byte) KeyType {
+	return KeyType(key[len(key)-1])
 }
 
-func ParseVersionKey(key []byte, tid, iid uint32) ([]sql.Value, Version, bool) {
-	if tid < MinVersionedTID {
-		panic(fmt.Sprintf("tid must be >= %d for keys with a version; %d", MinVersionedTID, tid))
+func GetKeyVersion(key []byte) Version {
+	if len(key) < 18 || KeyType(key[len(key)-1]) != VersionKeyType ||
+		KeyType(key[len(key)-10]) != VersionKeyType {
+
+		panic(fmt.Sprintf("not a version key: %v", key))
 	}
-	if len(key) < 8 {
-		return nil, 0, false
+	return Version(^binary.BigEndian.Uint64(key[len(key)-9 : len(key)-1]))
+}
+
+func GetKeyStatementID(key []byte) uint32 {
+	if len(key) < 14 || KeyType(key[len(key)-1]) != ProposedWriteKeyType ||
+		KeyType(key[len(key)-6]) != ProposedWriteKeyType {
+
+		panic(fmt.Sprintf("not a proposed write key: %v", key))
 	}
-	vals, ok := parseKey(key[:len(key)-8], tid, iid)
-	if !ok {
-		return nil, 0, false
+	return ^binary.BigEndian.Uint32(key[len(key)-5 : len(key)-1])
+}
+
+func GetKeyTransactionID(key []byte) uint32 {
+	if len(key) < 13 || KeyType(key[len(key)-1]) != TransactionKeyType {
+		panic(fmt.Sprintf("not a transaction key: %v", key))
 	}
-	ver := ^binary.BigEndian.Uint64(key[len(key)-8:])
-	return vals, Version(ver), true
+	return binary.BigEndian.Uint32(key[len(key)-5 : len(key)-1])
 }
 
 func FormatKey(key []byte) string {
-	if len(key) < 8 {
-		return fmt.Sprintf("bad key: %v", key)
-	}
-
-	tid := binary.BigEndian.Uint32(key)
-	iid := binary.BigEndian.Uint32(key[4:])
-
-	var ver Version
-	if tid >= MinVersionedTID {
-		if len(key) < 8 {
-			return fmt.Sprintf("bad key: %v", key)
-		}
-		ver = Version(^binary.BigEndian.Uint64(key[len(key)-8:]))
-		key = key[:len(key)-8]
-	}
-
-	vals, ok := parseKey(key, tid, iid)
+	tid, iid, vals, kt, ok := ParseKey(key)
 	if !ok {
 		return fmt.Sprintf("bad key: %v", key)
 	}
@@ -243,8 +296,15 @@ func FormatKey(key []byte) string {
 		}
 	}
 
-	if tid >= MinVersionedTID {
-		s = fmt.Sprintf("%s@%s", s, ver)
+	switch kt {
+	case ProposalKeyType:
+		s = fmt.Sprintf("%s@proposal", s)
+	case ProposedWriteKeyType:
+		s = fmt.Sprintf("%s@stmt(%d)", s, GetKeyStatementID(key))
+	case VersionKeyType:
+		s = fmt.Sprintf("%s@%d", s, GetKeyVersion(key))
+	case TransactionKeyType:
+		s = fmt.Sprintf("%s@txid(%d)", s, GetKeyTransactionID(key))
 	}
 	return s
 }
