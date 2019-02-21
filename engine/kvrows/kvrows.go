@@ -173,14 +173,14 @@ func setValue(db kv.DB, key, val []byte) error {
 	return nil
 }
 
-func keyValueScan(db kv.DB, prefix []byte, kvf func(key, val []byte) error) error {
+func keyValueScan(db kv.DB, key []byte, kvf func(key, val []byte) error) error {
 	rtx, err := db.ReadTx()
 	if err != nil {
 		return err
 	}
 	defer rtx.Discard()
 
-	it := rtx.Iterate(prefix)
+	it := rtx.Iterate(encoding.GetKeyPrefix(key))
 	defer it.Close()
 
 	it.Rewind()
@@ -460,7 +460,7 @@ func (kvdb *database) ListTables(ses engine.Session, tx interface{}) ([]engine.T
 		}
 	}
 
-	err := keyValueScan(kvdb.db, encoding.MakePrefixKey(tableMetadataTID, primaryIID, nil),
+	err := keyValueScan(kvdb.db, encoding.MakeBareKey(tableMetadataTID, primaryIID, nil),
 		func(key, val []byte) error {
 			fmt.Printf("key: %v\n", key)
 			_, _, vals, _, ok := encoding.ParseKey(key)

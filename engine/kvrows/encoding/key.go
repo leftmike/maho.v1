@@ -41,7 +41,7 @@ const (
 type KeyType byte
 type Version uint64
 
-func MakePrefixKey(tid, iid uint32, vals []sql.Value) []byte {
+func makeKey(tid, iid uint32, vals []sql.Value) []byte {
 	key := make([]byte, 8)
 	binary.BigEndian.PutUint32(key, tid)
 	binary.BigEndian.PutUint32(key[4:], iid)
@@ -93,28 +93,28 @@ func MakePrefixKey(tid, iid uint32, vals []sql.Value) []byte {
 }
 
 func MakeBareKey(tid, iid uint32, vals []sql.Value) []byte {
-	return append(MakePrefixKey(tid, iid, vals), byte(BareKeyType))
+	return append(makeKey(tid, iid, vals), byte(BareKeyType))
 }
 
 func MakeProposalKey(tid, iid uint32, vals []sql.Value) []byte {
-	return append(MakePrefixKey(tid, iid, vals), byte(ProposalKeyType))
+	return append(makeKey(tid, iid, vals), byte(ProposalKeyType))
 }
 
 func MakeProposedWriteKey(tid, iid uint32, vals []sql.Value, stmtid uint32) []byte {
-	key := MakePrefixKey(tid, iid, vals)
+	key := makeKey(tid, iid, vals)
 	key = append(key, byte(ProposedWriteKeyType))
 	key = encodeUInt32(key, ^stmtid) // Sort in descending order.
 	return append(key, byte(ProposedWriteKeyType))
 }
 
 func MakeTransactionKey(tid, iid uint32, vals []sql.Value, txid uint32) []byte {
-	key := MakePrefixKey(tid, iid, vals)
+	key := makeKey(tid, iid, vals)
 	key = encodeUInt32(key, txid)
 	return append(key, byte(TransactionKeyType))
 }
 
 func MakeVersionKey(tid, iid uint32, vals []sql.Value, ver Version) []byte {
-	key := MakePrefixKey(tid, iid, vals)
+	key := makeKey(tid, iid, vals)
 	key = append(key, byte(VersionKeyType))
 	key = encodeUInt64(key, ^uint64(ver)) // Sort in descending order.
 	return append(key, byte(VersionKeyType))
@@ -254,6 +254,13 @@ func ParseKey(key []byte) (uint32, uint32, []sql.Value, KeyType, bool) {
 
 func GetKeyType(key []byte) KeyType {
 	return KeyType(key[len(key)-1])
+}
+
+func GetKeyPrefix(key []byte) []byte {
+	if KeyType(key[len(key)-1]) != BareKeyType {
+		panic(fmt.Sprintf("not a bare key: %v", key))
+	}
+	return key[:len(key)-1]
 }
 
 func GetKeyVersion(key []byte) Version {
