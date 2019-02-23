@@ -31,11 +31,16 @@ const (
 	// keys will be ordered as proposal, proposed writes, and finally versions.
 	// The statement ids and versions are encoded so they sort in descending
 	// order; ie. higher statement ids and versions will come before lower ones.
-	BareKeyType          = KeyType(0) // No suffix
-	ProposalKeyType      = KeyType(1) // No suffix
-	ProposedWriteKeyType = KeyType(2) // Suffix: 2 <statement-id>
-	VersionKeyType       = KeyType(3) // Suffix: 3 <version>
-	TransactionKeyType   = KeyType(4) // Suffix: <transaction-id>
+	//
+	// Next key type and next bare key type are used in ranges. They will never
+	// be stored.
+	NextKeyType          = KeyType(0)   // ... [ <suffix> ] <key-type>
+	BareKeyType          = KeyType(1)   // No suffix
+	ProposalKeyType      = KeyType(2)   // No suffix
+	ProposedWriteKeyType = KeyType(3)   // Suffix: 2 <statement-id>
+	VersionKeyType       = KeyType(4)   // Suffix: 3 <version>
+	TransactionKeyType   = KeyType(5)   // Suffix: <transaction-id>
+	NextBareKeyType      = KeyType(255) // No suffix
 )
 
 type KeyType byte
@@ -120,6 +125,24 @@ func MakeVersionKey(tid, iid uint32, vals []sql.Value, ver Version) []byte {
 	return append(key, byte(VersionKeyType))
 }
 
+// MakeNextKey will return a key which can be used to start a key scan
+// immediately following the key argument.
+func MakeNextKey(key []byte) []byte {
+	return append(key, byte(NextKeyType))
+}
+
+// MakeNextBareKey will return a key which can be used to start a key scan
+// with the next bare key; it will sort after any other keys (ie. proposal
+// and proposed writes) with the same prefix.
+func MakeNextBareKey(key []byte) []byte {
+	if KeyType(key[len(key)-1]) != BareKeyType {
+		panic(fmt.Sprintf("not a bare key: %v", key))
+	}
+	nxt := append([]byte(nil), key...)
+	nxt[len(key)-1] = byte(NextBareKeyType)
+	return nxt
+}
+
 func encodeUInt64(buf []byte, u uint64) []byte {
 	// Use binary.BigEndian.Uint64 to decode.
 	return append(buf, byte(u>>56), byte(u>>48), byte(u>>40), byte(u>>32),
@@ -159,34 +182,62 @@ func decodeKeyBytes(key []byte) ([]byte, []byte, bool) {
 	return nil, nil, false
 }
 
+func parseSuffix(key []byte) (KeyType, []byte, bool) {
+	kt := KeyType(key[len(key)-1])
+	switch kt {
+	case NextKeyType:
+		if len(key) < 1 {
+			return 0, nil, false
+		}
+		return parseSuffix(key[:len(key)-1])
+	case BareKeyType:
+		if len(key) < 1 {
+			return 0, nil, false
+		}
+		key = key[:len(key)-1]
+	case ProposalKeyType:
+		if len(key) < 1 {
+			return 0, nil, false
+		}
+		key = key[:len(key)-1]
+	case ProposedWriteKeyType:
+		if len(key) < 6 || KeyType(key[len(key)-6]) != ProposedWriteKeyType {
+			return 0, nil, false
+		}
+		// 2 uint32 2
+		key = key[:len(key)-6]
+	case VersionKeyType:
+		if len(key) < 10 || KeyType(key[len(key)-10]) != VersionKeyType {
+			return 0, nil, false
+		}
+		// 3 uint64 3
+		key = key[:len(key)-10]
+	case TransactionKeyType:
+		if len(key) < 5 {
+			return 0, nil, false
+		}
+		// uint32 4
+		key = key[:len(key)-5]
+	case NextBareKeyType:
+		if len(key) < 1 {
+			return 0, nil, false
+		}
+		key = key[:len(key)-1]
+	default:
+		return 0, nil, false
+	}
+	return kt, key, true
+}
+
 func ParseKey(key []byte) (uint32, uint32, []sql.Value, KeyType, bool) {
 	if len(key) < 9 {
 		return 0, 0, nil, 0, false
 	}
 	tid := binary.BigEndian.Uint32(key)
 	iid := binary.BigEndian.Uint32(key[4:])
-	kt := KeyType(key[len(key)-1])
-	switch kt {
-	case BareKeyType:
-		key = key[8 : len(key)-1]
-	case ProposalKeyType:
-		key = key[8 : len(key)-1]
-	case ProposedWriteKeyType:
-		if KeyType(key[len(key)-6]) != ProposedWriteKeyType {
-			return 0, 0, nil, 0, false
-		}
-		// 2 uint32 2
-		key = key[8 : len(key)-6]
-	case VersionKeyType:
-		if KeyType(key[len(key)-10]) != VersionKeyType {
-			return 0, 0, nil, 0, false
-		}
-		// 3 uint64 3
-		key = key[8 : len(key)-10]
-	case TransactionKeyType:
-		// uint32 4
-		key = key[8 : len(key)-5]
-	default:
+
+	kt, key, ok := parseSuffix(key[8:])
+	if !ok {
 		return 0, 0, nil, 0, false
 	}
 
@@ -312,6 +363,8 @@ func FormatKey(key []byte) string {
 		s = fmt.Sprintf("%s@%d", s, GetKeyVersion(key))
 	case TransactionKeyType:
 		s = fmt.Sprintf("%s@txid(%d)", s, GetKeyTransactionID(key))
+	case NextBareKeyType:
+		s = fmt.Sprintf("%s@next-bare", s)
 	}
 	return s
 }
