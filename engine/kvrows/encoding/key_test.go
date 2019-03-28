@@ -178,7 +178,7 @@ func TestTransactionKeys(t *testing.T) {
 
 func TestVersionKeys(t *testing.T) {
 	cases := []struct {
-		ver encoding.Version
+		ver uint64
 		s   string
 	}{
 		{ver: 0, s: "@0"},

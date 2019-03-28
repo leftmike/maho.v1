@@ -6,7 +6,8 @@ To Do:
 - move DatabaseMetadata.NextTableID to be a sequence
 - change tableMetadata to be a versioned table: name:metadata
 - cache table metadata
-- change keys to have a typed suffix
+- scanRows: kvfn to return just keys (for deleting rows); a subset of columns; etc
+- encoding: split into keys and values packages
 
 - enhanced kv layer that incorporates mvcc:
 -- implement simple sql layer in terms of enhanced kv layer
@@ -27,6 +28,7 @@ import (
 	"bytes"
 	"errors"
 	"fmt"
+	"math"
 	"os"
 	"sync"
 
@@ -73,6 +75,7 @@ type tcontext struct {
 	txid   uint32
 	sid    uint32
 	txKey  []byte
+	ver    uint64
 	tables map[sql.Identifier]*table
 }
 
@@ -87,6 +90,7 @@ type table struct {
 }
 
 type rows struct {
+	tbl *table
 }
 
 func (e Engine) AttachDatabase(svcs engine.Services, name sql.Identifier, path string,
@@ -103,7 +107,7 @@ func (e Engine) AttachDatabase(svcs engine.Services, name sql.Identifier, path s
 	}
 
 	var md encoding.DatabaseMetadata
-	err = getProtobufValue(db, databaseKey, &md)
+	err = getProtobuf(db, databaseKey, &md)
 	if err != nil {
 		db.Close() // Ignore any error from close, since we can't do much about it.
 		return nil, err
@@ -117,7 +121,7 @@ func (e Engine) AttachDatabase(svcs engine.Services, name sql.Identifier, path s
 	}
 
 	md.Opens += 1
-	err = setValue(db, databaseKey, encoding.MakeProtobufValue(&md))
+	err = setProtobuf(db, databaseKey, &md)
 	if err != nil {
 		db.Close() // As above, ignore any error from close.
 		return nil, err
@@ -130,71 +134,6 @@ func (e Engine) AttachDatabase(svcs engine.Services, name sql.Identifier, path s
 		path:        path,
 		db:          db,
 	}, nil
-}
-
-func getProtobufValue(db kv.DB, key []byte, pb proto.Message) error {
-	rtx, err := db.ReadTx()
-	if err != nil {
-		return err
-	}
-	defer rtx.Discard()
-
-	err = rtx.Get(key,
-		func(val []byte) error {
-			if !encoding.ParseProtobufValue(val, pb) {
-				return fmt.Errorf("kvrows: unable to parse protobuf at %s",
-					encoding.FormatKey(key))
-			}
-			return nil
-		})
-	if err != nil {
-		return err
-	}
-
-	return nil
-}
-
-func setValue(db kv.DB, key, val []byte) error {
-	wtx, err := db.WriteTx()
-	if err != nil {
-		return err
-	}
-	defer wtx.Discard()
-
-	err = wtx.Set(key, val)
-	if err != nil {
-		return err
-	}
-
-	err = wtx.Commit()
-	if err != nil {
-		return err
-	}
-	return nil
-}
-
-func keyValueScan(db kv.DB, key []byte, kvf func(key, val []byte) error) error {
-	rtx, err := db.ReadTx()
-	if err != nil {
-		return err
-	}
-	defer rtx.Discard()
-
-	it := rtx.Iterate(encoding.GetKeyPrefix(key))
-	defer it.Close()
-
-	it.Rewind()
-	for it.Valid() {
-		err := it.Value(func(val []byte) error {
-			return kvf(it.Key(), val)
-		})
-		if err != nil {
-			return err
-		}
-		it.Next()
-	}
-
-	return nil
 }
 
 func initializeDB(db kv.DB, name sql.Identifier) (*encoding.DatabaseMetadata, error) {
@@ -210,7 +149,7 @@ func initializeDB(db kv.DB, name sql.Identifier) (*encoding.DatabaseMetadata, er
 		NextRowID: 1,
 	}
 
-	err := setValue(db, databaseKey, encoding.MakeProtobufValue(&md))
+	err := setProtobuf(db, databaseKey, &md)
 	if err != nil {
 		return nil, err
 	}
@@ -250,7 +189,7 @@ func (kvdb *database) Message() string {
 
 func (kvdb *database) lookupTableMetadata(tblname sql.Identifier) (*encoding.TableMetadata, error) {
 	var md encoding.TableMetadata
-	err := getProtobufValue(kvdb.db, makeTableKey(tblname), &md)
+	err := getProtobuf(kvdb.db, makeTableKey(tblname), &md)
 	if err != nil {
 		return nil, fmt.Errorf("kvdb: table %s.%s not found", kvdb.name, tblname)
 	}
@@ -319,7 +258,7 @@ func (kvdb *database) newTableID() (uint32, error) {
 	id := kvdb.metadata.NextTableID
 	kvdb.metadata.NextTableID += 1
 
-	err := setValue(kvdb.db, databaseKey, encoding.MakeProtobufValue(kvdb.metadata))
+	err := setProtobuf(kvdb.db, databaseKey, kvdb.metadata)
 	if err != nil {
 		return 0, err
 	}
@@ -330,7 +269,7 @@ func (kvdb *database) newVersion() (uint64, error) {
 	ver := kvdb.metadata.Version
 	kvdb.metadata.Version += 1
 
-	err := setValue(kvdb.db, databaseKey, encoding.MakeProtobufValue(kvdb.metadata))
+	err := setProtobuf(kvdb.db, databaseKey, kvdb.metadata)
 	if err != nil {
 		return 0, err
 	}
@@ -460,18 +399,21 @@ func (kvdb *database) ListTables(ses engine.Session, tx interface{}) ([]engine.T
 		}
 	}
 
-	err := keyValueScan(kvdb.db, encoding.MakeBareKey(tableMetadataTID, primaryIID, nil),
-		func(key, val []byte) error {
-			fmt.Printf("key: %v\n", key)
+	span := keySpan{
+		startKey: encoding.MakeBareKey(tableMetadataTID, primaryIID, nil),
+		endKey:   encoding.MakeBareKey(tableMetadataTID, primaryIID+1, nil),
+	}
+	_, _, err := scanValues(kvdb.db, span,
+		func(key, val []byte) (bool, error) {
 			_, _, vals, _, ok := encoding.ParseKey(key)
 			if !ok || len(vals) != 1 || encoding.IsTombstoneValue(val) {
-				return nil
+				return true, nil
 			}
 			s, ok := vals[0].(sql.StringValue)
 			if ok {
 				tblname := sql.ID(string(s))
 				if _, ok = tctx.tables[tblname]; ok {
-					return nil
+					return true, nil
 				}
 
 				tbls = append(tbls, engine.TableEntry{
@@ -479,7 +421,7 @@ func (kvdb *database) ListTables(ses engine.Session, tx interface{}) ([]engine.T
 					Type: engine.PhysicalType,
 				})
 			}
-			return nil
+			return true, nil
 		})
 	if err != nil {
 		return nil, err
@@ -498,6 +440,7 @@ func (kvdb *database) Begin(lkr fatlock.Locker) interface{} {
 		locker: lkr,
 		at:     kvdb.metadata.Opens,
 		txid:   txid,
+		ver:    math.MaxUint64,
 		tables: map[sql.Identifier]*table{},
 	}
 }
@@ -543,15 +486,14 @@ func (kvdb *database) Commit(ses engine.Session, tx interface{}) error {
 
 	for _, tbl := range tctx.tables {
 		if tbl.dropped {
-			err := setValue(kvdb.db, makeTableKey(tbl.name), encoding.MakeTombstoneValue())
+			err := deleteKey(kvdb.db, makeTableKey(tbl.name))
 			if err != nil {
 				return err
 			}
 			// XXX: also need to delete the rows
 		}
 		if tbl.created {
-			err := setValue(kvdb.db, makeTableKey(tbl.name),
-				encoding.MakeProtobufValue(tbl.metadata))
+			err := setProtobuf(kvdb.db, makeTableKey(tbl.name), tbl.metadata)
 			if err != nil {
 				return err
 			}
@@ -737,6 +679,331 @@ func (tctx *tcontext) proposeValue(db kv.DB, tid, iid uint32, kvals []sql.Value,
 	return nil
 }
 
+func commonPrefix(b1, b2 []byte) []byte {
+	var ret []byte
+
+	for i := 0; i < len(b1) && i < len(b2); i += 1 {
+		if b1[i] != b2[i] {
+			break
+		}
+		ret = append(ret, b1[i])
+	}
+	return ret
+}
+
+type keySpan struct {
+	startKey []byte
+	endKey   []byte
+}
+
+type keyValueFunc func(key, val []byte) (bool, error)
+
+func scanValues(db kv.DB, span keySpan, kvfn keyValueFunc) (keySpan, bool, error) {
+	rtx, err := db.ReadTx()
+	if err != nil {
+		return span, false, err
+	}
+	defer rtx.Discard()
+
+	it := rtx.Iterate(commonPrefix(encoding.GetKeyPrefix(span.startKey),
+		encoding.GetKeyPrefix(span.endKey)))
+	defer it.Close()
+
+	it.Rewind()
+	for it.Valid() {
+		key := it.Key()
+		if bytes.Compare(key, span.endKey) != -1 {
+			break
+		}
+		var more bool
+		err := it.Value(func(val []byte) error {
+			var err error
+			more, err = kvfn(key, val)
+			return err
+		})
+		if !more || err != nil {
+			span.startKey = encoding.MakeNextKey(key)
+			return span, false, err
+		}
+		it.Next()
+	}
+
+	span.startKey = span.endKey
+	return span, true, nil
+}
+
+func getProtobuf(db kv.DB, key []byte, pb proto.Message) error {
+	rtx, err := db.ReadTx()
+	if err != nil {
+		return err
+	}
+	defer rtx.Discard()
+
+	err = rtx.Get(key,
+		func(val []byte) error {
+			if !encoding.ParseProtobufValue(val, pb) {
+				return fmt.Errorf("kvrows: unable to parse protobuf at %s",
+					encoding.FormatKey(key))
+			}
+			return nil
+		})
+	if err != nil {
+		return err
+	}
+
+	return nil
+}
+
+func setProtobuf(db kv.DB, key []byte, pb proto.Message) error {
+	wtx, err := db.WriteTx()
+	if err != nil {
+		return err
+	}
+	defer wtx.Discard()
+
+	err = wtx.Set(key, encoding.MakeProtobufValue(pb))
+	if err != nil {
+		return err
+	}
+
+	err = wtx.Commit()
+	if err != nil {
+		return err
+	}
+	return nil
+}
+
+func deleteKey(db kv.DB, key []byte) error {
+	wtx, err := db.WriteTx()
+	if err != nil {
+		return err
+	}
+	defer wtx.Discard()
+
+	err = wtx.Delete(key)
+	if err != nil {
+		return err
+	}
+
+	err = wtx.Commit()
+	if err != nil {
+		return err
+	}
+	return nil
+}
+
+// XXX: testAndSetProtobuf
+
+func validForSpan(it kv.Iterator, span keySpan) bool {
+	return it.Valid() && bytes.Compare(it.Key(), span.endKey) == -1
+}
+
+func checkProposal(it kv.Iterator, txKey []byte) error {
+	var pd encoding.Proposal
+	err := it.Value(func(val []byte) error {
+		if !encoding.ParseProtobufValue(val, &pd) {
+			panic(fmt.Sprintf("kvrows: proposal corrupted for key %s",
+				encoding.FormatKey(it.Key())))
+		}
+		return nil
+	})
+	if err != nil {
+		return err
+	}
+
+	if !bytes.Equal(txKey, pd.TransactionKey) {
+		// XXX: need to check if transaction has been committed or aborted already
+		return fmt.Errorf("kvrows: conflicting change for key %s",
+			encoding.FormatKey(it.Key()))
+	}
+	return nil
+}
+
+// scanRowsTx returns the rows, as key-value pairs, visible to the
+// transaction. The keys returned will be a mixture of version keys and
+// proposed write keys depending upon what is visible. Note that if the value
+// is a tombstone, meaning that the row has been deleted, the key will not be
+// returned.
+func scanRowsTx(rtx kv.ReadTx, txKey []byte, sid uint32, ver uint64, span keySpan,
+	kvfn keyValueFunc) (keySpan, bool, error) {
+
+	it := rtx.Iterate(commonPrefix(encoding.GetKeyPrefix(span.startKey),
+		encoding.GetKeyPrefix(span.endKey)))
+	defer it.Close()
+
+	it.Rewind()
+	if !validForSpan(it, span) {
+		goto done
+	}
+
+	for {
+		for {
+			key := it.Key()
+			if encoding.GetKeyType(key) == encoding.ProposalKeyType {
+				err := checkProposal(it, txKey)
+				if err != nil {
+					span.startKey = encoding.MakeNextBareKey(key)
+					return span, false, err
+				}
+				proposalPrefix := append([]byte(nil), encoding.GetKeyPrefix(key)...)
+
+				for {
+					it.Next()
+					if !validForSpan(it, span) {
+						goto done
+					}
+					key = it.Key()
+					if encoding.GetKeyType(key) == encoding.ProposedWriteKeyType &&
+						bytes.Compare(proposalPrefix, encoding.GetKeyPrefix(key)) == 0 {
+						if encoding.GetKeyStatementID(key) < sid {
+							span.startKey = encoding.MakeNextBareKey(key)
+
+							more := true
+							err = it.Value(func(val []byte) error {
+								if encoding.IsTombstoneValue(val) {
+									return nil
+								}
+
+								var err error
+								more, err = kvfn(key, val)
+								return err
+							})
+							if !more || err != nil {
+								return span, false, err
+							}
+							break
+						}
+					} else {
+						break
+					}
+				}
+			} else if encoding.GetKeyType(key) == encoding.VersionKeyType {
+				if encoding.GetKeyVersion(key) < ver {
+					span.startKey = encoding.MakeNextBareKey(key)
+
+					more := true
+					err := it.Value(func(val []byte) error {
+						if encoding.IsTombstoneValue(val) {
+							return nil
+						}
+
+						var err error
+						more, err = kvfn(key, val)
+						return err
+					})
+					if !more || err != nil {
+						return span, false, err
+					}
+					break
+				}
+			}
+			// Ignore other key types.
+
+			it.Next()
+			if !validForSpan(it, span) {
+				goto done
+			}
+		}
+
+		// Skip keys until the next bare key.
+		for {
+			it.Next()
+			if !validForSpan(it, span) {
+				goto done
+			}
+			if bytes.Compare(it.Key(), span.startKey) == 1 {
+				break
+			}
+		}
+	}
+
+done:
+	span.startKey = span.endKey
+	return span, true, nil
+}
+
+func scanRows(db kv.DB, txKey []byte, sid uint32, ver uint64, span keySpan,
+	kvfn keyValueFunc) (keySpan, bool, error) {
+
+	rtx, err := db.ReadTx()
+	if err != nil {
+		return span, false, err
+	}
+	defer rtx.Discard()
+
+	return scanRowsTx(rtx, txKey, sid, ver, span, kvfn)
+}
+
+// updateRow changes the value of the row pointed at by rowKey to val. The
+// rowKey must be either a proposed write key or a version key. If it is a
+// proposed write key, it must be for this transaction, but for an earlier
+// statement. If it is a version key, it must be the newest one and there
+// must be no proposed writes by any transaction.
+func updateRow(db kv.DB, txKey []byte, sid uint32, rowKey []byte, val []byte) error {
+	// XXX
+	return nil
+}
+
+// insertRow adds a new row pointed at by rowKey. There must be no current
+// visible value for rowKey.
+func insertRow(db kv.DB, txKey []byte, sid uint32, rowKey []byte, val []byte) error {
+	wtx, err := db.WriteTx()
+	if err != nil {
+		return err
+	}
+	defer wtx.Discard()
+
+	_, _, err = scanRowsTx(wtx, txKey, sid, math.MaxUint64,
+		keySpan{rowKey, encoding.MakeNextBareKey(rowKey)},
+		func(key, val []byte) (bool, error) {
+			return false,
+				fmt.Errorf("kvrows: row already exists for key: %s", encoding.FormatKey(key))
+		})
+	if err != nil {
+		return err
+	}
+
+	// XXX: set Proposal and ProposedWrite; Commit
+	return nil
+}
+
+// makeTransaction makes a new transaction at txKey.
+func makeTransaction(db kv.DB, txKey []byte, at uint64) error {
+	// XXX
+	return nil
+}
+
+func (tctx *tcontext) needTransaction(db kv.DB, tid, iid uint32, kvals []sql.Value) error {
+	if tctx.txKey != nil {
+		return nil
+	}
+
+	wtx, err := db.WriteTx()
+	if err != nil {
+		return err
+	}
+	defer wtx.Discard()
+
+	txKey := encoding.MakeTransactionKey(tid, iid, kvals, tctx.txid)
+	td := encoding.Transaction{
+		Type:  uint32(encoding.Type_TransactionType),
+		State: uint32(encoding.TransactionState_Active),
+		At:    tctx.at,
+	}
+	err = wtx.Set(txKey, encoding.MakeProtobufValue(&td))
+	if err != nil {
+		return err
+	}
+
+	err = wtx.Commit()
+	if err != nil {
+		return err
+	}
+
+	tctx.txKey = txKey
+	return nil
+}
+
 func (kvt *table) Columns(ses engine.Session) []sql.Identifier {
 	return kvt.columns
 }
@@ -746,7 +1013,9 @@ func (kvt *table) ColumnTypes(ses engine.Session) []sql.ColumnType {
 }
 
 func (kvt *table) Rows(ses engine.Session) (engine.Rows, error) {
-	return nil, errors.New("kvrows: Rows: not implemented")
+	return &rows{
+		tbl: kvt,
+	}, nil
 }
 
 func (kvt *table) Insert(ses engine.Session, row []sql.Value) error {
@@ -754,7 +1023,7 @@ func (kvt *table) Insert(ses engine.Session, row []sql.Value) error {
 }
 
 func (kvr *rows) Columns() []sql.Identifier {
-	return nil
+	return kvr.tbl.columns
 }
 
 func (kvr *rows) Close() error {

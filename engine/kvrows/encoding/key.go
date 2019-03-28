@@ -44,7 +44,6 @@ const (
 )
 
 type KeyType byte
-type Version uint64
 
 func makeKey(tid, iid uint32, vals []sql.Value) []byte {
 	key := make([]byte, 8)
@@ -118,10 +117,10 @@ func MakeTransactionKey(tid, iid uint32, vals []sql.Value, txid uint32) []byte {
 	return append(key, byte(TransactionKeyType))
 }
 
-func MakeVersionKey(tid, iid uint32, vals []sql.Value, ver Version) []byte {
+func MakeVersionKey(tid, iid uint32, vals []sql.Value, ver uint64) []byte {
 	key := makeKey(tid, iid, vals)
 	key = append(key, byte(VersionKeyType))
-	key = encodeUInt64(key, ^uint64(ver)) // Sort in descending order.
+	key = encodeUInt64(key, ^ver) // Sort in descending order.
 	return append(key, byte(VersionKeyType))
 }
 
@@ -308,19 +307,20 @@ func GetKeyType(key []byte) KeyType {
 }
 
 func GetKeyPrefix(key []byte) []byte {
-	if KeyType(key[len(key)-1]) != BareKeyType {
-		panic(fmt.Sprintf("not a bare key: %v", key))
+	_, key, ok := parseSuffix(key)
+	if !ok {
+		return nil
 	}
-	return key[:len(key)-1]
+	return key
 }
 
-func GetKeyVersion(key []byte) Version {
+func GetKeyVersion(key []byte) uint64 {
 	if len(key) < 18 || KeyType(key[len(key)-1]) != VersionKeyType ||
 		KeyType(key[len(key)-10]) != VersionKeyType {
 
 		panic(fmt.Sprintf("not a version key: %v", key))
 	}
-	return Version(^binary.BigEndian.Uint64(key[len(key)-9 : len(key)-1]))
+	return ^binary.BigEndian.Uint64(key[len(key)-9 : len(key)-1])
 }
 
 func GetKeyStatementID(key []byte) uint32 {
