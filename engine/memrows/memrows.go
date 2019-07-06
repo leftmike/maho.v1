@@ -13,7 +13,6 @@ import (
 	"sync"
 
 	"github.com/leftmike/maho/engine"
-	"github.com/leftmike/maho/engine/fatlock"
 	"github.com/leftmike/maho/engine/service"
 	"github.com/leftmike/maho/sql"
 )
@@ -93,7 +92,7 @@ func (me *Engine) Begin(sid uint64) engine.Transaction {
 	return me.txService.Begin(sid)
 }
 
-func (me *Engine) Locks() []fatlock.Lock {
+func (me *Engine) Locks() []service.Lock {
 	return me.txService.Locks()
 }
 
@@ -127,7 +126,7 @@ func (mdb *database) LookupTable(ses engine.Session, tx engine.Transaction,
 		return tbl, nil
 	}
 
-	err := tctx.tx.LockTable(ses, mdb.name, tblname, fatlock.ACCESS)
+	err := tctx.tx.LockTable(ses, mdb.name, tblname, service.ACCESS)
 	if err != nil {
 		return nil, err
 	}
@@ -155,7 +154,7 @@ func (mdb *database) CreateTable(ses engine.Session, tx engine.Transaction, tbln
 	cols []sql.Identifier, colTypes []sql.ColumnType) error {
 
 	tctx := service.GetTxContext(tx, mdb).(*tcontext)
-	err := tctx.tx.LockTable(ses, mdb.name, tblname, fatlock.EXCLUSIVE)
+	err := tctx.tx.LockTable(ses, mdb.name, tblname, service.EXCLUSIVE)
 	if err != nil {
 		return err
 	}
@@ -207,7 +206,7 @@ func (mdb *database) DropTable(ses engine.Session, tx engine.Transaction, tblnam
 	exists bool) error {
 
 	tctx := service.GetTxContext(tx, mdb).(*tcontext)
-	err := tctx.tx.LockTable(ses, mdb.name, tblname, fatlock.EXCLUSIVE)
+	err := tctx.tx.LockTable(ses, mdb.name, tblname, service.EXCLUSIVE)
 	if err != nil {
 		return err
 	}
@@ -387,7 +386,7 @@ func (mt *table) Rows(ses engine.Session) (engine.Rows, error) {
 func (mt *table) Insert(ses engine.Session, row []sql.Value) error {
 	if !mt.modifyLock {
 		err := mt.tctx.tx.LockTable(ses, mt.db.name, mt.name,
-			fatlock.ROW_MODIFY)
+			service.ROW_MODIFY)
 		if err != nil {
 			return err
 		}
@@ -429,7 +428,7 @@ func (mr *rows) Delete(ses engine.Session) error {
 			mr.table.name)
 	}
 	if !mr.table.modifyLock {
-		err := mr.table.tctx.tx.LockTable(ses, mr.table.db.name, mr.table.name, fatlock.ROW_MODIFY)
+		err := mr.table.tctx.tx.LockTable(ses, mr.table.db.name, mr.table.name, service.ROW_MODIFY)
 		if err != nil {
 			return err
 		}
@@ -452,7 +451,7 @@ func (mr *rows) Update(ses engine.Session, updates []sql.ColumnUpdate) error {
 	}
 	if !mr.table.modifyLock {
 		err := mr.table.tctx.tx.LockTable(ses, mr.table.db.name, mr.table.name,
-			fatlock.ROW_MODIFY)
+			service.ROW_MODIFY)
 		if err != nil {
 			return err
 		}

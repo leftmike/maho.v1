@@ -6,7 +6,7 @@ import (
 	"sync"
 
 	"github.com/leftmike/maho/engine"
-	"github.com/leftmike/maho/engine/fatlock"
+	"github.com/leftmike/maho/engine/service"
 	"github.com/leftmike/maho/sql"
 )
 
@@ -55,7 +55,7 @@ func (_ *Engine) Begin(sid uint64) engine.Transaction {
 	return &transaction{}
 }
 
-func (_ *Engine) Locks() []fatlock.Lock {
+func (_ *Engine) Locks() []service.Lock {
 	return nil
 }
 

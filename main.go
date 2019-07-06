@@ -8,17 +8,13 @@ To Do:
 
 - fuzzing: parser.Parse
 
-- simplify transations by making part of engine -- and there will only be one transaction and no
-  per database context
 - perhaps change Manager to Engine: engine.Engine
-- move lockService into the engine
-- perhaps provide engine.Engine as type which implementations can extend
 - remove create database infrastructure; should be part of the engine
 - maho/engine: should just be interface
 - move virtual to a helper module?
 - when an engine is created, it takes a path argument
 - create/attach database: remove path argument; if used, can be part of options
-- move fatlock to service/fatlock.go; get rid of LockService interface; rename Service to LockService
+- engine: Session: change to just context.Context everywhere
 
 - fix engine tests
 

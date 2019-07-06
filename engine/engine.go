@@ -6,7 +6,6 @@ import (
 	"path/filepath"
 	"sync"
 
-	"github.com/leftmike/maho/engine/fatlock"
 	"github.com/leftmike/maho/sql"
 )
 
@@ -39,7 +38,7 @@ type Engine interface {
 	AttachDatabase(name sql.Identifier, path string, options Options) (Database, error)
 	CreateDatabase(name sql.Identifier, path string, options Options) (Database, error)
 	Begin(sid uint64) Transaction
-	Locks() []fatlock.Lock
+	//Locks() []service.Lock XXX
 	Transactions() []TransactionState
 }
 
@@ -108,10 +107,6 @@ type Database interface {
 		colTypes []sql.ColumnType) error
 	DropTable(ses Session, tx Transaction, tblname sql.Identifier, exists bool) error
 	ListTables(ses Session, tx Transaction) ([]TableEntry, error)
-	//Begin(lkr fatlock.Locker) interface{}
-	//Commit(ses Session, tctx interface{}) error
-	//Rollback(tctx interface{}) error
-	//NextStmt(tctx interface{})
 	CanClose(drop bool) bool
 	Close(drop bool) error
 }
@@ -132,9 +127,6 @@ type Manager struct {
 	databases     map[sql.Identifier]*databaseEntry
 	virtualTables TableMap
 	systemTables  TableMap
-	//lastTID       uint64
-	//lockService   fatlock.Service
-	//transactions  map[*Transaction]struct{}
 }
 
 func NewManager(dataDir string, eng Engine) *Manager {
@@ -143,17 +135,14 @@ func NewManager(dataDir string, eng Engine) *Manager {
 		engine:        eng,
 		databases:     map[sql.Identifier]*databaseEntry{},
 		virtualTables: TableMap{},
-		//transactions:  map[*Transaction]struct{}{},
 	}
 	m.systemTables = TableMap{
-		sql.ID("databases"):    m.makeDatabasesVirtual,
-		sql.ID("identifiers"):  makeIdentifiersVirtual,
-		sql.ID("config"):       makeConfigVirtual,
-		sql.ID("locks"):        m.makeLocksVirtual,
+		//sql.ID("databases"):   m.makeDatabasesVirtual,
+		sql.ID("identifiers"): makeIdentifiersVirtual,
+		sql.ID("config"):      makeConfigVirtual,
+		//sql.ID("locks"):        m.makeLocksVirtual,
 		sql.ID("transactions"): m.makeTransactionsVirtual,
 	}
-
-	//m.lockService.Init()
 
 	m.CreateVirtualTable(sql.ID("db$tables"), m.makeTablesVirtual)
 	m.CreateVirtualTable(sql.ID("db$columns"), m.makeColumnsVirtual)
@@ -161,12 +150,6 @@ func NewManager(dataDir string, eng Engine) *Manager {
 
 	return &m
 }
-
-/*
-func (m *Manager) LockService() fatlock.LockService {
-	return &m.lockService
-}
-*/
 
 func (m *Manager) canSetupDatabase(name sql.Identifier, options Options,
 	state databaseState) (Engine, *databaseEntry, error) {
@@ -308,112 +291,9 @@ func (m *Manager) DropDatabase(name sql.Identifier, exists bool, options Options
 	return m.tryCloseDatabase(name, exists, options, Dropping)
 }
 
-// Begin a new transaction.
 func (m *Manager) Begin(sid uint64) Transaction {
 	return m.engine.Begin(sid)
 }
-
-/*
-type Transaction struct {
-	m           *Manager
-	lockerState fatlock.LockerState
-	lockService *fatlock.Service
-	contexts    map[Database]interface{}
-	tid         uint64
-	sid         uint64
-}
-
-func (m *Manager) removeTransaction(tx *Transaction) {
-	m.mutex.Lock()
-	defer m.mutex.Unlock()
-
-	delete(m.transactions, tx)
-}
-
-// Begin a new transaction.
-func (m *Manager) Begin(sid uint64) *Transaction {
-	m.mutex.Lock()
-	defer m.mutex.Unlock()
-
-	m.lastTID += 1
-	tx := &Transaction{
-		m:           m,
-		lockService: &m.lockService,
-		contexts:    map[Database]interface{}{},
-		tid:         m.lastTID,
-		sid:         sid,
-	}
-	m.transactions[tx] = struct{}{}
-	return tx
-}
-
-func (tx *Transaction) LockerState() *fatlock.LockerState {
-	return &tx.lockerState
-}
-
-func (tx *Transaction) String() string {
-	return fmt.Sprintf("transaction-%d", tx.tid)
-}
-
-func (tx *Transaction) forContexts(fn func(d Database, tctx interface{}) error) error {
-	if tx.contexts == nil {
-		panic("transaction used after commit or rollback")
-	}
-
-	var err error
-	for d, tctx := range tx.contexts {
-		cerr := fn(d, tctx)
-		if cerr != nil {
-			if err == nil {
-				err = cerr
-			} else {
-				err = fmt.Errorf("%s; %s", err, cerr)
-			}
-		}
-	}
-	return err
-}
-
-func (tx *Transaction) Commit(ses Session) error {
-	err := tx.forContexts(func(d Database, tctx interface{}) error {
-		return d.Commit(ses, tctx)
-	})
-	tx.contexts = nil
-	tx.lockService.ReleaseLocks(tx)
-	tx.m.removeTransaction(tx)
-	return err
-}
-
-func (tx *Transaction) Rollback() error {
-	err := tx.forContexts(func(d Database, tctx interface{}) error {
-		return d.Rollback(tctx)
-	})
-	tx.contexts = nil
-	tx.lockService.ReleaseLocks(tx)
-	tx.m.removeTransaction(tx)
-	return err
-}
-
-func (tx *Transaction) NextStmt() {
-	tx.forContexts(func(d Database, tctx interface{}) error {
-		d.NextStmt(tctx)
-		return nil
-	})
-}
-
-func (tx *Transaction) getContext(d Database) interface{} {
-	if tx.contexts == nil {
-		panic("transaction used after commit or rollback")
-	}
-
-	tctx, ok := tx.contexts[d]
-	if !ok {
-		tctx = d.Begin(tx)
-		tx.contexts[d] = tctx
-	}
-	return tctx
-}
-*/
 
 // LookupTable looks up the named table in the named database.
 func (m *Manager) LookupTable(ses Session, tx Transaction, dbname, tblname sql.Identifier) (Table,

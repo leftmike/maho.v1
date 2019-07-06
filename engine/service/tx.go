@@ -5,20 +5,19 @@ import (
 	"sync"
 
 	"github.com/leftmike/maho/engine"
-	"github.com/leftmike/maho/engine/fatlock"
 	"github.com/leftmike/maho/sql"
 )
 
 type TransactionService struct {
 	mutex        sync.Mutex
-	lockService  fatlock.Service
+	lockService  LockService
 	lastTID      uint64
 	transactions map[*Transaction]struct{}
 }
 
 type Transaction struct {
 	ts          *TransactionService
-	lockerState fatlock.LockerState
+	lockerState LockerState
 	contexts    map[Database]interface{}
 	tid         uint64
 	sid         uint64
@@ -64,11 +63,11 @@ func (ts *TransactionService) Transactions() []engine.TransactionState {
 	return nil // XXX
 }
 
-func (ts *TransactionService) Locks() []fatlock.Lock {
+func (ts *TransactionService) Locks() []Lock {
 	return ts.lockService.Locks()
 }
 
-func (tx *Transaction) LockerState() *fatlock.LockerState {
+func (tx *Transaction) LockerState() *LockerState {
 	return &tx.lockerState
 }
 
@@ -120,7 +119,7 @@ func (tx *Transaction) NextStmt() {
 	})
 }
 
-func (tx *Transaction) LockTable(ses engine.Session, db, tbl sql.Identifier, ll fatlock.LockLevel) error {
+func (tx *Transaction) LockTable(ses engine.Session, db, tbl sql.Identifier, ll LockLevel) error {
 	return tx.ts.lockService.LockTable(ses, tx, db, tbl, ll)
 }
 

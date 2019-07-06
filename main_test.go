@@ -21,13 +21,11 @@ func TestMain(t *testing.T) {
 			`            table      type
             -----      ----
  1       'config' 'virtual'
- 2    'databases' 'virtual'
- 3   'db$columns' 'virtual'
- 4    'db$tables' 'virtual'
- 5  'identifiers' 'virtual'
- 6        'locks' 'virtual'
- 7 'transactions' 'virtual'
-(7 rows)
+ 2   'db$columns' 'virtual'
+ 3    'db$tables' 'virtual'
+ 4  'identifiers' 'virtual'
+ 5 'transactions' 'virtual'
+(5 rows)
 `},
 	}
 

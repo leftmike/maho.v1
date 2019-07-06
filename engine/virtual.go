@@ -5,7 +5,6 @@ import (
 	"io"
 
 	"github.com/leftmike/maho/config"
-	"github.com/leftmike/maho/engine/fatlock"
 	"github.com/leftmike/maho/sql"
 )
 
@@ -101,20 +100,6 @@ func (vdb *virtualDatabase) ListTables(ses Session, tx Transaction) ([]TableEntr
 	}
 	return tbls, nil
 }
-
-func (vdb *virtualDatabase) Begin(lkr fatlock.Locker) interface{} {
-	return nil
-}
-
-func (vdb *virtualDatabase) Commit(ses Session, tx Transaction) error {
-	return nil
-}
-
-func (vdb *virtualDatabase) Rollback(tx Transaction) error {
-	return nil
-}
-
-func (vdb *virtualDatabase) NextStmt(tx Transaction) {}
 
 func (vdb *virtualDatabase) CanClose(drop bool) bool {
 	return false
@@ -290,6 +275,7 @@ func (m *Manager) makeColumnsVirtual(ses Session, tx Transaction, d Database, db
 	}, nil
 }
 
+/*
 func (m *Manager) makeDatabasesVirtual(ses Session, tx Transaction, d Database, dbname,
 	tblname sql.Identifier) (Table, error) {
 
@@ -324,6 +310,7 @@ func (m *Manager) makeDatabasesVirtual(ses Session, tx Transaction, d Database, 
 		Values: values,
 	}, nil
 }
+*/
 
 func makeIdentifiersVirtual(ses Session, tx Transaction, d Database, dbname,
 	tblname sql.Identifier) (Table, error) {
@@ -369,6 +356,7 @@ func makeConfigVirtual(ses Session, tx Transaction, d Database, dbname,
 	}, nil
 }
 
+/*
 func (m *Manager) makeLocksVirtual(ses Session, tx Transaction, d Database, dbname,
 	tblname sql.Identifier) (Table, error) {
 
@@ -397,6 +385,7 @@ func (m *Manager) makeLocksVirtual(ses Session, tx Transaction, d Database, dbna
 		Values: values,
 	}, nil
 }
+*/
 
 func (m *Manager) makeTransactionsVirtual(ses Session, tx Transaction, d Database, dbname,
 	tblname sql.Identifier) (Table, error) {

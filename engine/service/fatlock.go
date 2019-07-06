@@ -1,4 +1,4 @@
-package fatlock
+package service
 
 import (
 	"context"
@@ -83,18 +83,14 @@ type LockerState struct {
 	locker    Locker
 }
 
-type LockService interface {
-	LockTable(ses Session, lkr Locker, db, tbl sql.Identifier, ll LockLevel) error
-}
-
-type Service struct {
+type LockService struct {
 	mutex sync.Mutex
 
 	// The set of locked objects: all of them have at least one lock.
 	objects map[lockKey]*object
 }
 
-func (svc *Service) Init() {
+func (svc *LockService) Init() {
 	svc.objects = map[lockKey]*object{}
 }
 
@@ -120,7 +116,7 @@ func addLock(obj *object, ls *LockerState, ll LockLevel) {
 	}
 }
 
-func (svc *Service) waitForLock(ses Session, obj *object, ls *LockerState, ll LockLevel) {
+func (svc *LockService) waitForLock(ses Session, obj *object, ls *LockerState, ll LockLevel) {
 	ls.waitLevel = ll
 	// Add the locker to the queue of waiters.
 	ls.nextWaiter = nil
@@ -159,10 +155,12 @@ type Session interface {
 
 // LockTable locks the table (specified by db.tbl) for lkr at the specified lock level. It may
 // block waiting for a lock.
-func (svc *Service) LockTable(ses Session, lkr Locker, db, tbl sql.Identifier, ll LockLevel) error {
+func (svc *LockService) LockTable(ses Session, lkr Locker, db, tbl sql.Identifier,
+	ll LockLevel) error {
+
 	ls := lkr.LockerState()
 	if ls.released {
-		return fmt.Errorf("fatlock: locker may not be reused")
+		return fmt.Errorf("service: locker may not be reused")
 	}
 	if ls.locks == nil {
 		ls.locks = map[lockKey]*lock{}
@@ -188,7 +186,7 @@ func (svc *Service) LockTable(ses Session, lkr Locker, db, tbl sql.Identifier, l
 			return nil
 		}
 
-		return fmt.Errorf("fatlock: unable to increase level of held lock")
+		return fmt.Errorf("service: unable to increase level of held lock")
 	}
 
 	obj, ok := svc.objects[key]
@@ -214,7 +212,7 @@ func (svc *Service) LockTable(ses Session, lkr Locker, db, tbl sql.Identifier, l
 	return nil
 }
 
-func (svc *Service) releaseLock(ls *LockerState, lk *lock) {
+func (svc *LockService) releaseLock(ls *LockerState, lk *lock) {
 	obj := lk.obj
 	delete(obj.locks, ls)
 
@@ -243,10 +241,10 @@ func (svc *Service) releaseLock(ls *LockerState, lk *lock) {
 }
 
 // ReleaseLocks will release all locks held by lkr.
-func (svc *Service) ReleaseLocks(lkr Locker) error {
+func (svc *LockService) ReleaseLocks(lkr Locker) error {
 	ls := lkr.LockerState()
 	if ls.released {
-		return fmt.Errorf("fatlock: locker may not be reused")
+		return fmt.Errorf("service: locker may not be reused")
 	}
 	ls.released = true
 
@@ -267,7 +265,7 @@ type Lock struct {
 }
 
 // Locks returns all locks.
-func (svc *Service) Locks() []Lock {
+func (svc *LockService) Locks() []Lock {
 	svc.mutex.Lock()
 	defer svc.mutex.Unlock()
 
