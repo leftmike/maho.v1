@@ -18,7 +18,6 @@ const (
 	COUNT
 	COUNT_ALL
 	DOUBLE
-	ENGINE
 	INT
 	INT2
 	INT4
@@ -31,7 +30,6 @@ const (
 	TEXT
 	VARBINARY
 	VARCHAR
-	WAIT
 )
 
 const (
@@ -117,7 +115,6 @@ var knownKeywords = map[string]struct {
 	"DETACH":      {DETACH, true},
 	"DOUBLE":      {DOUBLE, false},
 	"DROP":        {DROP, true},
-	"ENGINE":      {ENGINE, false},
 	"EXISTS":      {EXISTS, true},
 	"FALSE":       {FALSE, true},
 	"FROM":        {FROM, true},
@@ -162,7 +159,6 @@ var knownKeywords = map[string]struct {
 	"VALUES":      {VALUES, true},
 	"VARBINARY":   {VARBINARY, false},
 	"VARCHAR":     {VARCHAR, false},
-	"WAIT":        {WAIT, false},
 	"WHERE":       {WHERE, true},
 	"WITH":        {WITH, true},
 }

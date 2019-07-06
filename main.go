@@ -10,13 +10,14 @@ To Do:
 
 - simplify transations by making part of engine -- and there will only be one transaction and no
   per database context
-- remove sql.ENGINE, sql.WAIT
 - perhaps change Manager to Engine: engine.Engine
 - move lockService into the engine
 - perhaps provide engine.Engine as type which implementations can extend
 - remove create database infrastructure; should be part of the engine
 - maho/engine: should just be interface
 - move virtual to a helper module?
+
+- document SET
 
 - support schemas, including search path
 
@@ -223,7 +224,7 @@ func main() {
 		DefaultDatabase: sql.ID(*database),
 	}
 
-	err := mgr.CreateDatabase(sql.ID(*database), engine.Options{sql.WAIT: "true"})
+	err := mgr.CreateDatabase(sql.ID(*database), engine.Options{})
 	if err != nil {
 		fmt.Fprintf(os.Stderr, "maho: %s: %s\n", *database, err)
 		return

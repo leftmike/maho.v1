@@ -215,15 +215,8 @@ func (m *Manager) trySetupDatabase(name sql.Identifier, options Options,
 		return err
 	}
 
-	_, ok := options[sql.WAIT]
-	if ok {
-		delete(options, sql.WAIT)
-		m.setupDatabase(e, de, options)
-		return de.err
-	}
-
-	go m.setupDatabase(e, de, options)
-	return nil
+	m.setupDatabase(e, de, options)
+	return de.err
 }
 
 func (m *Manager) AttachDatabase(name sql.Identifier, options Options) error {
@@ -293,14 +286,8 @@ func (m *Manager) tryCloseDatabase(name sql.Identifier, exists bool, options Opt
 		return err
 	}
 
-	_, ok := options[sql.WAIT]
-	if ok {
-		m.closeDatabase(name, de)
-		return de.err
-	}
-
-	go m.closeDatabase(name, de)
-	return nil
+	m.closeDatabase(name, de)
+	return de.err
 }
 
 func (m *Manager) DetachDatabase(name sql.Identifier, options Options) error {

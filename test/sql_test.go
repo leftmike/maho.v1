@@ -57,7 +57,7 @@ func testSQL(t *testing.T, typ string, dbname sql.Identifier) {
 		"memrows": memrows.Engine{},
 	}[typ]
 	mgr := engine.NewManager("testdata", e)
-	err := mgr.CreateDatabase(dbname, engine.Options{sql.WAIT: "true"})
+	err := mgr.CreateDatabase(dbname, engine.Options{})
 	if err != nil {
 		// If the test is run multiple times, then the database will already exist.
 	}

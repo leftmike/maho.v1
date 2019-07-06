@@ -980,8 +980,6 @@ func (p *parser) parseSet() evaluate.Stmt {
 
 	if p.optionalReserved(sql.DATABASE) {
 		s.Variable = sql.DATABASE
-	} else if p.optionalReserved(sql.ENGINE) {
-		s.Variable = sql.ENGINE
 	} else {
 		s.Variable = p.expectIdentifier("expected a config variable")
 	}
@@ -1037,7 +1035,7 @@ func (p *parser) parseOptions() map[sql.Identifier]string {
 }
 
 func (p *parser) parseAttachDatabase() evaluate.Stmt {
-	// ATTACH DATABASE database [ [ WITH ] [ PATH [ '=' ] path ] [ ENGINE [ '=' ] engine ] ]
+	// ATTACH DATABASE database [ [ WITH ] [ PATH [ '=' ] path ] ]
 	var s datadef.AttachDatabase
 
 	s.Database = p.expectIdentifier("expected a database")
@@ -1049,7 +1047,7 @@ func (p *parser) parseAttachDatabase() evaluate.Stmt {
 
 func (p *parser) parseCreateDatabase() evaluate.Stmt {
 	// CREATE DATABASE database
-	//     [ WITH [ PATH [ '=' ] path ] [ ENGINE [ '=' ] engine ] [ WAIT [ '=' ] (true | false) ] ]
+	//     [ WITH [ PATH [ '=' ] path ] ]
 	var s datadef.CreateDatabase
 
 	s.Database = p.expectIdentifier("expected a database")
@@ -1060,18 +1058,15 @@ func (p *parser) parseCreateDatabase() evaluate.Stmt {
 }
 
 func (p *parser) parseDetachDatabase() evaluate.Stmt {
-	// DETACH DATABASE database [ WITH WAIT [ '=' ] (true | false) ]
+	// DETACH DATABASE database
 	var s datadef.DetachDatabase
 
 	s.Database = p.expectIdentifier("expected a database")
-	if p.optionalReserved(sql.WITH) {
-		s.Options = p.parseOptions()
-	}
 	return &s
 }
 
 func (p *parser) parseDropDatabase() evaluate.Stmt {
-	// DROP DATABASE [IF EXISTS] database [ WITH WAIT [ '=' ] (true | false) ]
+	// DROP DATABASE [IF EXISTS] database
 	var s datadef.DropDatabase
 
 	if p.optionalReserved(sql.IF) {
@@ -1080,8 +1075,5 @@ func (p *parser) parseDropDatabase() evaluate.Stmt {
 	}
 
 	s.Database = p.expectIdentifier("expected a database")
-	if p.optionalReserved(sql.WITH) {
-		s.Options = p.parseOptions()
-	}
 	return &s
 }

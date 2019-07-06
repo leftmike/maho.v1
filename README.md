@@ -50,8 +50,6 @@ Run maho: `maho -ssh=1`. And then in another terminal, connect using ssh:
 ATTACH DATABASE database
     [WITH
         [PATH ['='] path]
-        [ENGINE ['='] engine]
-        [WAIT ['='] (true | false)]
     ]
 ```
 
@@ -67,8 +65,6 @@ COMMIT
 CREATE DATABASE database
     [WITH
         [PATH ['='] path]
-        [ENGINE ['='] engine]
-        [WAIT ['='] (true | false)]
     ]
 ```
 
@@ -101,12 +97,10 @@ DELETE FROM [database '.'] table [WHERE <expr>]
 
 ```
 DETACH DATABASE database
-    [WITH WAIT ['='] (true | false)]
 ```
 
 ```
 DROP DATABASE [IF EXISTS] database
-    [WITH WAIT ['='] (true | false)]
 ```
 
 ```
