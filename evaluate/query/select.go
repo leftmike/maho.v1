@@ -135,11 +135,11 @@ func (stmt *Select) String() string {
 	return s
 }
 
-func (stmt *Select) Plan(ses *evaluate.Session, tx *engine.Transaction) (interface{}, error) {
+func (stmt *Select) Plan(ses *evaluate.Session, tx engine.Transaction) (interface{}, error) {
 	return stmt.Rows(ses, tx)
 }
 
-func (stmt *Select) Rows(ses *evaluate.Session, tx *engine.Transaction) (evaluate.Rows, error) {
+func (stmt *Select) Rows(ses *evaluate.Session, tx engine.Transaction) (evaluate.Rows, error) {
 	var rows evaluate.Rows
 	var fctx *fromContext
 	var err error
@@ -169,7 +169,7 @@ func (stmt *Select) Rows(ses *evaluate.Session, tx *engine.Transaction) (evaluat
 	return group(rows, fctx, stmt.Results, stmt.GroupBy, stmt.Having, stmt.OrderBy)
 }
 
-func (fs FromSelect) rows(ses *evaluate.Session, tx *engine.Transaction) (evaluate.Rows,
+func (fs FromSelect) rows(ses *evaluate.Session, tx engine.Transaction) (evaluate.Rows,
 	*fromContext, error) {
 
 	rows, err := fs.Select.Rows(ses, tx)

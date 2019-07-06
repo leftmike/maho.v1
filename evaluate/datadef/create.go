@@ -33,11 +33,11 @@ func (stmt *CreateTable) String() string {
 	return s
 }
 
-func (stmt *CreateTable) Plan(ses *evaluate.Session, tx *engine.Transaction) (interface{}, error) {
+func (stmt *CreateTable) Plan(ses *evaluate.Session, tx engine.Transaction) (interface{}, error) {
 	return stmt, nil
 }
 
-func (stmt *CreateTable) Execute(ses *evaluate.Session, tx *engine.Transaction) (int64, error) {
+func (stmt *CreateTable) Execute(ses *evaluate.Session, tx engine.Transaction) (int64, error) {
 	dbname := stmt.Table.Database
 	if dbname == 0 {
 		dbname = ses.DefaultDatabase
@@ -62,12 +62,12 @@ func (stmt *CreateDatabase) String() string {
 	return s
 }
 
-func (stmt *CreateDatabase) Plan(ses *evaluate.Session, tx *engine.Transaction) (interface{},
+func (stmt *CreateDatabase) Plan(ses *evaluate.Session, tx engine.Transaction) (interface{},
 	error) {
 
 	return stmt, nil
 }
 
-func (stmt *CreateDatabase) Execute(ses *evaluate.Session, tx *engine.Transaction) (int64, error) {
+func (stmt *CreateDatabase) Execute(ses *evaluate.Session, tx engine.Transaction) (int64, error) {
 	return -1, ses.Manager.CreateDatabase(stmt.Database, stmt.Options)
 }

@@ -1,17 +1,10 @@
 package engine
 
 import (
-	"context"
-	"errors"
-	"fmt"
-	"path/filepath"
-	"reflect"
 	"testing"
-
-	"github.com/leftmike/maho/engine/fatlock"
-	"github.com/leftmike/maho/sql"
 )
 
+/*
 type testOp struct {
 	op   string
 	args []string
@@ -192,7 +185,7 @@ func registerEngine() (*Manager, *testEngine) {
 	m := NewManager("testdata", te)
 	return m, te
 }
-
+*/
 func TestEngine(t *testing.T) {
 	/* XXX
 	m, te := registerEngine()
@@ -274,50 +267,52 @@ func TestEngine(t *testing.T) {
 }
 
 func TestDatabase(t *testing.T) {
-	m, te := registerEngine()
-	db := "db"
+	/*
+		m, te := registerEngine()
+		db := "db"
 
-	err := m.CreateDatabase(sql.ID(db), Options{})
-	if err != nil {
-		t.Errorf("CreateDatabase() failed with %s", err)
-	}
-	te.checkOps(t, []testOp{
-		{op: "CreateDatabase", args: []string{db, filepath.Join("testdata", db)}},
-	})
+		err := m.CreateDatabase(sql.ID(db), Options{})
+		if err != nil {
+			t.Errorf("CreateDatabase() failed with %s", err)
+		}
+		te.checkOps(t, []testOp{
+			{op: "CreateDatabase", args: []string{db, filepath.Join("testdata", db)}},
+		})
 
-	tx := m.Begin(0)
-	ses := session{}
-	err = m.CreateTable(ses, tx, sql.ID(db), sql.ID("table1"), nil, nil)
-	if err != nil {
-		t.Errorf("CreateTable(table1) failed with %s", err)
-	}
-	tx.NextStmt()
-	tx.NextStmt()
-	err = tx.Commit(ses)
-	if err != nil {
-		t.Errorf("Commit() failed with %s", err)
-	}
-	te.checkOps(t, []testOp{
-		{op: "Begin"},
-		{op: "CreateTable", args: []string{"table1"}},
-		{op: "NextStmt"},
-		{op: "NextStmt"},
-		{op: "Commit"},
-	})
+		tx := m.Begin(0)
+		ses := session{}
+		err = m.CreateTable(ses, tx, sql.ID(db), sql.ID("table1"), nil, nil)
+		if err != nil {
+			t.Errorf("CreateTable(table1) failed with %s", err)
+		}
+		tx.NextStmt()
+		tx.NextStmt()
+		err = tx.Commit(ses)
+		if err != nil {
+			t.Errorf("Commit() failed with %s", err)
+		}
+		te.checkOps(t, []testOp{
+			{op: "Begin"},
+			{op: "CreateTable", args: []string{"table1"}},
+			{op: "NextStmt"},
+			{op: "NextStmt"},
+			{op: "Commit"},
+		})
 
-	tx = m.Begin(0)
-	ses = session{}
-	_, err = m.LookupTable(ses, tx, sql.ID(db), sql.ID("table1"))
-	if err != nil {
-		t.Errorf("LookupTable(table1) failed with %s", err)
-	}
-	err = tx.Rollback()
-	if err != nil {
-		t.Errorf("Rollback() failed with %s", err)
-	}
-	te.checkOps(t, []testOp{
-		{op: "Begin"},
-		{op: "LookupTable", args: []string{"table1"}},
-		{op: "Rollback"},
-	})
+		tx = m.Begin(0)
+		ses = session{}
+		_, err = m.LookupTable(ses, tx, sql.ID(db), sql.ID("table1"))
+		if err != nil {
+			t.Errorf("LookupTable(table1) failed with %s", err)
+		}
+		err = tx.Rollback()
+		if err != nil {
+			t.Errorf("Rollback() failed with %s", err)
+		}
+		te.checkOps(t, []testOp{
+			{op: "Begin"},
+			{op: "LookupTable", args: []string{"table1"}},
+			{op: "Rollback"},
+		})
+	*/
 }

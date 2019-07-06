@@ -198,7 +198,7 @@ func TestInsert(t *testing.T) {
 		insertCases3)
 }
 
-func statement(ses *evaluate.Session, tx *engine.Transaction, s string) error {
+func statement(ses *evaluate.Session, tx engine.Transaction, s string) error {
 	p := parser.NewParser(strings.NewReader(s), "statement")
 	stmt, err := p.Parse()
 	if err != nil {

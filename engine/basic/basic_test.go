@@ -8,7 +8,7 @@ import (
 )
 
 func TestBasic(t *testing.T) {
-	e := basic.Engine{}
+	e := &basic.Engine{}
 	test.RunDatabaseTest(t, e)
 	test.RunTableTest(t, e)
 	test.RunParallelTest(t, e)

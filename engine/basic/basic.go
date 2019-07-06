@@ -14,6 +14,8 @@ var mutex sync.RWMutex
 
 type Engine struct{}
 
+type transaction struct{}
+
 type database struct {
 	name   sql.Identifier
 	tables map[sql.Identifier]*table
@@ -34,13 +36,13 @@ type rows struct {
 	haveRow bool
 }
 
-func (_ Engine) AttachDatabase(svcs engine.Services, name sql.Identifier, path string,
+func (_ *Engine) AttachDatabase(name sql.Identifier, path string,
 	options engine.Options) (engine.Database, error) {
 
 	return nil, fmt.Errorf("basic: attach database not supported")
 }
 
-func (_ Engine) CreateDatabase(svcs engine.Services, name sql.Identifier, path string,
+func (_ *Engine) CreateDatabase(name sql.Identifier, path string,
 	options engine.Options) (engine.Database, error) {
 
 	return &database{
@@ -49,11 +51,33 @@ func (_ Engine) CreateDatabase(svcs engine.Services, name sql.Identifier, path s
 	}, nil
 }
 
+func (_ *Engine) Begin(sid uint64) engine.Transaction {
+	return &transaction{}
+}
+
+func (_ *Engine) Locks() []fatlock.Lock {
+	return nil
+}
+
+func (_ *Engine) Transactions() []engine.TransactionState {
+	return nil
+}
+
+func (_ *transaction) Commit(ses engine.Session) error {
+	return nil
+}
+
+func (_ *transaction) Rollback() error {
+	return nil
+}
+
+func (_ *transaction) NextStmt() {}
+
 func (bdb *database) Message() string {
 	return ""
 }
 
-func (bdb *database) LookupTable(ses engine.Session, tctx interface{},
+func (bdb *database) LookupTable(ses engine.Session, tx engine.Transaction,
 	tblname sql.Identifier) (engine.Table, error) {
 
 	mutex.RLock()
@@ -66,7 +90,7 @@ func (bdb *database) LookupTable(ses engine.Session, tctx interface{},
 	return tbl, nil
 }
 
-func (bdb *database) CreateTable(ses engine.Session, tctx interface{}, tblname sql.Identifier,
+func (bdb *database) CreateTable(ses engine.Session, tx engine.Transaction, tblname sql.Identifier,
 	cols []sql.Identifier, colTypes []sql.ColumnType) error {
 
 	mutex.Lock()
@@ -85,7 +109,7 @@ func (bdb *database) CreateTable(ses engine.Session, tctx interface{}, tblname s
 	return nil
 }
 
-func (bdb *database) DropTable(ses engine.Session, tctx interface{}, tblname sql.Identifier,
+func (bdb *database) DropTable(ses engine.Session, tx engine.Transaction, tblname sql.Identifier,
 	exists bool) error {
 
 	mutex.Lock()
@@ -101,7 +125,9 @@ func (bdb *database) DropTable(ses engine.Session, tctx interface{}, tblname sql
 	return nil
 }
 
-func (bdb *database) ListTables(ses engine.Session, tctx interface{}) ([]engine.TableEntry, error) {
+func (bdb *database) ListTables(ses engine.Session, tx engine.Transaction) ([]engine.TableEntry,
+	error) {
+
 	mutex.RLock()
 	defer mutex.RUnlock()
 
@@ -114,20 +140,6 @@ func (bdb *database) ListTables(ses engine.Session, tctx interface{}) ([]engine.
 	}
 	return tbls, nil
 }
-
-func (bdb *database) Begin(lkr fatlock.Locker) interface{} {
-	return nil
-}
-
-func (bdb *database) Commit(ses engine.Session, tctx interface{}) error {
-	return nil
-}
-
-func (bdb *database) Rollback(tctx interface{}) error {
-	return nil
-}
-
-func (bdb *database) NextStmt(tctx interface{}) {}
 
 func (bdb *database) CanClose(drop bool) bool {
 	return true

@@ -8,7 +8,7 @@ import (
 )
 
 func TestMemRows(t *testing.T) {
-	e := memrows.Engine{}
+	e := &memrows.Engine{}
 	test.RunDatabaseTest(t, e)
 	test.RunTableTest(t, e)
 	test.RunParallelTest(t, e)

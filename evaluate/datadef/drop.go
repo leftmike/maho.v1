@@ -27,11 +27,11 @@ func (stmt *DropTable) String() string {
 	return s
 }
 
-func (stmt *DropTable) Plan(ses *evaluate.Session, tx *engine.Transaction) (interface{}, error) {
+func (stmt *DropTable) Plan(ses *evaluate.Session, tx engine.Transaction) (interface{}, error) {
 	return stmt, nil
 }
 
-func (stmt *DropTable) Execute(ses *evaluate.Session, tx *engine.Transaction) (int64, error) {
+func (stmt *DropTable) Execute(ses *evaluate.Session, tx engine.Transaction) (int64, error) {
 	for _, tbl := range stmt.Tables {
 		dbname := tbl.Database
 		if dbname == 0 {
@@ -66,12 +66,12 @@ func (stmt *DropDatabase) String() string {
 	return s
 }
 
-func (stmt *DropDatabase) Plan(ses *evaluate.Session, tx *engine.Transaction) (interface{},
+func (stmt *DropDatabase) Plan(ses *evaluate.Session, tx engine.Transaction) (interface{},
 	error) {
 
 	return stmt, nil
 }
 
-func (stmt *DropDatabase) Execute(ses *evaluate.Session, tx *engine.Transaction) (int64, error) {
+func (stmt *DropDatabase) Execute(ses *evaluate.Session, tx engine.Transaction) (int64, error) {
 	return -1, ses.Manager.DropDatabase(stmt.Database, stmt.IfExists, stmt.Options)
 }

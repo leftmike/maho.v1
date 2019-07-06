@@ -9,7 +9,7 @@ import (
 	"github.com/leftmike/maho/sql"
 )
 
-type MakeVirtual func(ses Session, tctx interface{}, d Database, dbname,
+type MakeVirtual func(ses Session, tx Transaction, d Database, dbname,
 	tblname sql.Identifier) (Table, error)
 
 type TableMap map[sql.Identifier]MakeVirtual
@@ -53,11 +53,11 @@ func (m *Manager) CreateVirtualDatabase(name sql.Identifier, tables TableMap) {
 	}
 }
 
-func (m *Manager) lookupVirtual(ses Session, tctx interface{}, d Database, dbname,
+func (m *Manager) lookupVirtual(ses Session, tx Transaction, d Database, dbname,
 	tblname sql.Identifier) (Table, error) {
 
 	if maker, ok := m.virtualTables[tblname]; ok {
-		return maker(ses, tctx, d, dbname, tblname)
+		return maker(ses, tx, d, dbname, tblname)
 	}
 	return nil, nil
 }
@@ -71,29 +71,29 @@ func (vdb *virtualDatabase) Message() string {
 	return ""
 }
 
-func (vdb *virtualDatabase) LookupTable(ses Session, tctx interface{},
+func (vdb *virtualDatabase) LookupTable(ses Session, tx Transaction,
 	tblname sql.Identifier) (Table, error) {
 
 	maker, ok := vdb.tables[tblname]
 	if !ok {
 		return nil, fmt.Errorf("virtual: table %s.%s not found", vdb.name, tblname)
 	}
-	return maker(ses, tctx, vdb, vdb.name, tblname)
+	return maker(ses, tx, vdb, vdb.name, tblname)
 }
 
-func (vdb *virtualDatabase) CreateTable(ses Session, tctx interface{}, tblname sql.Identifier,
+func (vdb *virtualDatabase) CreateTable(ses Session, tx Transaction, tblname sql.Identifier,
 	cols []sql.Identifier, colTypes []sql.ColumnType) error {
 
 	return fmt.Errorf("virtual: database %s may not be modified", vdb.name)
 }
 
-func (vdb *virtualDatabase) DropTable(ses Session, tctx interface{}, tblname sql.Identifier,
+func (vdb *virtualDatabase) DropTable(ses Session, tx Transaction, tblname sql.Identifier,
 	exists bool) error {
 
 	return fmt.Errorf("virtual: database %s may not be modified", vdb.name)
 }
 
-func (vdb *virtualDatabase) ListTables(ses Session, tctx interface{}) ([]TableEntry, error) {
+func (vdb *virtualDatabase) ListTables(ses Session, tx Transaction) ([]TableEntry, error) {
 
 	var tbls []TableEntry
 	for nam := range vdb.tables {
@@ -106,15 +106,15 @@ func (vdb *virtualDatabase) Begin(lkr fatlock.Locker) interface{} {
 	return nil
 }
 
-func (vdb *virtualDatabase) Commit(ses Session, tctx interface{}) error {
+func (vdb *virtualDatabase) Commit(ses Session, tx Transaction) error {
 	return nil
 }
 
-func (vdb *virtualDatabase) Rollback(tctx interface{}) error {
+func (vdb *virtualDatabase) Rollback(tx Transaction) error {
 	return nil
 }
 
-func (vdb *virtualDatabase) NextStmt(tctx interface{}) {}
+func (vdb *virtualDatabase) NextStmt(tx Transaction) {}
 
 func (vdb *virtualDatabase) CanClose(drop bool) bool {
 	return false
@@ -184,8 +184,8 @@ func (vr *virtualRows) Update(ses Session, updates []sql.ColumnUpdate) error {
 	return fmt.Errorf("virtual: table %s can not be modified", vr.name)
 }
 
-func (m *Manager) listTables(ses Session, tctx interface{}, d Database) ([]TableEntry, error) {
-	tbls, err := d.ListTables(ses, tctx)
+func (m *Manager) listTables(ses Session, tx Transaction, d Database) ([]TableEntry, error) {
+	tbls, err := d.ListTables(ses, tx)
 	if err != nil {
 		return nil, err
 	}
@@ -196,10 +196,10 @@ func (m *Manager) listTables(ses Session, tctx interface{}, d Database) ([]Table
 	return tbls, nil
 }
 
-func (m *Manager) makeTablesVirtual(ses Session, tctx interface{}, d Database, dbname,
+func (m *Manager) makeTablesVirtual(ses Session, tx Transaction, d Database, dbname,
 	tblname sql.Identifier) (Table, error) {
 
-	tbls, err := m.listTables(ses, tctx, d)
+	tbls, err := m.listTables(ses, tx, d)
 	if err != nil {
 		return nil, err
 	}
@@ -234,10 +234,10 @@ var (
 		sql.Int32ColType, sql.BoolColType, sql.BoolColType, sql.BoolColType, sql.NullStringColType}
 )
 
-func (m *Manager) makeColumnsVirtual(ses Session, tctx interface{}, d Database, dbname,
+func (m *Manager) makeColumnsVirtual(ses Session, tx Transaction, d Database, dbname,
 	tblname sql.Identifier) (Table, error) {
 
-	tbls, err := m.listTables(ses, tctx, d)
+	tbls, err := m.listTables(ses, tx, d)
 	if err != nil {
 		return nil, err
 	}
@@ -251,11 +251,11 @@ func (m *Manager) makeColumnsVirtual(ses Session, tctx interface{}, d Database, 
 			cols = columnsColumns
 			colTypes = columnsColumnTypes
 		} else {
-			tbl, err := m.lookupVirtual(ses, tctx, d, dbname, te.Name)
+			tbl, err := m.lookupVirtual(ses, tx, d, dbname, te.Name)
 			if err != nil {
 				return nil, err
 			} else if tbl == nil {
-				tbl, err = d.LookupTable(ses, tctx, te.Name)
+				tbl, err = d.LookupTable(ses, tx, te.Name)
 				if err != nil {
 					return nil, err
 				}
@@ -290,7 +290,7 @@ func (m *Manager) makeColumnsVirtual(ses Session, tctx interface{}, d Database, 
 	}, nil
 }
 
-func (m *Manager) makeDatabasesVirtual(ses Session, tctx interface{}, d Database, dbname,
+func (m *Manager) makeDatabasesVirtual(ses Session, tx Transaction, d Database, dbname,
 	tblname sql.Identifier) (Table, error) {
 
 	values := [][]sql.Value{}
@@ -325,7 +325,7 @@ func (m *Manager) makeDatabasesVirtual(ses Session, tctx interface{}, d Database
 	}, nil
 }
 
-func makeIdentifiersVirtual(ses Session, tctx interface{}, d Database, dbname,
+func makeIdentifiersVirtual(ses Session, tx Transaction, d Database, dbname,
 	tblname sql.Identifier) (Table, error) {
 
 	values := [][]sql.Value{}
@@ -347,7 +347,7 @@ func makeIdentifiersVirtual(ses Session, tctx interface{}, d Database, dbname,
 	}, nil
 }
 
-func makeConfigVirtual(ses Session, tctx interface{}, d Database, dbname,
+func makeConfigVirtual(ses Session, tx Transaction, d Database, dbname,
 	tblname sql.Identifier) (Table, error) {
 
 	values := [][]sql.Value{}
@@ -369,12 +369,12 @@ func makeConfigVirtual(ses Session, tctx interface{}, d Database, dbname,
 	}, nil
 }
 
-func (m *Manager) makeLocksVirtual(ses Session, tctx interface{}, d Database, dbname,
+func (m *Manager) makeLocksVirtual(ses Session, tx Transaction, d Database, dbname,
 	tblname sql.Identifier) (Table, error) {
 
 	values := [][]sql.Value{}
 
-	for _, lk := range m.lockService.Locks() {
+	for _, lk := range m.engine.Locks() {
 		var place sql.Value
 		if lk.Place > 0 {
 			place = sql.Int64Value(lk.Place)
@@ -398,12 +398,12 @@ func (m *Manager) makeLocksVirtual(ses Session, tctx interface{}, d Database, db
 	}, nil
 }
 
-func (m *Manager) makeTransactionsVirtual(ses Session, tctx interface{}, d Database, dbname,
+func (m *Manager) makeTransactionsVirtual(ses Session, tx Transaction, d Database, dbname,
 	tblname sql.Identifier) (Table, error) {
 
 	values := [][]sql.Value{}
 
-	for tx := range m.transactions {
+	for _, tx := range m.engine.Transactions() {
 		values = append(values, []sql.Value{
 			sql.StringValue(fmt.Sprintf("transaction-%d", tx.tid)),
 			sql.StringValue(fmt.Sprintf("session-%d", tx.sid)),

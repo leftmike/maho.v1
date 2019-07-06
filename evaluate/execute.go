@@ -5,5 +5,5 @@ import (
 )
 
 type Executor interface {
-	Execute(ses *Session, tx *engine.Transaction) (int64, error)
+	Execute(ses *Session, tx engine.Transaction) (int64, error)
 }

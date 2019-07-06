@@ -22,17 +22,25 @@ type TableEntry struct {
 	Type TableType
 }
 
-type Services interface {
-	LockService() fatlock.LockService
-}
-
 type Options map[sql.Identifier]string
 
+type Transaction interface {
+	Commit(ses Session) error
+	Rollback() error
+	NextStmt()
+}
+
+type TransactionState struct {
+	tid uint64
+	sid uint64
+}
+
 type Engine interface {
-	AttachDatabase(svcs Services, name sql.Identifier, path string, options Options) (Database,
-		error)
-	CreateDatabase(svcs Services, name sql.Identifier, path string, options Options) (Database,
-		error)
+	AttachDatabase(name sql.Identifier, path string, options Options) (Database, error)
+	CreateDatabase(name sql.Identifier, path string, options Options) (Database, error)
+	Begin(sid uint64) Transaction
+	Locks() []fatlock.Lock
+	Transactions() []TransactionState
 }
 
 type databaseState int
@@ -95,15 +103,15 @@ type Table interface {
 
 type Database interface {
 	Message() string
-	LookupTable(ses Session, tctx interface{}, tblname sql.Identifier) (Table, error)
-	CreateTable(ses Session, tctx interface{}, tblname sql.Identifier, cols []sql.Identifier,
+	LookupTable(ses Session, tx Transaction, tblname sql.Identifier) (Table, error)
+	CreateTable(ses Session, tx Transaction, tblname sql.Identifier, cols []sql.Identifier,
 		colTypes []sql.ColumnType) error
-	DropTable(ses Session, tctx interface{}, tblname sql.Identifier, exists bool) error
-	ListTables(ses Session, tctx interface{}) ([]TableEntry, error)
-	Begin(lkr fatlock.Locker) interface{}
-	Commit(ses Session, tctx interface{}) error
-	Rollback(tctx interface{}) error
-	NextStmt(tctx interface{})
+	DropTable(ses Session, tx Transaction, tblname sql.Identifier, exists bool) error
+	ListTables(ses Session, tx Transaction) ([]TableEntry, error)
+	//Begin(lkr fatlock.Locker) interface{}
+	//Commit(ses Session, tctx interface{}) error
+	//Rollback(tctx interface{}) error
+	//NextStmt(tctx interface{})
 	CanClose(drop bool) bool
 	Close(drop bool) error
 }
@@ -124,9 +132,9 @@ type Manager struct {
 	databases     map[sql.Identifier]*databaseEntry
 	virtualTables TableMap
 	systemTables  TableMap
-	lastTID       uint64
-	lockService   fatlock.Service
-	transactions  map[*Transaction]struct{}
+	//lastTID       uint64
+	//lockService   fatlock.Service
+	//transactions  map[*Transaction]struct{}
 }
 
 func NewManager(dataDir string, eng Engine) *Manager {
@@ -135,7 +143,7 @@ func NewManager(dataDir string, eng Engine) *Manager {
 		engine:        eng,
 		databases:     map[sql.Identifier]*databaseEntry{},
 		virtualTables: TableMap{},
-		transactions:  map[*Transaction]struct{}{},
+		//transactions:  map[*Transaction]struct{}{},
 	}
 	m.systemTables = TableMap{
 		sql.ID("databases"):    m.makeDatabasesVirtual,
@@ -145,7 +153,7 @@ func NewManager(dataDir string, eng Engine) *Manager {
 		sql.ID("transactions"): m.makeTransactionsVirtual,
 	}
 
-	m.lockService.Init()
+	//m.lockService.Init()
 
 	m.CreateVirtualTable(sql.ID("db$tables"), m.makeTablesVirtual)
 	m.CreateVirtualTable(sql.ID("db$columns"), m.makeColumnsVirtual)
@@ -154,9 +162,11 @@ func NewManager(dataDir string, eng Engine) *Manager {
 	return &m
 }
 
+/*
 func (m *Manager) LockService() fatlock.LockService {
 	return &m.lockService
 }
+*/
 
 func (m *Manager) canSetupDatabase(name sql.Identifier, options Options,
 	state databaseState) (Engine, *databaseEntry, error) {
@@ -186,10 +196,10 @@ func (m *Manager) canSetupDatabase(name sql.Identifier, options Options,
 func (m *Manager) setupDatabase(e Engine, de *databaseEntry, options Options) {
 	var d Database
 	if de.state == Attaching {
-		d, de.err = e.AttachDatabase(m, de.name, de.path, options)
+		d, de.err = e.AttachDatabase(de.name, de.path, options)
 	} else {
 		// de.state == Creating
-		d, de.err = e.CreateDatabase(m, de.name, de.path, options)
+		d, de.err = e.CreateDatabase(de.name, de.path, options)
 	}
 
 	m.mutex.Lock()
@@ -298,6 +308,12 @@ func (m *Manager) DropDatabase(name sql.Identifier, exists bool, options Options
 	return m.tryCloseDatabase(name, exists, options, Dropping)
 }
 
+// Begin a new transaction.
+func (m *Manager) Begin(sid uint64) Transaction {
+	return m.engine.Begin(sid)
+}
+
+/*
 type Transaction struct {
 	m           *Manager
 	lockerState fatlock.LockerState
@@ -397,9 +413,10 @@ func (tx *Transaction) getContext(d Database) interface{} {
 	}
 	return tctx
 }
+*/
 
 // LookupTable looks up the named table in the named database.
-func (m *Manager) LookupTable(ses Session, tx *Transaction, dbname, tblname sql.Identifier) (Table,
+func (m *Manager) LookupTable(ses Session, tx Transaction, dbname, tblname sql.Identifier) (Table,
 	error) {
 
 	m.mutex.RLock()
@@ -412,16 +429,15 @@ func (m *Manager) LookupTable(ses Session, tx *Transaction, dbname, tblname sql.
 	if de.state != Running {
 		return nil, fmt.Errorf("engine: database %s not running", dbname)
 	}
-	tctx := tx.getContext(de.database)
-	tbl, err := m.lookupVirtual(ses, tctx, de.database, dbname, tblname)
+	tbl, err := m.lookupVirtual(ses, tx, de.database, dbname, tblname)
 	if tbl != nil || err != nil {
 		return tbl, err
 	}
-	return de.database.LookupTable(ses, tctx, tblname)
+	return de.database.LookupTable(ses, tx, tblname)
 }
 
 // CreateTable creates the named table in the named database.
-func (m *Manager) CreateTable(ses Session, tx *Transaction, dbname, tblname sql.Identifier,
+func (m *Manager) CreateTable(ses Session, tx Transaction, dbname, tblname sql.Identifier,
 	cols []sql.Identifier, colTypes []sql.ColumnType) error {
 
 	m.mutex.RLock()
@@ -434,11 +450,11 @@ func (m *Manager) CreateTable(ses Session, tx *Transaction, dbname, tblname sql.
 	if de.state != Running {
 		return fmt.Errorf("engine: database %s not running", dbname)
 	}
-	return de.database.CreateTable(ses, tx.getContext(de.database), tblname, cols, colTypes)
+	return de.database.CreateTable(ses, tx, tblname, cols, colTypes)
 }
 
 // DropTable drops the named table from the named database.
-func (m *Manager) DropTable(ses Session, tx *Transaction, dbname, tblname sql.Identifier,
+func (m *Manager) DropTable(ses Session, tx Transaction, dbname, tblname sql.Identifier,
 	exists bool) error {
 
 	m.mutex.RLock()
@@ -451,5 +467,5 @@ func (m *Manager) DropTable(ses Session, tx *Transaction, dbname, tblname sql.Id
 	if de.state != Running {
 		return fmt.Errorf("engine: database %s not running", dbname)
 	}
-	return de.database.DropTable(ses, tx.getContext(de.database), tblname, exists)
+	return de.database.DropTable(ses, tx, tblname, exists)
 }

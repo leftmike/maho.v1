@@ -16,6 +16,11 @@ To Do:
 - remove create database infrastructure; should be part of the engine
 - maho/engine: should just be interface
 - move virtual to a helper module?
+- when an engine is created, it takes a path argument
+- create/attach database: remove path argument; if used, can be part of options
+- move fatlock to service/fatlock.go; get rid of LockService interface; rename Service to LockService
+
+- fix engine tests
 
 - document SET
 
@@ -199,8 +204,8 @@ func main() {
 	log.WithField("pid", os.Getpid()).Info("maho starting")
 
 	e, ok := map[string]engine.Engine{
-		"basic":   basic.Engine{},
-		"memrows": memrows.Engine{},
+		"basic":   &basic.Engine{},
+		"memrows": &memrows.Engine{},
 		//"badger":  kvrows.Engine{Engine: badger.Engine{}},
 		//"bolt":    kvrows.Engine{Engine: bbolt.Engine{}},
 	}[*eng]

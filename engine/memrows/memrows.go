@@ -14,22 +14,25 @@ import (
 
 	"github.com/leftmike/maho/engine"
 	"github.com/leftmike/maho/engine/fatlock"
+	"github.com/leftmike/maho/engine/service"
 	"github.com/leftmike/maho/sql"
 )
 
-type Engine struct{}
+type Engine struct {
+	inited    bool // XXX
+	txService service.TransactionService
+}
 
 type database struct {
-	lockService fatlock.LockService
-	mutex       sync.RWMutex
-	name        sql.Identifier
-	tables      map[sql.Identifier]*tableImpl
-	version     version // current version of the database
-	nextTID     tid
+	mutex   sync.RWMutex
+	name    sql.Identifier
+	tables  map[sql.Identifier]*tableImpl
+	version version // current version of the database
+	nextTID tid
 }
 
 type tcontext struct {
-	locker  fatlock.Locker
+	tx      *service.Transaction
 	version version
 	tid     tid
 	cid     cid
@@ -66,20 +69,36 @@ type rows struct {
 	haveRow bool
 }
 
-func (_ Engine) AttachDatabase(svcs engine.Services, name sql.Identifier, path string,
+func (me *Engine) AttachDatabase(name sql.Identifier, path string,
 	options engine.Options) (engine.Database, error) {
 
 	return nil, fmt.Errorf("memrows: attach database not supported")
 }
 
-func (_ Engine) CreateDatabase(svcs engine.Services, name sql.Identifier, path string,
+func (me *Engine) CreateDatabase(name sql.Identifier, path string,
 	options engine.Options) (engine.Database, error) {
 
+	if !me.inited { // XXX: should be a NewEngine func
+		me.txService.Init()
+		me.inited = true
+	}
+
 	return &database{
-		lockService: svcs.LockService(),
-		name:        name,
-		tables:      map[sql.Identifier]*tableImpl{},
+		name:   name,
+		tables: map[sql.Identifier]*tableImpl{},
 	}, nil
+}
+
+func (me *Engine) Begin(sid uint64) engine.Transaction {
+	return me.txService.Begin(sid)
+}
+
+func (me *Engine) Locks() []fatlock.Lock {
+	return me.txService.Locks()
+}
+
+func (me *Engine) Transactions() []engine.TransactionState {
+	return me.txService.Transactions()
 }
 
 func (mdb *database) Message() string {
@@ -96,10 +115,10 @@ func visibleVersion(ti *tableImpl, v version) *tableImpl {
 	return ti
 }
 
-func (mdb *database) LookupTable(ses engine.Session, tx interface{},
+func (mdb *database) LookupTable(ses engine.Session, tx engine.Transaction,
 	tblname sql.Identifier) (engine.Table, error) {
 
-	tctx := tx.(*tcontext)
+	tctx := service.GetTxContext(tx, mdb).(*tcontext)
 	tbl, ok := tctx.tables[tblname]
 	if ok {
 		if tbl.dropped && !tbl.created {
@@ -108,7 +127,7 @@ func (mdb *database) LookupTable(ses engine.Session, tx interface{},
 		return tbl, nil
 	}
 
-	err := mdb.lockService.LockTable(ses, tctx.locker, mdb.name, tblname, fatlock.ACCESS)
+	err := tctx.tx.LockTable(ses, mdb.name, tblname, fatlock.ACCESS)
 	if err != nil {
 		return nil, err
 	}
@@ -132,11 +151,11 @@ func (mdb *database) LookupTable(ses engine.Session, tx interface{},
 	return tbl, nil
 }
 
-func (mdb *database) CreateTable(ses engine.Session, tx interface{}, tblname sql.Identifier,
+func (mdb *database) CreateTable(ses engine.Session, tx engine.Transaction, tblname sql.Identifier,
 	cols []sql.Identifier, colTypes []sql.ColumnType) error {
 
-	tctx := tx.(*tcontext)
-	err := mdb.lockService.LockTable(ses, tctx.locker, mdb.name, tblname, fatlock.EXCLUSIVE)
+	tctx := service.GetTxContext(tx, mdb).(*tcontext)
+	err := tctx.tx.LockTable(ses, mdb.name, tblname, fatlock.EXCLUSIVE)
 	if err != nil {
 		return err
 	}
@@ -184,11 +203,11 @@ func (mdb *database) CreateTable(ses engine.Session, tx interface{}, tblname sql
 	return nil
 }
 
-func (mdb *database) DropTable(ses engine.Session, tx interface{}, tblname sql.Identifier,
+func (mdb *database) DropTable(ses engine.Session, tx engine.Transaction, tblname sql.Identifier,
 	exists bool) error {
 
-	tctx := tx.(*tcontext)
-	err := mdb.lockService.LockTable(ses, tctx.locker, mdb.name, tblname, fatlock.EXCLUSIVE)
+	tctx := service.GetTxContext(tx, mdb).(*tcontext)
+	err := tctx.tx.LockTable(ses, mdb.name, tblname, fatlock.EXCLUSIVE)
 	if err != nil {
 		return err
 	}
@@ -233,10 +252,12 @@ func (mdb *database) DropTable(ses engine.Session, tx interface{}, tblname sql.I
 	return nil
 }
 
-func (mdb *database) ListTables(ses engine.Session, tx interface{}) ([]engine.TableEntry, error) {
+func (mdb *database) ListTables(ses engine.Session, tx engine.Transaction) ([]engine.TableEntry,
+	error) {
+
 	var tbls []engine.TableEntry
 
-	tctx := tx.(*tcontext)
+	tctx := service.GetTxContext(tx, mdb).(*tcontext)
 	for _, tbl := range tctx.tables {
 		if !tbl.dropped {
 			tbls = append(tbls, engine.TableEntry{
@@ -263,13 +284,13 @@ func (mdb *database) ListTables(ses engine.Session, tx interface{}) ([]engine.Ta
 	return tbls, nil
 }
 
-func (mdb *database) Begin(lkr fatlock.Locker) interface{} {
+func (mdb *database) Begin(tx *service.Transaction) interface{} {
 	mdb.mutex.Lock()
 	defer mdb.mutex.Unlock()
 
 	mdb.nextTID += 1
 	return &tcontext{
-		locker:  lkr,
+		tx:      tx,
 		version: mdb.version,
 		tid:     mdb.nextTID - 1,
 		tables:  map[sql.Identifier]*table{},
@@ -319,6 +340,7 @@ func (mdb *database) Commit(ses engine.Session, tx interface{}) error {
 
 func (mdb *database) Rollback(tx interface{}) error {
 	tctx := tx.(*tcontext)
+
 	for _, tbl := range tctx.tables {
 		if tbl.table != nil {
 			err := tbl.table.checkRows(tctx.tid, tbl.modifiedRows)
@@ -364,7 +386,7 @@ func (mt *table) Rows(ses engine.Session) (engine.Rows, error) {
 
 func (mt *table) Insert(ses engine.Session, row []sql.Value) error {
 	if !mt.modifyLock {
-		err := mt.db.lockService.LockTable(ses, mt.tctx.locker, mt.db.name, mt.name,
+		err := mt.tctx.tx.LockTable(ses, mt.db.name, mt.name,
 			fatlock.ROW_MODIFY)
 		if err != nil {
 			return err
@@ -407,8 +429,7 @@ func (mr *rows) Delete(ses engine.Session) error {
 			mr.table.name)
 	}
 	if !mr.table.modifyLock {
-		err := mr.table.db.lockService.LockTable(ses, mr.table.tctx.locker, mr.table.db.name,
-			mr.table.name, fatlock.ROW_MODIFY)
+		err := mr.table.tctx.tx.LockTable(ses, mr.table.db.name, mr.table.name, fatlock.ROW_MODIFY)
 		if err != nil {
 			return err
 		}
@@ -430,8 +451,8 @@ func (mr *rows) Update(ses engine.Session, updates []sql.ColumnUpdate) error {
 			mr.table.name)
 	}
 	if !mr.table.modifyLock {
-		err := mr.table.db.lockService.LockTable(ses, mr.table.tctx.locker, mr.table.db.name,
-			mr.table.name, fatlock.ROW_MODIFY)
+		err := mr.table.tctx.tx.LockTable(ses, mr.table.db.name, mr.table.name,
+			fatlock.ROW_MODIFY)
 		if err != nil {
 			return err
 		}

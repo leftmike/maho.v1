@@ -7,6 +7,7 @@ import (
 	"testing"
 
 	"github.com/leftmike/maho/engine"
+	"github.com/leftmike/maho/engine/basic"
 	"github.com/leftmike/maho/evaluate"
 	"github.com/leftmike/maho/parser"
 )
@@ -30,7 +31,7 @@ func TestMain(t *testing.T) {
 `},
 	}
 
-	mgr := engine.NewManager("testdata", nil)
+	mgr := engine.NewManager("testdata", &basic.Engine{})
 
 	for i, c := range cases {
 		var b bytes.Buffer

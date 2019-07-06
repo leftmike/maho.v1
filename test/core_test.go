@@ -33,7 +33,7 @@ func TestValuesSimple(t *testing.T) {
 		},
 	}
 
-	mgr := engine.NewManager("testdata", basic.Engine{})
+	mgr := engine.NewManager("testdata", &basic.Engine{})
 	err := mgr.CreateDatabase(sql.ID("core_test"), engine.Options{})
 	if err != nil {
 		// If the test is run multiple times, then the database will already exist.

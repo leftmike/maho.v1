@@ -16,7 +16,7 @@ type Session struct {
 	Addr            string
 	Interactive     bool
 	sid             uint64
-	tx              *engine.Transaction
+	tx              engine.Transaction
 }
 
 func (ses *Session) SetSID(sid uint64) {
@@ -57,7 +57,7 @@ func (ses *Session) Rollback() error {
 	return err
 }
 
-func (ses *Session) Run(stmt Stmt, run func(tx *engine.Transaction, stmt Stmt) error) error {
+func (ses *Session) Run(stmt Stmt, run func(tx engine.Transaction, stmt Stmt) error) error {
 
 	if ses.tx != nil {
 		ses.tx.NextStmt()

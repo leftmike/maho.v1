@@ -15,7 +15,7 @@ import (
 func startManager(t *testing.T) *engine.Manager {
 	t.Helper()
 
-	mgr := engine.NewManager("testdata", basic.Engine{})
+	mgr := engine.NewManager("testdata", &basic.Engine{})
 	err := mgr.CreateDatabase(sql.ID("test"), engine.Options{})
 	if err != nil {
 		t.Fatal(err)

@@ -24,12 +24,12 @@ func (stmt *DetachDatabase) String() string {
 	return s
 }
 
-func (stmt *DetachDatabase) Plan(ses *evaluate.Session, tx *engine.Transaction) (interface{},
+func (stmt *DetachDatabase) Plan(ses *evaluate.Session, tx engine.Transaction) (interface{},
 	error) {
 
 	return stmt, nil
 }
 
-func (stmt *DetachDatabase) Execute(ses *evaluate.Session, tx *engine.Transaction) (int64, error) {
+func (stmt *DetachDatabase) Execute(ses *evaluate.Session, tx engine.Transaction) (int64, error) {
 	return -1, ses.Manager.DetachDatabase(stmt.Database, stmt.Options)
 }
