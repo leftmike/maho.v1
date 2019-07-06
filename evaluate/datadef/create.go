@@ -69,5 +69,5 @@ func (stmt *CreateDatabase) Plan(ses *evaluate.Session, tx *engine.Transaction) 
 }
 
 func (stmt *CreateDatabase) Execute(ses *evaluate.Session, tx *engine.Transaction) (int64, error) {
-	return -1, ses.Manager.CreateDatabase(ses.DefaultEngine, stmt.Database, stmt.Options)
+	return -1, ses.Manager.CreateDatabase(stmt.Database, stmt.Options)
 }

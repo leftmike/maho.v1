@@ -52,18 +52,18 @@ func (_ mahoDialect) DriverName() string {
 func testSQL(t *testing.T, typ string, dbname sql.Identifier) {
 	t.Helper()
 
-	mgr := engine.NewManager("testdata", map[string]engine.Engine{
+	e := map[string]engine.Engine{
 		"basic":   basic.Engine{},
 		"memrows": memrows.Engine{},
-	})
-	err := mgr.CreateDatabase(typ, dbname, engine.Options{sql.WAIT: "true"})
+	}[typ]
+	mgr := engine.NewManager("testdata", e)
+	err := mgr.CreateDatabase(dbname, engine.Options{sql.WAIT: "true"})
 	if err != nil {
 		// If the test is run multiple times, then the database will already exist.
 	}
 
 	run := test.Runner{
 		Manager:  mgr,
-		Engine:   typ,
 		Database: dbname,
 	}
 	var rptr reporter

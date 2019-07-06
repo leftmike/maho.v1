@@ -369,23 +369,6 @@ func makeConfigVirtual(ses Session, tctx interface{}, d Database, dbname,
 	}, nil
 }
 
-func (m *Manager) makeEnginesVirtual(ses Session, tctx interface{}, d Database, dbname,
-	tblname sql.Identifier) (Table, error) {
-
-	values := [][]sql.Value{}
-
-	for nam := range m.engines {
-		values = append(values, []sql.Value{sql.StringValue(nam)})
-	}
-
-	return &VirtualTable{
-		Name:     fmt.Sprintf("%s.%s", dbname, tblname),
-		Cols:     []sql.Identifier{sql.ID("name")},
-		ColTypes: []sql.ColumnType{sql.IdColType},
-		Values:   values,
-	}, nil
-}
-
 func (m *Manager) makeLocksVirtual(ses Session, tctx interface{}, d Database, dbname,
 	tblname sql.Identifier) (Table, error) {
 

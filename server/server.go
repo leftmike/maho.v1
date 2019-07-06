@@ -19,7 +19,6 @@ type Handler func(ses *evaluate.Session, rr io.RuneReader, w io.Writer)
 type Server struct {
 	Handler         Handler
 	Manager         *engine.Manager
-	DefaultEngine   string
 	DefaultDatabase sql.Identifier
 
 	mutex    sync.Mutex
@@ -66,7 +65,6 @@ func (svr *Server) removeSession(ses *evaluate.Session) {
 func (svr *Server) Handle(rr io.RuneReader, w io.Writer, user, typ, addr string, interactive bool) {
 	ses := &evaluate.Session{
 		Manager:         svr.Manager,
-		DefaultEngine:   svr.DefaultEngine,
 		DefaultDatabase: svr.DefaultDatabase,
 		User:            user,
 		Type:            typ,

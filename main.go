@@ -8,6 +8,18 @@ To Do:
 
 - fuzzing: parser.Parse
 
+- simplify transations by making part of engine -- and there will only be one transaction and no
+  per database context
+- remove sql.ENGINE, sql.WAIT
+- perhaps change Manager to Engine: engine.Engine
+- move lockService into the engine
+- perhaps provide engine.Engine as type which implementations can extend
+- remove create database infrastructure; should be part of the engine
+- maho/engine: should just be interface
+- move virtual to a helper module?
+
+- support schemas, including search path
+
 - Rows interface:
 -- return a chunk of rows at a time organized as a slice of values for each column
 -- maybe get rid of Delete and Update
@@ -59,7 +71,7 @@ import (
 
 var (
 	database = config.Var(new(string), "database").Usage("default `database` (maho)").String("maho")
-	eng      = config.Var(new(string), "engine").Usage("default `engine` (basic)").String("basic")
+	eng      = config.Var(new(string), "engine").Usage("`engine` (basic)").String("basic")
 	dataDir  = config.Var(new(string), "data-directory").
 			Flag("data", "`directory` containing databases (testdata)").String("testdata")
 	sshServer = config.Var(new(bool), "ssh").
@@ -185,12 +197,18 @@ func main() {
 
 	log.WithField("pid", os.Getpid()).Info("maho starting")
 
-	mgr := engine.NewManager(*dataDir, map[string]engine.Engine{
+	e, ok := map[string]engine.Engine{
 		"basic":   basic.Engine{},
 		"memrows": memrows.Engine{},
 		//"badger":  kvrows.Engine{Engine: badger.Engine{}},
 		//"bolt":    kvrows.Engine{Engine: bbolt.Engine{}},
-	})
+	}[*eng]
+	if !ok {
+		fmt.Fprintf(os.Stderr,
+			"maho: got %s for engine; want basic or memrows", *eng)
+		return
+	}
+	mgr := engine.NewManager(*dataDir, e)
 
 	svr := server.Server{
 		Handler: func(ses *evaluate.Session, rr io.RuneReader, w io.Writer) {
@@ -202,11 +220,10 @@ func main() {
 				parser.NewParser(rr, src), w)
 		},
 		Manager:         mgr,
-		DefaultEngine:   *eng,
 		DefaultDatabase: sql.ID(*database),
 	}
 
-	err := mgr.CreateDatabase(*eng, sql.ID(*database), engine.Options{sql.WAIT: "true"})
+	err := mgr.CreateDatabase(sql.ID(*database), engine.Options{sql.WAIT: "true"})
 	if err != nil {
 		fmt.Fprintf(os.Stderr, "maho: %s: %s\n", *database, err)
 		return

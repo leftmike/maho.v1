@@ -10,7 +10,6 @@ import (
 
 type Session struct {
 	Manager         *engine.Manager
-	DefaultEngine   string
 	DefaultDatabase sql.Identifier
 	User            string
 	Type            string
@@ -81,8 +80,6 @@ func (ses *Session) Run(stmt Stmt, run func(tx *engine.Transaction, stmt Stmt) e
 func (ses *Session) Set(v sql.Identifier, s string) error {
 	if v == sql.DATABASE {
 		ses.DefaultDatabase = sql.ID(s)
-	} else if v == sql.ENGINE {
-		ses.DefaultEngine = s
 	} else {
 		return fmt.Errorf("set: %s not found", v)
 	}

@@ -97,7 +97,6 @@ func TestSelect(t *testing.T) {
 	mgr := startManager(t)
 	ses := &evaluate.Session{
 		Manager:         mgr,
-		DefaultEngine:   "basic",
 		DefaultDatabase: sql.ID("test"),
 	}
 	for _, c := range cases {

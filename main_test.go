@@ -23,15 +23,14 @@ func TestMain(t *testing.T) {
  2    'databases' 'virtual'
  3   'db$columns' 'virtual'
  4    'db$tables' 'virtual'
- 5      'engines' 'virtual'
- 6  'identifiers' 'virtual'
- 7        'locks' 'virtual'
- 8 'transactions' 'virtual'
-(8 rows)
+ 5  'identifiers' 'virtual'
+ 6        'locks' 'virtual'
+ 7 'transactions' 'virtual'
+(7 rows)
 `},
 	}
 
-	mgr := engine.NewManager("testdata", map[string]engine.Engine{})
+	mgr := engine.NewManager("testdata", nil)
 
 	for i, c := range cases {
 		var b bytes.Buffer

@@ -190,9 +190,7 @@ func checkNotFound(t *testing.T, m *Manager, name sql.Identifier) {
 
 func registerEngine() (*Manager, *testEngine) {
 	te := &testEngine{}
-	m := NewManager("testdata", map[string]Engine{
-		"test": te,
-	})
+	m := NewManager("testdata", te)
 	return m, te
 }
 
@@ -201,9 +199,8 @@ func TestEngine(t *testing.T) {
 	te.done = make(chan struct{})
 	db1 := "db-1"
 	db2 := "db-2"
-	dbBad := "db-bad"
 
-	err := m.AttachDatabase("test", sql.ID(db1), nil)
+	err := m.AttachDatabase(sql.ID(db1), nil)
 	if err != nil {
 		t.Errorf("AttachDatabase(db1) failed with %s", err)
 	}
@@ -213,19 +210,19 @@ func TestEngine(t *testing.T) {
 	time.Sleep(50 * time.Millisecond)
 	checkDatabaseState(t, m, Running, sql.ID(db1))
 
-	err = m.CreateDatabase("test", sql.ID(db2), Options{sql.WAIT: "true"})
+	err = m.CreateDatabase(sql.ID(db2), Options{sql.WAIT: "true"})
 	if err != nil {
 		t.Errorf("CreateDatabase(db2) failed with %s", err)
 	}
 	checkDatabaseState(t, m, Running, sql.ID(db2))
 
-	err = m.CreateDatabase("test", sql.ID(dbCantClose), Options{sql.WAIT: "true"})
+	err = m.CreateDatabase(sql.ID(dbCantClose), Options{sql.WAIT: "true"})
 	if err != nil {
 		t.Errorf("CreateDatabase(dbCantClose) failed with %s", err)
 	}
 	checkDatabaseState(t, m, Running, sql.ID(dbCantClose))
 
-	err = m.CreateDatabase("test", sql.ID(dbCloseError), Options{sql.WAIT: "true"})
+	err = m.CreateDatabase(sql.ID(dbCloseError), Options{sql.WAIT: "true"})
 	if err != nil {
 		t.Errorf("CreateDatabase(dbCloseError) failed with %s", err)
 	}
@@ -273,28 +270,13 @@ func TestEngine(t *testing.T) {
 		{op: "CanClose", args: []string{db1, "true"}},
 		{op: "Close", args: []string{db1, "true"}},
 	})
-
-	err = m.CreateDatabase("bad", sql.ID(dbBad), nil)
-	if err == nil {
-		t.Errorf("CreateDatabase(dbBad) did not fail")
-	}
-
-	err = m.DropDatabase(sql.ID(dbBad), true, nil)
-	if err != nil {
-		t.Errorf("DropDatabase(dbBad) failed with %s", err)
-	}
-
-	err = m.DropDatabase(sql.ID(dbBad), false, nil)
-	if err == nil {
-		t.Errorf("DropDatabase(dbBad) did not fail")
-	}
 }
 
 func TestDatabase(t *testing.T) {
 	m, te := registerEngine()
 	db := "db"
 
-	err := m.CreateDatabase("test", sql.ID(db), Options{sql.WAIT: "true"})
+	err := m.CreateDatabase(sql.ID(db), Options{sql.WAIT: "true"})
 	if err != nil {
 		t.Errorf("CreateDatabase() failed with %s", err)
 	}

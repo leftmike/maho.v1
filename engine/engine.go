@@ -120,7 +120,7 @@ type databaseEntry struct {
 type Manager struct {
 	mutex         sync.RWMutex
 	dataDir       string
-	engines       map[string]Engine
+	engine        Engine
 	databases     map[sql.Identifier]*databaseEntry
 	virtualTables TableMap
 	systemTables  TableMap
@@ -129,10 +129,10 @@ type Manager struct {
 	transactions  map[*Transaction]struct{}
 }
 
-func NewManager(dataDir string, engines map[string]Engine) *Manager {
+func NewManager(dataDir string, eng Engine) *Manager {
 	m := Manager{
 		dataDir:       dataDir,
-		engines:       engines,
+		engine:        eng,
 		databases:     map[sql.Identifier]*databaseEntry{},
 		virtualTables: TableMap{},
 		transactions:  map[*Transaction]struct{}{},
@@ -141,7 +141,6 @@ func NewManager(dataDir string, engines map[string]Engine) *Manager {
 		sql.ID("databases"):    m.makeDatabasesVirtual,
 		sql.ID("identifiers"):  makeIdentifiersVirtual,
 		sql.ID("config"):       makeConfigVirtual,
-		sql.ID("engines"):      m.makeEnginesVirtual,
 		sql.ID("locks"):        m.makeLocksVirtual,
 		sql.ID("transactions"): m.makeTransactionsVirtual,
 	}
@@ -159,7 +158,7 @@ func (m *Manager) LockService() fatlock.LockService {
 	return &m.lockService
 }
 
-func (m *Manager) canSetupDatabase(eng string, name sql.Identifier, options Options,
+func (m *Manager) canSetupDatabase(name sql.Identifier, options Options,
 	state databaseState) (Engine, *databaseEntry, error) {
 
 	m.mutex.Lock()
@@ -169,16 +168,6 @@ func (m *Manager) canSetupDatabase(eng string, name sql.Identifier, options Opti
 		return nil, nil, fmt.Errorf("engine: database %s already exists", name)
 	}
 
-	typ, ok := options[sql.ENGINE]
-	if !ok {
-		typ = eng
-	} else {
-		delete(options, sql.ENGINE)
-	}
-	e, ok := m.engines[typ]
-	if !ok {
-		return nil, nil, fmt.Errorf("engine: type %s not found", typ)
-	}
 	path, ok := options[sql.PATH]
 	if !ok {
 		path = filepath.Join(m.dataDir, name.String())
@@ -189,10 +178,9 @@ func (m *Manager) canSetupDatabase(eng string, name sql.Identifier, options Opti
 		state: state,
 		name:  name,
 		path:  path,
-		typ:   typ,
 	}
 	m.databases[name] = de
-	return e, de, nil
+	return m.engine, de, nil
 }
 
 func (m *Manager) setupDatabase(e Engine, de *databaseEntry, options Options) {
@@ -219,10 +207,10 @@ func (m *Manager) setupDatabase(e Engine, de *databaseEntry, options Options) {
 	}
 }
 
-func (m *Manager) trySetupDatabase(eng string, name sql.Identifier, options Options,
+func (m *Manager) trySetupDatabase(name sql.Identifier, options Options,
 	state databaseState) error {
 
-	e, de, err := m.canSetupDatabase(eng, name, options, state)
+	e, de, err := m.canSetupDatabase(name, options, state)
 	if err != nil {
 		return err
 	}
@@ -238,12 +226,12 @@ func (m *Manager) trySetupDatabase(eng string, name sql.Identifier, options Opti
 	return nil
 }
 
-func (m *Manager) AttachDatabase(eng string, name sql.Identifier, options Options) error {
-	return m.trySetupDatabase(eng, name, options, Attaching)
+func (m *Manager) AttachDatabase(name sql.Identifier, options Options) error {
+	return m.trySetupDatabase(name, options, Attaching)
 }
 
-func (m *Manager) CreateDatabase(eng string, name sql.Identifier, options Options) error {
-	return m.trySetupDatabase(eng, name, options, Creating)
+func (m *Manager) CreateDatabase(name sql.Identifier, options Options) error {
+	return m.trySetupDatabase(name, options, Creating)
 }
 
 func (m *Manager) canCloseDatabase(name sql.Identifier, exists bool, options Options,

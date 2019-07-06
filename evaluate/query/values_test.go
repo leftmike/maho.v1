@@ -15,10 +15,8 @@ import (
 func startManager(t *testing.T) *engine.Manager {
 	t.Helper()
 
-	mgr := engine.NewManager("testdata", map[string]engine.Engine{
-		"basic": basic.Engine{},
-	})
-	err := mgr.CreateDatabase("basic", sql.ID("test"), engine.Options{sql.WAIT: "true"})
+	mgr := engine.NewManager("testdata", basic.Engine{})
+	err := mgr.CreateDatabase(sql.ID("test"), engine.Options{sql.WAIT: "true"})
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -69,7 +67,6 @@ func TestValues(t *testing.T) {
 	mgr := startManager(t)
 	ses := &evaluate.Session{
 		Manager:         mgr,
-		DefaultEngine:   "basic",
 		DefaultDatabase: sql.ID("test"),
 	}
 	for _, c := range cases {
@@ -155,7 +152,6 @@ func TestFromValues(t *testing.T) {
 	mgr := startManager(t)
 	ses := &evaluate.Session{
 		Manager:         mgr,
-		DefaultEngine:   "basic",
 		DefaultDatabase: sql.ID("test"),
 	}
 	for _, c := range cases {
