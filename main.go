@@ -8,10 +8,11 @@ To Do:
 
 - fuzzing: parser.Parse
 
-- perhaps change Manager to Engine: engine.Engine
+- basic.NewEngine(dataDir string) engine.Engine
+- memrows.NewEngine(dataDir string) engine.Engine
 - remove create database infrastructure; should be part of the engine
 - maho/engine: should just be interface
-- move virtual to a helper module?
+- move virtual to a helper module: CreateVirtualDatabase
 - when an engine is created, it takes a path argument
 - create/attach database: remove path argument; if used, can be part of options
 - engine: Session: change to just context.Context everywhere
@@ -21,6 +22,8 @@ To Do:
 - document SET
 
 - support schemas, including search path
+
+- add information_schema; get rid of ListTables; columns, schemata, tables
 
 - Rows interface:
 -- return a chunk of rows at a time organized as a slice of values for each column
