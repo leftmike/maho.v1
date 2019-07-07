@@ -12,7 +12,7 @@ import (
 
 var mutex sync.RWMutex
 
-type Engine struct{}
+type basicEngine struct{}
 
 type transaction struct{}
 
@@ -36,13 +36,17 @@ type rows struct {
 	haveRow bool
 }
 
-func (_ *Engine) AttachDatabase(name sql.Identifier, path string,
+func NewEngine(dataDir string) engine.Engine {
+	return &basicEngine{}
+}
+
+func (_ *basicEngine) AttachDatabase(name sql.Identifier, path string,
 	options engine.Options) (engine.Database, error) {
 
 	return nil, fmt.Errorf("basic: attach database not supported")
 }
 
-func (_ *Engine) CreateDatabase(name sql.Identifier, path string,
+func (_ *basicEngine) CreateDatabase(name sql.Identifier, path string,
 	options engine.Options) (engine.Database, error) {
 
 	return &database{
@@ -51,15 +55,15 @@ func (_ *Engine) CreateDatabase(name sql.Identifier, path string,
 	}, nil
 }
 
-func (_ *Engine) Begin(sid uint64) engine.Transaction {
+func (_ *basicEngine) Begin(sid uint64) engine.Transaction {
 	return &transaction{}
 }
 
-func (_ *Engine) Locks() []service.Lock {
+func (_ *basicEngine) Locks() []service.Lock {
 	return nil
 }
 
-func (_ *Engine) Transactions() []engine.TransactionState {
+func (_ *basicEngine) Transactions() []engine.TransactionState {
 	return nil
 }
 

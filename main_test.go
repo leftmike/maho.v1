@@ -29,7 +29,7 @@ func TestMain(t *testing.T) {
 `},
 	}
 
-	mgr := engine.NewManager("testdata", &basic.Engine{})
+	mgr := engine.NewManager("testdata", basic.NewEngine("testdata"))
 
 	for i, c := range cases {
 		var b bytes.Buffer

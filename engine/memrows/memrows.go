@@ -17,8 +17,7 @@ import (
 	"github.com/leftmike/maho/sql"
 )
 
-type Engine struct {
-	inited    bool // XXX
+type memrowsEngine struct {
 	txService service.TransactionService
 }
 
@@ -68,19 +67,20 @@ type rows struct {
 	haveRow bool
 }
 
-func (me *Engine) AttachDatabase(name sql.Identifier, path string,
+func NewEngine(dataDir string) engine.Engine {
+	me := memrowsEngine{}
+	me.txService.Init()
+	return &me
+}
+
+func (me *memrowsEngine) AttachDatabase(name sql.Identifier, path string,
 	options engine.Options) (engine.Database, error) {
 
 	return nil, fmt.Errorf("memrows: attach database not supported")
 }
 
-func (me *Engine) CreateDatabase(name sql.Identifier, path string,
+func (me *memrowsEngine) CreateDatabase(name sql.Identifier, path string,
 	options engine.Options) (engine.Database, error) {
-
-	if !me.inited { // XXX: should be a NewEngine func
-		me.txService.Init()
-		me.inited = true
-	}
 
 	return &database{
 		name:   name,
@@ -88,15 +88,15 @@ func (me *Engine) CreateDatabase(name sql.Identifier, path string,
 	}, nil
 }
 
-func (me *Engine) Begin(sid uint64) engine.Transaction {
+func (me *memrowsEngine) Begin(sid uint64) engine.Transaction {
 	return me.txService.Begin(sid)
 }
 
-func (me *Engine) Locks() []service.Lock {
+func (me *memrowsEngine) Locks() []service.Lock {
 	return me.txService.Locks()
 }
 
-func (me *Engine) Transactions() []engine.TransactionState {
+func (me *memrowsEngine) Transactions() []engine.TransactionState {
 	return me.txService.Transactions()
 }
 

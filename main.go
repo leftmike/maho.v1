@@ -8,8 +8,6 @@ To Do:
 
 - fuzzing: parser.Parse
 
-- basic.NewEngine(dataDir string) engine.Engine
-- memrows.NewEngine(dataDir string) engine.Engine
 - remove create database infrastructure; should be part of the engine
 - maho/engine: should just be interface
 - move virtual to a helper module: CreateVirtualDatabase
@@ -202,13 +200,15 @@ func main() {
 
 	log.WithField("pid", os.Getpid()).Info("maho starting")
 
-	e, ok := map[string]engine.Engine{
-		"basic":   &basic.Engine{},
-		"memrows": &memrows.Engine{},
-		//"badger":  kvrows.Engine{Engine: badger.Engine{}},
-		//"bolt":    kvrows.Engine{Engine: bbolt.Engine{}},
-	}[*eng]
-	if !ok {
+	var e engine.Engine
+	switch *eng {
+	case "basic":
+		e = basic.NewEngine(*dataDir)
+	case "memrows":
+		e = memrows.NewEngine(*dataDir)
+	//"badger":  kvrows.Engine{Engine: badger.Engine{}},
+	//"bolt":    kvrows.Engine{Engine: bbolt.Engine{}},
+	default:
 		fmt.Fprintf(os.Stderr,
 			"maho: got %s for engine; want basic or memrows", *eng)
 		return

@@ -52,10 +52,13 @@ func (_ mahoDialect) DriverName() string {
 func testSQL(t *testing.T, typ string, dbname sql.Identifier) {
 	t.Helper()
 
-	e := map[string]engine.Engine{
-		"basic":   &basic.Engine{},
-		"memrows": &memrows.Engine{},
-	}[typ]
+	var e engine.Engine
+	switch typ {
+	case "basic":
+		e = basic.NewEngine("testdata")
+	case "memrows":
+		e = memrows.NewEngine("testdata")
+	}
 	mgr := engine.NewManager("testdata", e)
 	err := mgr.CreateDatabase(dbname, engine.Options{})
 	if err != nil {
