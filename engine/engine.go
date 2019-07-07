@@ -3,7 +3,6 @@ package engine
 import (
 	"context"
 	"fmt"
-	"path/filepath"
 	"sync"
 
 	"github.com/leftmike/maho/sql"
@@ -35,8 +34,8 @@ type TransactionState struct {
 }
 
 type Engine interface {
-	AttachDatabase(name sql.Identifier, path string, options Options) (Database, error)
-	CreateDatabase(name sql.Identifier, path string, options Options) (Database, error)
+	AttachDatabase(name sql.Identifier, options Options) (Database, error)
+	CreateDatabase(name sql.Identifier, options Options) (Database, error)
 	Begin(sid uint64) Transaction
 	//Locks() []service.Lock XXX
 	Transactions() []TransactionState
@@ -115,7 +114,6 @@ type databaseEntry struct {
 	database Database
 	state    databaseState
 	name     sql.Identifier
-	path     string
 	typ      string
 	err      error
 }
@@ -161,16 +159,9 @@ func (m *Manager) canSetupDatabase(name sql.Identifier, options Options,
 		return nil, nil, fmt.Errorf("engine: database %s already exists", name)
 	}
 
-	path, ok := options[sql.PATH]
-	if !ok {
-		path = filepath.Join(m.dataDir, name.String())
-	} else {
-		delete(options, sql.PATH)
-	}
 	de := &databaseEntry{
 		state: state,
 		name:  name,
-		path:  path,
 	}
 	m.databases[name] = de
 	return m.engine, de, nil
@@ -179,10 +170,10 @@ func (m *Manager) canSetupDatabase(name sql.Identifier, options Options,
 func (m *Manager) setupDatabase(e Engine, de *databaseEntry, options Options) {
 	var d Database
 	if de.state == Attaching {
-		d, de.err = e.AttachDatabase(de.name, de.path, options)
+		d, de.err = e.AttachDatabase(de.name, options)
 	} else {
 		// de.state == Creating
-		d, de.err = e.CreateDatabase(de.name, de.path, options)
+		d, de.err = e.CreateDatabase(de.name, options)
 	}
 
 	m.mutex.Lock()

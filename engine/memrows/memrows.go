@@ -73,13 +73,13 @@ func NewEngine(dataDir string) engine.Engine {
 	return &me
 }
 
-func (me *memrowsEngine) AttachDatabase(name sql.Identifier, path string,
+func (me *memrowsEngine) AttachDatabase(name sql.Identifier,
 	options engine.Options) (engine.Database, error) {
 
 	return nil, fmt.Errorf("memrows: attach database not supported")
 }
 
-func (me *memrowsEngine) CreateDatabase(name sql.Identifier, path string,
+func (me *memrowsEngine) CreateDatabase(name sql.Identifier,
 	options engine.Options) (engine.Database, error) {
 
 	return &database{

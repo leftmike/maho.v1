@@ -10,9 +10,8 @@ To Do:
 
 - remove create database infrastructure; should be part of the engine
 - maho/engine: should just be interface
-- move virtual to a helper module: CreateVirtualDatabase
-- when an engine is created, it takes a path argument
-- create/attach database: remove path argument; if used, can be part of options
+- virtual should be an engine
+- add CreateSystemTable and CreateInfoTable to engine interface
 - engine: Session: change to just context.Context everywhere
 
 - fix engine tests

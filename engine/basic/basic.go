@@ -40,14 +40,14 @@ func NewEngine(dataDir string) engine.Engine {
 	return &basicEngine{}
 }
 
-func (_ *basicEngine) AttachDatabase(name sql.Identifier, path string,
-	options engine.Options) (engine.Database, error) {
+func (_ *basicEngine) AttachDatabase(name sql.Identifier, options engine.Options) (engine.Database,
+	error) {
 
 	return nil, fmt.Errorf("basic: attach database not supported")
 }
 
-func (_ *basicEngine) CreateDatabase(name sql.Identifier, path string,
-	options engine.Options) (engine.Database, error) {
+func (_ *basicEngine) CreateDatabase(name sql.Identifier, options engine.Options) (engine.Database,
+	error) {
 
 	return &database{
 		name:   name,
