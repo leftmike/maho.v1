@@ -33,10 +33,7 @@ func (Engine) Open(path string) (kv.DB, error) {
 		return nil, err
 	}
 	os.MkdirAll(path, 0755)
-	opts := badger.DefaultOptions
-	opts.Dir = path
-	opts.ValueDir = path
-	db, err := badger.Open(opts)
+	db, err := badger.Open(badger.DefaultOptions(path))
 	if err != nil {
 		return nil, err
 	}
