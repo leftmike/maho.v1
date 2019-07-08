@@ -8,7 +8,6 @@ import (
 
 	"golang.org/x/crypto/ssh"
 
-	"github.com/leftmike/maho/engine"
 	"github.com/leftmike/maho/engine/basic"
 	"github.com/leftmike/maho/evaluate"
 	"github.com/leftmike/maho/server"
@@ -89,7 +88,7 @@ func testSSHServer(t *testing.T, fail bool, cfg *ssh.ClientConfig, port int, aut
 		Handler: func(ses *evaluate.Session, rr io.RuneReader, w io.Writer) {
 			served <- struct{}{}
 		},
-		Manager: engine.NewManager("testdata", basic.NewEngine("testdata")),
+		Engine: basic.NewEngine("testdata"),
 	}
 
 	go func() {

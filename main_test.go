@@ -6,7 +6,6 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/leftmike/maho/engine"
 	"github.com/leftmike/maho/engine/basic"
 	"github.com/leftmike/maho/evaluate"
 	"github.com/leftmike/maho/parser"
@@ -28,12 +27,12 @@ func TestMain(t *testing.T) {
 `},
 	}
 
-	mgr := engine.NewManager("testdata", basic.NewEngine("testdata"))
+	e := basic.NewEngine("testdata")
 
 	for i, c := range cases {
 		var b bytes.Buffer
 		ses := &evaluate.Session{
-			Manager: mgr,
+			Engine: e,
 		}
 		replSQL(ses, parser.NewParser(strings.NewReader(c.s), fmt.Sprintf("cases[%d]", i)), &b)
 		if b.String() != c.r {

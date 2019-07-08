@@ -59,7 +59,7 @@ func (stmt *InsertValues) Execute(ses *evaluate.Session, tx engine.Transaction) 
 	if dbname == 0 {
 		dbname = ses.DefaultDatabase
 	}
-	tbl, err := ses.Manager.LookupTable(ses, tx, dbname, stmt.Table.Table)
+	tbl, err := ses.Engine.LookupTable(ses, tx, dbname, stmt.Table.Table)
 	if err != nil {
 		return -1, err
 	}

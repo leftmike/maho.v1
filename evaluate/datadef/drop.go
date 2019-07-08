@@ -37,7 +37,7 @@ func (stmt *DropTable) Execute(ses *evaluate.Session, tx engine.Transaction) (in
 		if dbname == 0 {
 			dbname = ses.DefaultDatabase
 		}
-		err := ses.Manager.DropTable(ses, tx, dbname, tbl.Table, stmt.IfExists)
+		err := ses.Engine.DropTable(ses, tx, dbname, tbl.Table, stmt.IfExists)
 		if err != nil {
 			return -1, err
 		}
@@ -73,5 +73,5 @@ func (stmt *DropDatabase) Plan(ses *evaluate.Session, tx engine.Transaction) (in
 }
 
 func (stmt *DropDatabase) Execute(ses *evaluate.Session, tx engine.Transaction) (int64, error) {
-	return -1, ses.Manager.DropDatabase(stmt.Database, stmt.IfExists, stmt.Options)
+	return -1, ses.Engine.DropDatabase(stmt.Database, stmt.IfExists, stmt.Options)
 }

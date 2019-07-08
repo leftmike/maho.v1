@@ -33,14 +33,14 @@ func TestValuesSimple(t *testing.T) {
 		},
 	}
 
-	mgr := engine.NewManager("testdata", basic.NewEngine("testdata"))
-	err := mgr.CreateDatabase(sql.ID("core_test"), engine.Options{})
+	e := basic.NewEngine("testdata")
+	err := e.CreateDatabase(sql.ID("core_test"), engine.Options{})
 	if err != nil {
 		// If the test is run multiple times, then the database will already exist.
 	}
 
 	ses := &evaluate.Session{
-		Manager:         mgr,
+		Engine:          e,
 		DefaultDatabase: sql.ID("core_test"),
 	}
 	for i, c := range cases {
@@ -50,7 +50,7 @@ func TestValuesSimple(t *testing.T) {
 			t.Errorf("Parse(%q) failed with %s", c.sql, err)
 			continue
 		}
-		tx := mgr.Begin(0)
+		tx := e.Begin(0)
 		ret, err := stmt.Plan(ses, tx)
 		if c.fail {
 			if err == nil {

@@ -14,7 +14,7 @@ import (
 )
 
 type Runner struct {
-	Manager  *engine.Manager
+	Engine   engine.Engine
 	Database sql.Identifier
 	ses      *evaluate.Session
 }
@@ -22,7 +22,7 @@ type Runner struct {
 func (run *Runner) RunExec(tst *sqltest.Test) error {
 	if run.ses == nil {
 		run.ses = &evaluate.Session{
-			Manager:         run.Manager,
+			Engine:          run.Engine,
 			DefaultDatabase: run.Database,
 		}
 	}
@@ -60,7 +60,7 @@ func (run *Runner) RunExec(tst *sqltest.Test) error {
 func (run *Runner) RunQuery(tst *sqltest.Test) ([]string, [][]string, error) {
 	if run.ses == nil {
 		run.ses = &evaluate.Session{
-			Manager:         run.Manager,
+			Engine:          run.Engine,
 			DefaultDatabase: run.Database,
 		}
 	}

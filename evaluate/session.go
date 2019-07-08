@@ -9,7 +9,7 @@ import (
 )
 
 type Session struct {
-	Manager         *engine.Manager
+	Engine          engine.Engine
 	DefaultDatabase sql.Identifier
 	User            string
 	Type            string
@@ -35,7 +35,7 @@ func (ses *Session) Begin() error {
 	if ses.tx != nil {
 		return fmt.Errorf("execute: session already has active transaction")
 	}
-	ses.tx = ses.Manager.Begin(ses.sid)
+	ses.tx = ses.Engine.Begin(ses.sid)
 	return nil
 }
 
@@ -64,7 +64,7 @@ func (ses *Session) Run(stmt Stmt, run func(tx engine.Transaction, stmt Stmt) er
 		return run(ses.tx, stmt)
 	}
 
-	tx := ses.Manager.Begin(ses.sid)
+	tx := ses.Engine.Begin(ses.sid)
 	err := run(tx, stmt)
 	if err != nil {
 		rerr := tx.Rollback()

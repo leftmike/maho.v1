@@ -42,7 +42,7 @@ func (stmt *CreateTable) Execute(ses *evaluate.Session, tx engine.Transaction) (
 	if dbname == 0 {
 		dbname = ses.DefaultDatabase
 	}
-	return -1, ses.Manager.CreateTable(ses, tx, dbname, stmt.Table.Table,
+	return -1, ses.Engine.CreateTable(ses, tx, dbname, stmt.Table.Table,
 		stmt.Columns, stmt.ColumnTypes)
 }
 
@@ -69,5 +69,5 @@ func (stmt *CreateDatabase) Plan(ses *evaluate.Session, tx engine.Transaction) (
 }
 
 func (stmt *CreateDatabase) Execute(ses *evaluate.Session, tx engine.Transaction) (int64, error) {
-	return -1, ses.Manager.CreateDatabase(stmt.Database, stmt.Options)
+	return -1, ses.Engine.CreateDatabase(stmt.Database, stmt.Options)
 }

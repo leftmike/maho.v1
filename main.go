@@ -10,11 +10,10 @@ To Do:
 
 - fix XXX
 - fix InfoTables: db$columns, db$tables
-- maho/engine: should just be interface
+- do something with ListTables
+- add system.databases
 - remove engine/virtual.go
-- engine: remove Database interface
 - engine: Session: change to just context.Context everywhere
-- engine: remove Database argument from MakeVirtual
 
 - fix engine tests
 
@@ -214,7 +213,6 @@ func main() {
 			"maho: got %s for engine; want basic or memrows", *eng)
 		return
 	}
-	mgr := engine.NewManager(*dataDir, e)
 
 	svr := server.Server{
 		Handler: func(ses *evaluate.Session, rr io.RuneReader, w io.Writer) {
@@ -225,11 +223,11 @@ func main() {
 			replSQL(ses,
 				parser.NewParser(rr, src), w)
 		},
-		Manager:         mgr,
+		Engine:          e,
 		DefaultDatabase: sql.ID(*database),
 	}
 
-	err := mgr.CreateDatabase(sql.ID(*database), engine.Options{})
+	err := e.CreateDatabase(sql.ID(*database), engine.Options{})
 	if err != nil {
 		fmt.Fprintf(os.Stderr, "maho: %s: %s\n", *database, err)
 		return

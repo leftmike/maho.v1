@@ -12,16 +12,16 @@ import (
 	"github.com/leftmike/maho/testutil"
 )
 
-func startManager(t *testing.T) *engine.Manager {
+func startEngine(t *testing.T) engine.Engine {
 	t.Helper()
 
-	mgr := engine.NewManager("testdata", basic.NewEngine("testdata"))
-	err := mgr.CreateDatabase(sql.ID("test"), engine.Options{})
+	e := basic.NewEngine("testdata")
+	err := e.CreateDatabase(sql.ID("test"), engine.Options{})
 	if err != nil {
 		t.Fatal(err)
 	}
 
-	return mgr
+	return e
 }
 
 func TestValues(t *testing.T) {
@@ -64,13 +64,13 @@ func TestValues(t *testing.T) {
 		},
 	}
 
-	mgr := startManager(t)
+	e := startEngine(t)
 	ses := &evaluate.Session{
-		Manager:         mgr,
+		Engine:          e,
 		DefaultDatabase: sql.ID("test"),
 	}
 	for _, c := range cases {
-		tx := mgr.Begin(0)
+		tx := e.Begin(0)
 		if c.values.String() != c.s {
 			t.Errorf("(%v).String() got %q want %q", c.values, c.values.String(), c.s)
 			continue
@@ -149,9 +149,9 @@ func TestFromValues(t *testing.T) {
 		},
 	}
 
-	mgr := startManager(t)
+	e := startEngine(t)
 	ses := &evaluate.Session{
-		Manager:         mgr,
+		Engine:          e,
 		DefaultDatabase: sql.ID("test"),
 	}
 	for _, c := range cases {
@@ -159,7 +159,7 @@ func TestFromValues(t *testing.T) {
 			t.Errorf("(%v).String() got %q want %q", c.from, c.from.String(), c.s)
 			continue
 		}
-		tx := mgr.Begin(0)
+		tx := e.Begin(0)
 		rows, fctx, err := c.from.TestRows(ses, tx)
 		if err != nil {
 			t.Errorf("(%v).Rows() failed with %s", c.from, err)

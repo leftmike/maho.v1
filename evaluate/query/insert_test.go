@@ -185,16 +185,16 @@ func TestInsert(t *testing.T) {
 		t.Errorf("InsertValues{}.String() got %s want %s", s.String(), r)
 	}
 
-	mgr := startManager(t)
+	e := startEngine(t)
 	ses := &evaluate.Session{
-		Manager:         mgr,
+		Engine:          e,
 		DefaultDatabase: sql.ID("test"),
 	}
-	testInsert(t, mgr, ses, sql.ID("test"), sql.ID("t"), insertColumns1, insertColumnTypes1,
+	testInsert(t, e, ses, sql.ID("test"), sql.ID("t"), insertColumns1, insertColumnTypes1,
 		insertCases1)
-	testInsert(t, mgr, ses, sql.ID("test"), sql.ID("t2"), insertColumns2, insertColumnTypes2,
+	testInsert(t, e, ses, sql.ID("test"), sql.ID("t2"), insertColumns2, insertColumnTypes2,
 		insertCases2)
-	testInsert(t, mgr, ses, sql.ID("test"), sql.ID("t3"), insertColumns3, insertColumnTypes3,
+	testInsert(t, e, ses, sql.ID("test"), sql.ID("t3"), insertColumns3, insertColumnTypes3,
 		insertCases3)
 }
 
@@ -228,12 +228,12 @@ func allRows(ses *evaluate.Session, rows engine.Rows) ([][]sql.Value, error) {
 	return all, nil
 }
 
-func testInsert(t *testing.T, mgr *engine.Manager, ses *evaluate.Session, dbnam, nam sql.Identifier,
+func testInsert(t *testing.T, e engine.Engine, ses *evaluate.Session, dbnam, nam sql.Identifier,
 	cols []sql.Identifier, colTypes []sql.ColumnType, cases []insertCase) {
 
 	for _, c := range cases {
-		tx := mgr.Begin(0)
-		err := mgr.CreateTable(ses, tx, dbnam, nam, cols, colTypes)
+		tx := e.Begin(0)
+		err := e.CreateTable(ses, tx, dbnam, nam, cols, colTypes)
 		if err != nil {
 			t.Error(err)
 			return
@@ -248,7 +248,7 @@ func testInsert(t *testing.T, mgr *engine.Manager, ses *evaluate.Session, dbnam,
 			t.Errorf("Parse(\"%s\").Execute() failed with %s", c.stmt, err.Error())
 		} else {
 			var tbl engine.Table
-			tbl, err = mgr.LookupTable(ses, tx, dbnam, nam)
+			tbl, err = e.LookupTable(ses, tx, dbnam, nam)
 			if err != nil {
 				t.Error(err)
 				continue
@@ -271,7 +271,7 @@ func testInsert(t *testing.T, mgr *engine.Manager, ses *evaluate.Session, dbnam,
 			}
 		}
 
-		err = mgr.DropTable(ses, tx, dbnam, nam, false)
+		err = e.DropTable(ses, tx, dbnam, nam, false)
 		if err != nil {
 			t.Error(err)
 			return

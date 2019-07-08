@@ -137,7 +137,7 @@ func GetTxContext(tx engine.Transaction, d Database) interface{} {
 }
 
 func (ts *TransactionService) makeTransactionsTable(ses engine.Session, tx engine.Transaction,
-	d engine.Database, dbname, tblname sql.Identifier) (engine.Table, error) {
+	dbname, tblname sql.Identifier) (engine.Table, error) {
 
 	ts.mutex.Lock()
 	defer ts.mutex.Unlock()

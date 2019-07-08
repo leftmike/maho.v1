@@ -94,13 +94,13 @@ func TestSelect(t *testing.T) {
 		},
 	}
 
-	mgr := startManager(t)
+	e := startEngine(t)
 	ses := &evaluate.Session{
-		Manager:         mgr,
+		Engine:          e,
 		DefaultDatabase: sql.ID("test"),
 	}
 	for _, c := range cases {
-		tx := mgr.Begin(0)
+		tx := e.Begin(0)
 		if c.stmt.String() != c.s {
 			t.Errorf("(%v).String() got %q want %q", c.stmt, c.stmt.String(), c.s)
 			continue

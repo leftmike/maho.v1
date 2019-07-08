@@ -19,7 +19,7 @@ type Handler func(ses *evaluate.Session, rr io.RuneReader, w io.Writer)
 
 type Server struct {
 	Handler         Handler
-	Manager         *engine.Manager
+	Engine          engine.Engine
 	DefaultDatabase sql.Identifier
 
 	mutex    sync.Mutex
@@ -49,7 +49,7 @@ func (svr *Server) addSession(ses *evaluate.Session) {
 
 	if svr.sessions == nil {
 		svr.sessions = map[*evaluate.Session]struct{}{}
-		svr.Manager.CreateSystemTable(sql.ID("sessions"), svr.makeSessionsVirtual)
+		svr.Engine.CreateSystemTable(sql.ID("sessions"), svr.makeSessionsVirtual)
 	}
 	svr.sessions[ses] = struct{}{}
 	svr.lastSID += 1
@@ -65,7 +65,7 @@ func (svr *Server) removeSession(ses *evaluate.Session) {
 
 func (svr *Server) Handle(rr io.RuneReader, w io.Writer, user, typ, addr string, interactive bool) {
 	ses := &evaluate.Session{
-		Manager:         svr.Manager,
+		Engine:          svr.Engine,
 		DefaultDatabase: svr.DefaultDatabase,
 		User:            user,
 		Type:            typ,
@@ -116,7 +116,7 @@ func (svr *Server) Shutdown(ctx context.Context) error {
 		})
 }
 
-func (svr *Server) makeSessionsVirtual(ses engine.Session, tx engine.Transaction, d engine.Database,
+func (svr *Server) makeSessionsVirtual(ses engine.Session, tx engine.Transaction,
 	dbname, tblname sql.Identifier) (engine.Table, error) {
 
 	svr.mutex.Lock()

@@ -305,7 +305,7 @@ func (svc *LockService) Locks() []Lock {
 }
 
 func (svc *LockService) makeLocksTable(ses engine.Session, tx engine.Transaction,
-	d engine.Database, dbname, tblname sql.Identifier) (engine.Table, error) {
+	dbname, tblname sql.Identifier) (engine.Table, error) {
 
 	values := [][]sql.Value{}
 

@@ -31,5 +31,5 @@ func (stmt *DetachDatabase) Plan(ses *evaluate.Session, tx engine.Transaction) (
 }
 
 func (stmt *DetachDatabase) Execute(ses *evaluate.Session, tx engine.Transaction) (int64, error) {
-	return -1, ses.Manager.DetachDatabase(stmt.Database, stmt.Options)
+	return -1, ses.Engine.DetachDatabase(stmt.Database, stmt.Options)
 }

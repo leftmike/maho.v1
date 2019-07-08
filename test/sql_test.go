@@ -59,14 +59,13 @@ func testSQL(t *testing.T, typ string, dbname sql.Identifier) {
 	case "memrows":
 		e = memrows.NewEngine("testdata")
 	}
-	mgr := engine.NewManager("testdata", e)
-	err := mgr.CreateDatabase(dbname, engine.Options{})
+	err := e.CreateDatabase(dbname, engine.Options{})
 	if err != nil {
 		// If the test is run multiple times, then the database will already exist.
 	}
 
 	run := test.Runner{
-		Manager:  mgr,
+		Engine:   e,
 		Database: dbname,
 	}
 	var rptr reporter
