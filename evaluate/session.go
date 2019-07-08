@@ -43,7 +43,7 @@ func (ses *Session) Commit() error {
 	if ses.tx == nil {
 		return fmt.Errorf("execute: session does not have active transaction")
 	}
-	err := ses.tx.Commit(ses)
+	err := ses.tx.Commit(ses.Context())
 	ses.tx = nil
 	return err
 }
@@ -72,7 +72,7 @@ func (ses *Session) Run(stmt Stmt, run func(tx engine.Transaction, stmt Stmt) er
 			err = fmt.Errorf("%s; rollback: %s", err, rerr)
 		}
 	} else {
-		err = tx.Commit(ses)
+		err = tx.Commit(ses.Context())
 	}
 	return err
 }

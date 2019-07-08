@@ -124,7 +124,7 @@ func TestSelect(t *testing.T) {
 			t.Errorf("(%v).Rows() got %v want %v\n%s", c.stmt, all, c.rows, trc)
 		}
 
-		err = tx.Commit(ses)
+		err = tx.Commit(ses.Context())
 		if err != nil {
 			t.Error(err)
 		}

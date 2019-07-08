@@ -33,15 +33,15 @@ func (er engineRows) Close() error {
 }
 
 func (er engineRows) Next(ses *evaluate.Session, dest []sql.Value) error {
-	return er.Rows.Next(ses, dest)
+	return er.Rows.Next(ses.Context(), dest)
 }
 
 func (er engineRows) Delete(ses *evaluate.Session) error {
-	return er.Rows.Delete(ses)
+	return er.Rows.Delete(ses.Context())
 }
 
 func (er engineRows) Update(ses *evaluate.Session, updates []sql.ColumnUpdate) error {
-	return er.Rows.Update(ses, updates)
+	return er.Rows.Update(ses.Context(), updates)
 }
 
 func lookupRows(ses *evaluate.Session, tx engine.Transaction, dbname,
@@ -50,11 +50,11 @@ func lookupRows(ses *evaluate.Session, tx engine.Transaction, dbname,
 	if dbname == 0 {
 		dbname = ses.DefaultDatabase
 	}
-	tbl, err := ses.Engine.LookupTable(ses, tx, dbname, tblname)
+	tbl, err := ses.Engine.LookupTable(ses.Context(), tx, dbname, tblname)
 	if err != nil {
 		return nil, err
 	}
-	rows, err := tbl.Rows(ses)
+	rows, err := tbl.Rows(ses.Context())
 	if err != nil {
 		return nil, err
 	}

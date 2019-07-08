@@ -90,11 +90,11 @@ func (stmt *Update) Plan(ses *evaluate.Session, tx engine.Transaction) (interfac
 	if dbname == 0 {
 		dbname = ses.DefaultDatabase
 	}
-	tbl, err := ses.Engine.LookupTable(ses, tx, dbname, stmt.Table.Table)
+	tbl, err := ses.Engine.LookupTable(ses.Context(), tx, dbname, stmt.Table.Table)
 	if err != nil {
 		return nil, err
 	}
-	er, err := tbl.Rows(ses)
+	er, err := tbl.Rows(ses.Context())
 	if err != nil {
 		return nil, err
 	}
@@ -110,8 +110,8 @@ func (stmt *Update) Plan(ses *evaluate.Session, tx engine.Transaction) (interfac
 	}
 
 	plan := updatePlan{
-		columns: tbl.Columns(ses),
-		types:   tbl.ColumnTypes(ses),
+		columns: tbl.Columns(ses.Context()),
+		types:   tbl.ColumnTypes(ses.Context()),
 		rows:    rows,
 		updates: make([]columnUpdate, 0, len(stmt.ColumnUpdates)),
 	}

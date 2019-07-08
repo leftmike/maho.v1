@@ -8,16 +8,13 @@ To Do:
 
 - fuzzing: parser.Parse
 
-- fix XXX
-- engine: Session: change to just context.Context everywhere
-
-- fix engine tests
+- fix engine tests and XXX
 
 - document SET
 
 - support schemas, including search path
 
-- add information_schema; get rid of ListTables; columns, schemata, tables
+- add information_schema: columns, schemata, tables
 
 - Rows interface:
 -- return a chunk of rows at a time organized as a slice of values for each column

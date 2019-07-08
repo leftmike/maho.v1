@@ -116,7 +116,7 @@ func (svr *Server) Shutdown(ctx context.Context) error {
 		})
 }
 
-func (svr *Server) makeSessionsVirtual(ses engine.Session, tx engine.Transaction,
+func (svr *Server) makeSessionsVirtual(ctx context.Context, tx engine.Transaction,
 	dbname, tblname sql.Identifier) (engine.Table, error) {
 
 	svr.mutex.Lock()

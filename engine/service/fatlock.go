@@ -121,7 +121,9 @@ func addLock(obj *object, ls *LockerState, ll LockLevel) {
 	}
 }
 
-func (svc *LockService) waitForLock(ses Session, obj *object, ls *LockerState, ll LockLevel) {
+func (svc *LockService) waitForLock(ctx context.Context, obj *object, ls *LockerState,
+	ll LockLevel) {
+
 	ls.waitLevel = ll
 	// Add the locker to the queue of waiters.
 	ls.nextWaiter = nil
@@ -154,13 +156,9 @@ func (svc *LockService) waitForLock(ses Session, obj *object, ls *LockerState, l
 	}
 }
 
-type Session interface {
-	Context() context.Context
-}
-
 // LockTable locks the table (specified by db.tbl) for lkr at the specified lock level. It may
 // block waiting for a lock.
-func (svc *LockService) LockTable(ses Session, lkr Locker, db, tbl sql.Identifier,
+func (svc *LockService) LockTable(ctx context.Context, lkr Locker, db, tbl sql.Identifier,
 	ll LockLevel) error {
 
 	ls := lkr.LockerState()
@@ -201,7 +199,7 @@ func (svc *LockService) LockTable(ses Session, lkr Locker, db, tbl sql.Identifie
 			return nil
 		}
 
-		svc.waitForLock(ses, obj, ls, ll)
+		svc.waitForLock(ctx, obj, ls, ll)
 		addLock(obj, ls, ll)
 		return nil
 	}
@@ -304,7 +302,7 @@ func (svc *LockService) Locks() []Lock {
 	return locks
 }
 
-func (svc *LockService) makeLocksTable(ses engine.Session, tx engine.Transaction,
+func (svc *LockService) makeLocksTable(ctx context.Context, tx engine.Transaction,
 	dbname, tblname sql.Identifier) (engine.Table, error) {
 
 	values := [][]sql.Value{}

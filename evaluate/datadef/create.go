@@ -42,7 +42,7 @@ func (stmt *CreateTable) Execute(ses *evaluate.Session, tx engine.Transaction) (
 	if dbname == 0 {
 		dbname = ses.DefaultDatabase
 	}
-	return -1, ses.Engine.CreateTable(ses, tx, dbname, stmt.Table.Table,
+	return -1, ses.Engine.CreateTable(ses.Context(), tx, dbname, stmt.Table.Table,
 		stmt.Columns, stmt.ColumnTypes)
 }
 

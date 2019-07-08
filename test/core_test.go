@@ -79,7 +79,7 @@ func TestValuesSimple(t *testing.T) {
 			}
 		}
 
-		err = tx.Commit(ses)
+		err = tx.Commit(ses.Context())
 		if err != nil {
 			t.Error(err)
 		}

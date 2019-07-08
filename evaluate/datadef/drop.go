@@ -37,7 +37,7 @@ func (stmt *DropTable) Execute(ses *evaluate.Session, tx engine.Transaction) (in
 		if dbname == 0 {
 			dbname = ses.DefaultDatabase
 		}
-		err := ses.Engine.DropTable(ses, tx, dbname, tbl.Table, stmt.IfExists)
+		err := ses.Engine.DropTable(ses.Context(), tx, dbname, tbl.Table, stmt.IfExists)
 		if err != nil {
 			return -1, err
 		}

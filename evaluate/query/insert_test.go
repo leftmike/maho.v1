@@ -217,7 +217,7 @@ func allRows(ses *evaluate.Session, rows engine.Rows) ([][]sql.Value, error) {
 	l := len(rows.Columns())
 	for {
 		dest := make([]sql.Value, l)
-		err := rows.Next(ses, dest)
+		err := rows.Next(ses.Context(), dest)
 		if err == io.EOF {
 			break
 		} else if err != nil {
@@ -233,7 +233,7 @@ func testInsert(t *testing.T, e engine.Engine, ses *evaluate.Session, dbnam, nam
 
 	for _, c := range cases {
 		tx := e.Begin(0)
-		err := e.CreateTable(ses, tx, dbnam, nam, cols, colTypes)
+		err := e.CreateTable(ses.Context(), tx, dbnam, nam, cols, colTypes)
 		if err != nil {
 			t.Error(err)
 			return
@@ -248,13 +248,13 @@ func testInsert(t *testing.T, e engine.Engine, ses *evaluate.Session, dbnam, nam
 			t.Errorf("Parse(\"%s\").Execute() failed with %s", c.stmt, err.Error())
 		} else {
 			var tbl engine.Table
-			tbl, err = e.LookupTable(ses, tx, dbnam, nam)
+			tbl, err = e.LookupTable(ses.Context(), tx, dbnam, nam)
 			if err != nil {
 				t.Error(err)
 				continue
 			}
 			var rows engine.Rows
-			rows, err = tbl.Rows(ses)
+			rows, err = tbl.Rows(ses.Context())
 			if err != nil {
 				t.Errorf("(%s).Rows() failed with %s", nam, err)
 				continue
@@ -271,13 +271,13 @@ func testInsert(t *testing.T, e engine.Engine, ses *evaluate.Session, dbnam, nam
 			}
 		}
 
-		err = e.DropTable(ses, tx, dbnam, nam, false)
+		err = e.DropTable(ses.Context(), tx, dbnam, nam, false)
 		if err != nil {
 			t.Error(err)
 			return
 		}
 
-		err = tx.Commit(ses)
+		err = tx.Commit(ses.Context())
 		if err != nil {
 			t.Error(err)
 			return

@@ -1,6 +1,7 @@
 package service
 
 import (
+	"context"
 	"fmt"
 	"sync"
 
@@ -26,7 +27,7 @@ type Transaction struct {
 
 type Database interface {
 	Begin(tx *Transaction) interface{}
-	Commit(ses engine.Session, tctx interface{}) error
+	Commit(ctx context.Context, tctx interface{}) error
 	Rollback(tctx interface{}) error
 	NextStmt(tctx interface{})
 }
@@ -90,9 +91,9 @@ func (tx *Transaction) forContexts(fn func(d Database, tctx interface{}) error) 
 	return err
 }
 
-func (tx *Transaction) Commit(ses engine.Session) error {
+func (tx *Transaction) Commit(ctx context.Context) error {
 	err := tx.forContexts(func(d Database, tctx interface{}) error {
-		return d.Commit(ses, tctx)
+		return d.Commit(ctx, tctx)
 	})
 	tx.contexts = nil
 	tx.ts.removeTransaction(tx)
@@ -115,8 +116,8 @@ func (tx *Transaction) NextStmt() {
 	})
 }
 
-func (tx *Transaction) LockTable(ses engine.Session, db, tbl sql.Identifier, ll LockLevel) error {
-	return tx.ts.lockService.LockTable(ses, tx, db, tbl, ll)
+func (tx *Transaction) LockTable(ctx context.Context, db, tbl sql.Identifier, ll LockLevel) error {
+	return tx.ts.lockService.LockTable(ctx, tx, db, tbl, ll)
 }
 
 func (tx *Transaction) getContext(d Database) interface{} {
@@ -136,7 +137,7 @@ func GetTxContext(tx engine.Transaction, d Database) interface{} {
 	return tx.(*Transaction).getContext(d)
 }
 
-func (ts *TransactionService) makeTransactionsTable(ses engine.Session, tx engine.Transaction,
+func (ts *TransactionService) makeTransactionsTable(ctx context.Context, tx engine.Transaction,
 	dbname, tblname sql.Identifier) (engine.Table, error) {
 
 	ts.mutex.Lock()

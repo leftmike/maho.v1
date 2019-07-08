@@ -94,7 +94,7 @@ func TestValues(t *testing.T) {
 			t.Errorf("(%v).Rows() got %v want %v\n%s", c.values, all, c.rows, trc)
 		}
 
-		err = tx.Commit(ses)
+		err = tx.Commit(ses.Context())
 		if err != nil {
 			t.Error(err)
 		}
@@ -184,7 +184,7 @@ func TestFromValues(t *testing.T) {
 			t.Errorf("(%v).Rows() got %v want %v\n%s", c.from, all, c.rows, trc)
 		}
 
-		err = tx.Commit(ses)
+		err = tx.Commit(ses.Context())
 		if err != nil {
 			t.Error(err)
 		}

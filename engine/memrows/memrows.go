@@ -8,6 +8,7 @@ package memrows
 */
 
 import (
+	"context"
 	"fmt"
 	"math"
 	"sync"
@@ -126,7 +127,7 @@ func (me *memrowsEngine) DropDatabase(name sql.Identifier, exists bool,
 	return nil // XXX: don't return until all transactions are done
 }
 
-func (me *memrowsEngine) LookupTable(ses engine.Session, tx engine.Transaction,
+func (me *memrowsEngine) LookupTable(ctx context.Context, tx engine.Transaction,
 	dbname, tblname sql.Identifier) (engine.Table, error) {
 
 	me.mutex.RLock()
@@ -136,10 +137,10 @@ func (me *memrowsEngine) LookupTable(ses engine.Session, tx engine.Transaction,
 	if !ok {
 		return nil, fmt.Errorf("memrows: database %s not found", dbname)
 	}
-	return mdb.lookupTable(ses, tx, tblname)
+	return mdb.lookupTable(ctx, tx, tblname)
 }
 
-func (me *memrowsEngine) CreateTable(ses engine.Session, tx engine.Transaction,
+func (me *memrowsEngine) CreateTable(ctx context.Context, tx engine.Transaction,
 	dbname, tblname sql.Identifier, cols []sql.Identifier, colTypes []sql.ColumnType) error {
 
 	me.mutex.Lock()
@@ -149,10 +150,10 @@ func (me *memrowsEngine) CreateTable(ses engine.Session, tx engine.Transaction,
 	if !ok {
 		return fmt.Errorf("memrows: database %s not found", dbname)
 	}
-	return mdb.createTable(ses, tx, tblname, cols, colTypes)
+	return mdb.createTable(ctx, tx, tblname, cols, colTypes)
 }
 
-func (me *memrowsEngine) DropTable(ses engine.Session, tx engine.Transaction,
+func (me *memrowsEngine) DropTable(ctx context.Context, tx engine.Transaction,
 	dbname, tblname sql.Identifier, exists bool) error {
 
 	me.mutex.Lock()
@@ -162,15 +163,15 @@ func (me *memrowsEngine) DropTable(ses engine.Session, tx engine.Transaction,
 	if !ok {
 		return fmt.Errorf("memrows: database %s not found", dbname)
 	}
-	return mdb.dropTable(ses, tx, tblname, exists)
+	return mdb.dropTable(ctx, tx, tblname, exists)
 }
 
 func (me *memrowsEngine) Begin(sid uint64) engine.Transaction {
 	return me.txService.Begin(sid)
 }
 
-func (me *memrowsEngine) ListDatabases(ses engine.Session, tx engine.Transaction) ([]sql.Identifier,
-	error) {
+func (me *memrowsEngine) ListDatabases(ctx context.Context,
+	tx engine.Transaction) ([]sql.Identifier, error) {
 
 	me.mutex.RLock()
 	defer me.mutex.RUnlock()
@@ -182,7 +183,7 @@ func (me *memrowsEngine) ListDatabases(ses engine.Session, tx engine.Transaction
 	return dbnames, nil
 }
 
-func (me *memrowsEngine) ListTables(ses engine.Session, tx engine.Transaction,
+func (me *memrowsEngine) ListTables(ctx context.Context, tx engine.Transaction,
 	name sql.Identifier) ([]sql.Identifier, error) {
 
 	me.mutex.RLock()
@@ -192,7 +193,7 @@ func (me *memrowsEngine) ListTables(ses engine.Session, tx engine.Transaction,
 	if !ok {
 		return nil, fmt.Errorf("memrows: database %s not found", name)
 	}
-	return mdb.listTables(ses, tx)
+	return mdb.listTables(ctx, tx)
 }
 
 func visibleVersion(ti *tableImpl, v version) *tableImpl {
@@ -205,7 +206,7 @@ func visibleVersion(ti *tableImpl, v version) *tableImpl {
 	return ti
 }
 
-func (mdb *database) lookupTable(ses engine.Session, tx engine.Transaction,
+func (mdb *database) lookupTable(ctx context.Context, tx engine.Transaction,
 	tblname sql.Identifier) (engine.Table, error) {
 
 	tctx := service.GetTxContext(tx, mdb).(*tcontext)
@@ -217,7 +218,7 @@ func (mdb *database) lookupTable(ses engine.Session, tx engine.Transaction,
 		return tbl, nil
 	}
 
-	err := tctx.tx.LockTable(ses, mdb.name, tblname, service.ACCESS)
+	err := tctx.tx.LockTable(ctx, mdb.name, tblname, service.ACCESS)
 	if err != nil {
 		return nil, err
 	}
@@ -241,11 +242,11 @@ func (mdb *database) lookupTable(ses engine.Session, tx engine.Transaction,
 	return tbl, nil
 }
 
-func (mdb *database) createTable(ses engine.Session, tx engine.Transaction, tblname sql.Identifier,
+func (mdb *database) createTable(ctx context.Context, tx engine.Transaction, tblname sql.Identifier,
 	cols []sql.Identifier, colTypes []sql.ColumnType) error {
 
 	tctx := service.GetTxContext(tx, mdb).(*tcontext)
-	err := tctx.tx.LockTable(ses, mdb.name, tblname, service.EXCLUSIVE)
+	err := tctx.tx.LockTable(ctx, mdb.name, tblname, service.EXCLUSIVE)
 	if err != nil {
 		return err
 	}
@@ -293,11 +294,11 @@ func (mdb *database) createTable(ses engine.Session, tx engine.Transaction, tbln
 	return nil
 }
 
-func (mdb *database) dropTable(ses engine.Session, tx engine.Transaction, tblname sql.Identifier,
+func (mdb *database) dropTable(ctx context.Context, tx engine.Transaction, tblname sql.Identifier,
 	exists bool) error {
 
 	tctx := service.GetTxContext(tx, mdb).(*tcontext)
-	err := tctx.tx.LockTable(ses, mdb.name, tblname, service.EXCLUSIVE)
+	err := tctx.tx.LockTable(ctx, mdb.name, tblname, service.EXCLUSIVE)
 	if err != nil {
 		return err
 	}
@@ -342,7 +343,7 @@ func (mdb *database) dropTable(ses engine.Session, tx engine.Transaction, tblnam
 	return nil
 }
 
-func (mdb *database) listTables(ses engine.Session, tx engine.Transaction) ([]sql.Identifier,
+func (mdb *database) listTables(ctx context.Context, tx engine.Transaction) ([]sql.Identifier,
 	error) {
 
 	var tblnames []sql.Identifier
@@ -381,7 +382,7 @@ func (mdb *database) Begin(tx *service.Transaction) interface{} {
 	}
 }
 
-func (mdb *database) Commit(ses engine.Session, tx interface{}) error {
+func (mdb *database) Commit(ctx context.Context, tx interface{}) error {
 	tctx := tx.(*tcontext)
 
 	for _, tbl := range tctx.tables {
@@ -448,21 +449,21 @@ func (mdb *database) NextStmt(tx interface{}) {
 	tctx.cid += 1
 }
 
-func (mt *table) Columns(ses engine.Session) []sql.Identifier {
+func (mt *table) Columns(ctx context.Context) []sql.Identifier {
 	return mt.table.getColumns(mt.tctx)
 }
 
-func (mt *table) ColumnTypes(ses engine.Session) []sql.ColumnType {
+func (mt *table) ColumnTypes(ctx context.Context) []sql.ColumnType {
 	return mt.table.getColumnTypes(mt.tctx)
 }
 
-func (mt *table) Rows(ses engine.Session) (engine.Rows, error) {
+func (mt *table) Rows(ctx context.Context) (engine.Rows, error) {
 	return &rows{table: mt}, nil
 }
 
-func (mt *table) Insert(ses engine.Session, row []sql.Value) error {
+func (mt *table) Insert(ctx context.Context, row []sql.Value) error {
 	if !mt.modifyLock {
-		err := mt.tctx.tx.LockTable(ses, mt.db.name, mt.name,
+		err := mt.tctx.tx.LockTable(ctx, mt.db.name, mt.name,
 			service.ROW_MODIFY)
 		if err != nil {
 			return err
@@ -488,7 +489,7 @@ func (mr *rows) Close() error {
 	return nil
 }
 
-func (mr *rows) Next(ses engine.Session, dest []sql.Value) error {
+func (mr *rows) Next(ctx context.Context, dest []sql.Value) error {
 	var err error
 	mr.index, err = mr.table.table.next(mr.table.tctx, dest, mr.index)
 	if err != nil {
@@ -499,13 +500,13 @@ func (mr *rows) Next(ses engine.Session, dest []sql.Value) error {
 	return nil
 }
 
-func (mr *rows) Delete(ses engine.Session) error {
+func (mr *rows) Delete(ctx context.Context) error {
 	if !mr.haveRow {
 		return fmt.Errorf("memrows: table %s.%s no row to delete", mr.table.db.name,
 			mr.table.name)
 	}
 	if !mr.table.modifyLock {
-		err := mr.table.tctx.tx.LockTable(ses, mr.table.db.name, mr.table.name, service.ROW_MODIFY)
+		err := mr.table.tctx.tx.LockTable(ctx, mr.table.db.name, mr.table.name, service.ROW_MODIFY)
 		if err != nil {
 			return err
 		}
@@ -521,13 +522,13 @@ func (mr *rows) Delete(ses engine.Session) error {
 	return nil
 }
 
-func (mr *rows) Update(ses engine.Session, updates []sql.ColumnUpdate) error {
+func (mr *rows) Update(ctx context.Context, updates []sql.ColumnUpdate) error {
 	if !mr.haveRow {
 		return fmt.Errorf("memrows: table %s.%s no row to update", mr.table.db.name,
 			mr.table.name)
 	}
 	if !mr.table.modifyLock {
-		err := mr.table.tctx.tx.LockTable(ses, mr.table.db.name, mr.table.name,
+		err := mr.table.tctx.tx.LockTable(ctx, mr.table.db.name, mr.table.name,
 			service.ROW_MODIFY)
 		if err != nil {
 			return err

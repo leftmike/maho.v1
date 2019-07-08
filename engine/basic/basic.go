@@ -1,6 +1,7 @@
 package basic
 
 import (
+	"context"
 	"fmt"
 	"io"
 	"sync"
@@ -96,7 +97,7 @@ func (be *basicEngine) DropDatabase(name sql.Identifier, exists bool,
 	return nil
 }
 
-func (be *basicEngine) LookupTable(ses engine.Session, tx engine.Transaction,
+func (be *basicEngine) LookupTable(ctx context.Context, tx engine.Transaction,
 	dbname, tblname sql.Identifier) (engine.Table, error) {
 
 	be.mutex.RLock()
@@ -106,10 +107,10 @@ func (be *basicEngine) LookupTable(ses engine.Session, tx engine.Transaction,
 	if !ok {
 		return nil, fmt.Errorf("basic: database %s not found", dbname)
 	}
-	return bdb.lookupTable(ses, tx, tblname)
+	return bdb.lookupTable(ctx, tx, tblname)
 }
 
-func (be *basicEngine) CreateTable(ses engine.Session, tx engine.Transaction,
+func (be *basicEngine) CreateTable(ctx context.Context, tx engine.Transaction,
 	dbname, tblname sql.Identifier, cols []sql.Identifier, colTypes []sql.ColumnType) error {
 
 	be.mutex.Lock()
@@ -119,10 +120,10 @@ func (be *basicEngine) CreateTable(ses engine.Session, tx engine.Transaction,
 	if !ok {
 		return fmt.Errorf("basic: database %s not found", dbname)
 	}
-	return bdb.createTable(ses, tx, tblname, cols, colTypes)
+	return bdb.createTable(ctx, tx, tblname, cols, colTypes)
 }
 
-func (be *basicEngine) DropTable(ses engine.Session, tx engine.Transaction,
+func (be *basicEngine) DropTable(ctx context.Context, tx engine.Transaction,
 	dbname, tblname sql.Identifier, exists bool) error {
 
 	be.mutex.Lock()
@@ -132,14 +133,14 @@ func (be *basicEngine) DropTable(ses engine.Session, tx engine.Transaction,
 	if !ok {
 		return fmt.Errorf("basic: database %s not found", dbname)
 	}
-	return bdb.dropTable(ses, tx, tblname, exists)
+	return bdb.dropTable(ctx, tx, tblname, exists)
 }
 
 func (_ *basicEngine) Begin(sid uint64) engine.Transaction {
 	return &transaction{}
 }
 
-func (be *basicEngine) ListDatabases(ses engine.Session, tx engine.Transaction) ([]sql.Identifier,
+func (be *basicEngine) ListDatabases(ctx context.Context, tx engine.Transaction) ([]sql.Identifier,
 	error) {
 
 	be.mutex.RLock()
@@ -152,7 +153,7 @@ func (be *basicEngine) ListDatabases(ses engine.Session, tx engine.Transaction) 
 	return dbnames, nil
 }
 
-func (be *basicEngine) ListTables(ses engine.Session, tx engine.Transaction,
+func (be *basicEngine) ListTables(ctx context.Context, tx engine.Transaction,
 	name sql.Identifier) ([]sql.Identifier, error) {
 
 	be.mutex.RLock()
@@ -170,7 +171,7 @@ func (be *basicEngine) ListTables(ses engine.Session, tx engine.Transaction,
 	return tblnames, nil
 }
 
-func (_ *transaction) Commit(ses engine.Session) error {
+func (_ *transaction) Commit(ctx context.Context) error {
 	return nil
 }
 
@@ -184,7 +185,7 @@ func (bdb *database) Message() string {
 	return ""
 }
 
-func (bdb *database) lookupTable(ses engine.Session, tx engine.Transaction,
+func (bdb *database) lookupTable(ctx context.Context, tx engine.Transaction,
 	tblname sql.Identifier) (engine.Table, error) {
 
 	tbl, ok := bdb.tables[tblname]
@@ -194,7 +195,7 @@ func (bdb *database) lookupTable(ses engine.Session, tx engine.Transaction,
 	return tbl, nil
 }
 
-func (bdb *database) createTable(ses engine.Session, tx engine.Transaction, tblname sql.Identifier,
+func (bdb *database) createTable(ctx context.Context, tx engine.Transaction, tblname sql.Identifier,
 	cols []sql.Identifier, colTypes []sql.ColumnType) error {
 
 	if _, dup := bdb.tables[tblname]; dup {
@@ -211,7 +212,7 @@ func (bdb *database) createTable(ses engine.Session, tx engine.Transaction, tbln
 	return nil
 }
 
-func (bdb *database) dropTable(ses engine.Session, tx engine.Transaction, tblname sql.Identifier,
+func (bdb *database) dropTable(ctx context.Context, tx engine.Transaction, tblname sql.Identifier,
 	exists bool) error {
 
 	if _, ok := bdb.tables[tblname]; !ok {
@@ -224,22 +225,22 @@ func (bdb *database) dropTable(ses engine.Session, tx engine.Transaction, tblnam
 	return nil
 }
 
-func (bt *table) Columns(ses engine.Session) []sql.Identifier {
+func (bt *table) Columns(ctx context.Context) []sql.Identifier {
 	return bt.columns
 }
 
-func (bt *table) ColumnTypes(ses engine.Session) []sql.ColumnType {
+func (bt *table) ColumnTypes(ctx context.Context) []sql.ColumnType {
 	return bt.columnTypes
 }
 
-func (bt *table) Rows(ses engine.Session) (engine.Rows, error) {
+func (bt *table) Rows(ctx context.Context) (engine.Rows, error) {
 	bt.be.mutex.RLock()
 	defer bt.be.mutex.RUnlock()
 
 	return &rows{be: bt.be, name: bt.name, columns: bt.columns, rows: bt.rows}, nil
 }
 
-func (bt *table) Insert(ses engine.Session, row []sql.Value) error {
+func (bt *table) Insert(ctx context.Context, row []sql.Value) error {
 	bt.be.mutex.Lock()
 	defer bt.be.mutex.Unlock()
 
@@ -257,7 +258,7 @@ func (br *rows) Close() error {
 	return nil
 }
 
-func (br *rows) Next(ses engine.Session, dest []sql.Value) error {
+func (br *rows) Next(ctx context.Context, dest []sql.Value) error {
 	br.be.mutex.RLock()
 	defer br.be.mutex.RUnlock()
 
@@ -275,7 +276,7 @@ func (br *rows) Next(ses engine.Session, dest []sql.Value) error {
 	return io.EOF
 }
 
-func (br *rows) Delete(ses engine.Session) error {
+func (br *rows) Delete(ctx context.Context) error {
 	br.be.mutex.Lock()
 	defer br.be.mutex.Unlock()
 
@@ -287,7 +288,7 @@ func (br *rows) Delete(ses engine.Session) error {
 	return nil
 }
 
-func (br *rows) Update(ses engine.Session, updates []sql.ColumnUpdate) error {
+func (br *rows) Update(ctx context.Context, updates []sql.ColumnUpdate) error {
 	br.be.mutex.Lock()
 	defer br.be.mutex.Unlock()
 
