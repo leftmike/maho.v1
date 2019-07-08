@@ -9,10 +9,6 @@ To Do:
 - fuzzing: parser.Parse
 
 - fix XXX
-- fix InfoTables: db$columns, db$tables
-- do something with ListTables
-- add system.databases
-- remove engine/virtual.go
 - engine: Session: change to just context.Context everywhere
 
 - fix engine tests

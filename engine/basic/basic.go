@@ -139,6 +139,37 @@ func (_ *basicEngine) Begin(sid uint64) engine.Transaction {
 	return &transaction{}
 }
 
+func (be *basicEngine) ListDatabases(ses engine.Session, tx engine.Transaction) ([]sql.Identifier,
+	error) {
+
+	be.mutex.RLock()
+	defer be.mutex.RUnlock()
+
+	var dbnames []sql.Identifier
+	for dbname := range be.databases {
+		dbnames = append(dbnames, dbname)
+	}
+	return dbnames, nil
+}
+
+func (be *basicEngine) ListTables(ses engine.Session, tx engine.Transaction,
+	name sql.Identifier) ([]sql.Identifier, error) {
+
+	be.mutex.RLock()
+	defer be.mutex.RUnlock()
+
+	bdb, ok := be.databases[name]
+	if !ok {
+		return nil, fmt.Errorf("basic: database %s not found", name)
+	}
+
+	var tblnames []sql.Identifier
+	for tblname := range bdb.tables {
+		tblnames = append(tblnames, tblname)
+	}
+	return tblnames, nil
+}
+
 func (_ *transaction) Commit(ses engine.Session) error {
 	return nil
 }
@@ -191,23 +222,6 @@ func (bdb *database) dropTable(ses engine.Session, tx engine.Transaction, tblnam
 	}
 	delete(bdb.tables, tblname)
 	return nil
-}
-
-// XXX: ???
-func (bdb *database) listTables(ses engine.Session, tx engine.Transaction) ([]engine.TableEntry,
-	error) {
-
-	bdb.be.mutex.RLock()
-	defer bdb.be.mutex.RUnlock()
-
-	var tbls []engine.TableEntry
-	for name, _ := range bdb.tables {
-		tbls = append(tbls, engine.TableEntry{
-			Name: name,
-			Type: engine.PhysicalType,
-		})
-	}
-	return tbls, nil
 }
 
 func (bt *table) Columns(ses engine.Session) []sql.Identifier {

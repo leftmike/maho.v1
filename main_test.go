@@ -6,7 +6,7 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/leftmike/maho/engine/basic"
+	"github.com/leftmike/maho/engine/memrows"
 	"github.com/leftmike/maho/evaluate"
 	"github.com/leftmike/maho/parser"
 )
@@ -17,17 +17,20 @@ func TestMain(t *testing.T) {
 		r string
 	}{
 		{"select * from system.db$tables order by [table]",
-			`           table      type
-           -----      ----
- 1      'config' 'virtual'
- 2  'db$columns' 'virtual'
- 3   'db$tables' 'virtual'
- 4 'identifiers' 'virtual'
-(4 rows)
+			`            table      type
+            -----      ----
+ 1       'config' 'virtual'
+ 2    'databases' 'virtual'
+ 3   'db$columns' 'virtual'
+ 4    'db$tables' 'virtual'
+ 5  'identifiers' 'virtual'
+ 6        'locks' 'virtual'
+ 7 'transactions' 'virtual'
+(7 rows)
 `},
 	}
 
-	e := basic.NewEngine("testdata")
+	e := memrows.NewEngine("testdata")
 
 	for i, c := range cases {
 		var b bytes.Buffer

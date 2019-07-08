@@ -169,6 +169,32 @@ func (me *memrowsEngine) Begin(sid uint64) engine.Transaction {
 	return me.txService.Begin(sid)
 }
 
+func (me *memrowsEngine) ListDatabases(ses engine.Session, tx engine.Transaction) ([]sql.Identifier,
+	error) {
+
+	me.mutex.RLock()
+	defer me.mutex.RUnlock()
+
+	var dbnames []sql.Identifier
+	for dbname := range me.databases {
+		dbnames = append(dbnames, dbname)
+	}
+	return dbnames, nil
+}
+
+func (me *memrowsEngine) ListTables(ses engine.Session, tx engine.Transaction,
+	name sql.Identifier) ([]sql.Identifier, error) {
+
+	me.mutex.RLock()
+	mdb, ok := me.databases[name]
+	me.mutex.RUnlock()
+
+	if !ok {
+		return nil, fmt.Errorf("memrows: database %s not found", name)
+	}
+	return mdb.listTables(ses, tx)
+}
+
 func visibleVersion(ti *tableImpl, v version) *tableImpl {
 	for ti != nil {
 		if v >= ti.createdVersion && (!ti.dropped || v < ti.droppedVersion) {
@@ -316,19 +342,15 @@ func (mdb *database) dropTable(ses engine.Session, tx engine.Transaction, tblnam
 	return nil
 }
 
-// XXX: ???
-func (mdb *database) ListTables(ses engine.Session, tx engine.Transaction) ([]engine.TableEntry,
+func (mdb *database) listTables(ses engine.Session, tx engine.Transaction) ([]sql.Identifier,
 	error) {
 
-	var tbls []engine.TableEntry
+	var tblnames []sql.Identifier
 
 	tctx := service.GetTxContext(tx, mdb).(*tcontext)
 	for _, tbl := range tctx.tables {
 		if !tbl.dropped {
-			tbls = append(tbls, engine.TableEntry{
-				Name: tbl.name,
-				Type: engine.PhysicalType,
-			})
+			tblnames = append(tblnames, tbl.name)
 		}
 	}
 
@@ -339,14 +361,11 @@ func (mdb *database) ListTables(ses engine.Session, tx engine.Transaction) ([]en
 		if _, ok := tctx.tables[name]; !ok {
 			ti = visibleVersion(ti, tctx.version)
 			if ti != nil {
-				tbls = append(tbls, engine.TableEntry{
-					Name: name,
-					Type: engine.PhysicalType,
-				})
+				tblnames = append(tblnames, name)
 			}
 		}
 	}
-	return tbls, nil
+	return tblnames, nil
 }
 
 func (mdb *database) Begin(tx *service.Transaction) interface{} {

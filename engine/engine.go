@@ -6,18 +6,6 @@ import (
 	"github.com/leftmike/maho/sql"
 )
 
-type TableType int
-
-const (
-	PhysicalType TableType = iota
-	VirtualType
-)
-
-type TableEntry struct {
-	Name sql.Identifier
-	Type TableType
-}
-
 type Options map[sql.Identifier]string
 
 type Transaction interface {
