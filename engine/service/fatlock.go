@@ -5,6 +5,8 @@ import (
 	"fmt"
 	"sync"
 
+	"github.com/leftmike/maho/engine"
+	"github.com/leftmike/maho/engine/virtual"
 	"github.com/leftmike/maho/sql"
 )
 
@@ -90,8 +92,11 @@ type LockService struct {
 	objects map[lockKey]*object
 }
 
-func (svc *LockService) Init() {
+func (svc *LockService) Init(e engine.Engine) {
 	svc.objects = map[lockKey]*object{}
+	if e != nil {
+		e.CreateSystemTable(sql.ID("locks"), svc.makeLocksTable)
+	}
 }
 
 // canIncreaseLock tests if an existing lock on the object can be increased to a higher lock level.
@@ -297,4 +302,30 @@ func (svc *LockService) Locks() []Lock {
 	}
 
 	return locks
+}
+
+func (svc *LockService) makeLocksTable(ses engine.Session, tx engine.Transaction,
+	d engine.Database, dbname, tblname sql.Identifier) (engine.Table, error) {
+
+	values := [][]sql.Value{}
+
+	for _, lk := range svc.Locks() {
+		var place sql.Value
+		if lk.Place > 0 {
+			place = sql.Int64Value(lk.Place)
+		}
+		values = append(values, []sql.Value{
+			sql.StringValue(lk.Key),
+			sql.StringValue(lk.Locker),
+			sql.StringValue(lk.Level.String()),
+			sql.BoolValue(lk.Place == 0),
+			place,
+		})
+	}
+
+	return virtual.MakeTable(fmt.Sprintf("%s.%s", dbname, tblname),
+		[]sql.Identifier{sql.ID("key"), sql.ID("locker"), sql.ID("level"), sql.ID("held"),
+			sql.ID("place")},
+		[]sql.ColumnType{sql.IdColType, sql.IdColType, sql.IdColType, sql.BoolColType,
+			sql.NullInt64ColType}, values), nil
 }

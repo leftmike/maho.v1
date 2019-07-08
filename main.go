@@ -8,11 +8,13 @@ To Do:
 
 - fuzzing: parser.Parse
 
-- remove create database infrastructure; should be part of the engine
+- fix XXX
+- fix InfoTables: db$columns, db$tables
 - maho/engine: should just be interface
-- virtual should be an engine
-- add CreateSystemTable and CreateInfoTable to engine interface
+- remove engine/virtual.go
+- engine: remove Database interface
 - engine: Session: change to just context.Context everywhere
+- engine: remove Database argument from MakeVirtual
 
 - fix engine tests
 

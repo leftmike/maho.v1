@@ -14,11 +14,14 @@ import (
 
 	"github.com/leftmike/maho/engine"
 	"github.com/leftmike/maho/engine/service"
+	"github.com/leftmike/maho/engine/virtual"
 	"github.com/leftmike/maho/sql"
 )
 
 type memrowsEngine struct {
 	txService service.TransactionService
+	mutex     sync.RWMutex
+	databases map[sql.Identifier]*database
 }
 
 type database struct {
@@ -68,40 +71,102 @@ type rows struct {
 }
 
 func NewEngine(dataDir string) engine.Engine {
-	me := memrowsEngine{}
-	me.txService.Init()
-	return &me
+	me := &memrowsEngine{
+		databases: map[sql.Identifier]*database{},
+	}
+	ve := virtual.NewEngine(me)
+	me.txService.Init(ve)
+	return ve
 }
 
-func (me *memrowsEngine) AttachDatabase(name sql.Identifier,
-	options engine.Options) (engine.Database, error) {
-
-	return nil, fmt.Errorf("memrows: attach database not supported")
+func (_ *memrowsEngine) CreateSystemTable(tblname sql.Identifier, maker engine.MakeVirtual) {
+	panic("memrows: use virtual engine with memrows engine")
 }
 
-func (me *memrowsEngine) CreateDatabase(name sql.Identifier,
-	options engine.Options) (engine.Database, error) {
+func (_ *memrowsEngine) CreateInfoTable(tblname sql.Identifier, maker engine.MakeVirtual) {
+	panic("memrows: use virtual engine with memrows engine")
+}
 
-	return &database{
+func (me *memrowsEngine) AttachDatabase(name sql.Identifier, options engine.Options) error {
+	return fmt.Errorf("memrows: attach database not supported")
+}
+
+func (me *memrowsEngine) CreateDatabase(name sql.Identifier, options engine.Options) error {
+	me.mutex.Lock()
+	defer me.mutex.Unlock()
+
+	if _, ok := me.databases[name]; ok {
+		return fmt.Errorf("memrows: database %s already exists", name)
+	}
+	me.databases[name] = &database{
 		name:   name,
 		tables: map[sql.Identifier]*tableImpl{},
-	}, nil
+	}
+	return nil
+}
+
+func (me *memrowsEngine) DetachDatabase(name sql.Identifier, options engine.Options) error {
+	return fmt.Errorf("memrows: detach database not supported")
+}
+
+func (me *memrowsEngine) DropDatabase(name sql.Identifier, exists bool,
+	options engine.Options) error {
+
+	me.mutex.Lock()
+	defer me.mutex.Unlock()
+
+	_, ok := me.databases[name]
+	if !ok {
+		if exists {
+			return nil
+		}
+		return fmt.Errorf("memrows: database %s does not exist", name)
+	}
+	delete(me.databases, name)
+	return nil // XXX: don't return until all transactions are done
+}
+
+func (me *memrowsEngine) LookupTable(ses engine.Session, tx engine.Transaction,
+	dbname, tblname sql.Identifier) (engine.Table, error) {
+
+	me.mutex.RLock()
+	defer me.mutex.RUnlock()
+
+	mdb, ok := me.databases[dbname]
+	if !ok {
+		return nil, fmt.Errorf("memrows: database %s not found", dbname)
+	}
+	return mdb.lookupTable(ses, tx, tblname)
+}
+
+func (me *memrowsEngine) CreateTable(ses engine.Session, tx engine.Transaction,
+	dbname, tblname sql.Identifier, cols []sql.Identifier, colTypes []sql.ColumnType) error {
+
+	me.mutex.Lock()
+	defer me.mutex.Unlock()
+
+	mdb, ok := me.databases[dbname]
+	if !ok {
+		return fmt.Errorf("memrows: database %s not found", dbname)
+	}
+	return mdb.createTable(ses, tx, tblname, cols, colTypes)
+}
+
+func (me *memrowsEngine) DropTable(ses engine.Session, tx engine.Transaction,
+	dbname, tblname sql.Identifier, exists bool) error {
+
+	me.mutex.Lock()
+	defer me.mutex.Unlock()
+
+	mdb, ok := me.databases[dbname]
+	if !ok {
+		return fmt.Errorf("memrows: database %s not found", dbname)
+	}
+	return mdb.dropTable(ses, tx, tblname, exists)
 }
 
 func (me *memrowsEngine) Begin(sid uint64) engine.Transaction {
 	return me.txService.Begin(sid)
-}
-
-func (me *memrowsEngine) Locks() []service.Lock {
-	return me.txService.Locks()
-}
-
-func (me *memrowsEngine) Transactions() []engine.TransactionState {
-	return me.txService.Transactions()
-}
-
-func (mdb *database) Message() string {
-	return ""
 }
 
 func visibleVersion(ti *tableImpl, v version) *tableImpl {
@@ -114,7 +179,7 @@ func visibleVersion(ti *tableImpl, v version) *tableImpl {
 	return ti
 }
 
-func (mdb *database) LookupTable(ses engine.Session, tx engine.Transaction,
+func (mdb *database) lookupTable(ses engine.Session, tx engine.Transaction,
 	tblname sql.Identifier) (engine.Table, error) {
 
 	tctx := service.GetTxContext(tx, mdb).(*tcontext)
@@ -150,7 +215,7 @@ func (mdb *database) LookupTable(ses engine.Session, tx engine.Transaction,
 	return tbl, nil
 }
 
-func (mdb *database) CreateTable(ses engine.Session, tx engine.Transaction, tblname sql.Identifier,
+func (mdb *database) createTable(ses engine.Session, tx engine.Transaction, tblname sql.Identifier,
 	cols []sql.Identifier, colTypes []sql.ColumnType) error {
 
 	tctx := service.GetTxContext(tx, mdb).(*tcontext)
@@ -202,7 +267,7 @@ func (mdb *database) CreateTable(ses engine.Session, tx engine.Transaction, tbln
 	return nil
 }
 
-func (mdb *database) DropTable(ses engine.Session, tx engine.Transaction, tblname sql.Identifier,
+func (mdb *database) dropTable(ses engine.Session, tx engine.Transaction, tblname sql.Identifier,
 	exists bool) error {
 
 	tctx := service.GetTxContext(tx, mdb).(*tcontext)
@@ -251,6 +316,7 @@ func (mdb *database) DropTable(ses engine.Session, tx engine.Transaction, tblnam
 	return nil
 }
 
+// XXX: ???
 func (mdb *database) ListTables(ses engine.Session, tx engine.Transaction) ([]engine.TableEntry,
 	error) {
 
@@ -361,14 +427,6 @@ func (mdb *database) Rollback(tx interface{}) error {
 func (mdb *database) NextStmt(tx interface{}) {
 	tctx := tx.(*tcontext)
 	tctx.cid += 1
-}
-
-func (mdb *database) CanClose(drop bool) bool {
-	return true
-}
-
-func (mdb *database) Close(drop bool) error {
-	return nil // XXX: don't return until all transactions are done
 }
 
 func (mt *table) Columns(ses engine.Session) []sql.Identifier {

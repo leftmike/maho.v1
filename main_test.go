@@ -18,14 +18,13 @@ func TestMain(t *testing.T) {
 		r string
 	}{
 		{"select * from system.db$tables order by [table]",
-			`            table      type
-            -----      ----
- 1       'config' 'virtual'
- 2   'db$columns' 'virtual'
- 3    'db$tables' 'virtual'
- 4  'identifiers' 'virtual'
- 5 'transactions' 'virtual'
-(5 rows)
+			`           table      type
+           -----      ----
+ 1      'config' 'virtual'
+ 2  'db$columns' 'virtual'
+ 3   'db$tables' 'virtual'
+ 4 'identifiers' 'virtual'
+(4 rows)
 `},
 	}
 

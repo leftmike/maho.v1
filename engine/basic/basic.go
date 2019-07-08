@@ -6,22 +6,25 @@ import (
 	"sync"
 
 	"github.com/leftmike/maho/engine"
-	"github.com/leftmike/maho/engine/service"
+	"github.com/leftmike/maho/engine/virtual"
 	"github.com/leftmike/maho/sql"
 )
 
-var mutex sync.RWMutex
-
-type basicEngine struct{}
+type basicEngine struct {
+	mutex     sync.RWMutex
+	databases map[sql.Identifier]*database
+}
 
 type transaction struct{}
 
 type database struct {
+	be     *basicEngine
 	name   sql.Identifier
 	tables map[sql.Identifier]*table
 }
 
 type table struct {
+	be          *basicEngine
 	name        string
 	columns     []sql.Identifier
 	columnTypes []sql.ColumnType
@@ -29,6 +32,7 @@ type table struct {
 }
 
 type rows struct {
+	be      *basicEngine
 	name    string
 	columns []sql.Identifier
 	rows    [][]sql.Value
@@ -37,34 +41,102 @@ type rows struct {
 }
 
 func NewEngine(dataDir string) engine.Engine {
-	return &basicEngine{}
+	be := &basicEngine{
+		databases: map[sql.Identifier]*database{},
+	}
+	ve := virtual.NewEngine(be)
+	return ve
 }
 
-func (_ *basicEngine) AttachDatabase(name sql.Identifier, options engine.Options) (engine.Database,
-	error) {
-
-	return nil, fmt.Errorf("basic: attach database not supported")
+func (_ *basicEngine) CreateSystemTable(tblname sql.Identifier, maker engine.MakeVirtual) {
+	panic("memrows: use virtual engine with memrows engine")
 }
 
-func (_ *basicEngine) CreateDatabase(name sql.Identifier, options engine.Options) (engine.Database,
-	error) {
+func (_ *basicEngine) CreateInfoTable(tblname sql.Identifier, maker engine.MakeVirtual) {
+	panic("memrows: use virtual engine with memrows engine")
+}
 
-	return &database{
+func (_ *basicEngine) AttachDatabase(name sql.Identifier, options engine.Options) error {
+	return fmt.Errorf("basic: attach database not supported")
+}
+
+func (be *basicEngine) CreateDatabase(name sql.Identifier, options engine.Options) error {
+	be.mutex.Lock()
+	defer be.mutex.Unlock()
+
+	if _, ok := be.databases[name]; ok {
+		return fmt.Errorf("basic: database %s already exists", name)
+	}
+	be.databases[name] = &database{
+		be:     be,
 		name:   name,
 		tables: map[sql.Identifier]*table{},
-	}, nil
+	}
+	return nil
+}
+
+func (be *basicEngine) DetachDatabase(name sql.Identifier, options engine.Options) error {
+	return fmt.Errorf("basic: detach database not supported")
+}
+
+func (be *basicEngine) DropDatabase(name sql.Identifier, exists bool,
+	options engine.Options) error {
+
+	be.mutex.Lock()
+	defer be.mutex.Unlock()
+
+	_, ok := be.databases[name]
+	if !ok {
+		if exists {
+			return nil
+		}
+		return fmt.Errorf("basic: database %s does not exist", name)
+	}
+	delete(be.databases, name)
+	return nil
+}
+
+func (be *basicEngine) LookupTable(ses engine.Session, tx engine.Transaction,
+	dbname, tblname sql.Identifier) (engine.Table, error) {
+
+	be.mutex.RLock()
+	defer be.mutex.RUnlock()
+
+	bdb, ok := be.databases[dbname]
+	if !ok {
+		return nil, fmt.Errorf("basic: database %s not found", dbname)
+	}
+	return bdb.lookupTable(ses, tx, tblname)
+}
+
+func (be *basicEngine) CreateTable(ses engine.Session, tx engine.Transaction,
+	dbname, tblname sql.Identifier, cols []sql.Identifier, colTypes []sql.ColumnType) error {
+
+	be.mutex.Lock()
+	defer be.mutex.Unlock()
+
+	bdb, ok := be.databases[dbname]
+	if !ok {
+		return fmt.Errorf("basic: database %s not found", dbname)
+	}
+	return bdb.createTable(ses, tx, tblname, cols, colTypes)
+}
+
+func (be *basicEngine) DropTable(ses engine.Session, tx engine.Transaction,
+	dbname, tblname sql.Identifier, exists bool) error {
+
+	be.mutex.Lock()
+	defer be.mutex.Unlock()
+
+	bdb, ok := be.databases[dbname]
+	if !ok {
+		return fmt.Errorf("basic: database %s not found", dbname)
+	}
+	return bdb.dropTable(ses, tx, tblname, exists)
 }
 
 func (_ *basicEngine) Begin(sid uint64) engine.Transaction {
 	return &transaction{}
-}
-
-func (_ *basicEngine) Locks() []service.Lock {
-	return nil
-}
-
-func (_ *basicEngine) Transactions() []engine.TransactionState {
-	return nil
 }
 
 func (_ *transaction) Commit(ses engine.Session) error {
@@ -81,11 +153,8 @@ func (bdb *database) Message() string {
 	return ""
 }
 
-func (bdb *database) LookupTable(ses engine.Session, tx engine.Transaction,
+func (bdb *database) lookupTable(ses engine.Session, tx engine.Transaction,
 	tblname sql.Identifier) (engine.Table, error) {
-
-	mutex.RLock()
-	defer mutex.RUnlock()
 
 	tbl, ok := bdb.tables[tblname]
 	if !ok {
@@ -94,17 +163,15 @@ func (bdb *database) LookupTable(ses engine.Session, tx engine.Transaction,
 	return tbl, nil
 }
 
-func (bdb *database) CreateTable(ses engine.Session, tx engine.Transaction, tblname sql.Identifier,
+func (bdb *database) createTable(ses engine.Session, tx engine.Transaction, tblname sql.Identifier,
 	cols []sql.Identifier, colTypes []sql.ColumnType) error {
-
-	mutex.Lock()
-	defer mutex.Unlock()
 
 	if _, dup := bdb.tables[tblname]; dup {
 		return fmt.Errorf("basic: table %s.%s already exists", bdb.name, tblname)
 	}
 
 	bdb.tables[tblname] = &table{
+		be:          bdb.be,
 		name:        fmt.Sprintf("%s.%s", bdb.name, tblname),
 		columns:     cols,
 		columnTypes: colTypes,
@@ -113,11 +180,8 @@ func (bdb *database) CreateTable(ses engine.Session, tx engine.Transaction, tbln
 	return nil
 }
 
-func (bdb *database) DropTable(ses engine.Session, tx engine.Transaction, tblname sql.Identifier,
+func (bdb *database) dropTable(ses engine.Session, tx engine.Transaction, tblname sql.Identifier,
 	exists bool) error {
-
-	mutex.Lock()
-	defer mutex.Unlock()
 
 	if _, ok := bdb.tables[tblname]; !ok {
 		if exists {
@@ -129,11 +193,12 @@ func (bdb *database) DropTable(ses engine.Session, tx engine.Transaction, tblnam
 	return nil
 }
 
-func (bdb *database) ListTables(ses engine.Session, tx engine.Transaction) ([]engine.TableEntry,
+// XXX: ???
+func (bdb *database) listTables(ses engine.Session, tx engine.Transaction) ([]engine.TableEntry,
 	error) {
 
-	mutex.RLock()
-	defer mutex.RUnlock()
+	bdb.be.mutex.RLock()
+	defer bdb.be.mutex.RUnlock()
 
 	var tbls []engine.TableEntry
 	for name, _ := range bdb.tables {
@@ -145,14 +210,6 @@ func (bdb *database) ListTables(ses engine.Session, tx engine.Transaction) ([]en
 	return tbls, nil
 }
 
-func (bdb *database) CanClose(drop bool) bool {
-	return true
-}
-
-func (bdb *database) Close(drop bool) error {
-	return nil
-}
-
 func (bt *table) Columns(ses engine.Session) []sql.Identifier {
 	return bt.columns
 }
@@ -162,15 +219,15 @@ func (bt *table) ColumnTypes(ses engine.Session) []sql.ColumnType {
 }
 
 func (bt *table) Rows(ses engine.Session) (engine.Rows, error) {
-	mutex.RLock()
-	defer mutex.RUnlock()
+	bt.be.mutex.RLock()
+	defer bt.be.mutex.RUnlock()
 
-	return &rows{name: bt.name, columns: bt.columns, rows: bt.rows}, nil
+	return &rows{be: bt.be, name: bt.name, columns: bt.columns, rows: bt.rows}, nil
 }
 
 func (bt *table) Insert(ses engine.Session, row []sql.Value) error {
-	mutex.Lock()
-	defer mutex.Unlock()
+	bt.be.mutex.Lock()
+	defer bt.be.mutex.Unlock()
 
 	bt.rows = append(bt.rows, row)
 	return nil
@@ -187,8 +244,8 @@ func (br *rows) Close() error {
 }
 
 func (br *rows) Next(ses engine.Session, dest []sql.Value) error {
-	mutex.RLock()
-	defer mutex.RUnlock()
+	br.be.mutex.RLock()
+	defer br.be.mutex.RUnlock()
 
 	for br.index < len(br.rows) {
 		if br.rows[br.index] != nil {
@@ -205,8 +262,8 @@ func (br *rows) Next(ses engine.Session, dest []sql.Value) error {
 }
 
 func (br *rows) Delete(ses engine.Session) error {
-	mutex.Lock()
-	defer mutex.Unlock()
+	br.be.mutex.Lock()
+	defer br.be.mutex.Unlock()
 
 	if !br.haveRow {
 		return fmt.Errorf("basic: table %s no row to delete", br.name)
@@ -217,8 +274,8 @@ func (br *rows) Delete(ses engine.Session) error {
 }
 
 func (br *rows) Update(ses engine.Session, updates []sql.ColumnUpdate) error {
-	mutex.Lock()
-	defer mutex.Unlock()
+	br.be.mutex.Lock()
+	defer br.be.mutex.Unlock()
 
 	if !br.haveRow {
 		return fmt.Errorf("basic: table %s no row to update", br.name)

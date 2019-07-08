@@ -275,7 +275,7 @@ func TestService1(t *testing.T) {
 	}
 
 	var svc service.LockService
-	svc.Init()
+	svc.Init(nil)
 	for _, ts := range steps {
 		ts.step(t, &svc)
 	}
@@ -302,7 +302,7 @@ func TestService2(t *testing.T) {
 	}
 
 	var svc service.LockService
-	svc.Init()
+	svc.Init(nil)
 	for _, ts := range steps {
 		ts.step(t, &svc)
 	}
@@ -334,7 +334,7 @@ func TestService3(t *testing.T) {
 	}
 
 	var svc service.LockService
-	svc.Init()
+	svc.Init(nil)
 	for _, ts := range steps {
 		ts.step(t, &svc)
 	}
@@ -370,7 +370,7 @@ func TestService4(t *testing.T) {
 	}
 
 	var svc service.LockService
-	svc.Init()
+	svc.Init(nil)
 	for _, ts := range steps {
 		ts.step(t, &svc)
 	}
@@ -398,7 +398,7 @@ func TestService5(t *testing.T) {
 	}
 
 	var svc service.LockService
-	svc.Init()
+	svc.Init(nil)
 	for _, ts := range steps {
 		ts.step(t, &svc)
 	}
@@ -433,7 +433,7 @@ func TestService6(t *testing.T) {
 	}
 
 	var svc service.LockService
-	svc.Init()
+	svc.Init(nil)
 	for _, ts := range steps {
 		ts.step(t, &svc)
 	}

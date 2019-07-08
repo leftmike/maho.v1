@@ -5,6 +5,7 @@ import (
 	"sync"
 
 	"github.com/leftmike/maho/engine"
+	"github.com/leftmike/maho/engine/virtual"
 	"github.com/leftmike/maho/sql"
 )
 
@@ -30,9 +31,12 @@ type Database interface {
 	NextStmt(tctx interface{})
 }
 
-func (ts *TransactionService) Init() {
+func (ts *TransactionService) Init(e engine.Engine) {
 	ts.transactions = map[*Transaction]struct{}{}
-	ts.lockService.Init()
+	ts.lockService.Init(e)
+	if e != nil {
+		e.CreateSystemTable(sql.ID("transactions"), ts.makeTransactionsTable)
+	}
 }
 
 func (ts *TransactionService) removeTransaction(tx *Transaction) {
@@ -57,14 +61,6 @@ func (ts *TransactionService) Begin(sid uint64) *Transaction {
 	}
 	ts.transactions[tx] = struct{}{}
 	return tx
-}
-
-func (ts *TransactionService) Transactions() []engine.TransactionState {
-	return nil // XXX
-}
-
-func (ts *TransactionService) Locks() []Lock {
-	return ts.lockService.Locks()
 }
 
 func (tx *Transaction) LockerState() *LockerState {
@@ -138,4 +134,24 @@ func (tx *Transaction) getContext(d Database) interface{} {
 
 func GetTxContext(tx engine.Transaction, d Database) interface{} {
 	return tx.(*Transaction).getContext(d)
+}
+
+func (ts *TransactionService) makeTransactionsTable(ses engine.Session, tx engine.Transaction,
+	d engine.Database, dbname, tblname sql.Identifier) (engine.Table, error) {
+
+	ts.mutex.Lock()
+	defer ts.mutex.Unlock()
+
+	values := [][]sql.Value{}
+
+	for tx := range ts.transactions {
+		values = append(values, []sql.Value{
+			sql.StringValue(fmt.Sprintf("transaction-%d", tx.tid)),
+			sql.StringValue(fmt.Sprintf("session-%d", tx.sid)),
+		})
+	}
+
+	return virtual.MakeTable(fmt.Sprintf("%s.%s", dbname, tblname),
+		[]sql.Identifier{sql.ID("transaction"), sql.ID("session")},
+		[]sql.ColumnType{sql.StringColType, sql.StringColType}, values), nil
 }

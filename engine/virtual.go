@@ -1,5 +1,6 @@
 package engine
 
+/*
 import (
 	"fmt"
 	"io"
@@ -7,9 +8,6 @@ import (
 	"github.com/leftmike/maho/config"
 	"github.com/leftmike/maho/sql"
 )
-
-type MakeVirtual func(ses Session, tx Transaction, d Database, dbname,
-	tblname sql.Identifier) (Table, error)
 
 type TableMap map[sql.Identifier]MakeVirtual
 
@@ -33,7 +31,7 @@ func (m *Manager) CreateSystemTable(tblname sql.Identifier, maker MakeVirtual) {
 	m.systemTables[tblname] = maker
 }
 
-func (m *Manager) CreateVirtualDatabase(name sql.Identifier, tables TableMap) {
+func (m *Manager) createVirtualDatabase(name sql.Identifier, tables TableMap) {
 	m.mutex.Lock()
 	defer m.mutex.Unlock()
 
@@ -275,7 +273,6 @@ func (m *Manager) makeColumnsVirtual(ses Session, tx Transaction, d Database, db
 	}, nil
 }
 
-/*
 func (m *Manager) makeDatabasesVirtual(ses Session, tx Transaction, d Database, dbname,
 	tblname sql.Identifier) (Table, error) {
 
@@ -310,7 +307,6 @@ func (m *Manager) makeDatabasesVirtual(ses Session, tx Transaction, d Database, 
 		Values: values,
 	}, nil
 }
-*/
 
 func makeIdentifiersVirtual(ses Session, tx Transaction, d Database, dbname,
 	tblname sql.Identifier) (Table, error) {
@@ -355,54 +351,4 @@ func makeConfigVirtual(ses Session, tx Transaction, d Database, dbname,
 		Values:   values,
 	}, nil
 }
-
-/*
-func (m *Manager) makeLocksVirtual(ses Session, tx Transaction, d Database, dbname,
-	tblname sql.Identifier) (Table, error) {
-
-	values := [][]sql.Value{}
-
-	for _, lk := range m.engine.Locks() {
-		var place sql.Value
-		if lk.Place > 0 {
-			place = sql.Int64Value(lk.Place)
-		}
-		values = append(values, []sql.Value{
-			sql.StringValue(lk.Key),
-			sql.StringValue(lk.Locker),
-			sql.StringValue(lk.Level.String()),
-			sql.BoolValue(lk.Place == 0),
-			place,
-		})
-	}
-
-	return &VirtualTable{
-		Name: fmt.Sprintf("%s.%s", dbname, tblname),
-		Cols: []sql.Identifier{sql.ID("key"), sql.ID("locker"), sql.ID("level"),
-			sql.ID("held"), sql.ID("place")},
-		ColTypes: []sql.ColumnType{sql.IdColType, sql.IdColType, sql.IdColType, sql.BoolColType,
-			sql.NullInt64ColType},
-		Values: values,
-	}, nil
-}
 */
-
-func (m *Manager) makeTransactionsVirtual(ses Session, tx Transaction, d Database, dbname,
-	tblname sql.Identifier) (Table, error) {
-
-	values := [][]sql.Value{}
-
-	for _, tx := range m.engine.Transactions() {
-		values = append(values, []sql.Value{
-			sql.StringValue(fmt.Sprintf("transaction-%d", tx.tid)),
-			sql.StringValue(fmt.Sprintf("session-%d", tx.sid)),
-		})
-	}
-
-	return &VirtualTable{
-		Name:     fmt.Sprintf("%s.%s", dbname, tblname),
-		Cols:     []sql.Identifier{sql.ID("transaction"), sql.ID("session")},
-		ColTypes: []sql.ColumnType{sql.StringColType, sql.StringColType},
-		Values:   values,
-	}, nil
-}

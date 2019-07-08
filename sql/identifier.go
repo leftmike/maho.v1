@@ -27,6 +27,7 @@ const (
 	PRECISION
 	REAL
 	SMALLINT
+	SYSTEM
 	TEXT
 	VARBINARY
 	VARCHAR
@@ -148,6 +149,7 @@ var knownKeywords = map[string]struct {
 	"SET":         {SET, true},
 	"SMALLINT":    {SMALLINT, false},
 	"START":       {START, true},
+	"SYSTEM":      {SYSTEM, false},
 	"TABLE":       {TABLE, true},
 	"TEXT":        {TEXT, false},
 	"TO":          {TO, true},

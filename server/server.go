@@ -8,6 +8,7 @@ import (
 	"sync"
 
 	"github.com/leftmike/maho/engine"
+	"github.com/leftmike/maho/engine/virtual"
 	"github.com/leftmike/maho/evaluate"
 	"github.com/leftmike/maho/sql"
 )
@@ -136,12 +137,9 @@ func (svr *Server) makeSessionsVirtual(ses engine.Session, tx engine.Transaction
 		})
 	}
 
-	return &engine.VirtualTable{
-		Name: fmt.Sprintf("%s.%s", dbname, tblname),
-		Cols: []sql.Identifier{sql.ID("session"), sql.ID("user"), sql.ID("type"), sql.ID("address"),
+	return virtual.MakeTable(fmt.Sprintf("%s.%s", dbname, tblname),
+		[]sql.Identifier{sql.ID("session"), sql.ID("user"), sql.ID("type"), sql.ID("address"),
 			sql.ID("interactive")},
-		ColTypes: []sql.ColumnType{sql.StringColType, sql.IdColType, sql.IdColType,
-			sql.NullStringColType, sql.BoolColType},
-		Values: values,
-	}, nil
+		[]sql.ColumnType{sql.StringColType, sql.IdColType, sql.IdColType,
+			sql.NullStringColType, sql.BoolColType}, values), nil
 }
