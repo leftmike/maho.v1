@@ -30,18 +30,8 @@ func (te *testEngine) CreateInfoTable(tblname sql.Identifier, maker engine.MakeV
 	te.t.Error("CreateInfoTable should never be called")
 }
 
-func (te *testEngine) AttachDatabase(name sql.Identifier, options engine.Options) error {
-	te.t.Error("AttachDatabase should never be called")
-	return nil
-}
-
 func (te *testEngine) CreateDatabase(name sql.Identifier, options engine.Options) error {
 	te.t.Error("CreateDatabase should never be called")
-	return nil
-}
-
-func (te *testEngine) DetachDatabase(name sql.Identifier, options engine.Options) error {
-	te.t.Error("DetachDatabase should never be called")
 	return nil
 }
 

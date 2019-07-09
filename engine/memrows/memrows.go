@@ -88,10 +88,6 @@ func (_ *memrowsEngine) CreateInfoTable(tblname sql.Identifier, maker engine.Mak
 	panic("memrows: use virtual engine with memrows engine")
 }
 
-func (me *memrowsEngine) AttachDatabase(name sql.Identifier, options engine.Options) error {
-	return fmt.Errorf("memrows: attach database not supported")
-}
-
 func (me *memrowsEngine) CreateDatabase(name sql.Identifier, options engine.Options) error {
 	me.mutex.Lock()
 	defer me.mutex.Unlock()
@@ -104,10 +100,6 @@ func (me *memrowsEngine) CreateDatabase(name sql.Identifier, options engine.Opti
 		tables: map[sql.Identifier]*tableImpl{},
 	}
 	return nil
-}
-
-func (me *memrowsEngine) DetachDatabase(name sql.Identifier, options engine.Options) error {
-	return fmt.Errorf("memrows: detach database not supported")
 }
 
 func (me *memrowsEngine) DropDatabase(name sql.Identifier, exists bool,

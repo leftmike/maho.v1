@@ -244,10 +244,6 @@ func (p *parser) parseStmt() evaluate.Stmt {
 		sql.UPDATE,
 		sql.VALUES,
 	) {
-	case sql.ATTACH:
-		// ATTACH DATABASE ...
-		p.expectReserved(sql.DATABASE)
-		return p.parseAttachDatabase()
 	case sql.BEGIN:
 		// BEGIN
 		return &misc.Begin{}
@@ -267,10 +263,6 @@ func (p *parser) parseStmt() evaluate.Stmt {
 		// DELETE FROM ...
 		p.expectReserved(sql.FROM)
 		return p.parseDelete()
-	case sql.DETACH:
-		// DETACH DATABASE ...
-		p.expectReserved(sql.DATABASE)
-		return p.parseDetachDatabase()
 	case sql.DROP:
 		switch p.expectReserved(sql.DATABASE, sql.TABLE) {
 		case sql.DATABASE:
@@ -1034,17 +1026,6 @@ func (p *parser) parseOptions() map[sql.Identifier]string {
 	return options
 }
 
-func (p *parser) parseAttachDatabase() evaluate.Stmt {
-	// ATTACH DATABASE database [ [ WITH ] [ PATH [ '=' ] path ] ]
-	var s datadef.AttachDatabase
-
-	s.Database = p.expectIdentifier("expected a database")
-	if p.optionalReserved(sql.WITH) {
-		s.Options = p.parseOptions()
-	}
-	return &s
-}
-
 func (p *parser) parseCreateDatabase() evaluate.Stmt {
 	// CREATE DATABASE database
 	//     [ WITH [ PATH [ '=' ] path ] ]
@@ -1054,14 +1035,6 @@ func (p *parser) parseCreateDatabase() evaluate.Stmt {
 	if p.optionalReserved(sql.WITH) {
 		s.Options = p.parseOptions()
 	}
-	return &s
-}
-
-func (p *parser) parseDetachDatabase() evaluate.Stmt {
-	// DETACH DATABASE database
-	var s datadef.DetachDatabase
-
-	s.Database = p.expectIdentifier("expected a database")
 	return &s
 }
 

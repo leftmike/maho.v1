@@ -20,9 +20,7 @@ type MakeVirtual func(ctx context.Context, tx Transaction, dbname, tblname sql.I
 type Engine interface {
 	CreateSystemTable(tblname sql.Identifier, maker MakeVirtual)
 	CreateInfoTable(tblname sql.Identifier, maker MakeVirtual)
-	AttachDatabase(name sql.Identifier, options Options) error
 	CreateDatabase(name sql.Identifier, options Options) error
-	DetachDatabase(name sql.Identifier, options Options) error
 	DropDatabase(name sql.Identifier, exists bool, options Options) error
 	LookupTable(ctx context.Context, tx Transaction, dbname, tblname sql.Identifier) (Table, error)
 	CreateTable(ctx context.Context, tx Transaction, dbname, tblname sql.Identifier,

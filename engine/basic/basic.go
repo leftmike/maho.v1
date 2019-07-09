@@ -57,10 +57,6 @@ func (_ *basicEngine) CreateInfoTable(tblname sql.Identifier, maker engine.MakeV
 	panic("memrows: use virtual engine with memrows engine")
 }
 
-func (_ *basicEngine) AttachDatabase(name sql.Identifier, options engine.Options) error {
-	return fmt.Errorf("basic: attach database not supported")
-}
-
 func (be *basicEngine) CreateDatabase(name sql.Identifier, options engine.Options) error {
 	be.mutex.Lock()
 	defer be.mutex.Unlock()
@@ -74,10 +70,6 @@ func (be *basicEngine) CreateDatabase(name sql.Identifier, options engine.Option
 		tables: map[sql.Identifier]*table{},
 	}
 	return nil
-}
-
-func (be *basicEngine) DetachDatabase(name sql.Identifier, options engine.Options) error {
-	return fmt.Errorf("basic: detach database not supported")
 }
 
 func (be *basicEngine) DropDatabase(name sql.Identifier, exists bool,

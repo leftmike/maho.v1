@@ -47,13 +47,6 @@ Run maho: `maho -ssh=1`. And then in another terminal, connect using ssh:
 
 ## Supported SQL
 ```
-ATTACH DATABASE database
-    [WITH
-        [PATH ['='] path]
-    ]
-```
-
-```
 BEGIN
 ```
 
@@ -93,10 +86,6 @@ CREATE TABLE [database '.'] table '(' <column> [',' ...] ')'
 
 ```
 DELETE FROM [database '.'] table [WHERE <expr>]
-```
-
-```
-DETACH DATABASE database
 ```
 
 ```

@@ -64,25 +64,11 @@ func (ve *virtualEngine) CreateInfoTable(tblname sql.Identifier, maker engine.Ma
 	ve.infoTables[tblname] = maker
 }
 
-func (ve *virtualEngine) AttachDatabase(name sql.Identifier, options engine.Options) error {
-	if name == sql.SYSTEM {
-		return fmt.Errorf("virtual: database %s already exists", name)
-	}
-	return ve.e.AttachDatabase(name, options)
-}
-
 func (ve *virtualEngine) CreateDatabase(name sql.Identifier, options engine.Options) error {
 	if name == sql.SYSTEM {
 		return fmt.Errorf("virtual: database %s already exists", name)
 	}
 	return ve.e.CreateDatabase(name, options)
-}
-
-func (ve *virtualEngine) DetachDatabase(name sql.Identifier, options engine.Options) error {
-	if name == sql.SYSTEM {
-		return fmt.Errorf("virtual: database %s may not be detached", name)
-	}
-	return ve.e.DetachDatabase(name, options)
 }
 
 func (ve *virtualEngine) DropDatabase(name sql.Identifier, exists bool,
