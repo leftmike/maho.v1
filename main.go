@@ -10,11 +10,12 @@ To Do:
 
 - fix engine tests and XXX
 
-- document SET
-
 - support schemas, including search path
 
 - add information_schema: columns, schemata, tables
+
+- combine AttachDatabase with CreateDatabase: make it an option to ATTACH = TRUE
+- combine DetachDatabase with DropDatabase: make it an option to DETACH = TRUE
 
 - Rows interface:
 -- return a chunk of rows at a time organized as a slice of values for each column

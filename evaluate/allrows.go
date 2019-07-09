@@ -20,5 +20,9 @@ func AllRows(ses *Session, rows Rows) ([][]sql.Value, error) {
 		}
 		all = append(all, dest)
 	}
+	err := rows.Close()
+	if err != nil {
+		return nil, err
+	}
 	return all, nil
 }

@@ -140,6 +140,10 @@ SELECT <select-list>
 ```
 
 ```
+SET DATABASE (TO | '=') <database>
+```
+
+```
 START TRANSACTION
 ```
 
