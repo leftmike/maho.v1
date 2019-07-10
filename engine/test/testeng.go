@@ -52,6 +52,7 @@ type cmd struct {
 }
 
 type transactionState struct {
+	tdx  int
 	tx   engine.Transaction
 	tbl  engine.Table
 	rows engine.Rows
@@ -84,6 +85,8 @@ func allRows(t *testing.T, ctx context.Context, rows engine.Rows) [][]sql.Value 
 func testTableLifecycle(t *testing.T, e engine.Engine, dbname sql.Identifier, cmds []cmd) {
 	transactions := [4]transactionState{}
 	state := &transactions[0]
+	state.tdx = 0
+
 	var ctx context.Context
 
 	for _, cmd := range cmds {
@@ -108,6 +111,7 @@ func testTableLifecycle(t *testing.T, e engine.Engine, dbname sql.Identifier, cm
 		switch cmd.cmd {
 		case cmdTransaction:
 			state = &transactions[cmd.tdx]
+			state.tdx = cmd.tdx
 		case cmdBegin:
 			if state.tx != nil {
 				panic("tx != nil: missing commit or rollback from commands")
@@ -115,7 +119,7 @@ func testTableLifecycle(t *testing.T, e engine.Engine, dbname sql.Identifier, cm
 			if cmd.needTransactions && !e.IsTransactional() {
 				return // Engine does not support transactions, so skip these tests.
 			}
-			state.tx = e.Begin(0)
+			state.tx = e.Begin(uint64(state.tdx))
 		case cmdCommit:
 			err := state.tx.Commit(ctx)
 			if cmd.fail {
@@ -835,7 +839,7 @@ func RunTableTest(t *testing.T, e engine.Engine) {
 			{cmd: cmdCommit},
 			{cmd: cmdTransaction, tdx: 0},
 			{cmd: cmdRollback},
-			/* XXX
+
 			{cmd: cmdTransaction, tdx: 0},
 			{cmd: cmdBegin},
 			{cmd: cmdLookupTable, name: sql.ID("tbl4")},
@@ -843,14 +847,14 @@ func RunTableTest(t *testing.T, e engine.Engine) {
 				updates: []sql.ColumnUpdate{{Index: 1, Value: sql.Int64Value(40)}}},
 			{cmd: cmdTransaction, tdx: 1},
 			{cmd: cmdBegin},
-			{cmd: cmdTransaction, tdx: 0},
-			{cmd: cmdCommit},
-			{cmd: cmdTransaction, tdx: 1},
 			{cmd: cmdLookupTable, name: sql.ID("tbl4")},
 			{cmd: cmdDelete, rowID: 1, fail: true},
 			{cmd: cmdUpdate, rowID: 1,
 				updates: []sql.ColumnUpdate{{Index: 1, Value: sql.Int64Value(-40)}},
 				fail:    true},
+			{cmd: cmdTransaction, tdx: 0},
+			{cmd: cmdCommit},
+			{cmd: cmdTransaction, tdx: 1},
 			{cmd: cmdCommit},
 
 			{cmd: cmdTransaction, tdx: 0},
@@ -864,7 +868,6 @@ func RunTableTest(t *testing.T, e engine.Engine) {
 			{cmd: cmdUpdate, rowID: 1,
 				updates: []sql.ColumnUpdate{{Index: 1, Value: sql.Int64Value(4000)}}},
 			{cmd: cmdCommit},
-			*/
 		})
 }
 
