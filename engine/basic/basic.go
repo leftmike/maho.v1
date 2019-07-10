@@ -132,6 +132,10 @@ func (_ *basicEngine) Begin(sid uint64) engine.Transaction {
 	return &transaction{}
 }
 
+func (_ *basicEngine) IsTransactional() bool {
+	return false
+}
+
 func (be *basicEngine) ListDatabases(ctx context.Context, tx engine.Transaction) ([]sql.Identifier,
 	error) {
 

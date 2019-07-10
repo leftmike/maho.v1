@@ -72,6 +72,10 @@ func (te *testEngine) Begin(sid uint64) engine.Transaction {
 	return &tx
 }
 
+func (_ *testEngine) IsTransactional() bool {
+	return true
+}
+
 func (ttx *testTransaction) Commit(ctx context.Context) error {
 	if !ttx.wantCommit {
 		ttx.t.Error("Commit unexpected")

@@ -138,6 +138,10 @@ func (ve *virtualEngine) Begin(sid uint64) engine.Transaction {
 	return ve.e.Begin(sid)
 }
 
+func (ve *virtualEngine) IsTransactional() bool {
+	return ve.e.IsTransactional()
+}
+
 func MakeTable(name string, cols []sql.Identifier, colTypes []sql.ColumnType,
 	values [][]sql.Value) engine.Table {
 

@@ -6,7 +6,6 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/leftmike/maho/engine"
 	"github.com/leftmike/maho/engine/basic"
 	"github.com/leftmike/maho/evaluate"
 	"github.com/leftmike/maho/parser"
@@ -34,7 +33,7 @@ func TestValuesSimple(t *testing.T) {
 	}
 
 	e := basic.NewEngine("testdata")
-	err := e.CreateDatabase(sql.ID("core_test"), engine.Options{})
+	err := e.CreateDatabase(sql.ID("core_test"), nil)
 	if err != nil {
 		// If the test is run multiple times, then the database will already exist.
 	}

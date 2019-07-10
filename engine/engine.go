@@ -28,6 +28,7 @@ type Engine interface {
 	DropTable(ctx context.Context, tx Transaction, dbname, tblname sql.Identifier,
 		exists bool) error
 	Begin(sid uint64) Transaction
+	IsTransactional() bool
 }
 
 type Rows interface {

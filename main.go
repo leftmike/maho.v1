@@ -8,8 +8,6 @@ To Do:
 
 - fuzzing: parser.Parse
 
-- fix engine tests and XXX
-
 - support schemas, including search path
 
 - add information_schema: columns, schemata, tables
@@ -218,7 +216,7 @@ func main() {
 		DefaultDatabase: sql.ID(*database),
 	}
 
-	err := e.CreateDatabase(sql.ID(*database), engine.Options{})
+	err := e.CreateDatabase(sql.ID(*database), nil)
 	if err != nil {
 		fmt.Fprintf(os.Stderr, "maho: %s: %s\n", *database, err)
 		return

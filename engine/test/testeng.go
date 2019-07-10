@@ -1,17 +1,19 @@
 package test
 
 import (
+	"context"
+	"fmt"
+	"io"
+	"reflect"
+	"sort"
+	"sync"
 	"testing"
 
 	"github.com/leftmike/maho/engine"
+	"github.com/leftmike/maho/engine/virtual"
+	"github.com/leftmike/maho/sql"
+	"github.com/leftmike/maho/testutil"
 )
-
-/*
-type session struct{}
-
-func (_ session) Context() context.Context {
-	return nil
-}
 
 var (
 	int32ColType  = sql.ColumnType{Type: sql.IntegerType, Size: 4, NotNull: true}
@@ -20,7 +22,7 @@ var (
 )
 
 const (
-	cmdSession = iota
+	cmdTransaction = iota
 	cmdBegin
 	cmdCommit
 	cmdRollback
@@ -37,7 +39,7 @@ const (
 
 type cmd struct {
 	cmd              int
-	ses              int                // Which session to use
+	tdx              int                // Which transaction to use
 	fail             bool               // The command should fail
 	needTransactions bool               // The test requires that transactions are supported
 	exists           bool               // Flag for DropTable
@@ -49,24 +51,10 @@ type cmd struct {
 	updates          []sql.ColumnUpdate // Updates to a row (rows.Update)
 }
 
-type testLocker struct {
-	lockerState fatlock.LockerState
-}
-
-func (tl *testLocker) LockerState() *fatlock.LockerState {
-	return &tl.lockerState
-}
-
-func (tl *testLocker) String() string {
-	return fmt.Sprintf("locker-%p", tl)
-}
-
-type sessionState struct {
-	ses    session
-	tctx   interface{}
-	locker fatlock.Locker
-	tbl    engine.Table
-	rows   engine.Rows
+type transactionState struct {
+	tx   engine.Transaction
+	tbl  engine.Table
+	rows engine.Rows
 }
 
 var (
@@ -74,14 +62,14 @@ var (
 	columnTypes = []sql.ColumnType{int32ColType, int64ColType, stringColType}
 )
 
-func allRows(t *testing.T, ses engine.Session, rows engine.Rows) [][]sql.Value {
+func allRows(t *testing.T, ctx context.Context, rows engine.Rows) [][]sql.Value {
 	t.Helper()
 
 	all := [][]sql.Value{}
 	l := len(rows.Columns())
 	for {
 		dest := make([]sql.Value, l)
-		err := rows.Next(ses, dest)
+		err := rows.Next(ctx, dest)
 		if err == io.EOF {
 			break
 		} else if err != nil {
@@ -93,13 +81,14 @@ func allRows(t *testing.T, ses engine.Session, rows engine.Rows) [][]sql.Value {
 	return all
 }
 
-func testTableLifecycle(t *testing.T, d engine.Database, svcs *Services, cmds []cmd) {
-	sessions := [4]sessionState{}
-	state := &sessions[0]
+func testTableLifecycle(t *testing.T, e engine.Engine, dbname sql.Identifier, cmds []cmd) {
+	transactions := [4]transactionState{}
+	state := &transactions[0]
+	var ctx context.Context
 
 	for _, cmd := range cmds {
 		switch cmd.cmd {
-		case cmdSession:
+		case cmdTransaction:
 		case cmdNextStmt:
 		case cmdRows:
 		case cmdInsert:
@@ -117,19 +106,18 @@ func testTableLifecycle(t *testing.T, d engine.Database, svcs *Services, cmds []
 		}
 
 		switch cmd.cmd {
-		case cmdSession:
-			state = &sessions[cmd.ses]
+		case cmdTransaction:
+			state = &transactions[cmd.tdx]
 		case cmdBegin:
-			if state.tctx != nil {
-				panic("tctx != nil: missing commit or rollback from commands")
+			if state.tx != nil {
+				panic("tx != nil: missing commit or rollback from commands")
 			}
-			state.locker = &testLocker{}
-			state.tctx = d.Begin(state.locker)
-			if state.tctx == nil && cmd.needTransactions {
+			if cmd.needTransactions && !e.IsTransactional() {
 				return // Engine does not support transactions, so skip these tests.
 			}
+			state.tx = e.Begin(0)
 		case cmdCommit:
-			err := d.Commit(state.ses, state.tctx)
+			err := state.tx.Commit(ctx)
 			if cmd.fail {
 				if err == nil {
 					t.Errorf("Commit() did not fail")
@@ -137,10 +125,9 @@ func testTableLifecycle(t *testing.T, d engine.Database, svcs *Services, cmds []
 			} else if err != nil {
 				t.Errorf("Commit() failed with %s", err)
 			}
-			state.tctx = nil
-			svcs.lockService.ReleaseLocks(state.locker)
+			state.tx = nil
 		case cmdRollback:
-			err := d.Rollback(state.tctx)
+			err := state.tx.Rollback()
 			if cmd.fail {
 				if err == nil {
 					t.Errorf("Rollback() did not fail")
@@ -148,13 +135,12 @@ func testTableLifecycle(t *testing.T, d engine.Database, svcs *Services, cmds []
 			} else if err != nil {
 				t.Errorf("Rollback() failed with %s", err)
 			}
-			state.tctx = nil
-			svcs.lockService.ReleaseLocks(state.locker)
+			state.tx = nil
 		case cmdNextStmt:
-			d.NextStmt(state.tctx)
+			state.tx.NextStmt()
 		case cmdLookupTable:
 			var err error
-			state.tbl, err = d.LookupTable(state.ses, state.tctx, cmd.name)
+			state.tbl, err = e.LookupTable(ctx, state.tx, dbname, cmd.name)
 			if cmd.fail {
 				if err == nil {
 					t.Errorf("LookupTable(%s) did not fail", cmd.name)
@@ -162,17 +148,17 @@ func testTableLifecycle(t *testing.T, d engine.Database, svcs *Services, cmds []
 			} else if err != nil {
 				t.Errorf("LookupTable(%s) failed with %s", cmd.name, err)
 			} else {
-				cols := state.tbl.Columns(state.ses)
+				cols := state.tbl.Columns(ctx)
 				if !reflect.DeepEqual(cols, columns) {
 					t.Errorf("tbl.Columns() got %v want %v", cols, columns)
 				}
-				colTypes := state.tbl.ColumnTypes(state.ses)
+				colTypes := state.tbl.ColumnTypes(ctx)
 				if !reflect.DeepEqual(colTypes, columnTypes) {
 					t.Errorf("tbl.ColumnTypes() got %v want %v", colTypes, columnTypes)
 				}
 			}
 		case cmdCreateTable:
-			err := d.CreateTable(state.ses, state.tctx, cmd.name, columns, columnTypes)
+			err := e.CreateTable(ctx, state.tx, dbname, cmd.name, columns, columnTypes)
 			if cmd.fail {
 				if err == nil {
 					t.Errorf("CreateTable(%s) did not fail", cmd.name)
@@ -181,7 +167,7 @@ func testTableLifecycle(t *testing.T, d engine.Database, svcs *Services, cmds []
 				t.Errorf("CreateTable(%s) failed with %s", cmd.name, err)
 			}
 		case cmdDropTable:
-			err := d.DropTable(state.ses, state.tctx, cmd.name, cmd.exists)
+			err := e.DropTable(ctx, state.tx, dbname, cmd.name, cmd.exists)
 			if cmd.fail {
 				if err == nil {
 					t.Errorf("DropTable(%s) did not fail", cmd.name)
@@ -190,13 +176,17 @@ func testTableLifecycle(t *testing.T, d engine.Database, svcs *Services, cmds []
 				t.Errorf("DropTable(%s) failed with %s", cmd.name, err)
 			}
 		case cmdListTables:
-			entries, err := d.ListTables(state.ses, state.tctx)
+			ve, ok := e.(virtual.Engine)
+			if !ok {
+				break
+			}
+			tblnames, err := ve.ListTables(ctx, state.tx, dbname)
 			if err != nil {
 				t.Errorf("ListTables() failed with %s", err)
 			} else {
 				var ret []string
-				for _, te := range entries {
-					ret = append(ret, te.Name.String())
+				for _, tblname := range tblnames {
+					ret = append(ret, tblname.String())
 				}
 				sort.Strings(ret)
 				if !reflect.DeepEqual(cmd.list, ret) {
@@ -205,11 +195,11 @@ func testTableLifecycle(t *testing.T, d engine.Database, svcs *Services, cmds []
 			}
 		case cmdRows:
 			var err error
-			state.rows, err = state.tbl.Rows(state.ses)
+			state.rows, err = state.tbl.Rows(ctx)
 			if err != nil {
 				t.Errorf("table.Rows() failed with %s", err)
 			} else {
-				vals := allRows(t, state.ses, state.rows)
+				vals := allRows(t, ctx, state.rows)
 				if vals != nil {
 					testutil.SortValues(vals)
 					if !reflect.DeepEqual(vals, cmd.values) {
@@ -218,18 +208,18 @@ func testTableLifecycle(t *testing.T, d engine.Database, svcs *Services, cmds []
 				}
 			}
 		case cmdInsert:
-			err := state.tbl.Insert(state.ses, cmd.row)
+			err := state.tbl.Insert(ctx, cmd.row)
 			if err != nil {
 				t.Errorf("table.Insert() failed with %s", err)
 			}
 		case cmdUpdate:
-			rows, err := state.tbl.Rows(state.ses)
+			rows, err := state.tbl.Rows(ctx)
 			if err != nil {
 				t.Errorf("table.Rows() failed with %s", err)
 			} else {
 				dest := make([]sql.Value, len(rows.Columns()))
 				for {
-					err = rows.Next(state.ses, dest)
+					err = rows.Next(ctx, dest)
 					if err != nil {
 						if !cmd.fail {
 							t.Errorf("rows.Next() failed with %s", err)
@@ -237,7 +227,7 @@ func testTableLifecycle(t *testing.T, d engine.Database, svcs *Services, cmds []
 						break
 					}
 					if i64, ok := dest[0].(sql.Int64Value); ok && int(i64) == cmd.rowID {
-						err = rows.Update(state.ses, cmd.updates)
+						err = rows.Update(ctx, cmd.updates)
 						if cmd.fail {
 							if err == nil {
 								t.Errorf("rows.Update() did not fail")
@@ -250,13 +240,13 @@ func testTableLifecycle(t *testing.T, d engine.Database, svcs *Services, cmds []
 				}
 			}
 		case cmdDelete:
-			rows, err := state.tbl.Rows(state.ses)
+			rows, err := state.tbl.Rows(ctx)
 			if err != nil {
 				t.Errorf("table.Rows() failed with %s", err)
 			} else {
 				dest := make([]sql.Value, len(rows.Columns()))
 				for {
-					err = rows.Next(state.ses, dest)
+					err = rows.Next(ctx, dest)
 					if err != nil {
 						if !cmd.fail {
 							t.Errorf("rows.Next() failed with %s", err)
@@ -264,7 +254,7 @@ func testTableLifecycle(t *testing.T, d engine.Database, svcs *Services, cmds []
 						break
 					}
 					if i64, ok := dest[0].(sql.Int64Value); ok && int(i64) == cmd.rowID {
-						err = rows.Delete(state.ses)
+						err = rows.Delete(ctx)
 						if cmd.fail {
 							if err == nil {
 								t.Errorf("rows.Delete() did not fail")
@@ -279,23 +269,17 @@ func testTableLifecycle(t *testing.T, d engine.Database, svcs *Services, cmds []
 		}
 	}
 }
-*/
 
 func RunDatabaseTest(t *testing.T, e engine.Engine) {
-	/* XXX
 	t.Helper()
 
-	var svcs Services
-	svcs.Init()
-	d, err := e.CreateDatabase(&svcs, sql.ID("database_test"),
-		filepath.Join("testdata", "database_test"), nil)
+	dbname := sql.ID("database_test")
+	err := e.CreateDatabase(dbname, nil)
 	if err != nil {
 		t.Fatal(err)
 	}
 
-	_ = d.Message()
-
-	testTableLifecycle(t, d, &svcs,
+	testTableLifecycle(t, e, dbname,
 		[]cmd{
 			{cmd: cmdBegin},
 			{cmd: cmdLookupTable, name: sql.ID("tbl-a"), fail: true},
@@ -352,7 +336,7 @@ func RunDatabaseTest(t *testing.T, e engine.Engine) {
 		})
 
 	for i := 0; i < 2; i++ {
-		testTableLifecycle(t, d, &svcs,
+		testTableLifecycle(t, e, dbname,
 			[]cmd{
 				{cmd: cmdBegin},
 				{cmd: cmdLookupTable, name: sql.ID("tbl1"), fail: true},
@@ -367,7 +351,7 @@ func RunDatabaseTest(t *testing.T, e engine.Engine) {
 			})
 	}
 
-	testTableLifecycle(t, d, &svcs,
+	testTableLifecycle(t, e, dbname,
 		[]cmd{
 			{cmd: cmdBegin},
 			{cmd: cmdLookupTable, name: sql.ID("tbl2"), fail: true},
@@ -376,7 +360,7 @@ func RunDatabaseTest(t *testing.T, e engine.Engine) {
 			{cmd: cmdCommit},
 		})
 
-	testTableLifecycle(t, d, &svcs,
+	testTableLifecycle(t, e, dbname,
 		[]cmd{
 			{cmd: cmdBegin},
 			{cmd: cmdLookupTable, name: sql.ID("tbl2"), fail: true},
@@ -385,7 +369,7 @@ func RunDatabaseTest(t *testing.T, e engine.Engine) {
 			{cmd: cmdCommit},
 		})
 
-	testTableLifecycle(t, d, &svcs,
+	testTableLifecycle(t, e, dbname,
 		[]cmd{
 			{cmd: cmdBegin},
 			{cmd: cmdCreateTable, name: sql.ID("tbl3")},
@@ -404,7 +388,7 @@ func RunDatabaseTest(t *testing.T, e engine.Engine) {
 		})
 
 	for i := 0; i < 2; i++ {
-		testTableLifecycle(t, d, &svcs,
+		testTableLifecycle(t, e, dbname,
 			[]cmd{
 				{cmd: cmdBegin},
 				{cmd: cmdCreateTable, name: sql.ID("tbl4")},
@@ -419,7 +403,7 @@ func RunDatabaseTest(t *testing.T, e engine.Engine) {
 			})
 	}
 
-	testTableLifecycle(t, d, &svcs,
+	testTableLifecycle(t, e, dbname,
 		[]cmd{
 			{cmd: cmdBegin, exists: true},
 			{cmd: cmdCreateTable, name: sql.ID("tbl5")},
@@ -437,7 +421,7 @@ func RunDatabaseTest(t *testing.T, e engine.Engine) {
 			{cmd: cmdCommit},
 		})
 
-	testTableLifecycle(t, d, &svcs,
+	testTableLifecycle(t, e, dbname,
 		[]cmd{
 			{cmd: cmdBegin},
 			{cmd: cmdCreateTable, name: sql.ID("tbl6")},
@@ -450,7 +434,7 @@ func RunDatabaseTest(t *testing.T, e engine.Engine) {
 			{cmd: cmdCommit},
 		})
 
-	testTableLifecycle(t, d, &svcs,
+	testTableLifecycle(t, e, dbname,
 		[]cmd{
 			{cmd: cmdBegin},
 			{cmd: cmdCreateTable, name: sql.ID("tbl7")},
@@ -459,7 +443,7 @@ func RunDatabaseTest(t *testing.T, e engine.Engine) {
 		})
 
 	for i := 0; i < 8; i++ {
-		testTableLifecycle(t, d, &svcs,
+		testTableLifecycle(t, e, dbname,
 			[]cmd{
 				{cmd: cmdBegin},
 				{cmd: cmdLookupTable, name: sql.ID("tbl7")},
@@ -471,436 +455,429 @@ func RunDatabaseTest(t *testing.T, e engine.Engine) {
 			})
 	}
 
-	testTableLifecycle(t, d, &svcs,
+	testTableLifecycle(t, e, dbname,
 		[]cmd{
 			{cmd: cmdBegin},
 			{cmd: cmdLookupTable, name: sql.ID("tbl7")},
 			{cmd: cmdCommit},
 		})
 
-	testTableLifecycle(t, d, &svcs,
+	testTableLifecycle(t, e, dbname,
 		[]cmd{
-			{cmd: cmdSession, ses: 0},
+			{cmd: cmdTransaction, tdx: 0},
 			{cmd: cmdBegin},
-			{cmd: cmdSession, ses: 1},
+			{cmd: cmdTransaction, tdx: 1},
 			{cmd: cmdBegin},
-			{cmd: cmdSession, ses: 0},
+			{cmd: cmdTransaction, tdx: 0},
 			{cmd: cmdCreateTable, name: sql.ID("tbl8")},
 			{cmd: cmdCommit},
-			{cmd: cmdSession, ses: 1},
+			{cmd: cmdTransaction, tdx: 1},
 			{cmd: cmdCreateTable, name: sql.ID("tbl8"), fail: true},
 			{cmd: cmdCommit},
 
-			{cmd: cmdSession, ses: 0},
+			{cmd: cmdTransaction, tdx: 0},
 			{cmd: cmdBegin},
-			{cmd: cmdSession, ses: 1},
+			{cmd: cmdTransaction, tdx: 1},
 			{cmd: cmdBegin},
-			{cmd: cmdSession, ses: 0},
+			{cmd: cmdTransaction, tdx: 0},
 			{cmd: cmdCreateTable, name: sql.ID("tbl8"), fail: true},
 			{cmd: cmdDropTable, name: sql.ID("tbl8")},
 			{cmd: cmdDropTable, name: sql.ID("tbl8"), fail: true},
 			{cmd: cmdCommit},
-			{cmd: cmdSession, ses: 1},
+			{cmd: cmdTransaction, tdx: 1},
 			{cmd: cmdDropTable, name: sql.ID("tbl8"), fail: true},
 			{cmd: cmdCommit},
 		})
-	*/
 }
 
 func RunTableTest(t *testing.T, e engine.Engine) {
-	/*
-		t.Helper()
-
-		var svcs Services
-		svcs.Init()
-		d, err := e.CreateDatabase(&svcs, sql.ID("table_test"),
-			filepath.Join("testdata", "table_test"), nil)
-		if err != nil {
-			t.Fatal(err)
-		}
-
-		testTableLifecycle(t, d, &svcs,
-			[]cmd{
-				{cmd: cmdBegin},
-				{cmd: cmdCreateTable, name: sql.ID("tbl1")},
-				{cmd: cmdLookupTable, name: sql.ID("tbl1")},
-				{cmd: cmdRows, values: [][]sql.Value{}},
-				{cmd: cmdCommit},
-
-				{cmd: cmdBegin},
-				{cmd: cmdLookupTable, name: sql.ID("tbl1")},
-				{cmd: cmdRows, values: [][]sql.Value{}},
-				{cmd: cmdInsert, row: []sql.Value{sql.Int64Value(1), sql.Int64Value(1),
-					sql.StringValue("first row")}},
-				{cmd: cmdInsert, row: []sql.Value{sql.Int64Value(2), sql.Int64Value(4),
-					sql.StringValue("second row")}},
-				{cmd: cmdNextStmt},
-				{cmd: cmdRows,
-					values: [][]sql.Value{
-						{sql.Int64Value(1), sql.Int64Value(1), sql.StringValue("first row")},
-						{sql.Int64Value(2), sql.Int64Value(4), sql.StringValue("second row")},
-					},
-				},
-				{cmd: cmdCommit},
-
-				{cmd: cmdBegin},
-				{cmd: cmdLookupTable, name: sql.ID("tbl1")},
-				{cmd: cmdRows,
-					values: [][]sql.Value{
-						{sql.Int64Value(1), sql.Int64Value(1), sql.StringValue("first row")},
-						{sql.Int64Value(2), sql.Int64Value(4), sql.StringValue("second row")},
-					},
-				},
-				{cmd: cmdCommit},
-
-				{cmd: cmdBegin, needTransactions: true},
-				{cmd: cmdLookupTable, name: sql.ID("tbl1")},
-				{cmd: cmdInsert, row: []sql.Value{sql.Int64Value(3), sql.Int64Value(9),
-					sql.StringValue("third row")}},
-				{cmd: cmdInsert, row: []sql.Value{sql.Int64Value(4), sql.Int64Value(16),
-					sql.StringValue("fourth row")}},
-				{cmd: cmdNextStmt},
-				{cmd: cmdRows,
-					values: [][]sql.Value{
-						{sql.Int64Value(1), sql.Int64Value(1), sql.StringValue("first row")},
-						{sql.Int64Value(2), sql.Int64Value(4), sql.StringValue("second row")},
-						{sql.Int64Value(3), sql.Int64Value(9), sql.StringValue("third row")},
-						{sql.Int64Value(4), sql.Int64Value(16), sql.StringValue("fourth row")},
-					},
-				},
-				{cmd: cmdRollback},
-
-				{cmd: cmdBegin},
-				{cmd: cmdLookupTable, name: sql.ID("tbl1")},
-				{cmd: cmdRows,
-					values: [][]sql.Value{
-						{sql.Int64Value(1), sql.Int64Value(1), sql.StringValue("first row")},
-						{sql.Int64Value(2), sql.Int64Value(4), sql.StringValue("second row")},
-					},
-				},
-				{cmd: cmdCommit},
-
-				{cmd: cmdBegin},
-				{cmd: cmdLookupTable, name: sql.ID("tbl1")},
-				{cmd: cmdInsert, row: []sql.Value{sql.Int64Value(3), sql.Int64Value(9),
-					sql.StringValue("third row")}},
-				{cmd: cmdInsert, row: []sql.Value{sql.Int64Value(4), sql.Int64Value(16),
-					sql.StringValue("fourth row")}},
-				{cmd: cmdNextStmt},
-				{cmd: cmdRows,
-					values: [][]sql.Value{
-						{sql.Int64Value(1), sql.Int64Value(1), sql.StringValue("first row")},
-						{sql.Int64Value(2), sql.Int64Value(4), sql.StringValue("second row")},
-						{sql.Int64Value(3), sql.Int64Value(9), sql.StringValue("third row")},
-						{sql.Int64Value(4), sql.Int64Value(16), sql.StringValue("fourth row")},
-					},
-				},
-				{cmd: cmdSession, ses: 1},
-				{cmd: cmdBegin},
-				{cmd: cmdLookupTable, name: sql.ID("tbl1")},
-				{cmd: cmdRows,
-					values: [][]sql.Value{
-						{sql.Int64Value(1), sql.Int64Value(1), sql.StringValue("first row")},
-						{sql.Int64Value(2), sql.Int64Value(4), sql.StringValue("second row")},
-					},
-				},
-				{cmd: cmdSession, ses: 0},
-				{cmd: cmdCommit},
-				{cmd: cmdSession, ses: 2},
-				{cmd: cmdBegin},
-				{cmd: cmdLookupTable, name: sql.ID("tbl1")},
-				{cmd: cmdRows,
-					values: [][]sql.Value{
-						{sql.Int64Value(1), sql.Int64Value(1), sql.StringValue("first row")},
-						{sql.Int64Value(2), sql.Int64Value(4), sql.StringValue("second row")},
-						{sql.Int64Value(3), sql.Int64Value(9), sql.StringValue("third row")},
-						{sql.Int64Value(4), sql.Int64Value(16), sql.StringValue("fourth row")},
-					},
-				},
-				{cmd: cmdCommit},
-				{cmd: cmdSession, ses: 1},
-				{cmd: cmdLookupTable, name: sql.ID("tbl1")},
-				{cmd: cmdRows,
-					values: [][]sql.Value{
-						{sql.Int64Value(1), sql.Int64Value(1), sql.StringValue("first row")},
-						{sql.Int64Value(2), sql.Int64Value(4), sql.StringValue("second row")},
-					},
-				},
-				{cmd: cmdCommit},
-			})
-
-		testTableLifecycle(t, d, &svcs,
-			[]cmd{
-				{cmd: cmdBegin},
-				{cmd: cmdCreateTable, name: sql.ID("tbl2")},
-				{cmd: cmdLookupTable, name: sql.ID("tbl2")},
-				{cmd: cmdInsert, row: []sql.Value{sql.Int64Value(1), sql.Int64Value(1),
-					sql.StringValue("first row")}},
-				{cmd: cmdInsert, row: []sql.Value{sql.Int64Value(2), sql.Int64Value(4),
-					sql.StringValue("second row")}},
-				{cmd: cmdInsert, row: []sql.Value{sql.Int64Value(3), sql.Int64Value(9),
-					sql.StringValue("third row")}},
-				{cmd: cmdInsert, row: []sql.Value{sql.Int64Value(4), sql.Int64Value(16),
-					sql.StringValue("fourth row")}},
-				{cmd: cmdNextStmt},
-				{cmd: cmdRows,
-					values: [][]sql.Value{
-						{sql.Int64Value(1), sql.Int64Value(1), sql.StringValue("first row")},
-						{sql.Int64Value(2), sql.Int64Value(4), sql.StringValue("second row")},
-						{sql.Int64Value(3), sql.Int64Value(9), sql.StringValue("third row")},
-						{sql.Int64Value(4), sql.Int64Value(16), sql.StringValue("fourth row")},
-					},
-				},
-				{cmd: cmdCommit},
-
-				{cmd: cmdBegin},
-				{cmd: cmdLookupTable, name: sql.ID("tbl2")},
-				{cmd: cmdDelete, rowID: 4},
-				{cmd: cmdNextStmt},
-				{cmd: cmdRows,
-					values: [][]sql.Value{
-						{sql.Int64Value(1), sql.Int64Value(1), sql.StringValue("first row")},
-						{sql.Int64Value(2), sql.Int64Value(4), sql.StringValue("second row")},
-						{sql.Int64Value(3), sql.Int64Value(9), sql.StringValue("third row")},
-					},
-				},
-				{cmd: cmdCommit},
-
-				{cmd: cmdBegin, needTransactions: true},
-				{cmd: cmdLookupTable, name: sql.ID("tbl2")},
-				{cmd: cmdDelete, rowID: 1},
-				{cmd: cmdNextStmt},
-				{cmd: cmdRows,
-					values: [][]sql.Value{
-						{sql.Int64Value(2), sql.Int64Value(4), sql.StringValue("second row")},
-						{sql.Int64Value(3), sql.Int64Value(9), sql.StringValue("third row")},
-					},
-				},
-				{cmd: cmdSession, ses: 1},
-				{cmd: cmdBegin},
-				{cmd: cmdLookupTable, name: sql.ID("tbl2")},
-				{cmd: cmdRows,
-					values: [][]sql.Value{
-						{sql.Int64Value(1), sql.Int64Value(1), sql.StringValue("first row")},
-						{sql.Int64Value(2), sql.Int64Value(4), sql.StringValue("second row")},
-						{sql.Int64Value(3), sql.Int64Value(9), sql.StringValue("third row")},
-					},
-				},
-				{cmd: cmdSession, ses: 0},
-				{cmd: cmdCommit},
-				{cmd: cmdSession, ses: 1},
-				{cmd: cmdRows,
-					values: [][]sql.Value{
-						{sql.Int64Value(1), sql.Int64Value(1), sql.StringValue("first row")},
-						{sql.Int64Value(2), sql.Int64Value(4), sql.StringValue("second row")},
-						{sql.Int64Value(3), sql.Int64Value(9), sql.StringValue("third row")},
-					},
-				},
-				{cmd: cmdCommit},
-
-				{cmd: cmdBegin},
-				{cmd: cmdLookupTable, name: sql.ID("tbl2")},
-				{cmd: cmdDelete, rowID: 2},
-				{cmd: cmdNextStmt},
-				{cmd: cmdRows,
-					values: [][]sql.Value{
-						{sql.Int64Value(3), sql.Int64Value(9), sql.StringValue("third row")},
-					},
-				},
-				{cmd: cmdRollback},
-
-				{cmd: cmdBegin},
-				{cmd: cmdLookupTable, name: sql.ID("tbl2")},
-				{cmd: cmdRows,
-					values: [][]sql.Value{
-						{sql.Int64Value(2), sql.Int64Value(4), sql.StringValue("second row")},
-						{sql.Int64Value(3), sql.Int64Value(9), sql.StringValue("third row")},
-					},
-				},
-				{cmd: cmdCommit},
-			})
-
-		testTableLifecycle(t, d, &svcs,
-			[]cmd{
-				{cmd: cmdBegin},
-				{cmd: cmdCreateTable, name: sql.ID("tbl3")},
-				{cmd: cmdLookupTable, name: sql.ID("tbl3")},
-				{cmd: cmdInsert, row: []sql.Value{sql.Int64Value(1), sql.Int64Value(1),
-					sql.StringValue("first row")}},
-				{cmd: cmdInsert, row: []sql.Value{sql.Int64Value(2), sql.Int64Value(4),
-					sql.StringValue("second row")}},
-				{cmd: cmdInsert, row: []sql.Value{sql.Int64Value(3), sql.Int64Value(9),
-					sql.StringValue("third row")}},
-				{cmd: cmdInsert, row: []sql.Value{sql.Int64Value(4), sql.Int64Value(16),
-					sql.StringValue("fourth row")}},
-				{cmd: cmdNextStmt},
-				{cmd: cmdRows,
-					values: [][]sql.Value{
-						{sql.Int64Value(1), sql.Int64Value(1), sql.StringValue("first row")},
-						{sql.Int64Value(2), sql.Int64Value(4), sql.StringValue("second row")},
-						{sql.Int64Value(3), sql.Int64Value(9), sql.StringValue("third row")},
-						{sql.Int64Value(4), sql.Int64Value(16), sql.StringValue("fourth row")},
-					},
-				},
-				{cmd: cmdCommit},
-
-				{cmd: cmdBegin},
-				{cmd: cmdLookupTable, name: sql.ID("tbl3")},
-				{cmd: cmdUpdate, rowID: 1,
-					updates: []sql.ColumnUpdate{{Index: 1, Value: sql.Int64Value(10)}}},
-				{cmd: cmdNextStmt},
-				{cmd: cmdRows,
-					values: [][]sql.Value{
-						{sql.Int64Value(1), sql.Int64Value(10), sql.StringValue("first row")},
-						{sql.Int64Value(2), sql.Int64Value(4), sql.StringValue("second row")},
-						{sql.Int64Value(3), sql.Int64Value(9), sql.StringValue("third row")},
-						{sql.Int64Value(4), sql.Int64Value(16), sql.StringValue("fourth row")},
-					},
-				},
-				{cmd: cmdCommit},
-
-				{cmd: cmdBegin, needTransactions: true},
-				{cmd: cmdLookupTable, name: sql.ID("tbl3")},
-				{cmd: cmdUpdate, rowID: 2,
-					updates: []sql.ColumnUpdate{{Index: 1, Value: sql.Int64Value(40)}}},
-				{cmd: cmdNextStmt},
-				{cmd: cmdRows,
-					values: [][]sql.Value{
-						{sql.Int64Value(1), sql.Int64Value(10), sql.StringValue("first row")},
-						{sql.Int64Value(2), sql.Int64Value(40), sql.StringValue("second row")},
-						{sql.Int64Value(3), sql.Int64Value(9), sql.StringValue("third row")},
-						{sql.Int64Value(4), sql.Int64Value(16), sql.StringValue("fourth row")},
-					},
-				},
-				{cmd: cmdRollback},
-
-				{cmd: cmdBegin},
-				{cmd: cmdLookupTable, name: sql.ID("tbl3")},
-				{cmd: cmdRows,
-					values: [][]sql.Value{
-						{sql.Int64Value(1), sql.Int64Value(10), sql.StringValue("first row")},
-						{sql.Int64Value(2), sql.Int64Value(4), sql.StringValue("second row")},
-						{sql.Int64Value(3), sql.Int64Value(9), sql.StringValue("third row")},
-						{sql.Int64Value(4), sql.Int64Value(16), sql.StringValue("fourth row")},
-					},
-				},
-				{cmd: cmdCommit},
-
-				{cmd: cmdSession, ses: 0},
-				{cmd: cmdBegin},
-				{cmd: cmdLookupTable, name: sql.ID("tbl3")},
-				{cmd: cmdUpdate, rowID: 3,
-					updates: []sql.ColumnUpdate{
-						{Index: 1, Value: sql.Int64Value(90)},
-						{Index: 2, Value: sql.StringValue("3rd row")},
-					},
-				},
-				{cmd: cmdSession, ses: 1},
-				{cmd: cmdBegin},
-				{cmd: cmdLookupTable, name: sql.ID("tbl3")},
-				{cmd: cmdRows,
-					values: [][]sql.Value{
-						{sql.Int64Value(1), sql.Int64Value(10), sql.StringValue("first row")},
-						{sql.Int64Value(2), sql.Int64Value(4), sql.StringValue("second row")},
-						{sql.Int64Value(3), sql.Int64Value(9), sql.StringValue("third row")},
-						{sql.Int64Value(4), sql.Int64Value(16), sql.StringValue("fourth row")},
-					},
-				},
-				{cmd: cmdCommit},
-				{cmd: cmdSession, ses: 0},
-				{cmd: cmdCommit},
-
-				{cmd: cmdSession, ses: 1},
-				{cmd: cmdBegin},
-				{cmd: cmdLookupTable, name: sql.ID("tbl3")},
-				{cmd: cmdRows,
-					values: [][]sql.Value{
-						{sql.Int64Value(1), sql.Int64Value(10), sql.StringValue("first row")},
-						{sql.Int64Value(2), sql.Int64Value(4), sql.StringValue("second row")},
-						{sql.Int64Value(3), sql.Int64Value(90), sql.StringValue("3rd row")},
-						{sql.Int64Value(4), sql.Int64Value(16), sql.StringValue("fourth row")},
-					},
-				},
-				{cmd: cmdCommit},
-			})
-
-		testTableLifecycle(t, d, &svcs,
-			[]cmd{
-				{cmd: cmdBegin, needTransactions: true},
-				{cmd: cmdCreateTable, name: sql.ID("tbl4")},
-				{cmd: cmdLookupTable, name: sql.ID("tbl4")},
-				{cmd: cmdInsert, row: []sql.Value{sql.Int64Value(1), sql.Int64Value(1),
-					sql.StringValue("first row")}},
-				{cmd: cmdInsert, row: []sql.Value{sql.Int64Value(2), sql.Int64Value(4),
-					sql.StringValue("second row")}},
-				{cmd: cmdNextStmt},
-				{cmd: cmdRows,
-					values: [][]sql.Value{
-						{sql.Int64Value(1), sql.Int64Value(1), sql.StringValue("first row")},
-						{sql.Int64Value(2), sql.Int64Value(4), sql.StringValue("second row")},
-					},
-				},
-				{cmd: cmdCommit},
-
-				{cmd: cmdSession, ses: 0},
-				{cmd: cmdBegin},
-				{cmd: cmdLookupTable, name: sql.ID("tbl4")},
-				{cmd: cmdDelete, rowID: 1},
-				{cmd: cmdSession, ses: 1},
-				{cmd: cmdBegin},
-				{cmd: cmdLookupTable, name: sql.ID("tbl4")},
-				{cmd: cmdDelete, rowID: 1, fail: true},
-				{cmd: cmdUpdate, rowID: 1,
-					updates: []sql.ColumnUpdate{{Index: 1, Value: sql.Int64Value(40)}}, fail: true},
-				{cmd: cmdCommit},
-				{cmd: cmdSession, ses: 0},
-				{cmd: cmdRollback},
-
-				{cmd: cmdSession, ses: 0},
-				{cmd: cmdBegin},
-				{cmd: cmdLookupTable, name: sql.ID("tbl4")},
-				{cmd: cmdUpdate, rowID: 1,
-					updates: []sql.ColumnUpdate{{Index: 1, Value: sql.Int64Value(40)}}},
-				{cmd: cmdSession, ses: 1},
-				{cmd: cmdBegin},
-				{cmd: cmdSession, ses: 0},
-				{cmd: cmdCommit},
-				{cmd: cmdSession, ses: 1},
-				{cmd: cmdLookupTable, name: sql.ID("tbl4")},
-				{cmd: cmdDelete, rowID: 1, fail: true},
-				{cmd: cmdUpdate, rowID: 1,
-					updates: []sql.ColumnUpdate{{Index: 1, Value: sql.Int64Value(-40)}},
-					fail:    true},
-				{cmd: cmdCommit},
-
-				{cmd: cmdSession, ses: 0},
-				{cmd: cmdBegin},
-				{cmd: cmdLookupTable, name: sql.ID("tbl4")},
-				{cmd: cmdUpdate, rowID: 1,
-					updates: []sql.ColumnUpdate{{Index: 1, Value: sql.Int64Value(400)}}},
-				{cmd: cmdUpdate, rowID: 1,
-					updates: []sql.ColumnUpdate{{Index: 1, Value: sql.Int64Value(-400)}}, fail: true},
-				{cmd: cmdNextStmt},
-				{cmd: cmdUpdate, rowID: 1,
-					updates: []sql.ColumnUpdate{{Index: 1, Value: sql.Int64Value(4000)}}},
-				{cmd: cmdCommit},
-			})
-	*/
-}
-
-func RunParallelTest(t *testing.T, e engine.Engine) {
-	/* XXX
 	t.Helper()
 
-	var svcs Services
-	svcs.Init()
-	d, err := e.CreateDatabase(&svcs, sql.ID("parallel_test"),
-		filepath.Join("testdata", "parallel_test"), nil)
+	dbname := sql.ID("table_test")
+	err := e.CreateDatabase(dbname, nil)
 	if err != nil {
 		t.Fatal(err)
 	}
 
-	testTableLifecycle(t, d, &svcs,
+	testTableLifecycle(t, e, dbname,
+		[]cmd{
+			{cmd: cmdBegin},
+			{cmd: cmdCreateTable, name: sql.ID("tbl1")},
+			{cmd: cmdLookupTable, name: sql.ID("tbl1")},
+			{cmd: cmdRows, values: [][]sql.Value{}},
+			{cmd: cmdCommit},
+
+			{cmd: cmdBegin},
+			{cmd: cmdLookupTable, name: sql.ID("tbl1")},
+			{cmd: cmdRows, values: [][]sql.Value{}},
+			{cmd: cmdInsert, row: []sql.Value{sql.Int64Value(1), sql.Int64Value(1),
+				sql.StringValue("first row")}},
+			{cmd: cmdInsert, row: []sql.Value{sql.Int64Value(2), sql.Int64Value(4),
+				sql.StringValue("second row")}},
+			{cmd: cmdNextStmt},
+			{cmd: cmdRows,
+				values: [][]sql.Value{
+					{sql.Int64Value(1), sql.Int64Value(1), sql.StringValue("first row")},
+					{sql.Int64Value(2), sql.Int64Value(4), sql.StringValue("second row")},
+				},
+			},
+			{cmd: cmdCommit},
+
+			{cmd: cmdBegin},
+			{cmd: cmdLookupTable, name: sql.ID("tbl1")},
+			{cmd: cmdRows,
+				values: [][]sql.Value{
+					{sql.Int64Value(1), sql.Int64Value(1), sql.StringValue("first row")},
+					{sql.Int64Value(2), sql.Int64Value(4), sql.StringValue("second row")},
+				},
+			},
+			{cmd: cmdCommit},
+
+			{cmd: cmdBegin, needTransactions: true},
+			{cmd: cmdLookupTable, name: sql.ID("tbl1")},
+			{cmd: cmdInsert, row: []sql.Value{sql.Int64Value(3), sql.Int64Value(9),
+				sql.StringValue("third row")}},
+			{cmd: cmdInsert, row: []sql.Value{sql.Int64Value(4), sql.Int64Value(16),
+				sql.StringValue("fourth row")}},
+			{cmd: cmdNextStmt},
+			{cmd: cmdRows,
+				values: [][]sql.Value{
+					{sql.Int64Value(1), sql.Int64Value(1), sql.StringValue("first row")},
+					{sql.Int64Value(2), sql.Int64Value(4), sql.StringValue("second row")},
+					{sql.Int64Value(3), sql.Int64Value(9), sql.StringValue("third row")},
+					{sql.Int64Value(4), sql.Int64Value(16), sql.StringValue("fourth row")},
+				},
+			},
+			{cmd: cmdRollback},
+
+			{cmd: cmdBegin},
+			{cmd: cmdLookupTable, name: sql.ID("tbl1")},
+			{cmd: cmdRows,
+				values: [][]sql.Value{
+					{sql.Int64Value(1), sql.Int64Value(1), sql.StringValue("first row")},
+					{sql.Int64Value(2), sql.Int64Value(4), sql.StringValue("second row")},
+				},
+			},
+			{cmd: cmdCommit},
+
+			{cmd: cmdBegin},
+			{cmd: cmdLookupTable, name: sql.ID("tbl1")},
+			{cmd: cmdInsert, row: []sql.Value{sql.Int64Value(3), sql.Int64Value(9),
+				sql.StringValue("third row")}},
+			{cmd: cmdInsert, row: []sql.Value{sql.Int64Value(4), sql.Int64Value(16),
+				sql.StringValue("fourth row")}},
+			{cmd: cmdNextStmt},
+			{cmd: cmdRows,
+				values: [][]sql.Value{
+					{sql.Int64Value(1), sql.Int64Value(1), sql.StringValue("first row")},
+					{sql.Int64Value(2), sql.Int64Value(4), sql.StringValue("second row")},
+					{sql.Int64Value(3), sql.Int64Value(9), sql.StringValue("third row")},
+					{sql.Int64Value(4), sql.Int64Value(16), sql.StringValue("fourth row")},
+				},
+			},
+			{cmd: cmdTransaction, tdx: 1},
+			{cmd: cmdBegin},
+			{cmd: cmdLookupTable, name: sql.ID("tbl1")},
+			{cmd: cmdRows,
+				values: [][]sql.Value{
+					{sql.Int64Value(1), sql.Int64Value(1), sql.StringValue("first row")},
+					{sql.Int64Value(2), sql.Int64Value(4), sql.StringValue("second row")},
+				},
+			},
+			{cmd: cmdTransaction, tdx: 0},
+			{cmd: cmdCommit},
+			{cmd: cmdTransaction, tdx: 2},
+			{cmd: cmdBegin},
+			{cmd: cmdLookupTable, name: sql.ID("tbl1")},
+			{cmd: cmdRows,
+				values: [][]sql.Value{
+					{sql.Int64Value(1), sql.Int64Value(1), sql.StringValue("first row")},
+					{sql.Int64Value(2), sql.Int64Value(4), sql.StringValue("second row")},
+					{sql.Int64Value(3), sql.Int64Value(9), sql.StringValue("third row")},
+					{sql.Int64Value(4), sql.Int64Value(16), sql.StringValue("fourth row")},
+				},
+			},
+			{cmd: cmdCommit},
+			{cmd: cmdTransaction, tdx: 1},
+			{cmd: cmdLookupTable, name: sql.ID("tbl1")},
+			{cmd: cmdRows,
+				values: [][]sql.Value{
+					{sql.Int64Value(1), sql.Int64Value(1), sql.StringValue("first row")},
+					{sql.Int64Value(2), sql.Int64Value(4), sql.StringValue("second row")},
+				},
+			},
+			{cmd: cmdCommit},
+		})
+
+	testTableLifecycle(t, e, dbname,
+		[]cmd{
+			{cmd: cmdBegin},
+			{cmd: cmdCreateTable, name: sql.ID("tbl2")},
+			{cmd: cmdLookupTable, name: sql.ID("tbl2")},
+			{cmd: cmdInsert, row: []sql.Value{sql.Int64Value(1), sql.Int64Value(1),
+				sql.StringValue("first row")}},
+			{cmd: cmdInsert, row: []sql.Value{sql.Int64Value(2), sql.Int64Value(4),
+				sql.StringValue("second row")}},
+			{cmd: cmdInsert, row: []sql.Value{sql.Int64Value(3), sql.Int64Value(9),
+				sql.StringValue("third row")}},
+			{cmd: cmdInsert, row: []sql.Value{sql.Int64Value(4), sql.Int64Value(16),
+				sql.StringValue("fourth row")}},
+			{cmd: cmdNextStmt},
+			{cmd: cmdRows,
+				values: [][]sql.Value{
+					{sql.Int64Value(1), sql.Int64Value(1), sql.StringValue("first row")},
+					{sql.Int64Value(2), sql.Int64Value(4), sql.StringValue("second row")},
+					{sql.Int64Value(3), sql.Int64Value(9), sql.StringValue("third row")},
+					{sql.Int64Value(4), sql.Int64Value(16), sql.StringValue("fourth row")},
+				},
+			},
+			{cmd: cmdCommit},
+
+			{cmd: cmdBegin},
+			{cmd: cmdLookupTable, name: sql.ID("tbl2")},
+			{cmd: cmdDelete, rowID: 4},
+			{cmd: cmdNextStmt},
+			{cmd: cmdRows,
+				values: [][]sql.Value{
+					{sql.Int64Value(1), sql.Int64Value(1), sql.StringValue("first row")},
+					{sql.Int64Value(2), sql.Int64Value(4), sql.StringValue("second row")},
+					{sql.Int64Value(3), sql.Int64Value(9), sql.StringValue("third row")},
+				},
+			},
+			{cmd: cmdCommit},
+
+			{cmd: cmdBegin, needTransactions: true},
+			{cmd: cmdLookupTable, name: sql.ID("tbl2")},
+			{cmd: cmdDelete, rowID: 1},
+			{cmd: cmdNextStmt},
+			{cmd: cmdRows,
+				values: [][]sql.Value{
+					{sql.Int64Value(2), sql.Int64Value(4), sql.StringValue("second row")},
+					{sql.Int64Value(3), sql.Int64Value(9), sql.StringValue("third row")},
+				},
+			},
+			{cmd: cmdTransaction, tdx: 1},
+			{cmd: cmdBegin},
+			{cmd: cmdLookupTable, name: sql.ID("tbl2")},
+			{cmd: cmdRows,
+				values: [][]sql.Value{
+					{sql.Int64Value(1), sql.Int64Value(1), sql.StringValue("first row")},
+					{sql.Int64Value(2), sql.Int64Value(4), sql.StringValue("second row")},
+					{sql.Int64Value(3), sql.Int64Value(9), sql.StringValue("third row")},
+				},
+			},
+			{cmd: cmdTransaction, tdx: 0},
+			{cmd: cmdCommit},
+			{cmd: cmdTransaction, tdx: 1},
+			{cmd: cmdRows,
+				values: [][]sql.Value{
+					{sql.Int64Value(1), sql.Int64Value(1), sql.StringValue("first row")},
+					{sql.Int64Value(2), sql.Int64Value(4), sql.StringValue("second row")},
+					{sql.Int64Value(3), sql.Int64Value(9), sql.StringValue("third row")},
+				},
+			},
+			{cmd: cmdCommit},
+
+			{cmd: cmdBegin},
+			{cmd: cmdLookupTable, name: sql.ID("tbl2")},
+			{cmd: cmdDelete, rowID: 2},
+			{cmd: cmdNextStmt},
+			{cmd: cmdRows,
+				values: [][]sql.Value{
+					{sql.Int64Value(3), sql.Int64Value(9), sql.StringValue("third row")},
+				},
+			},
+			{cmd: cmdRollback},
+
+			{cmd: cmdBegin},
+			{cmd: cmdLookupTable, name: sql.ID("tbl2")},
+			{cmd: cmdRows,
+				values: [][]sql.Value{
+					{sql.Int64Value(2), sql.Int64Value(4), sql.StringValue("second row")},
+					{sql.Int64Value(3), sql.Int64Value(9), sql.StringValue("third row")},
+				},
+			},
+			{cmd: cmdCommit},
+		})
+
+	testTableLifecycle(t, e, dbname,
+		[]cmd{
+			{cmd: cmdBegin},
+			{cmd: cmdCreateTable, name: sql.ID("tbl3")},
+			{cmd: cmdLookupTable, name: sql.ID("tbl3")},
+			{cmd: cmdInsert, row: []sql.Value{sql.Int64Value(1), sql.Int64Value(1),
+				sql.StringValue("first row")}},
+			{cmd: cmdInsert, row: []sql.Value{sql.Int64Value(2), sql.Int64Value(4),
+				sql.StringValue("second row")}},
+			{cmd: cmdInsert, row: []sql.Value{sql.Int64Value(3), sql.Int64Value(9),
+				sql.StringValue("third row")}},
+			{cmd: cmdInsert, row: []sql.Value{sql.Int64Value(4), sql.Int64Value(16),
+				sql.StringValue("fourth row")}},
+			{cmd: cmdNextStmt},
+			{cmd: cmdRows,
+				values: [][]sql.Value{
+					{sql.Int64Value(1), sql.Int64Value(1), sql.StringValue("first row")},
+					{sql.Int64Value(2), sql.Int64Value(4), sql.StringValue("second row")},
+					{sql.Int64Value(3), sql.Int64Value(9), sql.StringValue("third row")},
+					{sql.Int64Value(4), sql.Int64Value(16), sql.StringValue("fourth row")},
+				},
+			},
+			{cmd: cmdCommit},
+
+			{cmd: cmdBegin},
+			{cmd: cmdLookupTable, name: sql.ID("tbl3")},
+			{cmd: cmdUpdate, rowID: 1,
+				updates: []sql.ColumnUpdate{{Index: 1, Value: sql.Int64Value(10)}}},
+			{cmd: cmdNextStmt},
+			{cmd: cmdRows,
+				values: [][]sql.Value{
+					{sql.Int64Value(1), sql.Int64Value(10), sql.StringValue("first row")},
+					{sql.Int64Value(2), sql.Int64Value(4), sql.StringValue("second row")},
+					{sql.Int64Value(3), sql.Int64Value(9), sql.StringValue("third row")},
+					{sql.Int64Value(4), sql.Int64Value(16), sql.StringValue("fourth row")},
+				},
+			},
+			{cmd: cmdCommit},
+
+			{cmd: cmdBegin, needTransactions: true},
+			{cmd: cmdLookupTable, name: sql.ID("tbl3")},
+			{cmd: cmdUpdate, rowID: 2,
+				updates: []sql.ColumnUpdate{{Index: 1, Value: sql.Int64Value(40)}}},
+			{cmd: cmdNextStmt},
+			{cmd: cmdRows,
+				values: [][]sql.Value{
+					{sql.Int64Value(1), sql.Int64Value(10), sql.StringValue("first row")},
+					{sql.Int64Value(2), sql.Int64Value(40), sql.StringValue("second row")},
+					{sql.Int64Value(3), sql.Int64Value(9), sql.StringValue("third row")},
+					{sql.Int64Value(4), sql.Int64Value(16), sql.StringValue("fourth row")},
+				},
+			},
+			{cmd: cmdRollback},
+
+			{cmd: cmdBegin},
+			{cmd: cmdLookupTable, name: sql.ID("tbl3")},
+			{cmd: cmdRows,
+				values: [][]sql.Value{
+					{sql.Int64Value(1), sql.Int64Value(10), sql.StringValue("first row")},
+					{sql.Int64Value(2), sql.Int64Value(4), sql.StringValue("second row")},
+					{sql.Int64Value(3), sql.Int64Value(9), sql.StringValue("third row")},
+					{sql.Int64Value(4), sql.Int64Value(16), sql.StringValue("fourth row")},
+				},
+			},
+			{cmd: cmdCommit},
+
+			{cmd: cmdTransaction, tdx: 0},
+			{cmd: cmdBegin},
+			{cmd: cmdLookupTable, name: sql.ID("tbl3")},
+			{cmd: cmdUpdate, rowID: 3,
+				updates: []sql.ColumnUpdate{
+					{Index: 1, Value: sql.Int64Value(90)},
+					{Index: 2, Value: sql.StringValue("3rd row")},
+				},
+			},
+			{cmd: cmdTransaction, tdx: 1},
+			{cmd: cmdBegin},
+			{cmd: cmdLookupTable, name: sql.ID("tbl3")},
+			{cmd: cmdRows,
+				values: [][]sql.Value{
+					{sql.Int64Value(1), sql.Int64Value(10), sql.StringValue("first row")},
+					{sql.Int64Value(2), sql.Int64Value(4), sql.StringValue("second row")},
+					{sql.Int64Value(3), sql.Int64Value(9), sql.StringValue("third row")},
+					{sql.Int64Value(4), sql.Int64Value(16), sql.StringValue("fourth row")},
+				},
+			},
+			{cmd: cmdCommit},
+			{cmd: cmdTransaction, tdx: 0},
+			{cmd: cmdCommit},
+
+			{cmd: cmdTransaction, tdx: 1},
+			{cmd: cmdBegin},
+			{cmd: cmdLookupTable, name: sql.ID("tbl3")},
+			{cmd: cmdRows,
+				values: [][]sql.Value{
+					{sql.Int64Value(1), sql.Int64Value(10), sql.StringValue("first row")},
+					{sql.Int64Value(2), sql.Int64Value(4), sql.StringValue("second row")},
+					{sql.Int64Value(3), sql.Int64Value(90), sql.StringValue("3rd row")},
+					{sql.Int64Value(4), sql.Int64Value(16), sql.StringValue("fourth row")},
+				},
+			},
+			{cmd: cmdCommit},
+		})
+
+	testTableLifecycle(t, e, dbname,
+		[]cmd{
+			{cmd: cmdBegin, needTransactions: true},
+			{cmd: cmdCreateTable, name: sql.ID("tbl4")},
+			{cmd: cmdLookupTable, name: sql.ID("tbl4")},
+			{cmd: cmdInsert, row: []sql.Value{sql.Int64Value(1), sql.Int64Value(1),
+				sql.StringValue("first row")}},
+			{cmd: cmdInsert, row: []sql.Value{sql.Int64Value(2), sql.Int64Value(4),
+				sql.StringValue("second row")}},
+			{cmd: cmdNextStmt},
+			{cmd: cmdRows,
+				values: [][]sql.Value{
+					{sql.Int64Value(1), sql.Int64Value(1), sql.StringValue("first row")},
+					{sql.Int64Value(2), sql.Int64Value(4), sql.StringValue("second row")},
+				},
+			},
+			{cmd: cmdCommit},
+
+			{cmd: cmdTransaction, tdx: 0},
+			{cmd: cmdBegin},
+			{cmd: cmdLookupTable, name: sql.ID("tbl4")},
+			{cmd: cmdDelete, rowID: 1},
+			{cmd: cmdTransaction, tdx: 1},
+			{cmd: cmdBegin},
+			{cmd: cmdLookupTable, name: sql.ID("tbl4")},
+			{cmd: cmdDelete, rowID: 1, fail: true},
+			{cmd: cmdUpdate, rowID: 1,
+				updates: []sql.ColumnUpdate{{Index: 1, Value: sql.Int64Value(40)}}, fail: true},
+			{cmd: cmdCommit},
+			{cmd: cmdTransaction, tdx: 0},
+			{cmd: cmdRollback},
+			/* XXX
+			{cmd: cmdTransaction, tdx: 0},
+			{cmd: cmdBegin},
+			{cmd: cmdLookupTable, name: sql.ID("tbl4")},
+			{cmd: cmdUpdate, rowID: 1,
+				updates: []sql.ColumnUpdate{{Index: 1, Value: sql.Int64Value(40)}}},
+			{cmd: cmdTransaction, tdx: 1},
+			{cmd: cmdBegin},
+			{cmd: cmdTransaction, tdx: 0},
+			{cmd: cmdCommit},
+			{cmd: cmdTransaction, tdx: 1},
+			{cmd: cmdLookupTable, name: sql.ID("tbl4")},
+			{cmd: cmdDelete, rowID: 1, fail: true},
+			{cmd: cmdUpdate, rowID: 1,
+				updates: []sql.ColumnUpdate{{Index: 1, Value: sql.Int64Value(-40)}},
+				fail:    true},
+			{cmd: cmdCommit},
+
+			{cmd: cmdTransaction, tdx: 0},
+			{cmd: cmdBegin},
+			{cmd: cmdLookupTable, name: sql.ID("tbl4")},
+			{cmd: cmdUpdate, rowID: 1,
+				updates: []sql.ColumnUpdate{{Index: 1, Value: sql.Int64Value(400)}}},
+			{cmd: cmdUpdate, rowID: 1,
+				updates: []sql.ColumnUpdate{{Index: 1, Value: sql.Int64Value(-400)}}, fail: true},
+			{cmd: cmdNextStmt},
+			{cmd: cmdUpdate, rowID: 1,
+				updates: []sql.ColumnUpdate{{Index: 1, Value: sql.Int64Value(4000)}}},
+			{cmd: cmdCommit},
+			*/
+		})
+}
+
+func RunParallelTest(t *testing.T, e engine.Engine) {
+	t.Helper()
+
+	dbname := sql.ID("parallel_test")
+	err := e.CreateDatabase(sql.ID("parallel_test"), nil)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	testTableLifecycle(t, e, dbname,
 		[]cmd{
 			{cmd: cmdBegin},
 			{cmd: cmdCreateTable, name: sql.ID("tbl")},
@@ -910,11 +887,11 @@ func RunParallelTest(t *testing.T, e engine.Engine) {
 	var wg sync.WaitGroup
 	for i := 0; i < 20; i++ {
 		wg.Add(1)
-		go func(t *testing.T, d engine.Database, i, r int) {
+		go func(i, r int) {
 			defer wg.Done()
 
 			for j := 0; j < r; j++ {
-				testTableLifecycle(t, d, &svcs,
+				testTableLifecycle(t, e, dbname,
 					[]cmd{
 						{cmd: cmdBegin},
 						{cmd: cmdLookupTable, name: sql.ID("tbl")},
@@ -925,7 +902,7 @@ func RunParallelTest(t *testing.T, e engine.Engine) {
 			}
 
 			for j := 0; j < r; j++ {
-				testTableLifecycle(t, d, &svcs,
+				testTableLifecycle(t, e, dbname,
 					[]cmd{
 						{cmd: cmdBegin},
 						{cmd: cmdLookupTable, name: sql.ID("tbl")},
@@ -934,26 +911,28 @@ func RunParallelTest(t *testing.T, e engine.Engine) {
 						{cmd: cmdCommit},
 					})
 			}
-		}(t, d, i, 100)
+		}(i, 100)
 	}
 	wg.Wait()
-	*/
 }
 
-/*
-func incColumn(t *testing.T, d engine.Database, tctx interface{}, i int, name sql.Identifier) bool {
-	tbl, err := d.LookupTable(session{}, tctx, name)
+func incColumn(t *testing.T, e engine.Engine, tx engine.Transaction,
+	i int, dbname, tblname sql.Identifier) bool {
+
+	var ctx context.Context
+
+	tbl, err := e.LookupTable(ctx, tx, dbname, tblname)
 	if err != nil {
-		t.Fatalf("LookupTable(%s) failed with %s", name, err)
+		t.Fatalf("LookupTable(%s) failed with %s.%s", dbname, tblname, err)
 	}
-	rows, err := tbl.Rows(session{})
+	rows, err := tbl.Rows(ctx)
 	if err != nil {
 		t.Fatalf("table.Rows() failed with %s", err)
 	}
 
 	dest := make([]sql.Value, len(rows.Columns()))
 	for {
-		err = rows.Next(session{}, dest)
+		err = rows.Next(ctx, dest)
 		if err != nil {
 			if err != io.EOF {
 				t.Errorf("rows.Next() failed with %s", err)
@@ -962,7 +941,7 @@ func incColumn(t *testing.T, d engine.Database, tctx interface{}, i int, name sq
 		}
 		if i64, ok := dest[0].(sql.Int64Value); ok && int(i64) == i {
 			v := int(dest[1].(sql.Int64Value))
-			err = rows.Update(session{},
+			err = rows.Update(ctx,
 				[]sql.ColumnUpdate{{Index: 1, Value: sql.Int64Value(v + 1)}})
 			if err == nil {
 				return true
@@ -972,21 +951,17 @@ func incColumn(t *testing.T, d engine.Database, tctx interface{}, i int, name sq
 	}
 	return false
 }
-*/
 
 func RunStressTest(t *testing.T, e engine.Engine) {
-	/* XXX
 	t.Helper()
 
-	var svcs Services
-	svcs.Init()
-	d, err := e.CreateDatabase(&svcs, sql.ID("stress_test"),
-		filepath.Join("testdata", "stress_test"), nil)
+	dbname := sql.ID("stress_test")
+	err := e.CreateDatabase(dbname, nil)
 	if err != nil {
 		t.Fatal(err)
 	}
 
-	testTableLifecycle(t, d, &svcs,
+	testTableLifecycle(t, e, dbname,
 		[]cmd{
 			{cmd: cmdBegin},
 			{cmd: cmdCreateTable, name: sql.ID("tbl")},
@@ -996,7 +971,7 @@ func RunStressTest(t *testing.T, e engine.Engine) {
 	const rcnt = 100
 
 	for i := 0; i < rcnt; i++ {
-		testTableLifecycle(t, d, &svcs,
+		testTableLifecycle(t, e, dbname,
 			[]cmd{
 				{cmd: cmdBegin},
 				{cmd: cmdLookupTable, name: sql.ID("tbl")},
@@ -1005,36 +980,35 @@ func RunStressTest(t *testing.T, e engine.Engine) {
 				{cmd: cmdCommit},
 			})
 	}
-
 	const tcnt = 20
 
 	var wg sync.WaitGroup
-	for i := 0; i < tcnt; i++ {
+	for tdx := uint64(0); tdx < tcnt; tdx++ {
 		wg.Add(1)
-		go func(t *testing.T, d engine.Database, i, r int) {
+		go func(tdx uint64, r int) {
 			defer wg.Done()
 
+			var ctx context.Context
 			name := sql.ID("tbl")
 			for i := 0; i < r; i++ {
 				updated := false
 				for !updated {
-					lkr := &testLocker{}
-					tctx := d.Begin(lkr)
-					updated = incColumn(t, d, tctx, i, name)
+					tx := e.Begin(tdx)
+					updated = incColumn(t, e, tx, i, dbname, name)
 					if updated {
-						err := d.Commit(session{}, tctx)
+						err := tx.Commit(ctx)
 						if err != nil {
 							t.Errorf("Commit() failed with %s", err)
 						}
 					} else {
-						err := d.Rollback(tctx)
+						err := tx.Rollback()
 						if err != nil {
 							t.Errorf("Rollback() failed with %s", err)
 						}
 					}
 				}
 			}
-		}(t, d, i, rcnt)
+		}(tdx, rcnt)
 	}
 	wg.Wait()
 
@@ -1044,12 +1018,11 @@ func RunStressTest(t *testing.T, e engine.Engine) {
 			sql.StringValue(fmt.Sprintf("row %d", i))})
 	}
 
-	testTableLifecycle(t, d, &svcs,
+	testTableLifecycle(t, e, dbname,
 		[]cmd{
 			{cmd: cmdBegin},
 			{cmd: cmdLookupTable, name: sql.ID("tbl")},
 			{cmd: cmdRows, values: values},
 			{cmd: cmdCommit},
 		})
-	*/
 }

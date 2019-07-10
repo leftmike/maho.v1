@@ -59,7 +59,7 @@ func testSQL(t *testing.T, typ string, dbname sql.Identifier) {
 	case "memrows":
 		e = memrows.NewEngine("testdata")
 	}
-	err := e.CreateDatabase(dbname, engine.Options{})
+	err := e.CreateDatabase(dbname, nil)
 	if err != nil {
 		// If the test is run multiple times, then the database will already exist.
 	}
