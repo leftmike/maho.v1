@@ -30,32 +30,48 @@ func (te *testEngine) CreateInfoTable(tblname sql.Identifier, maker engine.MakeV
 	te.t.Error("CreateInfoTable should never be called")
 }
 
-func (te *testEngine) CreateDatabase(name sql.Identifier, options engine.Options) error {
+func (te *testEngine) CreateDatabase(dbname sql.Identifier, options engine.Options) error {
 	te.t.Error("CreateDatabase should never be called")
 	return nil
 }
 
-func (te *testEngine) DropDatabase(name sql.Identifier, exists bool, options engine.Options) error {
+func (te *testEngine) DropDatabase(dbname sql.Identifier, ifExists bool,
+	options engine.Options) error {
+
 	te.t.Error("DropDatabase should never be called")
 	return nil
 }
 
+func (te *testEngine) CreateSchema(ctx context.Context, tx engine.Transaction,
+	sn sql.SchemaName) error {
+
+	te.t.Error("CreateSchema should never be called")
+	return nil
+}
+
+func (te *testEngine) DropSchema(ctx context.Context, tx engine.Transaction, sn sql.SchemaName,
+	ifExists bool) error {
+
+	te.t.Error("DropSchema should never be called")
+	return nil
+}
+
 func (te *testEngine) LookupTable(ctx context.Context, tx engine.Transaction,
-	dbname, tblname sql.Identifier) (engine.Table, error) {
+	tn sql.TableName) (engine.Table, error) {
 
 	te.t.Error("LookupTable should never be called")
 	return nil, nil
 }
 
-func (te *testEngine) CreateTable(ctx context.Context, tx engine.Transaction,
-	dbname, tblname sql.Identifier, cols []sql.Identifier, colTypes []sql.ColumnType) error {
+func (te *testEngine) CreateTable(ctx context.Context, tx engine.Transaction, tn sql.TableName,
+	cols []sql.Identifier, colTypes []sql.ColumnType) error {
 
 	te.t.Error("CreateTable should never be called")
 	return nil
 }
 
-func (te *testEngine) DropTable(ctx context.Context, tx engine.Transaction,
-	dbname, tblname sql.Identifier, exists bool) error {
+func (te *testEngine) DropTable(ctx context.Context, tx engine.Transaction, tn sql.TableName,
+	ifExists bool) error {
 
 	te.t.Error("DropTable should never be called")
 	return nil

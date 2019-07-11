@@ -23,3 +23,21 @@ func TestTableName(t *testing.T) {
 		}
 	}
 }
+
+func TestSchemaName(t *testing.T) {
+	cases := []struct {
+		db  sql.Identifier
+		scm sql.Identifier
+		r   string
+	}{
+		{scm: sql.ID("abc"), r: "abc"},
+		{sql.ID("abcd"), sql.ID("efghijk"), "abcd.efghijk"},
+	}
+
+	for _, c := range cases {
+		sn := sql.SchemaName{Database: c.db, Schema: c.scm}
+		if sn.String() != c.r {
+			t.Errorf("SchemaName(%s.%s).String() got %s want %s", c.db, c.scm, sn.String(), c.r)
+		}
+	}
+}

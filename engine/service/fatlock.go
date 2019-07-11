@@ -303,7 +303,7 @@ func (svc *LockService) Locks() []Lock {
 }
 
 func (svc *LockService) makeLocksTable(ctx context.Context, tx engine.Transaction,
-	dbname, tblname sql.Identifier) (engine.Table, error) {
+	tn sql.TableName) (engine.Table, error) {
 
 	values := [][]sql.Value{}
 
@@ -321,7 +321,7 @@ func (svc *LockService) makeLocksTable(ctx context.Context, tx engine.Transactio
 		})
 	}
 
-	return virtual.MakeTable(fmt.Sprintf("%s.%s", dbname, tblname),
+	return virtual.MakeTable(tn.String(),
 		[]sql.Identifier{sql.ID("key"), sql.ID("locker"), sql.ID("level"), sql.ID("held"),
 			sql.ID("place")},
 		[]sql.ColumnType{sql.IdColType, sql.IdColType, sql.IdColType, sql.BoolColType,

@@ -14,19 +14,19 @@ type Transaction interface {
 	NextStmt()
 }
 
-type MakeVirtual func(ctx context.Context, tx Transaction, dbname, tblname sql.Identifier) (Table,
-	error)
+type MakeVirtual func(ctx context.Context, tx Transaction, tn sql.TableName) (Table, error)
 
 type Engine interface {
 	CreateSystemTable(tblname sql.Identifier, maker MakeVirtual)
 	CreateInfoTable(tblname sql.Identifier, maker MakeVirtual)
-	CreateDatabase(name sql.Identifier, options Options) error
-	DropDatabase(name sql.Identifier, exists bool, options Options) error
-	LookupTable(ctx context.Context, tx Transaction, dbname, tblname sql.Identifier) (Table, error)
-	CreateTable(ctx context.Context, tx Transaction, dbname, tblname sql.Identifier,
-		cols []sql.Identifier, colTypes []sql.ColumnType) error
-	DropTable(ctx context.Context, tx Transaction, dbname, tblname sql.Identifier,
-		exists bool) error
+	CreateDatabase(dbname sql.Identifier, options Options) error
+	DropDatabase(dbname sql.Identifier, ifExists bool, options Options) error
+	CreateSchema(ctx context.Context, tx Transaction, sn sql.SchemaName) error
+	DropSchema(ctx context.Context, tx Transaction, sn sql.SchemaName, ifExists bool) error
+	LookupTable(ctx context.Context, tx Transaction, tn sql.TableName) (Table, error)
+	CreateTable(ctx context.Context, tx Transaction, tn sql.TableName, cols []sql.Identifier,
+		colTypes []sql.ColumnType) error
+	DropTable(ctx context.Context, tx Transaction, tn sql.TableName, ifExists bool) error
 	Begin(sid uint64) Transaction
 	IsTransactional() bool
 }

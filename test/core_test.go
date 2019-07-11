@@ -41,6 +41,7 @@ func TestValuesSimple(t *testing.T) {
 	ses := &evaluate.Session{
 		Engine:          e,
 		DefaultDatabase: sql.ID("core_test"),
+		DefaultSchema:   sql.PUBLIC,
 	}
 	for i, c := range cases {
 		p := parser.NewParser(strings.NewReader(c.sql), fmt.Sprintf("tests[%d]", i))

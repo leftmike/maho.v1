@@ -189,13 +189,14 @@ func TestInsert(t *testing.T) {
 	ses := &evaluate.Session{
 		Engine:          e,
 		DefaultDatabase: sql.ID("test"),
+		DefaultSchema:   sql.PUBLIC,
 	}
-	testInsert(t, e, ses, sql.ID("test"), sql.ID("t"), insertColumns1, insertColumnTypes1,
-		insertCases1)
-	testInsert(t, e, ses, sql.ID("test"), sql.ID("t2"), insertColumns2, insertColumnTypes2,
-		insertCases2)
-	testInsert(t, e, ses, sql.ID("test"), sql.ID("t3"), insertColumns3, insertColumnTypes3,
-		insertCases3)
+	testInsert(t, e, ses, sql.TableName{sql.ID("test"), sql.ID("t")}, insertColumns1,
+		insertColumnTypes1, insertCases1)
+	testInsert(t, e, ses, sql.TableName{sql.ID("test"), sql.ID("t2")}, insertColumns2,
+		insertColumnTypes2, insertCases2)
+	testInsert(t, e, ses, sql.TableName{sql.ID("test"), sql.ID("t3")}, insertColumns3,
+		insertColumnTypes3, insertCases3)
 }
 
 func statement(ses *evaluate.Session, tx engine.Transaction, s string) error {
@@ -228,12 +229,12 @@ func allRows(ses *evaluate.Session, rows engine.Rows) ([][]sql.Value, error) {
 	return all, nil
 }
 
-func testInsert(t *testing.T, e engine.Engine, ses *evaluate.Session, dbnam, nam sql.Identifier,
+func testInsert(t *testing.T, e engine.Engine, ses *evaluate.Session, tn sql.TableName,
 	cols []sql.Identifier, colTypes []sql.ColumnType, cases []insertCase) {
 
 	for _, c := range cases {
 		tx := e.Begin(0)
-		err := e.CreateTable(ses.Context(), tx, dbnam, nam, cols, colTypes)
+		err := e.CreateTable(ses.Context(), tx, tn, cols, colTypes)
 		if err != nil {
 			t.Error(err)
 			return
@@ -248,7 +249,7 @@ func testInsert(t *testing.T, e engine.Engine, ses *evaluate.Session, dbnam, nam
 			t.Errorf("Parse(\"%s\").Execute() failed with %s", c.stmt, err.Error())
 		} else {
 			var tbl engine.Table
-			tbl, err = e.LookupTable(ses.Context(), tx, dbnam, nam)
+			tbl, err = e.LookupTable(ses.Context(), tx, tn)
 			if err != nil {
 				t.Error(err)
 				continue
@@ -256,22 +257,22 @@ func testInsert(t *testing.T, e engine.Engine, ses *evaluate.Session, dbnam, nam
 			var rows engine.Rows
 			rows, err = tbl.Rows(ses.Context())
 			if err != nil {
-				t.Errorf("(%s).Rows() failed with %s", nam, err)
+				t.Errorf("(%s).Rows() failed with %s", tn, err)
 				continue
 			}
 			var all [][]sql.Value
 			all, err = allRows(ses, rows)
 			if err != nil {
-				t.Errorf("(%s).Rows().Next() failed with %s", nam, err)
+				t.Errorf("(%s).Rows().Next() failed with %s", tn, err)
 				continue
 			}
 			var trc string
 			if !testutil.DeepEqual(all, c.rows, &trc) {
-				t.Errorf("(%s).Rows() got %v want %v\n%s", nam, all, c.rows, trc)
+				t.Errorf("(%s).Rows() got %v want %v\n%s", tn, all, c.rows, trc)
 			}
 		}
 
-		err = e.DropTable(ses.Context(), tx, dbnam, nam, false)
+		err = e.DropTable(ses.Context(), tx, tn, false)
 		if err != nil {
 			t.Error(err)
 			return

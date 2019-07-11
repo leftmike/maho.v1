@@ -28,6 +28,7 @@ type memrowsEngine struct {
 type database struct {
 	mutex   sync.RWMutex
 	name    sql.Identifier
+	schemas map[sql.Identifier]struct{}
 	tables  map[sql.Identifier]*tableImpl
 	version version // current version of the database
 	nextTID tid
@@ -88,74 +89,103 @@ func (_ *memrowsEngine) CreateInfoTable(tblname sql.Identifier, maker engine.Mak
 	panic("memrows: use virtual engine with memrows engine")
 }
 
-func (me *memrowsEngine) CreateDatabase(name sql.Identifier, options engine.Options) error {
+func (me *memrowsEngine) CreateDatabase(dbname sql.Identifier, options engine.Options) error {
 	me.mutex.Lock()
 	defer me.mutex.Unlock()
 
-	if _, ok := me.databases[name]; ok {
-		return fmt.Errorf("memrows: database %s already exists", name)
+	if _, ok := me.databases[dbname]; ok {
+		return fmt.Errorf("memrows: database %s already exists", dbname)
 	}
-	me.databases[name] = &database{
-		name:   name,
+	me.databases[dbname] = &database{
+		name: dbname,
+		schemas: map[sql.Identifier]struct{}{
+			sql.PUBLIC: struct{}{},
+		},
 		tables: map[sql.Identifier]*tableImpl{},
 	}
 	return nil
 }
 
-func (me *memrowsEngine) DropDatabase(name sql.Identifier, exists bool,
+func (me *memrowsEngine) DropDatabase(dbname sql.Identifier, ifExists bool,
 	options engine.Options) error {
 
 	me.mutex.Lock()
 	defer me.mutex.Unlock()
 
-	_, ok := me.databases[name]
+	_, ok := me.databases[dbname]
 	if !ok {
-		if exists {
+		if ifExists {
 			return nil
 		}
-		return fmt.Errorf("memrows: database %s does not exist", name)
+		return fmt.Errorf("memrows: database %s does not exist", dbname)
 	}
-	delete(me.databases, name)
+	delete(me.databases, dbname)
 	return nil // XXX: don't return until all transactions are done
 }
 
+func (me *memrowsEngine) CreateSchema(ctx context.Context, tx engine.Transaction,
+	sn sql.SchemaName) error {
+
+	me.mutex.Lock()
+	defer me.mutex.Unlock()
+
+	mdb, ok := me.databases[sn.Database]
+	if !ok {
+		return fmt.Errorf("memrows: database %s not found", sn.Database)
+	}
+	return mdb.createSchema(ctx, tx, sn.Schema)
+}
+
+func (me *memrowsEngine) DropSchema(ctx context.Context, tx engine.Transaction, sn sql.SchemaName,
+	ifExists bool) error {
+
+	me.mutex.Lock()
+	defer me.mutex.Unlock()
+
+	mdb, ok := me.databases[sn.Database]
+	if !ok {
+		return fmt.Errorf("memrows: database %s not found", sn.Database)
+	}
+	return mdb.dropSchema(ctx, tx, sn.Schema, ifExists)
+}
+
 func (me *memrowsEngine) LookupTable(ctx context.Context, tx engine.Transaction,
-	dbname, tblname sql.Identifier) (engine.Table, error) {
+	tn sql.TableName) (engine.Table, error) {
 
 	me.mutex.RLock()
 	defer me.mutex.RUnlock()
 
-	mdb, ok := me.databases[dbname]
+	mdb, ok := me.databases[tn.Database]
 	if !ok {
-		return nil, fmt.Errorf("memrows: database %s not found", dbname)
+		return nil, fmt.Errorf("memrows: database %s not found", tn.Database)
 	}
-	return mdb.lookupTable(ctx, tx, tblname)
+	return mdb.lookupTable(ctx, tx, tn)
 }
 
-func (me *memrowsEngine) CreateTable(ctx context.Context, tx engine.Transaction,
-	dbname, tblname sql.Identifier, cols []sql.Identifier, colTypes []sql.ColumnType) error {
+func (me *memrowsEngine) CreateTable(ctx context.Context, tx engine.Transaction, tn sql.TableName,
+	cols []sql.Identifier, colTypes []sql.ColumnType) error {
 
 	me.mutex.Lock()
 	defer me.mutex.Unlock()
 
-	mdb, ok := me.databases[dbname]
+	mdb, ok := me.databases[tn.Database]
 	if !ok {
-		return fmt.Errorf("memrows: database %s not found", dbname)
+		return fmt.Errorf("memrows: database %s not found", tn.Database)
 	}
-	return mdb.createTable(ctx, tx, tblname, cols, colTypes)
+	return mdb.createTable(ctx, tx, tn, cols, colTypes)
 }
 
-func (me *memrowsEngine) DropTable(ctx context.Context, tx engine.Transaction,
-	dbname, tblname sql.Identifier, exists bool) error {
+func (me *memrowsEngine) DropTable(ctx context.Context, tx engine.Transaction, tn sql.TableName,
+	ifExists bool) error {
 
 	me.mutex.Lock()
 	defer me.mutex.Unlock()
 
-	mdb, ok := me.databases[dbname]
+	mdb, ok := me.databases[tn.Database]
 	if !ok {
-		return fmt.Errorf("memrows: database %s not found", dbname)
+		return fmt.Errorf("memrows: database %s not found", tn.Database)
 	}
-	return mdb.dropTable(ctx, tx, tblname, exists)
+	return mdb.dropTable(ctx, tx, tn, ifExists)
 }
 
 func (me *memrowsEngine) Begin(sid uint64) engine.Transaction {
@@ -180,14 +210,14 @@ func (me *memrowsEngine) ListDatabases(ctx context.Context,
 }
 
 func (me *memrowsEngine) ListTables(ctx context.Context, tx engine.Transaction,
-	name sql.Identifier) ([]sql.Identifier, error) {
+	dbname sql.Identifier) ([]sql.Identifier, error) {
 
 	me.mutex.RLock()
-	mdb, ok := me.databases[name]
+	mdb, ok := me.databases[dbname]
 	me.mutex.RUnlock()
 
 	if !ok {
-		return nil, fmt.Errorf("memrows: database %s not found", name)
+		return nil, fmt.Errorf("memrows: database %s not found", dbname)
 	}
 	return mdb.listTables(ctx, tx)
 }
@@ -202,86 +232,117 @@ func visibleVersion(ti *tableImpl, v version) *tableImpl {
 	return ti
 }
 
+func (mdb *database) createSchema(ctx context.Context, tx engine.Transaction,
+	scname sql.Identifier) error {
+
+	mdb.mutex.Lock()
+	defer mdb.mutex.Unlock()
+
+	if _, ok := mdb.schemas[scname]; ok {
+		return fmt.Errorf("memrows: schema %s.%s already exists", mdb.name, scname)
+	}
+	mdb.schemas[scname] = struct{}{}
+	return nil
+}
+
+func (mdb *database) dropSchema(ctx context.Context, tx engine.Transaction, scname sql.Identifier,
+	ifExists bool) error {
+
+	mdb.mutex.Lock()
+	defer mdb.mutex.Unlock()
+
+	if _, ok := mdb.schemas[scname]; !ok {
+		if ifExists {
+			return nil
+		}
+		return fmt.Errorf("memrows: schema %s.%s already exists", mdb.name, scname)
+	}
+
+	// XXX: check to make sure no tables in the schema
+	delete(mdb.schemas, scname)
+	return nil
+}
+
 func (mdb *database) lookupTable(ctx context.Context, tx engine.Transaction,
-	tblname sql.Identifier) (engine.Table, error) {
+	tn sql.TableName) (engine.Table, error) {
 
 	tctx := service.GetTxContext(tx, mdb).(*tcontext)
-	tbl, ok := tctx.tables[tblname]
+	tbl, ok := tctx.tables[tn.Table]
 	if ok {
 		if tbl.dropped && !tbl.created {
-			return nil, fmt.Errorf("memrows: table %s.%s not found", mdb.name, tblname)
+			return nil, fmt.Errorf("memrows: table %s not found", tn)
 		}
 		return tbl, nil
 	}
 
-	err := tctx.tx.LockTable(ctx, mdb.name, tblname, service.ACCESS)
+	err := tctx.tx.LockTable(ctx, tn.Database, tn.Table, service.ACCESS)
 	if err != nil {
 		return nil, err
 	}
 
 	mdb.mutex.RLock()
-	ti, _ := mdb.tables[tblname]
+	ti, _ := mdb.tables[tn.Table]
 	mdb.mutex.RUnlock()
 
 	ti = visibleVersion(ti, tctx.version)
 	if ti == nil {
-		return nil, fmt.Errorf("memrows: table %s.%s not found", mdb.name, tblname)
+		return nil, fmt.Errorf("memrows: table %s not found", tn)
 	}
 
 	tbl = &table{
 		tctx:  tctx,
 		db:    mdb,
-		name:  tblname,
+		name:  tn.Table,
 		table: ti,
 	}
-	tctx.tables[tblname] = tbl
+	tctx.tables[tn.Table] = tbl
 	return tbl, nil
 }
 
-func (mdb *database) createTable(ctx context.Context, tx engine.Transaction, tblname sql.Identifier,
+func (mdb *database) createTable(ctx context.Context, tx engine.Transaction, tn sql.TableName,
 	cols []sql.Identifier, colTypes []sql.ColumnType) error {
 
 	tctx := service.GetTxContext(tx, mdb).(*tcontext)
-	err := tctx.tx.LockTable(ctx, mdb.name, tblname, service.EXCLUSIVE)
+	err := tctx.tx.LockTable(ctx, tn.Database, tn.Table, service.EXCLUSIVE)
 	if err != nil {
 		return err
 	}
 
-	if tbl, ok := tctx.tables[tblname]; ok {
+	if tbl, ok := tctx.tables[tn.Table]; ok {
 		if tbl.dropped && !tbl.created {
 			tbl.created = true
 			tbl.table = &tableImpl{
-				name:        fmt.Sprintf("%s.%s", mdb.name, tblname),
+				name:        tn.String(),
 				columns:     cols,
 				columnTypes: colTypes,
 				rows:        nil,
 			}
 			return nil
 		}
-		return fmt.Errorf("memrows: table %s.%s already exists", mdb.name, tblname)
+		return fmt.Errorf("memrows: table %s already exists", tn)
 	}
 
 	mdb.mutex.Lock()
-	ti, ok := mdb.tables[tblname]
+	ti, ok := mdb.tables[tn.Table]
 	mdb.mutex.Unlock()
 
 	if ok {
 		if ti.createdVersion <= tctx.version && !ti.dropped {
-			return fmt.Errorf("memrows: table %s.%s already exists", mdb.name, tblname)
+			return fmt.Errorf("memrows: table %s already exists", tn)
 		} else if ti.createdVersion > tctx.version ||
 			(ti.dropped && ti.droppedVersion > tctx.version) {
 
-			return fmt.Errorf("memrows: table %s.%s conflicting change", mdb.name, tblname)
+			return fmt.Errorf("memrows: table %s conflicting change", tn)
 		}
 	}
 
-	tctx.tables[tblname] = &table{
+	tctx.tables[tn.Table] = &table{
 		tctx:    tctx,
 		db:      mdb,
-		name:    tblname,
+		name:    tn.Table,
 		created: true,
 		table: &tableImpl{
-			name:        fmt.Sprintf("%s.%s", mdb.name, tblname),
+			name:        tn.String(),
 			columns:     cols,
 			columnTypes: colTypes,
 			rows:        nil,
@@ -290,27 +351,27 @@ func (mdb *database) createTable(ctx context.Context, tx engine.Transaction, tbl
 	return nil
 }
 
-func (mdb *database) dropTable(ctx context.Context, tx engine.Transaction, tblname sql.Identifier,
-	exists bool) error {
+func (mdb *database) dropTable(ctx context.Context, tx engine.Transaction, tn sql.TableName,
+	ifExists bool) error {
 
 	tctx := service.GetTxContext(tx, mdb).(*tcontext)
-	err := tctx.tx.LockTable(ctx, mdb.name, tblname, service.EXCLUSIVE)
+	err := tctx.tx.LockTable(ctx, tn.Database, tn.Table, service.EXCLUSIVE)
 	if err != nil {
 		return err
 	}
 
-	if tbl, ok := tctx.tables[tblname]; ok {
+	if tbl, ok := tctx.tables[tn.Table]; ok {
 		if tbl.created {
 			// The table was created in this transaction so dropping the table now means that
 			// even if this transaction committed, the table will never be visible: just go
 			// ahead and discard it from the transaction context.
-			delete(tctx.tables, tblname)
+			delete(tctx.tables, tn.Table)
 			return nil
 		} else if tbl.dropped {
-			if exists {
+			if ifExists {
 				return nil
 			}
-			return fmt.Errorf("memrows: table %s.%s does not exist", mdb.name, tblname)
+			return fmt.Errorf("memrows: table %s does not exist", tn.Table)
 		}
 		tbl.dropped = true
 		tbl.table = nil
@@ -318,22 +379,22 @@ func (mdb *database) dropTable(ctx context.Context, tx engine.Transaction, tblna
 	}
 
 	mdb.mutex.Lock()
-	ti, ok := mdb.tables[tblname]
+	ti, ok := mdb.tables[tn.Table]
 	mdb.mutex.Unlock()
 
 	if !ok || (ti.dropped && ti.droppedVersion <= tctx.version) {
-		if exists {
+		if ifExists {
 			return nil
 		}
-		return fmt.Errorf("memrows: table %s.%s does not exist", mdb.name, tblname)
+		return fmt.Errorf("memrows: table %s does not exist", tn.Table)
 	} else if ti.createdVersion > tctx.version || (ti.dropped && ti.droppedVersion > tctx.version) {
-		return fmt.Errorf("memrows: table %s.%s conflicting change", mdb.name, tblname)
+		return fmt.Errorf("memrows: table %s conflicting change", tn.Table)
 	}
 
-	tctx.tables[tblname] = &table{
+	tctx.tables[tn.Table] = &table{
 		tctx:    tctx,
 		db:      mdb,
-		name:    tblname,
+		name:    tn.Table,
 		dropped: true,
 	}
 	return nil

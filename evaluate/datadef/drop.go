@@ -33,11 +33,7 @@ func (stmt *DropTable) Plan(ses *evaluate.Session, tx engine.Transaction) (inter
 
 func (stmt *DropTable) Execute(ses *evaluate.Session, tx engine.Transaction) (int64, error) {
 	for _, tbl := range stmt.Tables {
-		dbname := tbl.Database
-		if dbname == 0 {
-			dbname = ses.DefaultDatabase
-		}
-		err := ses.Engine.DropTable(ses.Context(), tx, dbname, tbl.Table, stmt.IfExists)
+		err := ses.Engine.DropTable(ses.Context(), tx, ses.ResolveTableName(tbl), stmt.IfExists)
 		if err != nil {
 			return -1, err
 		}
@@ -52,7 +48,7 @@ type DropDatabase struct {
 }
 
 func (stmt *DropDatabase) String() string {
-	s := "DETACH DATABASE "
+	s := "DROP DATABASE "
 	if stmt.IfExists {
 		s += "IF EXISTS "
 	}
@@ -74,4 +70,27 @@ func (stmt *DropDatabase) Plan(ses *evaluate.Session, tx engine.Transaction) (in
 
 func (stmt *DropDatabase) Execute(ses *evaluate.Session, tx engine.Transaction) (int64, error) {
 	return -1, ses.Engine.DropDatabase(stmt.Database, stmt.IfExists, stmt.Options)
+}
+
+type DropSchema struct {
+	IfExists bool
+	Schema   sql.SchemaName
+}
+
+func (stmt *DropSchema) String() string {
+	s := "DROP SCHEMA "
+	if stmt.IfExists {
+		s += "IF EXISTS "
+	}
+	return s + stmt.Schema.String()
+}
+
+func (stmt *DropSchema) Plan(ses *evaluate.Session, tx engine.Transaction) (interface{},
+	error) {
+
+	return stmt, nil
+}
+
+func (stmt *DropSchema) Execute(ses *evaluate.Session, tx engine.Transaction) (int64, error) {
+	return -1, ses.Engine.DropSchema(ses.Context(), tx, stmt.Schema, stmt.IfExists)
 }

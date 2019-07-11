@@ -138,7 +138,7 @@ func GetTxContext(tx engine.Transaction, d Database) interface{} {
 }
 
 func (ts *TransactionService) makeTransactionsTable(ctx context.Context, tx engine.Transaction,
-	dbname, tblname sql.Identifier) (engine.Table, error) {
+	tn sql.TableName) (engine.Table, error) {
 
 	ts.mutex.Lock()
 	defer ts.mutex.Unlock()
@@ -152,7 +152,7 @@ func (ts *TransactionService) makeTransactionsTable(ctx context.Context, tx engi
 		})
 	}
 
-	return virtual.MakeTable(fmt.Sprintf("%s.%s", dbname, tblname),
+	return virtual.MakeTable(tn.String(),
 		[]sql.Identifier{sql.ID("transaction"), sql.ID("session")},
 		[]sql.ColumnType{sql.StringColType, sql.StringColType}, values), nil
 }

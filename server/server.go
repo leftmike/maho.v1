@@ -3,7 +3,6 @@ package server
 import (
 	"context"
 	"errors"
-	"fmt"
 	"io"
 	"sync"
 
@@ -67,6 +66,7 @@ func (svr *Server) Handle(rr io.RuneReader, w io.Writer, user, typ, addr string,
 	ses := &evaluate.Session{
 		Engine:          svr.Engine,
 		DefaultDatabase: svr.DefaultDatabase,
+		DefaultSchema:   sql.PUBLIC,
 		User:            user,
 		Type:            typ,
 		Addr:            addr,
@@ -117,7 +117,7 @@ func (svr *Server) Shutdown(ctx context.Context) error {
 }
 
 func (svr *Server) makeSessionsVirtual(ctx context.Context, tx engine.Transaction,
-	dbname, tblname sql.Identifier) (engine.Table, error) {
+	tn sql.TableName) (engine.Table, error) {
 
 	svr.mutex.Lock()
 	defer svr.mutex.Unlock()
@@ -137,7 +137,7 @@ func (svr *Server) makeSessionsVirtual(ctx context.Context, tx engine.Transactio
 		})
 	}
 
-	return virtual.MakeTable(fmt.Sprintf("%s.%s", dbname, tblname),
+	return virtual.MakeTable(tn.String(),
 		[]sql.Identifier{sql.ID("session"), sql.ID("user"), sql.ID("type"), sql.ID("address"),
 			sql.ID("interactive")},
 		[]sql.ColumnType{sql.StringColType, sql.IdColType, sql.IdColType,

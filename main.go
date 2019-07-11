@@ -8,7 +8,17 @@ To Do:
 
 - fuzzing: parser.Parse
 
-- support schemas, including search path
+- switch engine to use sql.TableName
+- from.go: LookupTable in lookupRows
+- LockTable: change to sql.TableName argument
+- add LockSchema
+
+- support schemas
+- memrows: createSchema and dropSchema should be transactional
+
+- USE <database> as equivalent to SET DATABASE <database>
+- SHOW DATABASE
+- SHOW SCHEMA
 
 - add information_schema: columns, schemata, tables
 

@@ -47,10 +47,8 @@ func (er engineRows) Update(ses *evaluate.Session, updates []sql.ColumnUpdate) e
 func lookupRows(ses *evaluate.Session, tx engine.Transaction, dbname,
 	tblname sql.Identifier) (evaluate.Rows, error) {
 
-	if dbname == 0 {
-		dbname = ses.DefaultDatabase
-	}
-	tbl, err := ses.Engine.LookupTable(ses.Context(), tx, dbname, tblname)
+	tbl, err := ses.Engine.LookupTable(ses.Context(), tx,
+		ses.ResolveTableName(sql.TableName{dbname, tblname})) // XXX
 	if err != nil {
 		return nil, err
 	}

@@ -251,10 +251,13 @@ func (p *parser) parseStmt() evaluate.Stmt {
 		// COMMIT
 		return &misc.Commit{}
 	case sql.CREATE:
-		switch p.expectReserved(sql.DATABASE, sql.TABLE) {
+		switch p.expectReserved(sql.DATABASE, sql.SCHEMA, sql.TABLE) {
 		case sql.DATABASE:
 			// CREATE DATABASE ...
 			return p.parseCreateDatabase()
+		case sql.SCHEMA:
+			// CREATE SCHEMA ...
+			return p.parseCreateSchema()
 		case sql.TABLE:
 			// CREATE TABLE ...
 			return p.parseCreateTable()
@@ -264,10 +267,13 @@ func (p *parser) parseStmt() evaluate.Stmt {
 		p.expectReserved(sql.FROM)
 		return p.parseDelete()
 	case sql.DROP:
-		switch p.expectReserved(sql.DATABASE, sql.TABLE) {
+		switch p.expectReserved(sql.DATABASE, sql.SCHEMA, sql.TABLE) {
 		case sql.DATABASE:
 			// DROP DATABASE ...
 			return p.parseDropDatabase()
+		case sql.SCHEMA:
+			// DROP SCHEMA ...
+			return p.parseDropSchema()
 		case sql.TABLE:
 			// DROP TABLE ...
 			return p.parseDropTable()
@@ -298,6 +304,18 @@ func (p *parser) parseStmt() evaluate.Stmt {
 	}
 
 	return nil
+}
+
+func (p *parser) parseSchemaName() sql.SchemaName {
+	var sn sql.SchemaName
+	id := p.expectIdentifier("expected a database or a schema")
+	if p.maybeToken(token.Dot) {
+		sn.Database = id
+		sn.Schema = p.expectIdentifier("expected a schema")
+	} else {
+		sn.Schema = id
+	}
+	return sn
 }
 
 func (p *parser) parseTableName() sql.TableName {
@@ -1048,5 +1066,26 @@ func (p *parser) parseDropDatabase() evaluate.Stmt {
 	}
 
 	s.Database = p.expectIdentifier("expected a database")
+	return &s
+}
+
+func (p *parser) parseCreateSchema() evaluate.Stmt {
+	// CREATE SCHEMA [database '.'] schema
+	var s datadef.CreateSchema
+
+	s.Schema = p.parseSchemaName()
+	return &s
+}
+
+func (p *parser) parseDropSchema() evaluate.Stmt {
+	// DROP SCHEMA [IF EXISTS] [database '.'] schema
+	var s datadef.DropSchema
+
+	if p.optionalReserved(sql.IF) {
+		p.expectReserved(sql.EXISTS)
+		s.IfExists = true
+	}
+
+	s.Schema = p.parseSchemaName()
 	return &s
 }

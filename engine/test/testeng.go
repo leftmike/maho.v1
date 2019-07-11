@@ -42,7 +42,7 @@ type cmd struct {
 	tdx              int                // Which transaction to use
 	fail             bool               // The command should fail
 	needTransactions bool               // The test requires that transactions are supported
-	exists           bool               // Flag for DropTable
+	ifExists         bool               // Flag for DropTable
 	name             sql.Identifier     // Name of the table
 	list             []string           // List of table names
 	values           [][]sql.Value      // Expected rows (table.Rows)
@@ -144,7 +144,7 @@ func testTableLifecycle(t *testing.T, e engine.Engine, dbname sql.Identifier, cm
 			state.tx.NextStmt()
 		case cmdLookupTable:
 			var err error
-			state.tbl, err = e.LookupTable(ctx, state.tx, dbname, cmd.name)
+			state.tbl, err = e.LookupTable(ctx, state.tx, sql.TableName{dbname, cmd.name})
 			if cmd.fail {
 				if err == nil {
 					t.Errorf("LookupTable(%s) did not fail", cmd.name)
@@ -162,7 +162,8 @@ func testTableLifecycle(t *testing.T, e engine.Engine, dbname sql.Identifier, cm
 				}
 			}
 		case cmdCreateTable:
-			err := e.CreateTable(ctx, state.tx, dbname, cmd.name, columns, columnTypes)
+			err := e.CreateTable(ctx, state.tx, sql.TableName{dbname, cmd.name}, columns,
+				columnTypes)
 			if cmd.fail {
 				if err == nil {
 					t.Errorf("CreateTable(%s) did not fail", cmd.name)
@@ -171,7 +172,7 @@ func testTableLifecycle(t *testing.T, e engine.Engine, dbname sql.Identifier, cm
 				t.Errorf("CreateTable(%s) failed with %s", cmd.name, err)
 			}
 		case cmdDropTable:
-			err := e.DropTable(ctx, state.tx, dbname, cmd.name, cmd.exists)
+			err := e.DropTable(ctx, state.tx, sql.TableName{dbname, cmd.name}, cmd.ifExists)
 			if cmd.fail {
 				if err == nil {
 					t.Errorf("DropTable(%s) did not fail", cmd.name)
@@ -359,7 +360,7 @@ func RunDatabaseTest(t *testing.T, e engine.Engine) {
 		[]cmd{
 			{cmd: cmdBegin},
 			{cmd: cmdLookupTable, name: sql.ID("tbl2"), fail: true},
-			{cmd: cmdDropTable, name: sql.ID("tbl2"), exists: true},
+			{cmd: cmdDropTable, name: sql.ID("tbl2"), ifExists: true},
 			{cmd: cmdLookupTable, name: sql.ID("tbl2"), fail: true},
 			{cmd: cmdCommit},
 		})
@@ -409,7 +410,7 @@ func RunDatabaseTest(t *testing.T, e engine.Engine) {
 
 	testTableLifecycle(t, e, dbname,
 		[]cmd{
-			{cmd: cmdBegin, exists: true},
+			{cmd: cmdBegin},
 			{cmd: cmdCreateTable, name: sql.ID("tbl5")},
 			{cmd: cmdLookupTable, name: sql.ID("tbl5")},
 			{cmd: cmdCommit},
@@ -919,14 +920,13 @@ func RunParallelTest(t *testing.T, e engine.Engine) {
 	wg.Wait()
 }
 
-func incColumn(t *testing.T, e engine.Engine, tx engine.Transaction,
-	i int, dbname, tblname sql.Identifier) bool {
+func incColumn(t *testing.T, e engine.Engine, tx engine.Transaction, i int, tn sql.TableName) bool {
 
 	var ctx context.Context
 
-	tbl, err := e.LookupTable(ctx, tx, dbname, tblname)
+	tbl, err := e.LookupTable(ctx, tx, tn)
 	if err != nil {
-		t.Fatalf("LookupTable(%s) failed with %s.%s", dbname, tblname, err)
+		t.Fatalf("LookupTable(%s) failed with %s", tn, err)
 	}
 	rows, err := tbl.Rows(ctx)
 	if err != nil {
@@ -997,7 +997,7 @@ func RunStressTest(t *testing.T, e engine.Engine) {
 				updated := false
 				for !updated {
 					tx := e.Begin(tdx)
-					updated = incColumn(t, e, tx, i, dbname, name)
+					updated = incColumn(t, e, tx, i, sql.TableName{dbname, name})
 					if updated {
 						err := tx.Commit(ctx)
 						if err != nil {

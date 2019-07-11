@@ -24,6 +24,7 @@ func (run *Runner) RunExec(tst *sqltest.Test) error {
 		run.ses = &evaluate.Session{
 			Engine:          run.Engine,
 			DefaultDatabase: run.Database,
+			DefaultSchema:   sql.PUBLIC,
 		}
 	}
 	p := parser.NewParser(strings.NewReader(tst.Test),
@@ -62,6 +63,7 @@ func (run *Runner) RunQuery(tst *sqltest.Test) ([]string, [][]string, error) {
 		run.ses = &evaluate.Session{
 			Engine:          run.Engine,
 			DefaultDatabase: run.Database,
+			DefaultSchema:   sql.PUBLIC,
 		}
 	}
 	p := parser.NewParser(strings.NewReader(tst.Test),

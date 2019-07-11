@@ -24,6 +24,7 @@ const (
 	INT8
 	INTEGER
 	PATH
+	PUBLIC
 	PRECISION
 	REAL
 	SMALLINT
@@ -70,6 +71,7 @@ const (
 	OUTER
 	RIGHT
 	ROLLBACK
+	SCHEMA
 	SELECT
 	SET
 	START
@@ -88,6 +90,8 @@ const (
 var knownIdentifiers = map[string]Identifier{
 	"count":     COUNT,
 	"count_all": COUNT_ALL,
+	"public":    PUBLIC,
+	"system":    SYSTEM,
 }
 
 var knownKeywords = map[string]struct {
@@ -145,11 +149,11 @@ var knownKeywords = map[string]struct {
 	"REAL":        {REAL, false},
 	"RIGHT":       {RIGHT, true},
 	"ROLLBACK":    {ROLLBACK, true},
+	"SCHEMA":      {SCHEMA, true},
 	"SELECT":      {SELECT, true},
 	"SET":         {SET, true},
 	"SMALLINT":    {SMALLINT, false},
 	"START":       {START, true},
-	"SYSTEM":      {SYSTEM, false},
 	"TABLE":       {TABLE, true},
 	"TEXT":        {TEXT, false},
 	"TO":          {TO, true},

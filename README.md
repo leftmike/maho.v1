@@ -62,6 +62,10 @@ CREATE DATABASE database
 ```
 
 ```
+CREATE SCHEMA [database '.'] schema
+```
+
+```
 CREATE TABLE [database '.'] table '(' <column> [',' ...] ')'
 <column> = name <data_type> [(DEFAULT <expr>) | (NOT NULL)]
 <data_type> =
@@ -90,6 +94,10 @@ DELETE FROM [database '.'] table [WHERE <expr>]
 
 ```
 DROP DATABASE [IF EXISTS] database
+```
+
+```
+DROP SCHEMA [IF EXISTS] [database '.'] schema
 ```
 
 ```
@@ -130,6 +138,7 @@ SELECT <select-list>
 
 ```
 SET DATABASE (TO | '=') <database>
+SET SCHEMA (TO | '=') <schema>
 ```
 
 ```

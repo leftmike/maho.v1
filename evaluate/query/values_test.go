@@ -68,6 +68,7 @@ func TestValues(t *testing.T) {
 	ses := &evaluate.Session{
 		Engine:          e,
 		DefaultDatabase: sql.ID("test"),
+		DefaultSchema:   sql.PUBLIC,
 	}
 	for _, c := range cases {
 		tx := e.Begin(0)
@@ -153,6 +154,7 @@ func TestFromValues(t *testing.T) {
 	ses := &evaluate.Session{
 		Engine:          e,
 		DefaultDatabase: sql.ID("test"),
+		DefaultSchema:   sql.PUBLIC,
 	}
 	for _, c := range cases {
 		if c.from.String() != c.s {

@@ -19,9 +19,10 @@ type basicEngine struct {
 type transaction struct{}
 
 type database struct {
-	be     *basicEngine
-	name   sql.Identifier
-	tables map[sql.Identifier]*table
+	be      *basicEngine
+	name    sql.Identifier
+	schemas map[sql.Identifier]struct{}
+	tables  map[sql.Identifier]*table
 }
 
 type table struct {
@@ -57,75 +58,104 @@ func (_ *basicEngine) CreateInfoTable(tblname sql.Identifier, maker engine.MakeV
 	panic("memrows: use virtual engine with memrows engine")
 }
 
-func (be *basicEngine) CreateDatabase(name sql.Identifier, options engine.Options) error {
+func (be *basicEngine) CreateDatabase(dbname sql.Identifier, options engine.Options) error {
 	be.mutex.Lock()
 	defer be.mutex.Unlock()
 
-	if _, ok := be.databases[name]; ok {
-		return fmt.Errorf("basic: database %s already exists", name)
+	if _, ok := be.databases[dbname]; ok {
+		return fmt.Errorf("basic: database %s already exists", dbname)
 	}
-	be.databases[name] = &database{
-		be:     be,
-		name:   name,
+	be.databases[dbname] = &database{
+		be:   be,
+		name: dbname,
+		schemas: map[sql.Identifier]struct{}{
+			sql.PUBLIC: struct{}{},
+		},
 		tables: map[sql.Identifier]*table{},
 	}
 	return nil
 }
 
-func (be *basicEngine) DropDatabase(name sql.Identifier, exists bool,
+func (be *basicEngine) DropDatabase(dbname sql.Identifier, ifExists bool,
 	options engine.Options) error {
 
 	be.mutex.Lock()
 	defer be.mutex.Unlock()
 
-	_, ok := be.databases[name]
+	_, ok := be.databases[dbname]
 	if !ok {
-		if exists {
+		if ifExists {
 			return nil
 		}
-		return fmt.Errorf("basic: database %s does not exist", name)
+		return fmt.Errorf("basic: database %s does not exist", dbname)
 	}
-	delete(be.databases, name)
+	delete(be.databases, dbname)
 	return nil
 }
 
+func (be *basicEngine) CreateSchema(ctx context.Context, tx engine.Transaction,
+	sn sql.SchemaName) error {
+
+	be.mutex.Lock()
+	defer be.mutex.Unlock()
+
+	bdb, ok := be.databases[sn.Database]
+	if !ok {
+		return fmt.Errorf("basic: database %s not found", sn.Database)
+	}
+	return bdb.createSchema(sn.Schema)
+}
+
+func (be *basicEngine) DropSchema(ctx context.Context, tx engine.Transaction, sn sql.SchemaName,
+	ifExists bool) error {
+
+	be.mutex.Lock()
+	defer be.mutex.Unlock()
+
+	bdb, ok := be.databases[sn.Database]
+	if !ok {
+		return fmt.Errorf("basic: database %s not found", sn.Database)
+	}
+	return bdb.dropSchema(sn.Schema, ifExists)
+}
+
 func (be *basicEngine) LookupTable(ctx context.Context, tx engine.Transaction,
-	dbname, tblname sql.Identifier) (engine.Table, error) {
+	tn sql.TableName) (engine.Table, error) {
 
 	be.mutex.RLock()
 	defer be.mutex.RUnlock()
 
-	bdb, ok := be.databases[dbname]
+	bdb, ok := be.databases[tn.Database]
 	if !ok {
-		return nil, fmt.Errorf("basic: database %s not found", dbname)
+		return nil, fmt.Errorf("basic: database %s not found", tn.Database)
 	}
-	return bdb.lookupTable(ctx, tx, tblname)
+	return bdb.lookupTable(ctx, tx, tn)
 }
 
-func (be *basicEngine) CreateTable(ctx context.Context, tx engine.Transaction,
-	dbname, tblname sql.Identifier, cols []sql.Identifier, colTypes []sql.ColumnType) error {
+func (be *basicEngine) CreateTable(ctx context.Context, tx engine.Transaction, tn sql.TableName,
+	cols []sql.Identifier, colTypes []sql.ColumnType) error {
 
 	be.mutex.Lock()
 	defer be.mutex.Unlock()
 
-	bdb, ok := be.databases[dbname]
+	bdb, ok := be.databases[tn.Database]
 	if !ok {
-		return fmt.Errorf("basic: database %s not found", dbname)
+		return fmt.Errorf("basic: database %s not found", tn.Database)
 	}
-	return bdb.createTable(ctx, tx, tblname, cols, colTypes)
+	return bdb.createTable(ctx, tx, tn, cols, colTypes)
 }
 
-func (be *basicEngine) DropTable(ctx context.Context, tx engine.Transaction,
-	dbname, tblname sql.Identifier, exists bool) error {
+func (be *basicEngine) DropTable(ctx context.Context, tx engine.Transaction, tn sql.TableName,
+	ifExists bool) error {
 
 	be.mutex.Lock()
 	defer be.mutex.Unlock()
 
-	bdb, ok := be.databases[dbname]
+	bdb, ok := be.databases[tn.Database]
 	if !ok {
-		return fmt.Errorf("basic: database %s not found", dbname)
+		return fmt.Errorf("basic: database %s not found", tn.Database)
 	}
-	return bdb.dropTable(ctx, tx, tblname, exists)
+	return bdb.dropTable(ctx, tx, tn, ifExists)
 }
 
 func (_ *basicEngine) Begin(sid uint64) engine.Transaction {
@@ -150,14 +180,14 @@ func (be *basicEngine) ListDatabases(ctx context.Context, tx engine.Transaction)
 }
 
 func (be *basicEngine) ListTables(ctx context.Context, tx engine.Transaction,
-	name sql.Identifier) ([]sql.Identifier, error) {
+	dbname sql.Identifier) ([]sql.Identifier, error) {
 
 	be.mutex.RLock()
 	defer be.mutex.RUnlock()
 
-	bdb, ok := be.databases[name]
+	bdb, ok := be.databases[dbname]
 	if !ok {
-		return nil, fmt.Errorf("basic: database %s not found", name)
+		return nil, fmt.Errorf("basic: database %s not found", dbname)
 	}
 
 	var tblnames []sql.Identifier
@@ -177,30 +207,47 @@ func (_ *transaction) Rollback() error {
 
 func (_ *transaction) NextStmt() {}
 
-func (bdb *database) Message() string {
-	return ""
+func (bdb *database) createSchema(scname sql.Identifier) error {
+	if _, ok := bdb.schemas[scname]; ok {
+		return fmt.Errorf("basic: schema %s.%s already exists", bdb.name, scname)
+	}
+	bdb.schemas[scname] = struct{}{}
+	return nil
+}
+
+func (bdb *database) dropSchema(scname sql.Identifier, ifExists bool) error {
+	if _, ok := bdb.schemas[scname]; !ok {
+		if ifExists {
+			return nil
+		}
+		return fmt.Errorf("basic: schema %s.%s already exists", bdb.name, scname)
+	}
+
+	// XXX: check to make sure no tables in the schema
+	delete(bdb.schemas, scname)
+	return nil
 }
 
 func (bdb *database) lookupTable(ctx context.Context, tx engine.Transaction,
-	tblname sql.Identifier) (engine.Table, error) {
+	tn sql.TableName) (engine.Table, error) {
 
-	tbl, ok := bdb.tables[tblname]
+	tbl, ok := bdb.tables[tn.Table]
 	if !ok {
-		return nil, fmt.Errorf("basic: table %s.%s not found", bdb.name, tblname)
+		return nil, fmt.Errorf("basic: table %s not found", tn)
 	}
 	return tbl, nil
 }
 
-func (bdb *database) createTable(ctx context.Context, tx engine.Transaction, tblname sql.Identifier,
+func (bdb *database) createTable(ctx context.Context, tx engine.Transaction, tn sql.TableName,
 	cols []sql.Identifier, colTypes []sql.ColumnType) error {
 
-	if _, dup := bdb.tables[tblname]; dup {
-		return fmt.Errorf("basic: table %s.%s already exists", bdb.name, tblname)
+	if _, dup := bdb.tables[tn.Table]; dup {
+		return fmt.Errorf("basic: table %s already exists", tn)
 	}
 
-	bdb.tables[tblname] = &table{
+	bdb.tables[tn.Table] = &table{
 		be:          bdb.be,
-		name:        fmt.Sprintf("%s.%s", bdb.name, tblname),
+		name:        tn.String(),
 		columns:     cols,
 		columnTypes: colTypes,
 		rows:        nil,
@@ -208,16 +255,16 @@ func (bdb *database) createTable(ctx context.Context, tx engine.Transaction, tbl
 	return nil
 }
 
-func (bdb *database) dropTable(ctx context.Context, tx engine.Transaction, tblname sql.Identifier,
-	exists bool) error {
+func (bdb *database) dropTable(ctx context.Context, tx engine.Transaction, tn sql.TableName,
+	ifExists bool) error {
 
-	if _, ok := bdb.tables[tblname]; !ok {
-		if exists {
+	if _, ok := bdb.tables[tn.Table]; !ok {
+		if ifExists {
 			return nil
 		}
-		return fmt.Errorf("basic: table %s.%s does not exist", bdb.name, tblname)
+		return fmt.Errorf("basic: table %s does not exist", tn)
 	}
-	delete(bdb.tables, tblname)
+	delete(bdb.tables, tn.Table)
 	return nil
 }
 

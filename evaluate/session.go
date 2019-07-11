@@ -11,6 +11,7 @@ import (
 type Session struct {
 	Engine          engine.Engine
 	DefaultDatabase sql.Identifier
+	DefaultSchema   sql.Identifier
 	User            string
 	Type            string
 	Addr            string
@@ -80,8 +81,22 @@ func (ses *Session) Run(stmt Stmt, run func(tx engine.Transaction, stmt Stmt) er
 func (ses *Session) Set(v sql.Identifier, s string) error {
 	if v == sql.DATABASE {
 		ses.DefaultDatabase = sql.ID(s)
+	} else if v == sql.SCHEMA {
+		ses.DefaultSchema = sql.ID(s)
 	} else {
 		return fmt.Errorf("set: %s not found", v)
 	}
 	return nil
+}
+
+func (ses *Session) ResolveTableName(tn sql.TableName) sql.TableName {
+	if tn.Database == 0 {
+		tn.Database = ses.DefaultDatabase
+	}
+	/* XXX
+	if tn.Schema == 0 {
+		tn.Schema = ses.DefaultSchema
+	}
+	*/
+	return tn
 }

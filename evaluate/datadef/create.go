@@ -38,11 +38,7 @@ func (stmt *CreateTable) Plan(ses *evaluate.Session, tx engine.Transaction) (int
 }
 
 func (stmt *CreateTable) Execute(ses *evaluate.Session, tx engine.Transaction) (int64, error) {
-	dbname := stmt.Table.Database
-	if dbname == 0 {
-		dbname = ses.DefaultDatabase
-	}
-	return -1, ses.Engine.CreateTable(ses.Context(), tx, dbname, stmt.Table.Table,
+	return -1, ses.Engine.CreateTable(ses.Context(), tx, ses.ResolveTableName(stmt.Table),
 		stmt.Columns, stmt.ColumnTypes)
 }
 
@@ -70,4 +66,22 @@ func (stmt *CreateDatabase) Plan(ses *evaluate.Session, tx engine.Transaction) (
 
 func (stmt *CreateDatabase) Execute(ses *evaluate.Session, tx engine.Transaction) (int64, error) {
 	return -1, ses.Engine.CreateDatabase(stmt.Database, stmt.Options)
+}
+
+type CreateSchema struct {
+	Schema sql.SchemaName
+}
+
+func (stmt *CreateSchema) String() string {
+	return fmt.Sprintf("CREATE SCHEMA %s", stmt.Schema)
+}
+
+func (stmt *CreateSchema) Plan(ses *evaluate.Session, tx engine.Transaction) (interface{},
+	error) {
+
+	return stmt, nil
+}
+
+func (stmt *CreateSchema) Execute(ses *evaluate.Session, tx engine.Transaction) (int64, error) {
+	return -1, ses.Engine.CreateSchema(ses.Context(), tx, stmt.Schema)
 }

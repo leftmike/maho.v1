@@ -55,11 +55,7 @@ func (stmt *InsertValues) Plan(ses *evaluate.Session, tx engine.Transaction) (in
 }
 
 func (stmt *InsertValues) Execute(ses *evaluate.Session, tx engine.Transaction) (int64, error) {
-	dbname := stmt.Table.Database
-	if dbname == 0 {
-		dbname = ses.DefaultDatabase
-	}
-	tbl, err := ses.Engine.LookupTable(ses.Context(), tx, dbname, stmt.Table.Table)
+	tbl, err := ses.Engine.LookupTable(ses.Context(), tx, ses.ResolveTableName(stmt.Table))
 	if err != nil {
 		return -1, err
 	}

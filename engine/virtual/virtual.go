@@ -14,7 +14,7 @@ import (
 type Engine interface {
 	engine.Engine
 	ListDatabases(ctx context.Context, tx engine.Transaction) ([]sql.Identifier, error)
-	ListTables(ctx context.Context, tx engine.Transaction, name sql.Identifier) ([]sql.Identifier,
+	ListTables(ctx context.Context, tx engine.Transaction, dbname sql.Identifier) ([]sql.Identifier,
 		error)
 }
 
@@ -64,74 +64,86 @@ func (ve *virtualEngine) CreateInfoTable(tblname sql.Identifier, maker engine.Ma
 	ve.infoTables[tblname] = maker
 }
 
-func (ve *virtualEngine) CreateDatabase(name sql.Identifier, options engine.Options) error {
-	if name == sql.SYSTEM {
-		return fmt.Errorf("virtual: database %s already exists", name)
+func (ve *virtualEngine) CreateDatabase(dbname sql.Identifier, options engine.Options) error {
+	if dbname == sql.SYSTEM {
+		return fmt.Errorf("virtual: database %s already exists", dbname)
 	}
-	return ve.e.CreateDatabase(name, options)
+	return ve.e.CreateDatabase(dbname, options)
 }
 
-func (ve *virtualEngine) DropDatabase(name sql.Identifier, exists bool,
+func (ve *virtualEngine) DropDatabase(dbname sql.Identifier, ifExists bool,
 	options engine.Options) error {
 
-	if name == sql.SYSTEM {
-		return fmt.Errorf("virtual: database %s may not be dropped", name)
+	if dbname == sql.SYSTEM {
+		return fmt.Errorf("virtual: database %s may not be dropped", dbname)
 	}
-	return ve.e.DropDatabase(name, exists, options)
+	return ve.e.DropDatabase(dbname, ifExists, options)
+}
+
+func (ve *virtualEngine) CreateSchema(ctx context.Context, tx engine.Transaction,
+	sn sql.SchemaName) error {
+
+	return ve.e.CreateSchema(ctx, tx, sn)
+}
+
+func (ve *virtualEngine) DropSchema(ctx context.Context, tx engine.Transaction, sn sql.SchemaName,
+	ifExists bool) error {
+
+	return ve.e.DropSchema(ctx, tx, sn, ifExists)
 }
 
 func (ve *virtualEngine) LookupTable(ctx context.Context, tx engine.Transaction,
-	dbname, tblname sql.Identifier) (engine.Table, error) {
+	tn sql.TableName) (engine.Table, error) {
 
 	ve.mutex.RLock()
 	defer ve.mutex.RUnlock()
 
-	if dbname == sql.SYSTEM {
-		if maker, ok := ve.systemTables[tblname]; ok {
-			return maker(ctx, tx, dbname, tblname)
+	if tn.Database == sql.SYSTEM {
+		if maker, ok := ve.systemTables[tn.Table]; ok {
+			return maker(ctx, tx, tn)
 		}
-		if maker, ok := ve.infoTables[tblname]; ok {
-			return maker(ctx, tx, dbname, tblname)
+		if maker, ok := ve.infoTables[tn.Table]; ok {
+			return maker(ctx, tx, tn)
 		}
-		return nil, fmt.Errorf("virtual: table %s.%s not found", dbname, tblname)
+		return nil, fmt.Errorf("virtual: table %s not found", tn)
 	}
-	if maker, ok := ve.infoTables[tblname]; ok {
-		return maker(ctx, tx, dbname, tblname)
+	if maker, ok := ve.infoTables[tn.Table]; ok {
+		return maker(ctx, tx, tn)
 	}
-	return ve.e.LookupTable(ctx, tx, dbname, tblname)
+	return ve.e.LookupTable(ctx, tx, tn)
 }
 
-func (ve *virtualEngine) checkCreateDrop(dbname, tblname sql.Identifier) error {
-	if dbname == sql.SYSTEM {
-		return fmt.Errorf("virtual: database %s may not be modified", dbname)
+func (ve *virtualEngine) checkCreateDrop(tn sql.TableName) error {
+	if tn.Database == sql.SYSTEM {
+		return fmt.Errorf("virtual: database %s may not be modified", tn.Database)
 	}
 
 	ve.mutex.RLock()
 	defer ve.mutex.RUnlock()
-	if _, ok := ve.infoTables[tblname]; ok {
-		return fmt.Errorf("virtual: table %s may not be modified", tblname)
+	if _, ok := ve.infoTables[tn.Table]; ok {
+		return fmt.Errorf("virtual: table %s may not be modified", tn)
 	}
 	return nil
 }
 
-func (ve *virtualEngine) CreateTable(ctx context.Context, tx engine.Transaction,
-	dbname, tblname sql.Identifier, cols []sql.Identifier, colTypes []sql.ColumnType) error {
+func (ve *virtualEngine) CreateTable(ctx context.Context, tx engine.Transaction, tn sql.TableName,
+	cols []sql.Identifier, colTypes []sql.ColumnType) error {
 
-	err := ve.checkCreateDrop(dbname, tblname)
+	err := ve.checkCreateDrop(tn)
 	if err != nil {
 		return err
 	}
-	return ve.e.CreateTable(ctx, tx, dbname, tblname, cols, colTypes)
+	return ve.e.CreateTable(ctx, tx, tn, cols, colTypes)
 }
 
-func (ve *virtualEngine) DropTable(ctx context.Context, tx engine.Transaction,
-	dbname, tblname sql.Identifier, exists bool) error {
+func (ve *virtualEngine) DropTable(ctx context.Context, tx engine.Transaction, tn sql.TableName,
+	ifExists bool) error {
 
-	err := ve.checkCreateDrop(dbname, tblname)
+	err := ve.checkCreateDrop(tn)
 	if err != nil {
 		return err
 	}
-	return ve.e.DropTable(ctx, tx, dbname, tblname, exists)
+	return ve.e.DropTable(ctx, tx, tn, ifExists)
 }
 
 func (ve *virtualEngine) Begin(sid uint64) engine.Transaction {
@@ -214,14 +226,14 @@ func (vr *virtualRows) Update(ctx context.Context, updates []sql.ColumnUpdate) e
 }
 
 func (ve *virtualEngine) makeTablesTable(ctx context.Context, tx engine.Transaction,
-	dbname, tblname sql.Identifier) (engine.Table, error) {
+	tn sql.TableName) (engine.Table, error) {
 
 	ve.mutex.RLock()
 	defer ve.mutex.RUnlock()
 
 	values := [][]sql.Value{}
 
-	if dbname == sql.SYSTEM {
+	if tn.Database == sql.SYSTEM {
 		for tblname := range ve.systemTables {
 			values = append(values, []sql.Value{
 				sql.StringValue(tblname.String()),
@@ -229,7 +241,7 @@ func (ve *virtualEngine) makeTablesTable(ctx context.Context, tx engine.Transact
 			})
 		}
 	} else {
-		tblnames, err := ve.e.ListTables(ctx, tx, dbname)
+		tblnames, err := ve.e.ListTables(ctx, tx, tn.Database)
 		if err != nil {
 			return nil, err
 		}
@@ -249,7 +261,7 @@ func (ve *virtualEngine) makeTablesTable(ctx context.Context, tx engine.Transact
 		})
 	}
 
-	return MakeTable(fmt.Sprintf("%s.%s", dbname, tblname),
+	return MakeTable(tn.String(),
 		[]sql.Identifier{sql.ID("table"), sql.ID("type")},
 		[]sql.ColumnType{sql.IdColType, sql.IdColType}, values), nil
 }
@@ -261,7 +273,7 @@ var (
 		sql.Int32ColType, sql.BoolColType, sql.BoolColType, sql.BoolColType, sql.NullStringColType}
 )
 
-func appendColumns(values [][]sql.Value, tblname sql.Identifier, cols []sql.Identifier,
+func appendColumns(values [][]sql.Value, tn sql.TableName, cols []sql.Identifier,
 	colTypes []sql.ColumnType) [][]sql.Value {
 
 	for i, ct := range colTypes {
@@ -271,7 +283,7 @@ func appendColumns(values [][]sql.Value, tblname sql.Identifier, cols []sql.Iden
 		}
 		values = append(values,
 			[]sql.Value{
-				sql.StringValue(tblname.String()),
+				sql.StringValue(tn.Table.String()),
 				sql.StringValue(cols[i].String()),
 				sql.StringValue(ct.Type.String()),
 				sql.Int64Value(ct.Size),
@@ -285,54 +297,56 @@ func appendColumns(values [][]sql.Value, tblname sql.Identifier, cols []sql.Iden
 }
 
 func (ve *virtualEngine) makeColumnsTable(ctx context.Context, tx engine.Transaction,
-	dbname, tblname sql.Identifier) (engine.Table, error) {
+	tn sql.TableName) (engine.Table, error) {
 
 	ve.mutex.RLock()
 	defer ve.mutex.RUnlock()
 
 	values := [][]sql.Value{}
 
-	if dbname == sql.SYSTEM {
+	if tn.Database == sql.SYSTEM {
 		for tblname := range ve.systemTables {
-			tbl, err := ve.LookupTable(ctx, tx, dbname, tblname)
+			ttn := sql.TableName{tn.Database, tblname}
+			tbl, err := ve.LookupTable(ctx, tx, ttn)
 			if err != nil {
 				return nil, err
 			}
-			values = appendColumns(values, tblname, tbl.Columns(ctx), tbl.ColumnTypes(ctx))
+			values = appendColumns(values, ttn, tbl.Columns(ctx), tbl.ColumnTypes(ctx))
 		}
 	} else {
-		tblnames, err := ve.e.ListTables(ctx, tx, dbname)
+		tblnames, err := ve.e.ListTables(ctx, tx, tn.Database)
 		if err != nil {
 			return nil, err
 		}
 
 		for _, tblname := range tblnames {
-			tbl, err := ve.e.LookupTable(ctx, tx, dbname, tblname)
+			ttn := sql.TableName{tn.Database, tblname}
+			tbl, err := ve.e.LookupTable(ctx, tx, ttn)
 			if err != nil {
 				return nil, err
 			}
-			values = appendColumns(values, tblname, tbl.Columns(ctx), tbl.ColumnTypes(ctx))
+			values = appendColumns(values, ttn, tbl.Columns(ctx), tbl.ColumnTypes(ctx))
 		}
 	}
 
 	for tblname := range ve.infoTables {
+		ttn := sql.TableName{tn.Database, tblname}
 		if tblname == sql.ID("db$columns") {
-			values = appendColumns(values, sql.ID("db$columns"), columnsColumns, columnsColumnTypes)
+			values = appendColumns(values, ttn, columnsColumns, columnsColumnTypes)
 		} else {
-			tbl, err := ve.LookupTable(ctx, tx, dbname, tblname)
+			tbl, err := ve.LookupTable(ctx, tx, ttn)
 			if err != nil {
 				return nil, err
 			}
-			values = appendColumns(values, tblname, tbl.Columns(ctx), tbl.ColumnTypes(ctx))
+			values = appendColumns(values, ttn, tbl.Columns(ctx), tbl.ColumnTypes(ctx))
 		}
 	}
 
-	return MakeTable(fmt.Sprintf("%s.%s", dbname, tblname), columnsColumns, columnsColumnTypes,
-		values), nil
+	return MakeTable(tn.String(), columnsColumns, columnsColumnTypes, values), nil
 }
 
 func (ve *virtualEngine) makeDatabasesTable(ctx context.Context, tx engine.Transaction,
-	dbname, tblname sql.Identifier) (engine.Table, error) {
+	tn sql.TableName) (engine.Table, error) {
 
 	dbnames, err := ve.e.ListDatabases(ctx, tx)
 	if err != nil {
@@ -350,13 +364,13 @@ func (ve *virtualEngine) makeDatabasesTable(ctx context.Context, tx engine.Trans
 			sql.StringValue(dbname.String()),
 		})
 	}
-	return MakeTable(fmt.Sprintf("%s.%s", dbname, tblname),
-		[]sql.Identifier{sql.ID("database")}, []sql.ColumnType{sql.IdColType}, values), nil
+	return MakeTable(tn.String(), []sql.Identifier{sql.ID("database")},
+		[]sql.ColumnType{sql.IdColType}, values), nil
 
 }
 
 func makeIdentifiersTable(ctx context.Context, tx engine.Transaction,
-	dbname, tblname sql.Identifier) (engine.Table, error) {
+	tn sql.TableName) (engine.Table, error) {
 
 	values := [][]sql.Value{}
 
@@ -369,13 +383,13 @@ func makeIdentifiersTable(ctx context.Context, tx engine.Transaction,
 			})
 	}
 
-	return MakeTable(fmt.Sprintf("%s.%s", dbname, tblname),
+	return MakeTable(tn.String(),
 		[]sql.Identifier{sql.ID("name"), sql.ID("id"), sql.ID("reserved")},
 		[]sql.ColumnType{sql.IdColType, sql.Int32ColType, sql.BoolColType}, values), nil
 }
 
-func makeConfigTable(ctx context.Context, tx engine.Transaction,
-	dbname, tblname sql.Identifier) (engine.Table, error) {
+func makeConfigTable(ctx context.Context, tx engine.Transaction, tn sql.TableName) (engine.Table,
+	error) {
 
 	values := [][]sql.Value{}
 
@@ -388,7 +402,7 @@ func makeConfigTable(ctx context.Context, tx engine.Transaction,
 			})
 	}
 
-	return MakeTable(fmt.Sprintf("%s.%s", dbname, tblname),
+	return MakeTable(tn.String(),
 		[]sql.Identifier{sql.ID("name"), sql.ID("by"), sql.ID("value")},
 		[]sql.ColumnType{sql.IdColType, sql.IdColType, sql.StringColType}, values), nil
 }
