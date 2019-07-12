@@ -41,12 +41,26 @@ var lockSharing = [5][5]bool{
 	EXCLUSIVE:       [5]bool{},
 }
 
+type keyType int
+
+const (
+	SCHEMA_KEY keyType = iota + 1
+	TABLE_KEY
+)
+
 type lockKey struct {
-	db, tbl sql.Identifier
+	typ              keyType
+	key1, key2, key3 sql.Identifier
 }
 
 func (lk lockKey) String() string {
-	return fmt.Sprintf("%s.%s", lk.db, lk.tbl)
+	switch lk.typ {
+	case SCHEMA_KEY:
+		return fmt.Sprintf("schema %s.%s", lk.key1, lk.key2)
+	case TABLE_KEY:
+		return fmt.Sprintf("table %s.%s.%s", lk.key1, lk.key2, lk.key3)
+	}
+	panic(fmt.Sprintf("unexpected lock type %d", lk.typ))
 }
 
 // A lock will exist for every Locker that has an object currently locked.
@@ -161,7 +175,8 @@ func (svc *LockService) waitForLock(ctx context.Context, obj *object, ls *Locker
 func (svc *LockService) LockSchema(ctx context.Context, lkr Locker, sn sql.SchemaName,
 	ll LockLevel) error {
 
-	return svc.lockObject(ctx, lkr, lockKey{sn.Database, sn.Schema}, ll)
+	key := lockKey{typ: SCHEMA_KEY, key1: sn.Database, key2: sn.Schema}
+	return svc.lockObject(ctx, lkr, key, ll)
 }
 
 // LockTable locks the table (specified by tn) for lkr at the specified lock level. It may
@@ -169,7 +184,8 @@ func (svc *LockService) LockSchema(ctx context.Context, lkr Locker, sn sql.Schem
 func (svc *LockService) LockTable(ctx context.Context, lkr Locker, tn sql.TableName,
 	ll LockLevel) error {
 
-	return svc.lockObject(ctx, lkr, lockKey{tn.Database, tn.Table}, ll)
+	key := lockKey{typ: TABLE_KEY, key1: tn.Database, key2: tn.Schema, key3: tn.Table}
+	return svc.lockObject(ctx, lkr, key, ll)
 }
 
 func (svc *LockService) lockObject(ctx context.Context, lkr Locker, key lockKey,
