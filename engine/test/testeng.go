@@ -144,7 +144,8 @@ func testTableLifecycle(t *testing.T, e engine.Engine, dbname sql.Identifier, cm
 			state.tx.NextStmt()
 		case cmdLookupTable:
 			var err error
-			state.tbl, err = e.LookupTable(ctx, state.tx, sql.TableName{dbname, cmd.name})
+			state.tbl, err = e.LookupTable(ctx, state.tx,
+				sql.TableName{dbname, sql.PUBLIC, cmd.name})
 			if cmd.fail {
 				if err == nil {
 					t.Errorf("LookupTable(%s) did not fail", cmd.name)
@@ -162,8 +163,8 @@ func testTableLifecycle(t *testing.T, e engine.Engine, dbname sql.Identifier, cm
 				}
 			}
 		case cmdCreateTable:
-			err := e.CreateTable(ctx, state.tx, sql.TableName{dbname, cmd.name}, columns,
-				columnTypes)
+			err := e.CreateTable(ctx, state.tx, sql.TableName{dbname, sql.PUBLIC, cmd.name},
+				columns, columnTypes)
 			if cmd.fail {
 				if err == nil {
 					t.Errorf("CreateTable(%s) did not fail", cmd.name)
@@ -172,7 +173,8 @@ func testTableLifecycle(t *testing.T, e engine.Engine, dbname sql.Identifier, cm
 				t.Errorf("CreateTable(%s) failed with %s", cmd.name, err)
 			}
 		case cmdDropTable:
-			err := e.DropTable(ctx, state.tx, sql.TableName{dbname, cmd.name}, cmd.ifExists)
+			err := e.DropTable(ctx, state.tx, sql.TableName{dbname, sql.PUBLIC, cmd.name},
+				cmd.ifExists)
 			if cmd.fail {
 				if err == nil {
 					t.Errorf("DropTable(%s) did not fail", cmd.name)
@@ -997,7 +999,7 @@ func RunStressTest(t *testing.T, e engine.Engine) {
 				updated := false
 				for !updated {
 					tx := e.Begin(tdx)
-					updated = incColumn(t, e, tx, i, sql.TableName{dbname, name})
+					updated = incColumn(t, e, tx, i, sql.TableName{dbname, sql.PUBLIC, name})
 					if updated {
 						err := tx.Commit(ctx)
 						if err != nil {

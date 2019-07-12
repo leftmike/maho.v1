@@ -20,12 +20,7 @@ type FromTableAlias struct {
 }
 
 func (fta FromTableAlias) String() string {
-	var s string
-	if fta.Database == 0 {
-		s = fta.Table.String()
-	} else {
-		s = fmt.Sprintf("%s.%s", fta.Database, fta.Table)
-	}
+	s := fta.TableName.String()
 	if fta.Alias != 0 {
 		s += fmt.Sprintf(" AS %s", fta.Alias)
 	}

@@ -11,6 +11,7 @@ type SchemaName struct {
 
 type TableName struct {
 	Database Identifier
+	Schema   Identifier
 	Table    Identifier
 }
 
@@ -23,7 +24,10 @@ func (sn SchemaName) String() string {
 
 func (tn TableName) String() string {
 	if tn.Database == 0 {
-		return tn.Table.String()
+		if tn.Schema == 0 {
+			return tn.Table.String()
+		}
+		return fmt.Sprintf("%s.%s", tn.Schema, tn.Table)
 	}
-	return fmt.Sprintf("%s.%s", tn.Database, tn.Table)
+	return fmt.Sprintf("%s.%s.%s", tn.Database, tn.Schema, tn.Table)
 }

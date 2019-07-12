@@ -13,11 +13,11 @@ import (
 func TestSelectString(t *testing.T) {
 	s := query.Select{
 		From: query.FromTableAlias{
-			TableName: sql.TableName{sql.ID("db"), sql.ID("tbl")},
+			TableName: sql.TableName{sql.ID("db"), sql.ID("sc"), sql.ID("tbl")},
 			Alias:     sql.ID("alias"),
 		},
 	}
-	r := "SELECT * FROM db.tbl AS alias"
+	r := "SELECT * FROM db.sc.tbl AS alias"
 	if s.String() != r {
 		t.Errorf("Select{}.String() got %s want %s", s.String(), r)
 	}

@@ -8,8 +8,14 @@ import (
 )
 
 func TestCreateTable(t *testing.T) {
-	s := datadef.CreateTable{Table: sql.TableName{Database: sql.ID("xyz"), Table: sql.ID("abc")}}
-	r := "CREATE TABLE xyz.abc ()"
+	s := datadef.CreateTable{
+		Table: sql.TableName{
+			Database: sql.ID("xyz"),
+			Schema:   sql.ID("mno"),
+			Table:    sql.ID("abc"),
+		},
+	}
+	r := "CREATE TABLE xyz.mno.abc ()"
 	if s.String() != r {
 		t.Errorf("CreateTable{}.String() got %s want %s", s.String(), r)
 	}

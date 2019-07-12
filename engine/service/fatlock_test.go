@@ -61,7 +61,8 @@ type stepLockTable struct {
 func (slt stepLockTable) lockTable(t *testing.T, ses *session, svc *service.LockService) {
 	t.Helper()
 
-	err := svc.LockTable(ses.Context(), ses.tl, sql.TableName{sql.ID("db"), slt.tbl}, slt.ll)
+	tn := sql.TableName{sql.ID("db"), sql.PUBLIC, slt.tbl}
+	err := svc.LockTable(ses.Context(), ses.tl, tn, slt.ll)
 	if slt.fail {
 		if err == nil {
 			t.Errorf("LockTable(%s, %s, %s) did not fail", ses, ses.tl, slt.ll)

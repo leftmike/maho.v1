@@ -179,8 +179,14 @@ var (
 )
 
 func TestInsert(t *testing.T) {
-	s := query.InsertValues{Table: sql.TableName{Database: sql.ID("left"), Table: sql.ID("right")}}
-	r := "INSERT INTO left.right VALUES"
+	s := query.InsertValues{
+		Table: sql.TableName{
+			Database: sql.ID("left"),
+			Schema:   sql.ID("middle"),
+			Table:    sql.ID("right"),
+		},
+	}
+	r := "INSERT INTO left.middle.right VALUES"
 	if s.String() != r {
 		t.Errorf("InsertValues{}.String() got %s want %s", s.String(), r)
 	}
@@ -191,11 +197,11 @@ func TestInsert(t *testing.T) {
 		DefaultDatabase: sql.ID("test"),
 		DefaultSchema:   sql.PUBLIC,
 	}
-	testInsert(t, e, ses, sql.TableName{sql.ID("test"), sql.ID("t")}, insertColumns1,
+	testInsert(t, e, ses, sql.TableName{sql.ID("test"), sql.PUBLIC, sql.ID("t")}, insertColumns1,
 		insertColumnTypes1, insertCases1)
-	testInsert(t, e, ses, sql.TableName{sql.ID("test"), sql.ID("t2")}, insertColumns2,
+	testInsert(t, e, ses, sql.TableName{sql.ID("test"), sql.PUBLIC, sql.ID("t2")}, insertColumns2,
 		insertColumnTypes2, insertCases2)
-	testInsert(t, e, ses, sql.TableName{sql.ID("test"), sql.ID("t3")}, insertColumns3,
+	testInsert(t, e, ses, sql.TableName{sql.ID("test"), sql.PUBLIC, sql.ID("t3")}, insertColumns3,
 		insertColumnTypes3, insertCases3)
 }
 

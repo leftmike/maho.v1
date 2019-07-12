@@ -16,20 +16,20 @@ func TestDropTable(t *testing.T) {
 			datadef.DropTable{
 				IfExists: false,
 				Tables: []sql.TableName{
-					{Database: sql.ID("abc"), Table: sql.ID("defghi")},
+					{Database: sql.ID("abc"), Schema: sql.ID("def"), Table: sql.ID("ghijk")},
 				},
 			},
-			"DROP TABLE abc.defghi",
+			"DROP TABLE abc.def.ghijk",
 		},
 		{
 			datadef.DropTable{
 				IfExists: true,
 				Tables: []sql.TableName{
-					{Database: sql.ID("abc"), Table: sql.ID("defghi")},
+					{Database: sql.ID("abc"), Schema: sql.ID("def"), Table: sql.ID("ghijk")},
 					{Table: sql.ID("jkl")},
 				},
 			},
-			"DROP TABLE IF EXISTS abc.defghi, jkl",
+			"DROP TABLE IF EXISTS abc.def.ghijk, jkl",
 		},
 	}
 

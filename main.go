@@ -9,7 +9,6 @@ To Do:
 - fuzzing: parser.Parse
 
 - support schemas
--- add Schema to sql.TableName
 -- update LockTable for Schema
 -- update parsing for schemas: CREATE TABLE, DELETE, DROP TABLE, INSERT, SELECT, UPDATE
 -- update engines to use schemas

@@ -306,7 +306,7 @@ func (ve *virtualEngine) makeColumnsTable(ctx context.Context, tx engine.Transac
 
 	if tn.Database == sql.SYSTEM {
 		for tblname := range ve.systemTables {
-			ttn := sql.TableName{tn.Database, tblname}
+			ttn := sql.TableName{tn.Database, tn.Schema, tblname}
 			tbl, err := ve.LookupTable(ctx, tx, ttn)
 			if err != nil {
 				return nil, err
@@ -320,7 +320,7 @@ func (ve *virtualEngine) makeColumnsTable(ctx context.Context, tx engine.Transac
 		}
 
 		for _, tblname := range tblnames {
-			ttn := sql.TableName{tn.Database, tblname}
+			ttn := sql.TableName{tn.Database, tn.Schema, tblname}
 			tbl, err := ve.e.LookupTable(ctx, tx, ttn)
 			if err != nil {
 				return nil, err
@@ -330,7 +330,7 @@ func (ve *virtualEngine) makeColumnsTable(ctx context.Context, tx engine.Transac
 	}
 
 	for tblname := range ve.infoTables {
-		ttn := sql.TableName{tn.Database, tblname}
+		ttn := sql.TableName{tn.Database, tn.Schema, tblname}
 		if tblname == sql.ID("db$columns") {
 			values = appendColumns(values, ttn, columnsColumns, columnsColumnTypes)
 		} else {
