@@ -344,9 +344,9 @@ func (p *parser) parseAlias(required bool) sql.Identifier {
 	return 0
 }
 
-func (p *parser) parseTableAlias() sql.TableAlias {
+func (p *parser) parseTableAlias() query.FromTableAlias {
 	tn := p.parseTableName()
-	return sql.TableAlias{Database: tn.Database, Table: tn.Table, Alias: p.parseAlias(false)}
+	return query.FromTableAlias{TableName: tn, Alias: p.parseAlias(false)}
 }
 
 func (p *parser) parseColumnAliases() []sql.Identifier {
@@ -888,7 +888,7 @@ func (p *parser) parseFromItem() query.FromItem {
 			p.expectTokens(token.RParen)
 		}
 	} else {
-		fi = (query.FromTableAlias)(p.parseTableAlias())
+		fi = p.parseTableAlias()
 	}
 
 	jt := query.NoJoin

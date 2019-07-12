@@ -46,7 +46,7 @@ func (dp *deletePlan) Execute(ses *evaluate.Session, tx engine.Transaction) (int
 }
 
 func (stmt *Delete) Plan(ses *evaluate.Session, tx engine.Transaction) (interface{}, error) {
-	rows, err := lookupRows(ses, tx, stmt.Table.Database, stmt.Table.Table)
+	rows, err := lookupRows(ses, tx, stmt.Table)
 	if err != nil {
 		return nil, err
 	}

@@ -13,9 +13,8 @@ import (
 func TestSelectString(t *testing.T) {
 	s := query.Select{
 		From: query.FromTableAlias{
-			Database: sql.ID("db"),
-			Table:    sql.ID("tbl"),
-			Alias:    sql.ID("alias"),
+			TableName: sql.TableName{sql.ID("db"), sql.ID("tbl")},
+			Alias:     sql.ID("alias"),
 		},
 	}
 	r := "SELECT * FROM db.tbl AS alias"

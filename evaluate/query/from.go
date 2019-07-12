@@ -14,10 +14,22 @@ type FromItem interface {
 	rows(ses *evaluate.Session, tx engine.Transaction) (evaluate.Rows, *fromContext, error)
 }
 
-type FromTableAlias sql.TableAlias
+type FromTableAlias struct {
+	sql.TableName
+	Alias sql.Identifier
+}
 
 func (fta FromTableAlias) String() string {
-	return ((sql.TableAlias)(fta)).String()
+	var s string
+	if fta.Database == 0 {
+		s = fta.Table.String()
+	} else {
+		s = fmt.Sprintf("%s.%s", fta.Database, fta.Table)
+	}
+	if fta.Alias != 0 {
+		s += fmt.Sprintf(" AS %s", fta.Alias)
+	}
+	return s
 }
 
 type engineRows struct {
@@ -44,11 +56,10 @@ func (er engineRows) Update(ses *evaluate.Session, updates []sql.ColumnUpdate) e
 	return er.Rows.Update(ses.Context(), updates)
 }
 
-func lookupRows(ses *evaluate.Session, tx engine.Transaction, dbname,
-	tblname sql.Identifier) (evaluate.Rows, error) {
+func lookupRows(ses *evaluate.Session, tx engine.Transaction, tn sql.TableName) (evaluate.Rows,
+	error) {
 
-	tbl, err := ses.Engine.LookupTable(ses.Context(), tx,
-		ses.ResolveTableName(sql.TableName{dbname, tblname})) // XXX
+	tbl, err := ses.Engine.LookupTable(ses.Context(), tx, ses.ResolveTableName(tn))
 	if err != nil {
 		return nil, err
 	}
@@ -62,7 +73,7 @@ func lookupRows(ses *evaluate.Session, tx engine.Transaction, dbname,
 func (fta FromTableAlias) rows(ses *evaluate.Session, tx engine.Transaction) (evaluate.Rows,
 	*fromContext, error) {
 
-	rows, err := lookupRows(ses, tx, fta.Database, fta.Table)
+	rows, err := lookupRows(ses, tx, fta.TableName)
 	if err != nil {
 		return nil, nil, err
 	}
