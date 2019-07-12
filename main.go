@@ -8,12 +8,13 @@ To Do:
 
 - fuzzing: parser.Parse
 
-- switch engine to use sql.TableName
 - from.go: LookupTable in lookupRows
-- LockTable: change to sql.TableName argument
-- add LockSchema
 
 - support schemas
+-- add Schema to sql.TableName
+-- update LockTable for Schema
+-- update parsing for schemas
+-- update engines to use schemas
 - memrows: createSchema and dropSchema should be transactional
 
 - USE <database> as equivalent to SET DATABASE <database>

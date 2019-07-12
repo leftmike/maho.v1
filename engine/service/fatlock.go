@@ -156,9 +156,23 @@ func (svc *LockService) waitForLock(ctx context.Context, obj *object, ls *Locker
 	}
 }
 
-// LockTable locks the table (specified by db.tbl) for lkr at the specified lock level. It may
+// LockSchema locks the schema (specified by sn) for lkr at the specified lock level. It may
 // block waiting for a lock.
-func (svc *LockService) LockTable(ctx context.Context, lkr Locker, db, tbl sql.Identifier,
+func (svc *LockService) LockSchema(ctx context.Context, lkr Locker, sn sql.SchemaName,
+	ll LockLevel) error {
+
+	return svc.lockObject(ctx, lkr, lockKey{sn.Database, sn.Schema}, ll)
+}
+
+// LockTable locks the table (specified by tn) for lkr at the specified lock level. It may
+// block waiting for a lock.
+func (svc *LockService) LockTable(ctx context.Context, lkr Locker, tn sql.TableName,
+	ll LockLevel) error {
+
+	return svc.lockObject(ctx, lkr, lockKey{tn.Database, tn.Table}, ll)
+}
+
+func (svc *LockService) lockObject(ctx context.Context, lkr Locker, key lockKey,
 	ll LockLevel) error {
 
 	ls := lkr.LockerState()
@@ -170,7 +184,6 @@ func (svc *LockService) LockTable(ctx context.Context, lkr Locker, db, tbl sql.I
 		ls.waitCh = make(chan bool, 1)
 		ls.locker = lkr
 	}
-	key := lockKey{db, tbl}
 
 	svc.mutex.Lock()
 	defer svc.mutex.Unlock()

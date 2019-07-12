@@ -44,8 +44,7 @@ type tcontext struct {
 
 type table struct {
 	tctx         *tcontext
-	db           *database
-	name         sql.Identifier
+	tn           sql.TableName
 	modifyLock   bool
 	table        *tableImpl
 	modifiedRows []int // indexes of modified rows
@@ -275,7 +274,7 @@ func (mdb *database) lookupTable(ctx context.Context, tx engine.Transaction,
 		return tbl, nil
 	}
 
-	err := tctx.tx.LockTable(ctx, tn.Database, tn.Table, service.ACCESS)
+	err := tctx.tx.LockTable(ctx, tn, service.ACCESS)
 	if err != nil {
 		return nil, err
 	}
@@ -291,8 +290,7 @@ func (mdb *database) lookupTable(ctx context.Context, tx engine.Transaction,
 
 	tbl = &table{
 		tctx:  tctx,
-		db:    mdb,
-		name:  tn.Table,
+		tn:    tn,
 		table: ti,
 	}
 	tctx.tables[tn.Table] = tbl
@@ -303,7 +301,7 @@ func (mdb *database) createTable(ctx context.Context, tx engine.Transaction, tn 
 	cols []sql.Identifier, colTypes []sql.ColumnType) error {
 
 	tctx := service.GetTxContext(tx, mdb).(*tcontext)
-	err := tctx.tx.LockTable(ctx, tn.Database, tn.Table, service.EXCLUSIVE)
+	err := tctx.tx.LockTable(ctx, tn, service.EXCLUSIVE)
 	if err != nil {
 		return err
 	}
@@ -338,8 +336,7 @@ func (mdb *database) createTable(ctx context.Context, tx engine.Transaction, tn 
 
 	tctx.tables[tn.Table] = &table{
 		tctx:    tctx,
-		db:      mdb,
-		name:    tn.Table,
+		tn:      tn,
 		created: true,
 		table: &tableImpl{
 			name:        tn.String(),
@@ -355,7 +352,7 @@ func (mdb *database) dropTable(ctx context.Context, tx engine.Transaction, tn sq
 	ifExists bool) error {
 
 	tctx := service.GetTxContext(tx, mdb).(*tcontext)
-	err := tctx.tx.LockTable(ctx, tn.Database, tn.Table, service.EXCLUSIVE)
+	err := tctx.tx.LockTable(ctx, tn, service.EXCLUSIVE)
 	if err != nil {
 		return err
 	}
@@ -393,8 +390,7 @@ func (mdb *database) dropTable(ctx context.Context, tx engine.Transaction, tn sq
 
 	tctx.tables[tn.Table] = &table{
 		tctx:    tctx,
-		db:      mdb,
-		name:    tn.Table,
+		tn:      tn,
 		dropped: true,
 	}
 	return nil
@@ -408,7 +404,7 @@ func (mdb *database) listTables(ctx context.Context, tx engine.Transaction) ([]s
 	tctx := service.GetTxContext(tx, mdb).(*tcontext)
 	for _, tbl := range tctx.tables {
 		if !tbl.dropped {
-			tblnames = append(tblnames, tbl.name)
+			tblnames = append(tblnames, tbl.tn.Table)
 		}
 	}
 
@@ -464,16 +460,16 @@ func (mdb *database) Commit(ctx context.Context, tx interface{}) error {
 
 	for _, tbl := range tctx.tables {
 		if tbl.dropped {
-			ti := mdb.tables[tbl.name]
+			ti := mdb.tables[tbl.tn.Table]
 			ti.droppedVersion = v
 			ti.dropped = true
 		}
 		if tbl.created {
 			ti := tbl.table
 			ti.createdVersion = v
-			pti, _ := mdb.tables[tbl.name]
+			pti, _ := mdb.tables[tbl.tn.Table]
 			ti.previous = pti
-			mdb.tables[tbl.name] = ti
+			mdb.tables[tbl.tn.Table] = ti
 		}
 		tbl.tctx = nil
 	}
@@ -520,8 +516,7 @@ func (mt *table) Rows(ctx context.Context) (engine.Rows, error) {
 
 func (mt *table) Insert(ctx context.Context, row []sql.Value) error {
 	if !mt.modifyLock {
-		err := mt.tctx.tx.LockTable(ctx, mt.db.name, mt.name,
-			service.ROW_MODIFY)
+		err := mt.tctx.tx.LockTable(ctx, mt.tn, service.ROW_MODIFY)
 		if err != nil {
 			return err
 		}
@@ -559,11 +554,10 @@ func (mr *rows) Next(ctx context.Context, dest []sql.Value) error {
 
 func (mr *rows) Delete(ctx context.Context) error {
 	if !mr.haveRow {
-		return fmt.Errorf("memrows: table %s.%s no row to delete", mr.table.db.name,
-			mr.table.name)
+		return fmt.Errorf("memrows: table %s no row to delete", mr.table.tn)
 	}
 	if !mr.table.modifyLock {
-		err := mr.table.tctx.tx.LockTable(ctx, mr.table.db.name, mr.table.name, service.ROW_MODIFY)
+		err := mr.table.tctx.tx.LockTable(ctx, mr.table.tn, service.ROW_MODIFY)
 		if err != nil {
 			return err
 		}
@@ -581,12 +575,10 @@ func (mr *rows) Delete(ctx context.Context) error {
 
 func (mr *rows) Update(ctx context.Context, updates []sql.ColumnUpdate) error {
 	if !mr.haveRow {
-		return fmt.Errorf("memrows: table %s.%s no row to update", mr.table.db.name,
-			mr.table.name)
+		return fmt.Errorf("memrows: table %s no row to update", mr.table.tn)
 	}
 	if !mr.table.modifyLock {
-		err := mr.table.tctx.tx.LockTable(ctx, mr.table.db.name, mr.table.name,
-			service.ROW_MODIFY)
+		err := mr.table.tctx.tx.LockTable(ctx, mr.table.tn, service.ROW_MODIFY)
 		if err != nil {
 			return err
 		}

@@ -116,8 +116,12 @@ func (tx *Transaction) NextStmt() {
 	})
 }
 
-func (tx *Transaction) LockTable(ctx context.Context, db, tbl sql.Identifier, ll LockLevel) error {
-	return tx.ts.lockService.LockTable(ctx, tx, db, tbl, ll)
+func (tx *Transaction) LockSchema(ctx context.Context, sn sql.SchemaName, ll LockLevel) error {
+	return tx.ts.lockService.LockSchema(ctx, tx, sn, ll)
+}
+
+func (tx *Transaction) LockTable(ctx context.Context, tn sql.TableName, ll LockLevel) error {
+	return tx.ts.lockService.LockTable(ctx, tx, tn, ll)
 }
 
 func (tx *Transaction) getContext(d Database) interface{} {
