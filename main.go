@@ -9,7 +9,6 @@ To Do:
 - fuzzing: parser.Parse
 
 - support schemas
--- update parsing for schemas: CREATE TABLE, DELETE, DROP TABLE, INSERT, SELECT, UPDATE
 -- update engines to use schemas
 - memrows: createSchema and dropSchema should be transactional
 

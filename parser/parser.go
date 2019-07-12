@@ -319,15 +319,18 @@ func (p *parser) parseSchemaName() sql.SchemaName {
 }
 
 func (p *parser) parseTableName() sql.TableName {
-	var tbl sql.TableName
-	id := p.expectIdentifier("expected a database or a table")
+	var tn sql.TableName
+	tn.Table = p.expectIdentifier("expected a database, schema, or table")
 	if p.maybeToken(token.Dot) {
-		tbl.Database = id
-		tbl.Table = p.expectIdentifier("expected a table")
-	} else {
-		tbl.Table = id
+		tn.Schema = tn.Table
+		tn.Table = p.expectIdentifier("expected a schema or table")
+		if p.maybeToken(token.Dot) {
+			tn.Database = tn.Schema
+			tn.Schema = tn.Table
+			tn.Table = p.expectIdentifier("expected a table")
+		}
 	}
-	return tbl
+	return tn
 }
 
 func (p *parser) parseAlias(required bool) sql.Identifier {

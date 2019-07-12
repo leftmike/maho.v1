@@ -16,7 +16,7 @@ func TestMain(t *testing.T) {
 		s string
 		r string
 	}{
-		{"select * from system.db$tables order by [table]",
+		{"select * from system.public.db$tables order by [table]",
 			`            table      type
             -----      ----
  1       'config' 'virtual'

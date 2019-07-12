@@ -92,11 +92,9 @@ func (ses *Session) Set(v sql.Identifier, s string) error {
 func (ses *Session) ResolveTableName(tn sql.TableName) sql.TableName {
 	if tn.Database == 0 {
 		tn.Database = ses.DefaultDatabase
+		if tn.Schema == 0 {
+			tn.Schema = ses.DefaultSchema
+		}
 	}
-	/* XXX
-	if tn.Schema == 0 {
-		tn.Schema = ses.DefaultSchema
-	}
-	*/
 	return tn
 }

@@ -66,7 +66,7 @@ CREATE SCHEMA [database '.'] schema
 ```
 
 ```
-CREATE TABLE [database '.'] table '(' <column> [',' ...] ')'
+CREATE TABLE [[database '.'] schema '.'] table '(' <column> [',' ...] ')'
 <column> = name <data_type> [(DEFAULT <expr>) | (NOT NULL)]
 <data_type> =
 	| BINARY ['(' length ')']
@@ -89,7 +89,7 @@ CREATE TABLE [database '.'] table '(' <column> [',' ...] ')'
 ```
 
 ```
-DELETE FROM [database '.'] table [WHERE <expr>]
+DELETE FROM [[database '.'] schema '.'] table [WHERE <expr>]
 ```
 
 ```
@@ -101,11 +101,11 @@ DROP SCHEMA [IF EXISTS] [database '.'] schema
 ```
 
 ```
-DROP TABLE [IF EXISTS] [database '.'] table [',' ...]
+DROP TABLE [IF EXISTS] [[database '.'] schema '.'] table [',' ...]
 ```
 
 ```
-INSERT INTO [database '.'] table ['(' column [',' ...] ')']
+INSERT INTO [[database '.'] schema '.'] table ['(' column [',' ...] ')']
 	VALUES '(' <expr> | DEFAULT [',' ...] ')' [',' ...]
 ```
 
@@ -125,7 +125,7 @@ SELECT <select-list>
 <select-item> = table '.' '*'
     | [table '.' ] column [[AS] column-alias]
     | <expr> [[AS] column-alias]
-<from-item> = [database '.'] table [[AS] alias]
+<from-item> = [[database '.'] schema '.'] table [[AS] alias]
     | '(' <select> | <values> ')' [AS] alias ['(' column-alias [',' ...] ')']
     | '(' <from-item> [',' ...] ')'
     | <from-item> <join-type> <from-item> [ON <expr> | USING '(' join-column [',' ...] ')']
@@ -146,7 +146,7 @@ START TRANSACTION
 ```
 
 ```
-UPDATE [database '.'] table SET column '=' <expr> [',' ...] [WHERE <expr>]
+UPDATE [[database '.'] schema '.'] table SET column '=' <expr> [',' ...] [WHERE <expr>]
 ```
 
 ```
