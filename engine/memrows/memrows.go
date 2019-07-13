@@ -132,7 +132,7 @@ func (me *memrowsEngine) CreateSchema(ctx context.Context, tx engine.Transaction
 	if !ok {
 		return fmt.Errorf("memrows: database %s not found", sn.Database)
 	}
-	return mdb.createSchema(ctx, tx, sn.Schema)
+	return mdb.createSchema(ctx, tx, sn)
 }
 
 func (me *memrowsEngine) DropSchema(ctx context.Context, tx engine.Transaction, sn sql.SchemaName,
@@ -145,7 +145,7 @@ func (me *memrowsEngine) DropSchema(ctx context.Context, tx engine.Transaction, 
 	if !ok {
 		return fmt.Errorf("memrows: database %s not found", sn.Database)
 	}
-	return mdb.dropSchema(ctx, tx, sn.Schema, ifExists)
+	return mdb.dropSchema(ctx, tx, sn, ifExists)
 }
 
 func (me *memrowsEngine) LookupTable(ctx context.Context, tx engine.Transaction,
@@ -208,7 +208,7 @@ func (me *memrowsEngine) ListDatabases(ctx context.Context,
 	return dbnames, nil
 }
 
-func (me *memrowsEngine) ListTables(ctx context.Context, tx engine.Transaction,
+func (me *memrowsEngine) ListSchemas(ctx context.Context, tx engine.Transaction,
 	dbname sql.Identifier) ([]sql.Identifier, error) {
 
 	me.mutex.RLock()
@@ -218,7 +218,20 @@ func (me *memrowsEngine) ListTables(ctx context.Context, tx engine.Transaction,
 	if !ok {
 		return nil, fmt.Errorf("memrows: database %s not found", dbname)
 	}
-	return mdb.listTables(ctx, tx)
+	return mdb.listTables(ctx, tx) // XXX
+}
+
+func (me *memrowsEngine) ListTables(ctx context.Context, tx engine.Transaction,
+	sn sql.SchemaName) ([]sql.Identifier, error) {
+
+	me.mutex.RLock()
+	mdb, ok := me.databases[sn.Database]
+	me.mutex.RUnlock()
+
+	if !ok {
+		return nil, fmt.Errorf("memrows: database %s not found", sn.Database)
+	}
+	return mdb.listTables(ctx, tx) // XXX
 }
 
 func visibleVersion(ti *tableImpl, v version) *tableImpl {
@@ -232,33 +245,33 @@ func visibleVersion(ti *tableImpl, v version) *tableImpl {
 }
 
 func (mdb *database) createSchema(ctx context.Context, tx engine.Transaction,
-	scname sql.Identifier) error {
+	sn sql.SchemaName) error {
 
 	mdb.mutex.Lock()
 	defer mdb.mutex.Unlock()
 
-	if _, ok := mdb.schemas[scname]; ok {
-		return fmt.Errorf("memrows: schema %s.%s already exists", mdb.name, scname)
+	if _, ok := mdb.schemas[sn.Schema]; ok {
+		return fmt.Errorf("memrows: schema %s already exists", sn)
 	}
-	mdb.schemas[scname] = struct{}{}
+	mdb.schemas[sn.Schema] = struct{}{}
 	return nil
 }
 
-func (mdb *database) dropSchema(ctx context.Context, tx engine.Transaction, scname sql.Identifier,
+func (mdb *database) dropSchema(ctx context.Context, tx engine.Transaction, sn sql.SchemaName,
 	ifExists bool) error {
 
 	mdb.mutex.Lock()
 	defer mdb.mutex.Unlock()
 
-	if _, ok := mdb.schemas[scname]; !ok {
+	if _, ok := mdb.schemas[sn.Schema]; !ok {
 		if ifExists {
 			return nil
 		}
-		return fmt.Errorf("memrows: schema %s.%s already exists", mdb.name, scname)
+		return fmt.Errorf("memrows: schema %s not found", sn)
 	}
 
 	// XXX: check to make sure no tables in the schema
-	delete(mdb.schemas, scname)
+	delete(mdb.schemas, sn.Schema)
 	return nil
 }
 

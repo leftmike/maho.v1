@@ -187,7 +187,7 @@ func testTableLifecycle(t *testing.T, e engine.Engine, dbname sql.Identifier, cm
 			if !ok {
 				break
 			}
-			tblnames, err := ve.ListTables(ctx, state.tx, dbname)
+			tblnames, err := ve.ListTables(ctx, state.tx, sql.SchemaName{dbname, sql.PUBLIC})
 			if err != nil {
 				t.Errorf("ListTables() failed with %s", err)
 			} else {

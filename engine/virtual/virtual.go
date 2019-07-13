@@ -14,7 +14,9 @@ import (
 type Engine interface {
 	engine.Engine
 	ListDatabases(ctx context.Context, tx engine.Transaction) ([]sql.Identifier, error)
-	ListTables(ctx context.Context, tx engine.Transaction, dbname sql.Identifier) ([]sql.Identifier,
+	ListSchemas(ctx context.Context, tx engine.Transaction,
+		dbname sql.Identifier) ([]sql.Identifier, error)
+	ListTables(ctx context.Context, tx engine.Transaction, sn sql.SchemaName) ([]sql.Identifier,
 		error)
 }
 
@@ -241,7 +243,7 @@ func (ve *virtualEngine) makeTablesTable(ctx context.Context, tx engine.Transact
 			})
 		}
 	} else {
-		tblnames, err := ve.e.ListTables(ctx, tx, tn.Database)
+		tblnames, err := ve.e.ListTables(ctx, tx, tn.SchemaName()) // XXX
 		if err != nil {
 			return nil, err
 		}
@@ -314,7 +316,7 @@ func (ve *virtualEngine) makeColumnsTable(ctx context.Context, tx engine.Transac
 			values = appendColumns(values, ttn, tbl.Columns(ctx), tbl.ColumnTypes(ctx))
 		}
 	} else {
-		tblnames, err := ve.e.ListTables(ctx, tx, tn.Database)
+		tblnames, err := ve.e.ListTables(ctx, tx, tn.SchemaName()) // XXX
 		if err != nil {
 			return nil, err
 		}

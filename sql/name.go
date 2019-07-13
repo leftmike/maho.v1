@@ -31,3 +31,7 @@ func (tn TableName) String() string {
 	}
 	return fmt.Sprintf("%s.%s.%s", tn.Database, tn.Schema, tn.Table)
 }
+
+func (tn TableName) SchemaName() SchemaName {
+	return SchemaName{tn.Database, tn.Schema}
+}
