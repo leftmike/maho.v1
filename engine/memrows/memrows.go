@@ -28,10 +28,17 @@ type memrowsEngine struct {
 type database struct {
 	mutex   sync.RWMutex
 	name    sql.Identifier
-	schemas map[sql.Identifier]struct{}
-	tables  map[sql.Identifier]*tableImpl
+	schemas map[sql.SchemaName]*schemaImpl
+	tables  map[sql.TableName]*tableImpl
 	version version // current version of the database
 	nextTID tid
+}
+
+type schemaImpl struct {
+	createdVersion version
+	droppedVersion version
+	dropped        bool
+	previous       *schemaImpl
 }
 
 type tcontext struct {
@@ -39,7 +46,21 @@ type tcontext struct {
 	version version
 	tid     tid
 	cid     cid
-	tables  map[sql.Identifier]*table
+	schemas map[sql.SchemaName]*schema
+	tables  map[sql.TableName]*table
+}
+
+type schema struct {
+	schema *schemaImpl
+
+	// True if and only if the schema existed before the transaction started.
+	dropped bool
+
+	// True if the schema was created by the transaction. If a schema with the same name existed
+	// before the transaction started, then it must have been dropped first and dropped will
+	// be true. Otherwise, a schema with the same name must not have existed when the transaction
+	// started.
+	created bool
 }
 
 type table struct {
@@ -49,20 +70,14 @@ type table struct {
 	table        *tableImpl
 	modifiedRows []int // indexes of modified rows
 
-	/*
-		There four possible cases for CreateTable and DropTable within a single transaction
-		(for all of them, the transaction has an exclusive lock on the table).
-		(1) DropTable: dropped = true
-		(2) CreateTable: created = true
-		(3) DropTable followed by CreateTable: dropped = true and created = true
-		    During Commit, this is handled by always doing drops before creates; this always
-		    works because (4) is never visible at Commit time.
-		(4) CreateTable followed by DropTable: this is effectively a nop with respect to a
-		    committed transaction. It is handled by DropTable detecting the CreateTable and
-		    discarding the table context from the transaction.
-	*/
-	created bool
+	// True if and only if the table existed before the transaction started.
 	dropped bool
+
+	// True if the table was created by the transaction. If a table with the same name existed
+	// before the transaction started, then it must have been dropped first and dropped will
+	// be true. Otherwise, a table with the same name must not have existed when the transaction
+	// started.
+	created bool
 }
 
 type rows struct {
@@ -97,10 +112,10 @@ func (me *memrowsEngine) CreateDatabase(dbname sql.Identifier, options engine.Op
 	}
 	me.databases[dbname] = &database{
 		name: dbname,
-		schemas: map[sql.Identifier]struct{}{
-			sql.PUBLIC: struct{}{},
+		schemas: map[sql.SchemaName]*schemaImpl{
+			sql.SchemaName{dbname, sql.PUBLIC}: &schemaImpl{},
 		},
-		tables: map[sql.Identifier]*tableImpl{},
+		tables: map[sql.TableName]*tableImpl{},
 	}
 	return nil
 }
@@ -247,31 +262,92 @@ func visibleVersion(ti *tableImpl, v version) *tableImpl {
 func (mdb *database) createSchema(ctx context.Context, tx engine.Transaction,
 	sn sql.SchemaName) error {
 
-	mdb.mutex.Lock()
-	defer mdb.mutex.Unlock()
+	tctx := service.GetTxContext(tx, mdb).(*tcontext)
+	err := tctx.tx.LockSchema(ctx, sn, service.EXCLUSIVE)
+	if err != nil {
+		return err
+	}
 
-	if _, ok := mdb.schemas[sn.Schema]; ok {
+	if sc, ok := tctx.schemas[sn]; ok {
+		if sc.dropped && !sc.created {
+			sc.created = true
+			sc.schema = &schemaImpl{}
+			return nil
+		}
 		return fmt.Errorf("memrows: schema %s already exists", sn)
 	}
-	mdb.schemas[sn.Schema] = struct{}{}
+
+	mdb.mutex.Lock()
+	si, ok := mdb.schemas[sn]
+	mdb.mutex.Unlock()
+
+	if ok {
+		if si.createdVersion <= tctx.version && !si.dropped {
+			return fmt.Errorf("memrows: schema %s already exists", sn)
+		} else if si.createdVersion > tctx.version ||
+			(si.dropped && si.droppedVersion > tctx.version) {
+
+			return fmt.Errorf("memrows: schema %s conflicting change", sn)
+		}
+	}
+
+	tctx.schemas[sn] = &schema{
+		created: true,
+		schema:  &schemaImpl{},
+	}
 	return nil
 }
 
 func (mdb *database) dropSchema(ctx context.Context, tx engine.Transaction, sn sql.SchemaName,
 	ifExists bool) error {
 
-	mdb.mutex.Lock()
-	defer mdb.mutex.Unlock()
-
-	if _, ok := mdb.schemas[sn.Schema]; !ok {
-		if ifExists {
-			return nil
-		}
-		return fmt.Errorf("memrows: schema %s not found", sn)
+	tctx := service.GetTxContext(tx, mdb).(*tcontext)
+	err := tctx.tx.LockSchema(ctx, sn, service.EXCLUSIVE)
+	if err != nil {
+		return err
 	}
 
 	// XXX: check to make sure no tables in the schema
-	delete(mdb.schemas, sn.Schema)
+
+	if sc, ok := tctx.schemas[sn]; ok {
+		if sc.created {
+			// The schema was created in this transaction.
+			if sc.dropped {
+				// But there was a previous schema which was dropped first.
+				sc.created = false
+				sc.schema = nil
+			} else {
+				// No previous schema, so just forget about this one.
+				delete(tctx.schemas, sn)
+			}
+			return nil
+		} else if sc.dropped {
+			if ifExists {
+				return nil
+			}
+			return fmt.Errorf("memrows: schema %s does not exist", sn)
+		}
+		sc.dropped = true
+		sc.schema = nil
+		return nil
+	}
+
+	mdb.mutex.Lock()
+	si, ok := mdb.schemas[sn]
+	mdb.mutex.Unlock()
+
+	if !ok || (si.dropped && si.droppedVersion <= tctx.version) {
+		if ifExists {
+			return nil
+		}
+		return fmt.Errorf("memrows: schema %s does not exist", sn)
+	} else if si.createdVersion > tctx.version || (si.dropped && si.droppedVersion > tctx.version) {
+		return fmt.Errorf("memrows: schema %s conflicting change", sn)
+	}
+
+	tctx.schemas[sn] = &schema{
+		dropped: true,
+	}
 	return nil
 }
 
@@ -279,7 +355,7 @@ func (mdb *database) lookupTable(ctx context.Context, tx engine.Transaction,
 	tn sql.TableName) (engine.Table, error) {
 
 	tctx := service.GetTxContext(tx, mdb).(*tcontext)
-	tbl, ok := tctx.tables[tn.Table]
+	tbl, ok := tctx.tables[tn]
 	if ok {
 		if tbl.dropped && !tbl.created {
 			return nil, fmt.Errorf("memrows: table %s not found", tn)
@@ -293,7 +369,7 @@ func (mdb *database) lookupTable(ctx context.Context, tx engine.Transaction,
 	}
 
 	mdb.mutex.RLock()
-	ti, _ := mdb.tables[tn.Table]
+	ti, _ := mdb.tables[tn]
 	mdb.mutex.RUnlock()
 
 	ti = visibleVersion(ti, tctx.version)
@@ -306,7 +382,7 @@ func (mdb *database) lookupTable(ctx context.Context, tx engine.Transaction,
 		tn:    tn,
 		table: ti,
 	}
-	tctx.tables[tn.Table] = tbl
+	tctx.tables[tn] = tbl
 	return tbl, nil
 }
 
@@ -314,19 +390,22 @@ func (mdb *database) createTable(ctx context.Context, tx engine.Transaction, tn 
 	cols []sql.Identifier, colTypes []sql.ColumnType) error {
 
 	tctx := service.GetTxContext(tx, mdb).(*tcontext)
-	err := tctx.tx.LockTable(ctx, tn, service.EXCLUSIVE)
+	err := tctx.tx.LockSchema(ctx, tn.SchemaName(), service.ACCESS)
+	if err != nil {
+		return err
+	}
+	err = tctx.tx.LockTable(ctx, tn, service.EXCLUSIVE)
 	if err != nil {
 		return err
 	}
 
-	if tbl, ok := tctx.tables[tn.Table]; ok {
+	if tbl, ok := tctx.tables[tn]; ok {
 		if tbl.dropped && !tbl.created {
 			tbl.created = true
 			tbl.table = &tableImpl{
-				name:        tn.String(),
+				tn:          tn,
 				columns:     cols,
 				columnTypes: colTypes,
-				rows:        nil,
 			}
 			return nil
 		}
@@ -334,7 +413,7 @@ func (mdb *database) createTable(ctx context.Context, tx engine.Transaction, tn 
 	}
 
 	mdb.mutex.Lock()
-	ti, ok := mdb.tables[tn.Table]
+	ti, ok := mdb.tables[tn]
 	mdb.mutex.Unlock()
 
 	if ok {
@@ -347,15 +426,14 @@ func (mdb *database) createTable(ctx context.Context, tx engine.Transaction, tn 
 		}
 	}
 
-	tctx.tables[tn.Table] = &table{
+	tctx.tables[tn] = &table{
 		tctx:    tctx,
 		tn:      tn,
 		created: true,
 		table: &tableImpl{
-			name:        tn.String(),
+			tn:          tn,
 			columns:     cols,
 			columnTypes: colTypes,
-			rows:        nil,
 		},
 	}
 	return nil
@@ -365,23 +443,32 @@ func (mdb *database) dropTable(ctx context.Context, tx engine.Transaction, tn sq
 	ifExists bool) error {
 
 	tctx := service.GetTxContext(tx, mdb).(*tcontext)
-	err := tctx.tx.LockTable(ctx, tn, service.EXCLUSIVE)
+	err := tctx.tx.LockSchema(ctx, tn.SchemaName(), service.ACCESS)
+	if err != nil {
+		return err
+	}
+	err = tctx.tx.LockTable(ctx, tn, service.EXCLUSIVE)
 	if err != nil {
 		return err
 	}
 
-	if tbl, ok := tctx.tables[tn.Table]; ok {
+	if tbl, ok := tctx.tables[tn]; ok {
 		if tbl.created {
-			// The table was created in this transaction so dropping the table now means that
-			// even if this transaction committed, the table will never be visible: just go
-			// ahead and discard it from the transaction context.
-			delete(tctx.tables, tn.Table)
+			// The table was created in this transaction.
+			if tbl.dropped {
+				// But there was a previous table which was dropped first.
+				tbl.created = false
+				tbl.table = nil
+			} else {
+				// No previous table, so just forget about this one.
+				delete(tctx.tables, tn)
+			}
 			return nil
 		} else if tbl.dropped {
 			if ifExists {
 				return nil
 			}
-			return fmt.Errorf("memrows: table %s does not exist", tn.Table)
+			return fmt.Errorf("memrows: table %s does not exist", tn)
 		}
 		tbl.dropped = true
 		tbl.table = nil
@@ -389,19 +476,19 @@ func (mdb *database) dropTable(ctx context.Context, tx engine.Transaction, tn sq
 	}
 
 	mdb.mutex.Lock()
-	ti, ok := mdb.tables[tn.Table]
+	ti, ok := mdb.tables[tn]
 	mdb.mutex.Unlock()
 
 	if !ok || (ti.dropped && ti.droppedVersion <= tctx.version) {
 		if ifExists {
 			return nil
 		}
-		return fmt.Errorf("memrows: table %s does not exist", tn.Table)
+		return fmt.Errorf("memrows: table %s does not exist", tn)
 	} else if ti.createdVersion > tctx.version || (ti.dropped && ti.droppedVersion > tctx.version) {
-		return fmt.Errorf("memrows: table %s conflicting change", tn.Table)
+		return fmt.Errorf("memrows: table %s conflicting change", tn)
 	}
 
-	tctx.tables[tn.Table] = &table{
+	tctx.tables[tn] = &table{
 		tctx:    tctx,
 		tn:      tn,
 		dropped: true,
@@ -424,11 +511,11 @@ func (mdb *database) listTables(ctx context.Context, tx engine.Transaction) ([]s
 	mdb.mutex.RLock()
 	defer mdb.mutex.RUnlock()
 
-	for name, ti := range mdb.tables {
-		if _, ok := tctx.tables[name]; !ok {
+	for tn, ti := range mdb.tables {
+		if _, ok := tctx.tables[tn]; !ok {
 			ti = visibleVersion(ti, tctx.version)
 			if ti != nil {
-				tblnames = append(tblnames, name)
+				tblnames = append(tblnames, tn.Table)
 			}
 		}
 	}
@@ -444,7 +531,8 @@ func (mdb *database) Begin(tx *service.Transaction) interface{} {
 		tx:      tx,
 		version: mdb.version,
 		tid:     mdb.nextTID - 1,
-		tables:  map[sql.Identifier]*table{},
+		schemas: map[sql.SchemaName]*schema{},
+		tables:  map[sql.TableName]*table{},
 	}
 }
 
@@ -473,18 +561,33 @@ func (mdb *database) Commit(ctx context.Context, tx interface{}) error {
 
 	for _, tbl := range tctx.tables {
 		if tbl.dropped {
-			ti := mdb.tables[tbl.tn.Table]
+			ti := mdb.tables[tbl.tn]
 			ti.droppedVersion = v
 			ti.dropped = true
 		}
 		if tbl.created {
 			ti := tbl.table
 			ti.createdVersion = v
-			pti, _ := mdb.tables[tbl.tn.Table]
+			pti, _ := mdb.tables[tbl.tn]
 			ti.previous = pti
-			mdb.tables[tbl.tn.Table] = ti
+			mdb.tables[tbl.tn] = ti
 		}
 		tbl.tctx = nil
+	}
+
+	for sn, sc := range tctx.schemas {
+		if sc.dropped {
+			si := mdb.schemas[sn]
+			si.droppedVersion = v
+			si.dropped = true
+		}
+		if sc.created {
+			si := sc.schema
+			si.createdVersion = v
+			psi, _ := mdb.schemas[sn]
+			si.previous = psi
+			mdb.schemas[sn] = si
+		}
 	}
 	return nil
 }

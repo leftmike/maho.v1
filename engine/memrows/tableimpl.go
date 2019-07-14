@@ -9,7 +9,7 @@ import (
 )
 
 type tableImpl struct {
-	name           string
+	tn             sql.TableName
 	createdVersion version
 	droppedVersion version
 	dropped        bool
@@ -70,7 +70,7 @@ func (mt *tableImpl) deleteRow(tctx *tcontext, idx int) error {
 
 	row := mt.rows[idx].modifyValues(tctx, false)
 	if row == nil {
-		return fmt.Errorf("memrows: table %s delete row: %d conflicting changes", mt.name, idx)
+		return fmt.Errorf("memrows: table %s delete row: %d conflicting changes", mt.tn, idx)
 	}
 	mt.rows[idx] = row
 	return nil
@@ -82,7 +82,7 @@ func (mt *tableImpl) updateRow(tctx *tcontext, updates []sql.ColumnUpdate, idx i
 
 	row := mt.rows[idx].modifyValues(tctx, true)
 	if row == nil {
-		return fmt.Errorf("memrows: table %s update row: %d conflicting changes", mt.name, idx)
+		return fmt.Errorf("memrows: table %s update row: %d conflicting changes", mt.tn, idx)
 	}
 	mt.rows[idx] = row
 	for _, up := range updates {
@@ -97,11 +97,11 @@ func (mt *tableImpl) checkRows(tid tid, rows []int) error {
 
 	for _, idx := range rows {
 		if idx >= len(mt.rows) || mt.rows[idx] == nil {
-			return fmt.Errorf("memrows: table %s row %d does not exist", mt.name, idx)
+			return fmt.Errorf("memrows: table %s row %d does not exist", mt.tn, idx)
 		}
 		row := mt.rows[idx]
 		if !row.version.isTransaction() || row.version.getTID() != tid {
-			return fmt.Errorf("memrows: table %s row %d not part of transaction: %d", mt.name, idx,
+			return fmt.Errorf("memrows: table %s row %d not part of transaction: %d", mt.tn, idx,
 				tid)
 		}
 	}

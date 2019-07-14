@@ -9,10 +9,8 @@ To Do:
 - fuzzing: parser.Parse
 
 - support schemas
--- update memrows to use schemas
 -- test schema support (testeng.go)
-
-- memrows: createSchema and dropSchema should be transactional
+-- memrows: ListSchemas (and ListTables) transaction aware
 
 - USE <database> as equivalent to SET DATABASE <database>
 - SHOW DATABASE
