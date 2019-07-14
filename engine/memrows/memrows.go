@@ -233,7 +233,7 @@ func (me *memrowsEngine) ListSchemas(ctx context.Context, tx engine.Transaction,
 	if !ok {
 		return nil, fmt.Errorf("memrows: database %s not found", dbname)
 	}
-	return mdb.listTables(ctx, tx) // XXX
+	return mdb.listSchemas(ctx, tx)
 }
 
 func (me *memrowsEngine) ListTables(ctx context.Context, tx engine.Transaction,
@@ -246,17 +246,7 @@ func (me *memrowsEngine) ListTables(ctx context.Context, tx engine.Transaction,
 	if !ok {
 		return nil, fmt.Errorf("memrows: database %s not found", sn.Database)
 	}
-	return mdb.listTables(ctx, tx) // XXX
-}
-
-func visibleVersion(ti *tableImpl, v version) *tableImpl {
-	for ti != nil {
-		if v >= ti.createdVersion && (!ti.dropped || v < ti.droppedVersion) {
-			break
-		}
-		ti = ti.previous
-	}
-	return ti
+	return mdb.listTables(ctx, tx, sn)
 }
 
 func (mdb *database) createSchema(ctx context.Context, tx engine.Transaction,
@@ -307,7 +297,13 @@ func (mdb *database) dropSchema(ctx context.Context, tx engine.Transaction, sn s
 		return err
 	}
 
-	// XXX: check to make sure no tables in the schema
+	tblnames, err := mdb.listTables(ctx, tx, sn)
+	if err != nil {
+		return err
+	}
+	if len(tblnames) != 0 {
+		return fmt.Errorf("memrows: schemas %s is not empty", sn)
+	}
 
 	if sc, ok := tctx.schemas[sn]; ok {
 		if sc.created {
@@ -351,6 +347,16 @@ func (mdb *database) dropSchema(ctx context.Context, tx engine.Transaction, sn s
 	return nil
 }
 
+func visibleTableVersion(ti *tableImpl, v version) *tableImpl {
+	for ti != nil {
+		if v >= ti.createdVersion && (!ti.dropped || v < ti.droppedVersion) {
+			break
+		}
+		ti = ti.previous
+	}
+	return ti
+}
+
 func (mdb *database) lookupTable(ctx context.Context, tx engine.Transaction,
 	tn sql.TableName) (engine.Table, error) {
 
@@ -372,7 +378,7 @@ func (mdb *database) lookupTable(ctx context.Context, tx engine.Transaction,
 	ti, _ := mdb.tables[tn]
 	mdb.mutex.RUnlock()
 
-	ti = visibleVersion(ti, tctx.version)
+	ti = visibleTableVersion(ti, tctx.version)
 	if ti == nil {
 		return nil, fmt.Errorf("memrows: table %s not found", tn)
 	}
@@ -384,6 +390,32 @@ func (mdb *database) lookupTable(ctx context.Context, tx engine.Transaction,
 	}
 	tctx.tables[tn] = tbl
 	return tbl, nil
+}
+
+func visibleSchemaVersion(si *schemaImpl, v version) *schemaImpl {
+	for si != nil {
+		if v >= si.createdVersion && (!si.dropped || v < si.droppedVersion) {
+			break
+		}
+		si = si.previous
+	}
+	return si
+}
+
+func (mdb *database) schemaVisible(tctx *tcontext, sn sql.SchemaName) bool {
+
+	if sc, ok := tctx.schemas[sn]; ok {
+		if sc.dropped && !sc.created {
+			return false
+		}
+		return true
+	}
+
+	mdb.mutex.Lock()
+	si, _ := mdb.schemas[sn]
+	mdb.mutex.Unlock()
+
+	return visibleSchemaVersion(si, tctx.version) != nil
 }
 
 func (mdb *database) createTable(ctx context.Context, tx engine.Transaction, tn sql.TableName,
@@ -424,6 +456,11 @@ func (mdb *database) createTable(ctx context.Context, tx engine.Transaction, tn 
 
 			return fmt.Errorf("memrows: table %s conflicting change", tn)
 		}
+	}
+
+	sn := tn.SchemaName()
+	if !mdb.schemaVisible(tctx, sn) {
+		return fmt.Errorf("memrows: schema %s not found", sn)
 	}
 
 	tctx.tables[tn] = &table{
@@ -496,15 +533,42 @@ func (mdb *database) dropTable(ctx context.Context, tx engine.Transaction, tn sq
 	return nil
 }
 
-func (mdb *database) listTables(ctx context.Context, tx engine.Transaction) ([]sql.Identifier,
+func (mdb *database) listSchemas(ctx context.Context, tx engine.Transaction) ([]sql.Identifier,
 	error) {
+
+	var scnames []sql.Identifier
+
+	tctx := service.GetTxContext(tx, mdb).(*tcontext)
+	for sn, sc := range tctx.schemas {
+		if !sc.dropped {
+			scnames = append(scnames, sn.Schema)
+		}
+	}
+
+	mdb.mutex.RLock()
+	defer mdb.mutex.RUnlock()
+
+	for sn, si := range mdb.schemas {
+		if _, ok := tctx.schemas[sn]; ok {
+			continue
+		}
+		if visibleSchemaVersion(si, tctx.version) != nil {
+			scnames = append(scnames, sn.Schema)
+		}
+	}
+
+	return scnames, nil
+}
+
+func (mdb *database) listTables(ctx context.Context, tx engine.Transaction,
+	sn sql.SchemaName) ([]sql.Identifier, error) {
 
 	var tblnames []sql.Identifier
 
 	tctx := service.GetTxContext(tx, mdb).(*tcontext)
-	for _, tbl := range tctx.tables {
+	for tn, tbl := range tctx.tables {
 		if !tbl.dropped {
-			tblnames = append(tblnames, tbl.tn.Table)
+			tblnames = append(tblnames, tn.Table)
 		}
 	}
 
@@ -512,11 +576,14 @@ func (mdb *database) listTables(ctx context.Context, tx engine.Transaction) ([]s
 	defer mdb.mutex.RUnlock()
 
 	for tn, ti := range mdb.tables {
-		if _, ok := tctx.tables[tn]; !ok {
-			ti = visibleVersion(ti, tctx.version)
-			if ti != nil {
-				tblnames = append(tblnames, tn.Table)
-			}
+		if _, ok := tctx.tables[tn]; ok {
+			continue
+		}
+		if tn.SchemaName() != sn {
+			continue
+		}
+		if visibleTableVersion(ti, tctx.version) != nil {
+			tblnames = append(tblnames, tn.Table)
 		}
 	}
 	return tblnames, nil

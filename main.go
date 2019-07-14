@@ -10,13 +10,12 @@ To Do:
 
 - support schemas
 -- test schema support (testeng.go)
--- memrows: ListSchemas (and ListTables) transaction aware
+
+- add information_schema: columns, schemata, tables
 
 - USE <database> as equivalent to SET DATABASE <database>
 - SHOW DATABASE
 - SHOW SCHEMA
-
-- add information_schema: columns, schemata, tables
 
 - Rows interface:
 -- return a chunk of rows at a time organized as a slice of values for each column
