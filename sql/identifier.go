@@ -18,6 +18,7 @@ const (
 	COUNT
 	COUNT_ALL
 	DOUBLE
+	INFORMATION_SCHEMA
 	INT
 	INT2
 	INT4
@@ -88,10 +89,11 @@ const (
 )
 
 var knownIdentifiers = map[string]Identifier{
-	"count":     COUNT,
-	"count_all": COUNT_ALL,
-	"public":    PUBLIC,
-	"system":    SYSTEM,
+	"count":              COUNT,
+	"count_all":          COUNT_ALL,
+	"information_schema": INFORMATION_SCHEMA,
+	"public":             PUBLIC,
+	"system":             SYSTEM,
 }
 
 var knownKeywords = map[string]struct {

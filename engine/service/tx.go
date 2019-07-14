@@ -156,7 +156,7 @@ func (ts *TransactionService) makeTransactionsTable(ctx context.Context, tx engi
 		})
 	}
 
-	return virtual.MakeTable(tn.String(),
+	return virtual.MakeTable(tn,
 		[]sql.Identifier{sql.ID("transaction"), sql.ID("session")},
 		[]sql.ColumnType{sql.StringColType, sql.StringColType}, values), nil
 }

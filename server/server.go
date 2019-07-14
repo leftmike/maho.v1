@@ -137,7 +137,7 @@ func (svr *Server) makeSessionsVirtual(ctx context.Context, tx engine.Transactio
 		})
 	}
 
-	return virtual.MakeTable(tn.String(),
+	return virtual.MakeTable(tn,
 		[]sql.Identifier{sql.ID("session"), sql.ID("user"), sql.ID("type"), sql.ID("address"),
 			sql.ID("interactive")},
 		[]sql.ColumnType{sql.StringColType, sql.IdColType, sql.IdColType,

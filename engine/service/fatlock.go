@@ -350,7 +350,7 @@ func (svc *LockService) makeLocksTable(ctx context.Context, tx engine.Transactio
 		})
 	}
 
-	return virtual.MakeTable(tn.String(),
+	return virtual.MakeTable(tn,
 		[]sql.Identifier{sql.ID("key"), sql.ID("locker"), sql.ID("level"), sql.ID("held"),
 			sql.ID("place")},
 		[]sql.ColumnType{sql.IdColType, sql.IdColType, sql.IdColType, sql.BoolColType,

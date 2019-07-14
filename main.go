@@ -8,8 +8,6 @@ To Do:
 
 - fuzzing: parser.Parse
 
-- add information_schema: columns, schemata, tables
-
 - USE <database> as equivalent to SET DATABASE <database>
 - SHOW DATABASE
 - SHOW SCHEMA
