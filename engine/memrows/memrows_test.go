@@ -10,6 +10,7 @@ import (
 func TestMemRows(t *testing.T) {
 	e := memrows.NewEngine("testdata")
 	test.RunDatabaseTest(t, e)
+	test.RunSchemaTest(t, e)
 	test.RunTableTest(t, e)
 	test.RunParallelTest(t, e)
 	test.RunStressTest(t, e)

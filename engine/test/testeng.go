@@ -27,6 +27,11 @@ const (
 	cmdCommit
 	cmdRollback
 	cmdNextStmt
+	cmdCreateSchema
+	cmdDropSchema
+	cmdSetSchema
+	cmdListSchemas
+	cmdLookupSchema
 	cmdLookupTable
 	cmdCreateTable
 	cmdDropTable
@@ -42,9 +47,9 @@ type cmd struct {
 	tdx              int                // Which transaction to use
 	fail             bool               // The command should fail
 	needTransactions bool               // The test requires that transactions are supported
-	ifExists         bool               // Flag for DropTable
-	name             sql.Identifier     // Name of the table
-	list             []string           // List of table names
+	ifExists         bool               // Flag for DropTable or DropSchema
+	name             sql.Identifier     // Name of the table or schema
+	list             []string           // List of table names or schema names
 	values           [][]sql.Value      // Expected rows (table.Rows)
 	row              []sql.Value        // Row to insert (table.Insert)
 	rowID            int                // Row to update (rows.Update) or delete (rows.Delete)
@@ -86,6 +91,8 @@ func testTableLifecycle(t *testing.T, e engine.Engine, dbname sql.Identifier, cm
 	transactions := [4]transactionState{}
 	state := &transactions[0]
 	state.tdx = 0
+
+	scname := sql.PUBLIC
 
 	var ctx context.Context
 
@@ -142,10 +149,72 @@ func testTableLifecycle(t *testing.T, e engine.Engine, dbname sql.Identifier, cm
 			state.tx = nil
 		case cmdNextStmt:
 			state.tx.NextStmt()
+		case cmdCreateSchema:
+			err := e.CreateSchema(ctx, state.tx, sql.SchemaName{dbname, cmd.name})
+			if cmd.fail {
+				if err == nil {
+					t.Errorf("CreateSchema(%s) did not fail", cmd.name)
+				}
+			} else if err != nil {
+				t.Errorf("CreateSchema(%s) failed with %s", cmd.name, err)
+			}
+		case cmdDropSchema:
+			err := e.DropSchema(ctx, state.tx, sql.SchemaName{dbname, cmd.name}, cmd.ifExists)
+			if cmd.fail {
+				if err == nil {
+					t.Errorf("DropSchema(%s) did not fail", cmd.name)
+				}
+			} else if err != nil {
+				t.Errorf("DropSchema(%s) failed with %s", cmd.name, err)
+			}
+		case cmdSetSchema:
+			scname = cmd.name
+		case cmdListSchemas:
+			ve, ok := e.(virtual.Engine)
+			if !ok {
+				break
+			}
+			scnames, err := ve.ListSchemas(ctx, state.tx, dbname)
+			if err != nil {
+				t.Errorf("ListSchemas() failed with %s", err)
+			} else {
+				var ret []string
+				for _, scname := range scnames {
+					ret = append(ret, scname.String())
+				}
+				sort.Strings(ret)
+				if !reflect.DeepEqual(cmd.list, ret) {
+					t.Errorf("ListSchemas() got %v want %v", ret, cmd.list)
+				}
+			}
+		case cmdLookupSchema:
+			ve, ok := e.(virtual.Engine)
+			if !ok {
+				break
+			}
+			scnames, err := ve.ListSchemas(ctx, state.tx, dbname)
+			if err != nil {
+				t.Errorf("ListSchemas() failed with %s", err)
+			} else {
+				found := false
+				for _, scname := range scnames {
+					if scname == cmd.name {
+						found = true
+						break
+					}
+				}
+				if cmd.fail {
+					if found {
+						t.Errorf("LookupSchema(%s) did not fail", cmd.name)
+					}
+				} else if !found {
+					t.Errorf("LookupSchema(%s): schema not found", cmd.name)
+				}
+			}
 		case cmdLookupTable:
 			var err error
 			state.tbl, err = e.LookupTable(ctx, state.tx,
-				sql.TableName{dbname, sql.PUBLIC, cmd.name})
+				sql.TableName{dbname, scname, cmd.name})
 			if cmd.fail {
 				if err == nil {
 					t.Errorf("LookupTable(%s) did not fail", cmd.name)
@@ -163,7 +232,7 @@ func testTableLifecycle(t *testing.T, e engine.Engine, dbname sql.Identifier, cm
 				}
 			}
 		case cmdCreateTable:
-			err := e.CreateTable(ctx, state.tx, sql.TableName{dbname, sql.PUBLIC, cmd.name},
+			err := e.CreateTable(ctx, state.tx, sql.TableName{dbname, scname, cmd.name},
 				columns, columnTypes)
 			if cmd.fail {
 				if err == nil {
@@ -173,7 +242,7 @@ func testTableLifecycle(t *testing.T, e engine.Engine, dbname sql.Identifier, cm
 				t.Errorf("CreateTable(%s) failed with %s", cmd.name, err)
 			}
 		case cmdDropTable:
-			err := e.DropTable(ctx, state.tx, sql.TableName{dbname, sql.PUBLIC, cmd.name},
+			err := e.DropTable(ctx, state.tx, sql.TableName{dbname, scname, cmd.name},
 				cmd.ifExists)
 			if cmd.fail {
 				if err == nil {
@@ -187,7 +256,7 @@ func testTableLifecycle(t *testing.T, e engine.Engine, dbname sql.Identifier, cm
 			if !ok {
 				break
 			}
-			tblnames, err := ve.ListTables(ctx, state.tx, sql.SchemaName{dbname, sql.PUBLIC})
+			tblnames, err := ve.ListTables(ctx, state.tx, sql.SchemaName{dbname, scname})
 			if err != nil {
 				t.Errorf("ListTables() failed with %s", err)
 			} else {
@@ -493,6 +562,226 @@ func RunDatabaseTest(t *testing.T, e engine.Engine) {
 			{cmd: cmdCommit},
 			{cmd: cmdTransaction, tdx: 1},
 			{cmd: cmdDropTable, name: sql.ID("tbl8"), fail: true},
+			{cmd: cmdCommit},
+		})
+}
+
+func RunSchemaTest(t *testing.T, e engine.Engine) {
+	t.Helper()
+
+	dbname := sql.ID("schema_test")
+	err := e.CreateDatabase(dbname, nil)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	testTableLifecycle(t, e, dbname,
+		[]cmd{
+			{cmd: cmdBegin},
+			{cmd: cmdLookupSchema, name: sql.ID("sc-a"), fail: true},
+			{cmd: cmdCreateSchema, name: sql.ID("sc-a")},
+			{cmd: cmdLookupSchema, name: sql.ID("sc-a")},
+			{cmd: cmdCommit},
+
+			{cmd: cmdBegin},
+			{cmd: cmdLookupSchema, name: sql.ID("sc-a")},
+			{cmd: cmdCreateSchema, name: sql.ID("sc-a"), fail: true},
+			{cmd: cmdLookupSchema, name: sql.ID("sc-a")},
+			{cmd: cmdCommit},
+
+			{cmd: cmdBegin},
+			{cmd: cmdListSchemas, list: []string{"sc-a"}},
+			{cmd: cmdCommit},
+			{cmd: cmdBegin},
+			{cmd: cmdCreateSchema, name: sql.ID("sc-b")},
+			{cmd: cmdCreateSchema, name: sql.ID("sc-c")},
+			{cmd: cmdCreateSchema, name: sql.ID("sc-d")},
+			{cmd: cmdListSchemas, list: []string{"sc-a", "sc-b", "sc-c", "sc-d"}},
+			{cmd: cmdCommit},
+
+			{cmd: cmdBegin},
+			{cmd: cmdListSchemas, list: []string{"sc-a", "sc-b", "sc-c", "sc-d"}},
+			{cmd: cmdCommit},
+
+			{cmd: cmdBegin},
+			{cmd: cmdDropSchema, name: sql.ID("sc-a")},
+			{cmd: cmdListSchemas, list: []string{"sc-b", "sc-c", "sc-d"}},
+			{cmd: cmdCommit},
+
+			{cmd: cmdBegin},
+			{cmd: cmdListSchemas, list: []string{"sc-b", "sc-c", "sc-d"}},
+			{cmd: cmdCommit},
+
+			{cmd: cmdBegin, needTransactions: true},
+			{cmd: cmdCreateSchema, name: sql.ID("sc-e")},
+			{cmd: cmdListSchemas, list: []string{"sc-b", "sc-c", "sc-d", "sc-e"}},
+			{cmd: cmdRollback},
+
+			{cmd: cmdBegin},
+			{cmd: cmdListSchemas, list: []string{"sc-b", "sc-c", "sc-d"}},
+			{cmd: cmdCommit},
+
+			{cmd: cmdBegin},
+			{cmd: cmdDropSchema, name: sql.ID("sc-c")},
+			{cmd: cmdListSchemas, list: []string{"sc-b", "sc-d"}},
+			{cmd: cmdRollback},
+
+			{cmd: cmdBegin},
+			{cmd: cmdListSchemas, list: []string{"sc-b", "sc-c", "sc-d"}},
+			{cmd: cmdCommit},
+		})
+
+	for i := 0; i < 2; i++ {
+		testTableLifecycle(t, e, dbname,
+			[]cmd{
+				{cmd: cmdBegin},
+				{cmd: cmdLookupSchema, name: sql.ID("sc1"), fail: true},
+				{cmd: cmdCreateSchema, name: sql.ID("sc1")},
+				{cmd: cmdLookupSchema, name: sql.ID("sc1")},
+				{cmd: cmdCommit},
+				{cmd: cmdBegin},
+				{cmd: cmdLookupSchema, name: sql.ID("sc1")},
+				{cmd: cmdDropSchema, name: sql.ID("sc1")},
+				{cmd: cmdLookupSchema, name: sql.ID("sc1"), fail: true},
+				{cmd: cmdCommit},
+			})
+	}
+
+	testTableLifecycle(t, e, dbname,
+		[]cmd{
+			{cmd: cmdBegin},
+			{cmd: cmdLookupSchema, name: sql.ID("sc2"), fail: true},
+			{cmd: cmdDropSchema, name: sql.ID("sc2"), ifExists: true},
+			{cmd: cmdLookupSchema, name: sql.ID("sc2"), fail: true},
+			{cmd: cmdCommit},
+		})
+
+	testTableLifecycle(t, e, dbname,
+		[]cmd{
+			{cmd: cmdBegin},
+			{cmd: cmdLookupSchema, name: sql.ID("sc2"), fail: true},
+			{cmd: cmdDropSchema, name: sql.ID("sc2"), fail: true},
+			{cmd: cmdLookupSchema, name: sql.ID("sc2"), fail: true},
+			{cmd: cmdCommit},
+		})
+
+	testTableLifecycle(t, e, dbname,
+		[]cmd{
+			{cmd: cmdBegin},
+			{cmd: cmdCreateSchema, name: sql.ID("sc3")},
+			{cmd: cmdLookupSchema, name: sql.ID("sc3")},
+			{cmd: cmdCommit},
+
+			{cmd: cmdBegin},
+			{cmd: cmdDropSchema, name: sql.ID("sc3")},
+			{cmd: cmdCreateSchema, name: sql.ID("sc3")},
+			{cmd: cmdLookupSchema, name: sql.ID("sc3")},
+			{cmd: cmdCommit},
+
+			{cmd: cmdBegin},
+			{cmd: cmdLookupSchema, name: sql.ID("sc3")},
+			{cmd: cmdCommit},
+		})
+
+	for i := 0; i < 2; i++ {
+		testTableLifecycle(t, e, dbname,
+			[]cmd{
+				{cmd: cmdBegin},
+				{cmd: cmdCreateSchema, name: sql.ID("sc4")},
+				{cmd: cmdLookupSchema, name: sql.ID("sc4")},
+				{cmd: cmdDropSchema, name: sql.ID("sc4")},
+				{cmd: cmdLookupSchema, name: sql.ID("sc4"), fail: true},
+				{cmd: cmdCommit},
+
+				{cmd: cmdBegin},
+				{cmd: cmdLookupSchema, name: sql.ID("sc4"), fail: true},
+				{cmd: cmdCommit},
+			})
+	}
+
+	testTableLifecycle(t, e, dbname,
+		[]cmd{
+			{cmd: cmdBegin},
+			{cmd: cmdCreateSchema, name: sql.ID("sc5")},
+			{cmd: cmdLookupSchema, name: sql.ID("sc5")},
+			{cmd: cmdCommit},
+
+			{cmd: cmdBegin},
+			{cmd: cmdDropSchema, name: sql.ID("sc5")},
+			{cmd: cmdCreateSchema, name: sql.ID("sc5")},
+			{cmd: cmdLookupSchema, name: sql.ID("sc5")},
+			{cmd: cmdRollback},
+
+			{cmd: cmdBegin},
+			{cmd: cmdLookupSchema, name: sql.ID("sc5")},
+			{cmd: cmdCommit},
+		})
+
+	testTableLifecycle(t, e, dbname,
+		[]cmd{
+			{cmd: cmdBegin},
+			{cmd: cmdCreateSchema, name: sql.ID("sc6")},
+			{cmd: cmdLookupSchema, name: sql.ID("sc6")},
+			{cmd: cmdDropSchema, name: sql.ID("sc6")},
+			{cmd: cmdRollback},
+
+			{cmd: cmdBegin},
+			{cmd: cmdLookupSchema, name: sql.ID("sc6"), fail: true},
+			{cmd: cmdCommit},
+		})
+
+	testTableLifecycle(t, e, dbname,
+		[]cmd{
+			{cmd: cmdBegin},
+			{cmd: cmdCreateSchema, name: sql.ID("sc7")},
+			{cmd: cmdLookupSchema, name: sql.ID("sc7")},
+			{cmd: cmdCommit},
+		})
+
+	for i := 0; i < 8; i++ {
+		testTableLifecycle(t, e, dbname,
+			[]cmd{
+				{cmd: cmdBegin},
+				{cmd: cmdLookupSchema, name: sql.ID("sc7")},
+				{cmd: cmdDropSchema, name: sql.ID("sc7")},
+				{cmd: cmdLookupSchema, name: sql.ID("sc7"), fail: true},
+				{cmd: cmdCreateSchema, name: sql.ID("sc7")},
+				{cmd: cmdLookupSchema, name: sql.ID("sc7")},
+				{cmd: cmdCommit},
+			})
+	}
+
+	testTableLifecycle(t, e, dbname,
+		[]cmd{
+			{cmd: cmdBegin},
+			{cmd: cmdLookupSchema, name: sql.ID("sc7")},
+			{cmd: cmdCommit},
+		})
+
+	testTableLifecycle(t, e, dbname,
+		[]cmd{
+			{cmd: cmdTransaction, tdx: 0},
+			{cmd: cmdBegin},
+			{cmd: cmdTransaction, tdx: 1},
+			{cmd: cmdBegin},
+			{cmd: cmdTransaction, tdx: 0},
+			{cmd: cmdCreateSchema, name: sql.ID("sc8")},
+			{cmd: cmdCommit},
+			{cmd: cmdTransaction, tdx: 1},
+			{cmd: cmdCreateSchema, name: sql.ID("sc8"), fail: true},
+			{cmd: cmdCommit},
+
+			{cmd: cmdTransaction, tdx: 0},
+			{cmd: cmdBegin},
+			{cmd: cmdTransaction, tdx: 1},
+			{cmd: cmdBegin},
+			{cmd: cmdTransaction, tdx: 0},
+			{cmd: cmdCreateSchema, name: sql.ID("sc8"), fail: true},
+			{cmd: cmdDropSchema, name: sql.ID("sc8")},
+			{cmd: cmdDropSchema, name: sql.ID("sc8"), fail: true},
+			{cmd: cmdCommit},
+			{cmd: cmdTransaction, tdx: 1},
+			{cmd: cmdDropSchema, name: sql.ID("sc8"), fail: true},
 			{cmd: cmdCommit},
 		})
 }

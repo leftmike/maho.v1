@@ -10,6 +10,7 @@ import (
 func TestBasic(t *testing.T) {
 	e := basic.NewEngine("testdata")
 	test.RunDatabaseTest(t, e)
+	test.RunSchemaTest(t, e)
 	test.RunTableTest(t, e)
 	test.RunParallelTest(t, e)
 }

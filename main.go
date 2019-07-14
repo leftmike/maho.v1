@@ -8,9 +8,6 @@ To Do:
 
 - fuzzing: parser.Parse
 
-- support schemas
--- test schema support (testeng.go)
-
 - add information_schema: columns, schemata, tables
 
 - USE <database> as equivalent to SET DATABASE <database>
