@@ -66,9 +66,9 @@ CREATE SCHEMA [database '.'] schema
 ```
 
 ```
-CREATE TABLE [[database '.'] schema '.'] table '(' <column> [',' ...] ')'
-<column> = name <data_type> [(DEFAULT <expr>) | (NOT NULL)]
-<data_type> =
+CREATE TABLE [[database '.'] schema '.'] table '(' column [',' ...] ')'
+column = name data_type [(DEFAULT expr) | (NOT NULL)]
+data_type =
 	| BINARY ['(' length ')']
 	| VARBINARY ['(' length ')']
 	| BLOB ['(' length ')']
@@ -89,7 +89,7 @@ CREATE TABLE [[database '.'] schema '.'] table '(' <column> [',' ...] ')'
 ```
 
 ```
-DELETE FROM [[database '.'] schema '.'] table [WHERE <expr>]
+DELETE FROM [[database '.'] schema '.'] table [WHERE expr]
 ```
 
 ```
@@ -106,7 +106,7 @@ DROP TABLE [IF EXISTS] [[database '.'] schema '.'] table [',' ...]
 
 ```
 INSERT INTO [[database '.'] schema '.'] table ['(' column [',' ...] ')']
-	VALUES '(' <expr> | DEFAULT [',' ...] ')' [',' ...]
+	VALUES '(' expr | DEFAULT [',' ...] ')' [',' ...]
 ```
 
 ```
@@ -114,22 +114,22 @@ ROLLBACK
 ```
 
 ```
-SELECT <select-list>
-    [FROM <from-item> [',' ...]]
-    [WHERE <expr>]
-    [GROUP BY <expr> [',' ...]]
-    [HAVING <expr>]
+SELECT select-list
+    [FROM from-item [',' ...]]
+    [WHERE expr]
+    [GROUP BY expr [',' ...]]
+    [HAVING expr]
     [ORDER BY column [ASC | DESC] [',' ...]]
-<select-list> = '*'
-    | <select-item> [',' ...]
-<select-item> = table '.' '*'
+select-list = '*'
+    | select-item [',' ...]
+select-item = table '.' '*'
     | [table '.' ] column [[AS] column-alias]
-    | <expr> [[AS] column-alias]
-<from-item> = [[database '.'] schema '.'] table [[AS] alias]
-    | '(' <select> | <values> ')' [AS] alias ['(' column-alias [',' ...] ')']
-    | '(' <from-item> [',' ...] ')'
-    | <from-item> <join-type> <from-item> [ON <expr> | USING '(' join-column [',' ...] ')']
-<join-type> = [INNER] JOIN
+    | expr [[AS] column-alias]
+from-item = [[database '.'] schema '.'] table [[AS] alias]
+    | '(' select | values ')' [AS] alias ['(' column-alias [',' ...] ')']
+    | '(' from-item [',' ...] ')'
+    | from-item join-type from-item [ON expr | USING '(' join-column [',' ...] ')']
+join-type = [INNER] JOIN
     | LEFT [OUTER] JOIN
     | RIGHT [OUTER] JOIN
     | FULL [OUTER] JOIN
@@ -137,8 +137,8 @@ SELECT <select-list>
 ```
 
 ```
-SET DATABASE (TO | '=') <database>
-SET SCHEMA (TO | '=') <schema>
+SET DATABASE (TO | '=') database
+SET SCHEMA (TO | '=') schema
 ```
 
 ```
@@ -146,22 +146,26 @@ START TRANSACTION
 ```
 
 ```
-UPDATE [[database '.'] schema '.'] table SET column '=' <expr> [',' ...] [WHERE <expr>]
+UPDATE [[database '.'] schema '.'] table SET column '=' expr [',' ...] [WHERE expr]
 ```
 
 ```
-VALUES '(' <expr> [',' ...] ')' [',' ...]
+USE database
 ```
 
 ```
-<expr> = <literal>
-    | '-' <expr>
-    | NOT <expr>
-    | '(' <expr> ')'
-    | <expr> <op> <expr>
-    | <ref> ['.' <ref> ...]
-    | <func> '(' [<expr> [',' ...]] ')'
-<op> = '+' '-' '*' '/' '%'
+VALUES '(' expr [',' ...] ')' [',' ...]
+```
+
+```
+expr = literal
+    | '-' expr
+    | NOT expr
+    | '(' expr ')'
+    | expr op expr
+    | ref ['.' ref ...]
+    | func '(' [expr [',' ...]] ')'
+op = '+' '-' '*' '/' '%'
     | '=' '==' '!=' '<>' '<' '<=' '>' '>='
     | '<<' '>>' '&' '|'
     | AND | OR

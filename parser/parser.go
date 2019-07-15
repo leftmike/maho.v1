@@ -242,6 +242,7 @@ func (p *parser) parseStmt() evaluate.Stmt {
 		sql.SET,
 		sql.START,
 		sql.UPDATE,
+		sql.USE,
 		sql.VALUES,
 	) {
 	case sql.BEGIN:
@@ -298,6 +299,9 @@ func (p *parser) parseStmt() evaluate.Stmt {
 	case sql.UPDATE:
 		// UPDATE ...
 		return p.parseUpdate()
+	case sql.USE:
+		// USE ...
+		return p.parseUse()
 	case sql.VALUES:
 		// VALUES ...
 		return p.parseValues()
@@ -404,9 +408,9 @@ var types = map[sql.Identifier]sql.ColumnType{
 
 func (p *parser) parseCreateColumns(s *datadef.CreateTable) {
 	/*
-		CREATE TABLE [database '.'] table '(' <column> [',' ...] ')'
-		<column> = name <data_type> [(DEFAULT <expr>) | (NOT NULL)]
-		<data_type> =
+		CREATE TABLE [database '.'] table '(' column [',' ...] ')'
+		column = name data_type [(DEFAULT expr) | (NOT NULL)]
+		data_type =
 			| BINARY ['(' length ')']
 			| VARBINARY ['(' length ')']
 			| BLOB ['(' length ')']
@@ -481,7 +485,7 @@ func (p *parser) parseCreateColumns(s *datadef.CreateTable) {
 }
 
 func (p *parser) parseDelete() evaluate.Stmt {
-	// DELETE FROM [database '.'] table [WHERE <expr>]
+	// DELETE FROM [database '.'] table [WHERE expr]
 	var s query.Delete
 	s.Table = p.parseTableName()
 	if p.optionalReserved(sql.WHERE) {
@@ -566,15 +570,15 @@ func (p *parser) parseExpr() sql.Expr {
 }
 
 /*
-<expr> = <literal>
-    | '-' <expr>
-    | NOT <expr>
-    | '(' <expr> ')'
-    | <expr> <op> <expr>
-    | <ref> ['.' <ref> ...]
-    | <func> '(' [<expr> [',' ...]] ')'
+expr = literal
+    | '-' expr
+    | NOT expr
+    | '(' expr ')'
+    | expr op expr
+    | ref ['.' ref ...]
+    | func '(' [expr [',' ...]] ')'
     | 'count' '(' '*' ')'
-<op> = '+' '-' '*' '/' '%'
+op = '+' '-' '*' '/' '%'
     | '=' '==' '!=' '<>' '<' '<=' '>' '>='
     | '<<' '>>' '&' '|'
     | AND | OR
@@ -625,7 +629,7 @@ func (p *parser) parseSubExpr() sql.Expr {
 	} else if r == token.Identifier {
 		id := p.sctx.Identifier
 		if p.maybeToken(token.LParen) {
-			// <func> ( <expr> [,...] )
+			// func ( expr [,...] )
 			c := &expr.Call{Name: id}
 			if !p.maybeToken(token.RParen) {
 				if id == sql.COUNT && p.maybeToken(token.Star) {
@@ -643,7 +647,7 @@ func (p *parser) parseSubExpr() sql.Expr {
 			}
 			e = c
 		} else {
-			// <ref> [. <ref>]
+			// ref [. ref]
 			ref := expr.Ref{p.sctx.Identifier}
 			for p.maybeToken(token.Dot) {
 				ref = append(ref, p.expectIdentifier("expected a reference"))
@@ -651,10 +655,10 @@ func (p *parser) parseSubExpr() sql.Expr {
 			e = ref
 		}
 	} else if r == token.Minus {
-		// - <expr>
+		// - expr
 		e = &expr.Unary{Op: expr.NegateOp, Expr: p.parseSubExpr()}
 	} else if r == token.LParen {
-		// ( <expr> )
+		// ( expr )
 		e = &expr.Unary{Op: expr.NoOp, Expr: p.parseSubExpr()}
 		if p.scan() != token.RParen {
 			p.error(fmt.Sprintf("expected closing parenthesis, got %s", p.got()))
@@ -683,7 +687,7 @@ func (p *parser) parseSubExpr() sql.Expr {
 func (p *parser) parseInsert() evaluate.Stmt {
 	/*
 		INSERT INTO [database '.'] table ['(' column [',' ...] ')']
-			VALUES '(' <expr> | DEFAULT [',' ...] ')' [',' ...]
+			VALUES '(' expr | DEFAULT [',' ...] ')' [',' ...]
 	*/
 
 	var s query.InsertValues
@@ -737,7 +741,7 @@ func (p *parser) parseInsert() evaluate.Stmt {
 
 func (p *parser) parseValues() *query.Values {
 	/*
-	   <values> = VALUES '(' <expr> [',' ...] ')' [',' ...]
+	   values = VALUES '(' expr [',' ...] ')' [',' ...]
 	*/
 
 	var s query.Values
@@ -767,18 +771,18 @@ func (p *parser) parseValues() *query.Values {
 }
 
 /*
-<select> =
-    SELECT <select-list>
-    [FROM <from-item> [',' ...]]
-    [WHERE <expr>]
-    [GROUP BY <expr> [',' ...]]
-    [HAVING <expr>]
+select =
+    SELECT select-list
+    [FROM from-item [',' ...]]
+    [WHERE expr]
+    [GROUP BY expr [',' ...]]
+    [HAVING expr]
     [ORDER BY column [ASC | DESC] [',' ...]]
-<select-list> = '*'
-    | <select-item> [',' ...]
-<select-item> = table '.' '*'
+select-list = '*'
+    | select-item [',' ...]
+select-item = table '.' '*'
     | [table '.' ] column [[AS] column-alias]
-    | <expr> [[AS] column-alias]
+    | expr [[AS] column-alias]
 */
 
 func (p *parser) parseSelect() *query.Select {
@@ -803,7 +807,7 @@ func (p *parser) parseSelect() *query.Select {
 			}
 			p.unscan()
 
-			// <expr> [[ AS ] column-alias]
+			// expr [[ AS ] column-alias]
 			s.Results = append(s.Results, query.ExprResult{
 				Expr:  p.parseExpr(),
 				Alias: p.parseAlias(false),
@@ -860,11 +864,11 @@ func (p *parser) parseSelect() *query.Select {
 }
 
 /*
-<from-item> = [database '.'] table [[AS] alias]
-    | '(' <select> | <values> ')' [AS] alias ['(' column-alias [',' ...] ')']
-    | '(' <from-item> [',' ...] ')'
-    | <from-item> <join-type> <from-item> [ON <expr> | USING '(' join-column [',' ...] ')']
-<join-type> = [INNER] JOIN
+from-item = [database '.'] table [[AS] alias]
+    | '(' select | values ')' [AS] alias ['(' column-alias [',' ...] ')']
+    | '(' from-item [',' ...] ')'
+    | from-item join-type from-item [ON expr | USING '(' join-column [',' ...] ')']
+join-type = [INNER] JOIN
     | LEFT [OUTER] JOIN
     | RIGHT [OUTER] JOIN
     | FULL [OUTER] JOIN
@@ -964,7 +968,7 @@ func (p *parser) parseFromList() query.FromItem {
 }
 
 func (p *parser) parseUpdate() evaluate.Stmt {
-	// UPDATE [database '.'] table SET column '=' <expr> [',' ...] [WHERE <expr>]
+	// UPDATE [database '.'] table SET column '=' expr [',' ...] [WHERE expr]
 	var s query.Update
 	s.Table = p.parseTableName()
 	p.expectReserved(sql.SET)
@@ -988,17 +992,37 @@ func (p *parser) parseUpdate() evaluate.Stmt {
 }
 
 func (p *parser) parseSet() evaluate.Stmt {
-	// SET <variable> ( TO | '=' ) <literal>
+	// SET variable ( TO | '=' ) literal
 	var s misc.Set
 
 	if p.optionalReserved(sql.DATABASE) {
 		s.Variable = sql.DATABASE
+	} else if p.optionalReserved(sql.SCHEMA) {
+		s.Variable = sql.SCHEMA
 	} else {
 		s.Variable = p.expectIdentifier("expected a config variable")
 	}
 	if !p.maybeToken(token.Equal) {
 		p.expectReserved(sql.TO)
 	}
+	e := p.parseExpr()
+	l, ok := e.(*expr.Literal)
+	if !ok {
+		p.error(fmt.Sprintf("expected a literal value, got %s", e.String()))
+	}
+	if sv, ok := l.Value.(sql.StringValue); ok {
+		s.Value = string(sv)
+	} else {
+		s.Value = l.Value.String()
+	}
+
+	return &s
+}
+
+func (p *parser) parseUse() evaluate.Stmt {
+	// USE database
+	s := misc.Set{Variable: sql.DATABASE}
+
 	e := p.parseExpr()
 	l, ok := e.(*expr.Literal)
 	if !ok {

@@ -8,9 +8,14 @@ To Do:
 
 - fuzzing: parser.Parse
 
-- USE <database> as equivalent to SET DATABASE <database>
+- on parser error, skip to terminating ;
+
 - SHOW DATABASE
 - SHOW SCHEMA
+- SHOW COLUMNS FROM [[database '.'] schema '.'] table
+- SHOW DATABASES
+- SHOW SCHEMAS [FROM database]
+- SHOW TABLES [FROM [database '.'] schema]
 
 - Rows interface:
 -- return a chunk of rows at a time organized as a slice of values for each column
