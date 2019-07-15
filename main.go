@@ -8,8 +8,6 @@ To Do:
 
 - fuzzing: parser.Parse
 
-- on parser error, skip to terminating ;
-
 - SHOW DATABASE
 - SHOW SCHEMA
 - SHOW COLUMNS FROM [[database '.'] schema '.'] table

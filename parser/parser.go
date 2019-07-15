@@ -30,6 +30,7 @@ type parser struct {
 	current   uint
 	unscanned uint
 	scanned   rune
+	failed    bool
 }
 
 func NewParser(rr io.RuneReader, fn string) Parser {
@@ -48,6 +49,18 @@ func (p *parser) Parse() (stmt evaluate.Stmt, err error) {
 	}
 	p.unscan()
 
+	if p.failed {
+		for {
+			t := p.scan()
+			if t == token.EOF {
+				return nil, io.EOF
+			}
+			if t == token.EndOfStatement {
+				break
+			}
+		}
+	}
+
 	defer func() {
 		if r := recover(); r != nil {
 			if _, ok := r.(runtime.Error); ok {
@@ -55,6 +68,7 @@ func (p *parser) Parse() (stmt evaluate.Stmt, err error) {
 			}
 			err = r.(error)
 			stmt = nil
+			p.failed = true
 		}
 	}()
 
