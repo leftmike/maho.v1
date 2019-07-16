@@ -15,8 +15,10 @@ const (
 	BOOL
 	BOOLEAN
 	CHAR
+	COLUMNS
 	COUNT
 	COUNT_ALL
+	DATABASES
 	DOUBLE
 	INFORMATION_SCHEMA
 	INT
@@ -28,8 +30,10 @@ const (
 	PUBLIC
 	PRECISION
 	REAL
+	SCHEMAS
 	SMALLINT
 	SYSTEM
+	TABLES
 	TEXT
 	VARBINARY
 	VARCHAR
@@ -75,6 +79,7 @@ const (
 	SCHEMA
 	SELECT
 	SET
+	SHOW
 	START
 	TABLE
 	TO
@@ -90,11 +95,15 @@ const (
 )
 
 var knownIdentifiers = map[string]Identifier{
+	"columns":            COLUMNS,
 	"count":              COUNT,
 	"count_all":          COUNT_ALL,
+	"databases":          DATABASES,
 	"information_schema": INFORMATION_SCHEMA,
 	"public":             PUBLIC,
+	"schemas":            SCHEMAS,
 	"system":             SYSTEM,
+	"tables":             TABLES,
 }
 
 var knownKeywords = map[string]struct {
@@ -155,6 +164,7 @@ var knownKeywords = map[string]struct {
 	"SCHEMA":      {SCHEMA, true},
 	"SELECT":      {SELECT, true},
 	"SET":         {SET, true},
+	"SHOW":        {SHOW, true},
 	"SMALLINT":    {SMALLINT, false},
 	"START":       {START, true},
 	"TABLE":       {TABLE, true},

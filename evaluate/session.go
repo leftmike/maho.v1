@@ -89,6 +89,21 @@ func (ses *Session) Set(v sql.Identifier, s string) error {
 	return nil
 }
 
+func (ses *Session) Show(v sql.Identifier) (Rows, error) {
+	if v == sql.DATABASE {
+		return &Values{
+			Cols: []sql.Identifier{sql.DATABASE},
+			Rows: [][]sql.Value{{sql.StringValue(ses.DefaultDatabase.String())}},
+		}, nil
+	} else if v == sql.SCHEMA {
+		return &Values{
+			Cols: []sql.Identifier{sql.SCHEMA},
+			Rows: [][]sql.Value{{sql.StringValue(ses.DefaultSchema.String())}},
+		}, nil
+	}
+	return nil, fmt.Errorf("show: %s not found", v)
+}
+
 func (ses *Session) ResolveTableName(tn sql.TableName) sql.TableName {
 	if tn.Database == 0 {
 		tn.Database = ses.DefaultDatabase

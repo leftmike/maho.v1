@@ -32,8 +32,8 @@ func TestSelect(t *testing.T) {
 	}{
 		{
 			stmt: query.Select{
-				From: query.FromValues{
-					Values: query.Values{
+				From: query.FromStmt{
+					Stmt: &query.Values{
 						Expressions: [][]sql.Expr{
 							{expr.Int64Literal(1), expr.StringLiteral("abc"), expr.True(),
 								expr.Nil()},
@@ -52,8 +52,8 @@ func TestSelect(t *testing.T) {
 		},
 		{
 			stmt: query.Select{
-				From: query.FromValues{
-					Values: query.Values{
+				From: query.FromStmt{
+					Stmt: &query.Values{
 						Expressions: [][]sql.Expr{
 							{expr.Int64Literal(1), expr.StringLiteral("abc"), expr.True()},
 							{expr.Int64Literal(2), expr.StringLiteral("def"), expr.False()},
@@ -76,8 +76,8 @@ func TestSelect(t *testing.T) {
 		},
 		{
 			stmt: query.Select{
-				From: query.FromValues{
-					Values: query.Values{
+				From: query.FromStmt{
+					Stmt: &query.Values{
 						Expressions: [][]sql.Expr{
 							{expr.Nil(), expr.Nil(), expr.Nil()},
 						},
@@ -105,23 +105,28 @@ func TestSelect(t *testing.T) {
 			t.Errorf("(%v).String() got %q want %q", c.stmt, c.stmt.String(), c.s)
 			continue
 		}
-		rows, err := c.stmt.Rows(ses, tx)
+		ret, err := c.stmt.Plan(ses, tx)
 		if err != nil {
-			t.Errorf("(%v).Rows() failed with %s", c.stmt, err)
+			t.Errorf("(%v).Plan() failed with %s", c.stmt, err)
+			continue
+		}
+		rows, ok := ret.(evaluate.Rows)
+		if !ok {
+			t.Errorf("(%v).Plan() did not return Rows", c.stmt)
 			continue
 		}
 		cols := rows.Columns()
 		if !testutil.DeepEqual(cols, c.cols) {
-			t.Errorf("(%v).Rows().Columns() got %v want %v", c.stmt, cols, c.cols)
+			t.Errorf("(%v).Plan().Columns() got %v want %v", c.stmt, cols, c.cols)
 			continue
 		}
 		all, err := evaluate.AllRows(ses, rows)
 		if err != nil {
-			t.Errorf("(%v).Rows().Next() failed with %s", c.stmt, err)
+			t.Errorf("(%v).AllRows() failed with %s", c.stmt, err)
 		}
 		var trc string
 		if !testutil.DeepEqual(all, c.rows, &trc) {
-			t.Errorf("(%v).Rows() got %v want %v\n%s", c.stmt, all, c.rows, trc)
+			t.Errorf("(%v).AllRows() got %v want %v\n%s", c.stmt, all, c.rows, trc)
 		}
 
 		err = tx.Commit(ses.Context())

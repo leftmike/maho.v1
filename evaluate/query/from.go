@@ -79,6 +79,45 @@ func (fta FromTableAlias) rows(ses *evaluate.Session, tx engine.Transaction) (ev
 	return rows, makeFromContext(nam, rows.Columns()), nil
 }
 
+type FromStmt struct {
+	Stmt          evaluate.Stmt
+	Alias         sql.Identifier
+	ColumnAliases []sql.Identifier
+}
+
+func (fs FromStmt) String() string {
+	s := fmt.Sprintf("(%s) AS %s", fs.Stmt, fs.Alias)
+	if fs.ColumnAliases != nil {
+		s += " ("
+		for i, col := range fs.ColumnAliases {
+			if i > 0 {
+				s += ", "
+			}
+			s += col.String()
+		}
+		s += ")"
+	}
+	return s
+}
+
+func (fs FromStmt) rows(ses *evaluate.Session, tx engine.Transaction) (evaluate.Rows,
+	*fromContext, error) {
+
+	ret, err := fs.Stmt.Plan(ses, tx)
+	if err != nil {
+		return nil, nil, err
+	}
+	rows := ret.(evaluate.Rows)
+	cols := rows.Columns()
+	if fs.ColumnAliases != nil {
+		if len(fs.ColumnAliases) != len(cols) {
+			return nil, nil, fmt.Errorf("engine: wrong number of column aliases")
+		}
+		cols = fs.ColumnAliases
+	}
+	return rows, makeFromContext(fs.Alias, cols), nil
+}
+
 type colRef struct {
 	table  sql.Identifier
 	column sql.Identifier

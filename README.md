@@ -126,7 +126,7 @@ select-item = table '.' '*'
     | [table '.' ] column [[AS] column-alias]
     | expr [[AS] column-alias]
 from-item = [[database '.'] schema '.'] table [[AS] alias]
-    | '(' select | values ')' [AS] alias ['(' column-alias [',' ...] ')']
+    | '(' select | values | show ')' [AS] alias ['(' column-alias [',' ...] ')']
     | '(' from-item [',' ...] ')'
     | from-item join-type from-item [ON expr | USING '(' join-column [',' ...] ')']
 join-type = [INNER] JOIN

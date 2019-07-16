@@ -59,6 +59,7 @@ func (p *parser) Parse() (stmt evaluate.Stmt, err error) {
 				break
 			}
 		}
+		p.failed = false
 	}
 
 	defer func() {
@@ -254,6 +255,7 @@ func (p *parser) parseStmt() evaluate.Stmt {
 		sql.ROLLBACK,
 		sql.SELECT,
 		sql.SET,
+		sql.SHOW,
 		sql.START,
 		sql.UPDATE,
 		sql.USE,
@@ -306,6 +308,9 @@ func (p *parser) parseStmt() evaluate.Stmt {
 	case sql.SET:
 		// SET ...
 		return p.parseSet()
+	case sql.SHOW:
+		// SHOW ...
+		return p.parseShow()
 	case sql.START:
 		// START TRANSACTION
 		p.expectReserved(sql.TRANSACTION)
@@ -879,7 +884,7 @@ func (p *parser) parseSelect() *query.Select {
 
 /*
 from-item = [database '.'] table [[AS] alias]
-    | '(' select | values ')' [AS] alias ['(' column-alias [',' ...] ')']
+    | '(' select | values | show ')' [AS] alias ['(' column-alias [',' ...] ')']
     | '(' from-item [',' ...] ')'
     | from-item join-type from-item [ON expr | USING '(' join-column [',' ...] ')']
 join-type = [INNER] JOIN
@@ -893,17 +898,11 @@ func (p *parser) parseFromItem() query.FromItem {
 	var fi query.FromItem
 	if p.maybeToken(token.LParen) {
 		if p.optionalReserved(sql.SELECT) {
-			ss := p.parseSelect()
-			p.expectTokens(token.RParen)
-			a := p.parseAlias(true)
-			fi = query.FromSelect{Select: query.Select(*ss), Alias: a,
-				ColumnAliases: p.parseColumnAliases()}
+			fi = p.parseFromStmt(p.parseSelect())
 		} else if p.optionalReserved(sql.VALUES) {
-			vs := p.parseValues()
-			p.expectTokens(token.RParen)
-			a := p.parseAlias(true)
-			fi = query.FromValues{Values: query.Values(*vs), Alias: a,
-				ColumnAliases: p.parseColumnAliases()}
+			fi = p.parseFromStmt(p.parseValues())
+		} else if p.optionalReserved(sql.SHOW) {
+			fi = p.parseFromStmt(p.parseShow())
 		} else {
 			fi = p.parseFromList()
 			p.expectTokens(token.RParen)
@@ -981,6 +980,12 @@ func (p *parser) parseFromList() query.FromItem {
 	return fi
 }
 
+func (p *parser) parseFromStmt(s evaluate.Stmt) query.FromItem {
+	p.expectTokens(token.RParen)
+	a := p.parseAlias(true)
+	return query.FromStmt{Stmt: s, Alias: a, ColumnAliases: p.parseColumnAliases()}
+}
+
 func (p *parser) parseUpdate() evaluate.Stmt {
 	// UPDATE [database '.'] table SET column '=' expr [',' ...] [WHERE expr]
 	var s query.Update
@@ -1028,6 +1033,27 @@ func (p *parser) parseSet() evaluate.Stmt {
 		s.Value = string(sv)
 	} else {
 		s.Value = l.Value.String()
+	}
+
+	return &s
+}
+
+func (p *parser) parseShow() evaluate.Stmt {
+	// SHOW DATABASE
+	// SHOW SCHEMA
+	// SHOW COLUMNS FROM [[database '.'] schema '.'] table
+	// SHOW DATABASES
+	// SHOW SCHEMAS [FROM database]
+	// SHOW TABLES [FROM [database '.'] schema]
+	// SHOW variable
+	var s misc.Show
+
+	if p.optionalReserved(sql.DATABASE) {
+		s.Variable = sql.DATABASE
+	} else if p.optionalReserved(sql.SCHEMA) {
+		s.Variable = sql.SCHEMA
+	} else {
+		s.Variable = p.expectIdentifier("expected a config variable")
 	}
 
 	return &s

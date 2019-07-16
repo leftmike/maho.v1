@@ -8,12 +8,11 @@ To Do:
 
 - fuzzing: parser.Parse
 
-- SHOW DATABASE
-- SHOW SCHEMA
 - SHOW COLUMNS FROM [[database '.'] schema '.'] table
 - SHOW DATABASES
 - SHOW SCHEMAS [FROM database]
 - SHOW TABLES [FROM [database '.'] schema]
+- SHOW variable
 
 - Rows interface:
 -- return a chunk of rows at a time organized as a slice of values for each column
@@ -24,12 +23,6 @@ To Do:
 -- add UpdateWhere which takes a where clause and an update function
 -- add support for where clauses where an Engine can choose to implement all, some, or none
    of where clauses itself
-
-- SHOW variable
-- SHOW TABLES
-- SHOW CREATE ...
-- information_schema
-- allow SHOW ... to be used as a <from-item> in FROM; cockroach does it as [SHOW ...]
 
 - ALTER TABLE ...
 - memrows: tableImpl: add versioned metadata and use METADATA_MODIFY locking level

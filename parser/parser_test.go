@@ -597,8 +597,8 @@ func TestSelect(t *testing.T) {
 			sql: "select * from (select * from t1) as s1 join t2 using (c1)",
 			stmt: query.Select{
 				From: query.FromJoin{
-					Left: query.FromSelect{
-						Select: query.Select{
+					Left: query.FromStmt{
+						Stmt: &query.Select{
 							From: query.FromTableAlias{
 								TableName: sql.TableName{Table: sql.ID("t1")},
 							},
@@ -616,8 +616,8 @@ func TestSelect(t *testing.T) {
 			stmt: query.Select{
 				From: query.FromJoin{
 					Left: query.FromTableAlias{TableName: sql.TableName{Table: sql.ID("t2")}},
-					Right: query.FromValues{
-						Values: query.Values{
+					Right: query.FromStmt{
+						Stmt: &query.Values{
 							Expressions: [][]sql.Expr{
 								{expr.Int64Literal(1), expr.StringLiteral("abc"), expr.True()},
 							},
@@ -634,16 +634,16 @@ func TestSelect(t *testing.T) {
 				"using (c1, c2)",
 			stmt: query.Select{
 				From: query.FromJoin{
-					Left: query.FromSelect{
-						Select: query.Select{
+					Left: query.FromStmt{
+						Stmt: &query.Select{
 							From: query.FromTableAlias{
 								TableName: sql.TableName{Table: sql.ID("t1")},
 							},
 						},
 						Alias: sql.ID("s1"),
 					},
-					Right: query.FromValues{
-						Values: query.Values{
+					Right: query.FromStmt{
+						Stmt: &query.Values{
 							Expressions: [][]sql.Expr{
 								{expr.Int64Literal(1), expr.StringLiteral("abc"), expr.True()},
 							},
@@ -663,8 +663,8 @@ func TestSelect(t *testing.T) {
 		{
 			sql: "select * from (values (1, 'abc', true)) as v1",
 			stmt: query.Select{
-				From: query.FromValues{
-					Values: query.Values{
+				From: query.FromStmt{
+					Stmt: &query.Values{
 						Expressions: [][]sql.Expr{
 							{expr.Int64Literal(1), expr.StringLiteral("abc"), expr.True()},
 						},
@@ -676,8 +676,8 @@ func TestSelect(t *testing.T) {
 		{
 			sql: "select * from (values (1, 'abc', true)) as v1 (c1, c2, c3)",
 			stmt: query.Select{
-				From: query.FromValues{
-					Values: query.Values{
+				From: query.FromStmt{
+					Stmt: &query.Values{
 						Expressions: [][]sql.Expr{
 							{expr.Int64Literal(1), expr.StringLiteral("abc"), expr.True()},
 						},
@@ -695,8 +695,8 @@ func TestSelect(t *testing.T) {
 		{
 			sql: "select * from (select * from t1) as s1",
 			stmt: query.Select{
-				From: query.FromSelect{
-					Select: query.Select{
+				From: query.FromStmt{
+					Stmt: &query.Select{
 						From: query.FromTableAlias{TableName: sql.TableName{Table: sql.ID("t1")}},
 					},
 					Alias: sql.ID("s1"),
@@ -706,8 +706,8 @@ func TestSelect(t *testing.T) {
 		{
 			sql: "select * from (select * from t1) as s1 (c1)",
 			stmt: query.Select{
-				From: query.FromSelect{
-					Select: query.Select{
+				From: query.FromStmt{
+					Stmt: &query.Select{
 						From: query.FromTableAlias{TableName: sql.TableName{Table: sql.ID("t1")}},
 					},
 					Alias:         sql.ID("s1"),
@@ -718,8 +718,8 @@ func TestSelect(t *testing.T) {
 		{
 			sql: "select * from (select * from t1) as s1 (c1, c2)",
 			stmt: query.Select{
-				From: query.FromSelect{
-					Select: query.Select{
+				From: query.FromStmt{
+					Stmt: &query.Select{
 						From: query.FromTableAlias{TableName: sql.TableName{Table: sql.ID("t1")}},
 					},
 					Alias:         sql.ID("s1"),
@@ -730,8 +730,8 @@ func TestSelect(t *testing.T) {
 		{
 			sql: "select * from (select * from t1) as s1 (c1, c2, c3)",
 			stmt: query.Select{
-				From: query.FromSelect{
-					Select: query.Select{
+				From: query.FromStmt{
+					Stmt: &query.Select{
 						From: query.FromTableAlias{TableName: sql.TableName{Table: sql.ID("t1")}},
 					},
 					Alias:         sql.ID("s1"),

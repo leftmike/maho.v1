@@ -69,27 +69,6 @@ func (er ExprResult) Column(idx int) sql.Identifier {
 	return col
 }
 
-type FromSelect struct {
-	Select
-	Alias         sql.Identifier
-	ColumnAliases []sql.Identifier
-}
-
-func (fs FromSelect) String() string {
-	s := fmt.Sprintf("(%s) AS %s", fs.Select.String(), fs.Alias)
-	if fs.ColumnAliases != nil {
-		s += " ("
-		for i, col := range fs.ColumnAliases {
-			if i > 0 {
-				s += ", "
-			}
-			s += col.String()
-		}
-		s += ")"
-	}
-	return s
-}
-
 func (stmt *Select) String() string {
 	s := "SELECT "
 	if stmt.Results == nil {
@@ -136,10 +115,6 @@ func (stmt *Select) String() string {
 }
 
 func (stmt *Select) Plan(ses *evaluate.Session, tx engine.Transaction) (interface{}, error) {
-	return stmt.Rows(ses, tx)
-}
-
-func (stmt *Select) Rows(ses *evaluate.Session, tx engine.Transaction) (evaluate.Rows, error) {
 	var rows evaluate.Rows
 	var fctx *fromContext
 	var err error
@@ -167,23 +142,6 @@ func (stmt *Select) Rows(ses *evaluate.Session, tx engine.Transaction) (evaluate
 		// Aggregrate function used in SELECT results causes an implicit GROUP BY
 	}
 	return group(rows, fctx, stmt.Results, stmt.GroupBy, stmt.Having, stmt.OrderBy)
-}
-
-func (fs FromSelect) rows(ses *evaluate.Session, tx engine.Transaction) (evaluate.Rows,
-	*fromContext, error) {
-
-	rows, err := fs.Select.Rows(ses, tx)
-	if err != nil {
-		return nil, nil, err
-	}
-	cols := rows.Columns()
-	if fs.ColumnAliases != nil {
-		if len(fs.ColumnAliases) != len(cols) {
-			return nil, nil, fmt.Errorf("engine: wrong number of column aliases")
-		}
-		cols = fs.ColumnAliases
-	}
-	return rows, makeFromContext(fs.Alias, cols), nil
 }
 
 type orderBy struct {
