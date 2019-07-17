@@ -8,8 +8,6 @@ To Do:
 
 - fuzzing: parser.Parse
 
-- finish SHOW COLUMNS and SHOW TABLES
-- add tests of SHOW to main_test.go
 - SHOW variable
 
 - Rows interface:

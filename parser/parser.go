@@ -1068,6 +1068,21 @@ func (p *parser) parseShow() evaluate.Stmt {
 	case sql.COLUMNS:
 		p.expectReserved(sql.FROM)
 		tn := p.parseTableName()
+
+		var schemaTest *expr.Binary
+		if tn.Schema == 0 {
+			schemaTest = &expr.Binary{
+				Op:    expr.EqualOp,
+				Left:  expr.Ref{sql.ID("table_schema")},
+				Right: expr.Stmt{&misc.Show{sql.SCHEMA}},
+			}
+		} else {
+			schemaTest = &expr.Binary{
+				Op:    expr.EqualOp,
+				Left:  expr.Ref{sql.ID("table_schema")},
+				Right: expr.StringLiteral(tn.Schema.String()),
+			}
+		}
 		return &query.Select{
 			From: query.FromTableAlias{
 				TableName: sql.TableName{
@@ -1076,11 +1091,14 @@ func (p *parser) parseShow() evaluate.Stmt {
 					Table:    sql.COLUMNS,
 				},
 			},
-			// XXX: AND table_schema = tn.Schema # need function for getting default schema
 			Where: &expr.Binary{
-				Op:    expr.EqualOp,
-				Left:  expr.Ref{sql.ID("table_name")},
-				Right: expr.StringLiteral(tn.Table.String()),
+				Op: expr.AndOp,
+				Left: &expr.Binary{
+					Op:    expr.EqualOp,
+					Left:  expr.Ref{sql.ID("table_name")},
+					Right: expr.StringLiteral(tn.Table.String()),
+				},
+				Right: schemaTest,
 			},
 		}
 	case sql.DATABASES:
@@ -1119,7 +1137,11 @@ func (p *parser) parseShow() evaluate.Stmt {
 				Right: expr.StringLiteral(sn.Schema.String()),
 			}
 		} else {
-			// XXX: Where: table_schema == default_schema()
+			where = &expr.Binary{
+				Op:    expr.EqualOp,
+				Left:  expr.Ref{sql.ID("table_schema")},
+				Right: expr.Stmt{&misc.Show{sql.SCHEMA}},
+			}
 		}
 		return &query.Select{
 			From: query.FromTableAlias{
