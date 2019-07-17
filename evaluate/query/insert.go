@@ -136,7 +136,7 @@ func (plan *insertValuesPlan) Execute(ctx context.Context, eng engine.Engine,
 
 			ce := r[i]
 			if ce != nil {
-				v, err = ce.Eval(nil)
+				v, err = ce.Eval(ctx, nil)
 				if err != nil {
 					return -1, err
 				}

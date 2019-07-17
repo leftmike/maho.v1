@@ -113,8 +113,8 @@ func (jr *joinRows) EvalRef(idx int) sql.Value {
 	return jr.rightDest[idx-jr.leftLen]
 }
 
-func (jr *joinRows) onMatch(dest []sql.Value) (bool, error) {
-	v, err := jr.on.Eval(jr)
+func (jr *joinRows) onMatch(ctx context.Context, dest []sql.Value) (bool, error) {
+	v, err := jr.on.Eval(ctx, jr)
 	if err != nil {
 		return true, err
 	}
@@ -213,7 +213,7 @@ func (jr *joinRows) Next(ctx context.Context, dest []sql.Value) error {
 			// Compare the left and right rows, and decide whether to combine and return them as a
 			// result row.
 			if jr.on != nil {
-				if done, err := jr.onMatch(dest); done {
+				if done, err := jr.onMatch(ctx, dest); done {
 					return err
 				}
 			} else if jr.using != nil {

@@ -1,6 +1,7 @@
 package expr
 
 import (
+	"context"
 	"fmt"
 
 	"github.com/leftmike/maho/sql"
@@ -12,10 +13,10 @@ type EvalContext interface {
 
 type CExpr interface {
 	fmt.Stringer
-	Eval(ctx EvalContext) (sql.Value, error)
+	Eval(ctx context.Context, etx EvalContext) (sql.Value, error)
 }
 
-func (l *Literal) Eval(ctx EvalContext) (sql.Value, error) {
+func (l *Literal) Eval(ctx context.Context, etx EvalContext) (sql.Value, error) {
 	return l.Value, nil
 }
 
@@ -25,8 +26,8 @@ func (ci colIndex) String() string {
 	return fmt.Sprintf("row[%d]", ci)
 }
 
-func (ci colIndex) Eval(ctx EvalContext) (sql.Value, error) {
-	return ctx.EvalRef(int(ci)), nil
+func (ci colIndex) Eval(ctx context.Context, etx EvalContext) (sql.Value, error) {
+	return etx.EvalRef(int(ci)), nil
 }
 
 func ColumnIndex(ce CExpr) (int, bool) {
@@ -53,18 +54,18 @@ func (c *call) String() string {
 	return s
 }
 
-func (c *call) Eval(ctx EvalContext) (sql.Value, error) {
+func (c *call) Eval(ctx context.Context, etx EvalContext) (sql.Value, error) {
 	args := make([]sql.Value, len(c.args))
 	for i, a := range c.args {
 		var err error
-		args[i], err = a.Eval(ctx)
+		args[i], err = a.Eval(ctx, etx)
 		if err != nil {
 			return nil, err
 		} else if args[i] == nil && !c.call.handleNull {
 			return nil, nil
 		}
 	}
-	return c.call.fn(ctx, args)
+	return c.call.fn(etx, args)
 }
 
 func numFunc(a0 sql.Value, a1 sql.Value, ifn func(i0, i1 sql.Int64Value) sql.Value,

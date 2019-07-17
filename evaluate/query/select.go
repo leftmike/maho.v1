@@ -324,7 +324,7 @@ func (fr *filterRows) Next(ctx context.Context, dest []sql.Value) error {
 		defer func() {
 			fr.dest = nil
 		}()
-		v, err := fr.cond.Eval(fr)
+		v, err := fr.cond.Eval(ctx, fr)
 		if err != nil {
 			return err
 		}
@@ -455,7 +455,7 @@ func (rr *resultRows) Next(ctx context.Context, dest []sql.Value) error {
 		dest[c2d.destColIndex] = rr.dest[c2d.srcColIndex]
 	}
 	for _, e2d := range rr.destExprs {
-		val, err := e2d.expr.Eval(rr)
+		val, err := e2d.expr.Eval(ctx, rr)
 		if err != nil {
 			return err
 		}

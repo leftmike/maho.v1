@@ -70,7 +70,7 @@ func (up *updatePlan) Execute(ctx context.Context, eng engine.Engine,
 		for idx := range up.updates {
 			cdx := up.updates[idx].index
 			var val sql.Value
-			val, err = up.updates[idx].expr.Eval(up)
+			val, err = up.updates[idx].expr.Eval(ctx, up)
 			if err != nil {
 				return -1, err
 			}

@@ -9,7 +9,6 @@ To Do:
 - fuzzing: parser.Parse
 
 - add ses, tx to expr.Compile
-- add ctx to CExpr.Eval
 
 - add scalar subqueries
 - finish SHOW COLUMNS and SHOW TABLES
