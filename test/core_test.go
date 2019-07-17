@@ -6,6 +6,7 @@ import (
 	"strings"
 	"testing"
 
+	"github.com/leftmike/maho/engine"
 	"github.com/leftmike/maho/engine/basic"
 	"github.com/leftmike/maho/evaluate"
 	"github.com/leftmike/maho/parser"
@@ -62,14 +63,14 @@ func TestValuesSimple(t *testing.T) {
 			t.Errorf("Plan(%q) failed with %s", c.sql, err)
 			continue
 		}
-		rows, ok := ret.(evaluate.Rows)
+		rows, ok := ret.(engine.Rows)
 		if !ok {
 			t.Errorf("Plan(%q).(engine.Rows) failed", c.sql)
 			continue
 		}
 		dest := make([]sql.Value, len(rows.Columns()))
 		for i, r := range c.rows {
-			if rows.Next(ses, dest) != nil {
+			if rows.Next(ses.Context(), dest) != nil {
 				t.Errorf("Plan(%q).Rows() got %d rows; want %d rows", c.sql, i, len(c.rows))
 				break
 			}

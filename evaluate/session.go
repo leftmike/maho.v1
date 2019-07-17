@@ -89,7 +89,7 @@ func (ses *Session) Set(v sql.Identifier, s string) error {
 	return nil
 }
 
-func (ses *Session) Show(v sql.Identifier) (Rows, error) {
+func (ses *Session) Show(v sql.Identifier) (engine.Rows, error) {
 	if v == sql.DATABASE {
 		return &Values{
 			Cols: []sql.Identifier{sql.DATABASE},

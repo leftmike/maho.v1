@@ -1,6 +1,7 @@
 package query
 
 import (
+	"context"
 	"fmt"
 	"io"
 
@@ -75,7 +76,7 @@ type usingMatch struct {
 type joinRows struct {
 	state joinState
 
-	leftRows evaluate.Rows
+	leftRows engine.Rows
 	haveLeft bool
 	leftDest []sql.Value
 	leftLen  int
@@ -153,7 +154,7 @@ func (jr *joinRows) onUsing(dest []sql.Value) (bool, error) {
 	return true, nil
 }
 
-func (jr *joinRows) Next(ses *evaluate.Session, dest []sql.Value) error {
+func (jr *joinRows) Next(ctx context.Context, dest []sql.Value) error {
 	if jr.state == allDone {
 		return io.EOF
 	} else if jr.state == rightRemaining {
@@ -184,11 +185,11 @@ func (jr *joinRows) Next(ses *evaluate.Session, dest []sql.Value) error {
 	for {
 		// Make sure that we have a left row.
 		if !jr.haveLeft {
-			err := jr.leftRows.Next(ses, jr.leftDest)
+			err := jr.leftRows.Next(ctx, jr.leftDest)
 			if err == io.EOF && jr.rightUsed != nil {
 				jr.state = rightRemaining
 				jr.rightIndex = 0
-				return jr.Next(ses, dest)
+				return jr.Next(ctx, dest)
 			}
 			if err != nil {
 				jr.state = allDone
@@ -239,15 +240,15 @@ func (jr *joinRows) Next(ses *evaluate.Session, dest []sql.Value) error {
 	}
 }
 
-func (_ *joinRows) Delete(ses *evaluate.Session) error {
+func (_ *joinRows) Delete(ctx context.Context) error {
 	return fmt.Errorf("join rows may not be deleted")
 }
 
-func (_ *joinRows) Update(ses *evaluate.Session, updates []sql.ColumnUpdate) error {
+func (_ *joinRows) Update(ctx context.Context, updates []sql.ColumnUpdate) error {
 	return fmt.Errorf("join rows may not be updated")
 }
 
-func (fj FromJoin) rows(ses *evaluate.Session, tx engine.Transaction) (evaluate.Rows, *fromContext,
+func (fj FromJoin) rows(ses *evaluate.Session, tx engine.Transaction) (engine.Rows, *fromContext,
 	error) {
 
 	leftRows, leftCtx, err := fj.Left.rows(ses, tx)

@@ -81,7 +81,7 @@ func TestValues(t *testing.T) {
 			t.Errorf("(%v).Plan() failed with %s", c.values, err)
 			continue
 		}
-		rows, ok := ret.(evaluate.Rows)
+		rows, ok := ret.(engine.Rows)
 		if !ok {
 			t.Errorf("(%v).Plan() did not return Rows", c.values)
 			continue

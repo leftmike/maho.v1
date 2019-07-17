@@ -1,10 +1,11 @@
 package query
 
 import (
+	"context"
 	"fmt"
 	"io"
 
-	"github.com/leftmike/maho/evaluate"
+	"github.com/leftmike/maho/engine"
 	"github.com/leftmike/maho/evaluate/expr"
 	"github.com/leftmike/maho/sql"
 )
@@ -15,7 +16,7 @@ type aggregator struct {
 }
 
 type groupRows struct {
-	rows        evaluate.Rows
+	rows        engine.Rows
 	dest        []sql.Value
 	columns     []sql.Identifier
 	groupExprs  []expr2dest
@@ -42,11 +43,11 @@ type groupRow struct {
 	aggregators []expr.Aggregator
 }
 
-func (gr *groupRows) group(ses *evaluate.Session) error {
+func (gr *groupRows) group(ctx context.Context) error {
 	gr.dest = make([]sql.Value, len(gr.rows.Columns()))
 	groups := map[string]groupRow{}
 	for {
-		err := gr.rows.Next(ses, gr.dest)
+		err := gr.rows.Next(ctx, gr.dest)
 		if err == io.EOF {
 			break
 		} else if err != nil {
@@ -104,9 +105,9 @@ func (gr *groupRows) group(ses *evaluate.Session) error {
 	return nil
 }
 
-func (gr *groupRows) Next(ses *evaluate.Session, dest []sql.Value) error {
+func (gr *groupRows) Next(ctx context.Context, dest []sql.Value) error {
 	if gr.dest == nil {
-		err := gr.group(ses)
+		err := gr.group(ctx)
 		if err != nil {
 			return err
 		}
@@ -120,11 +121,11 @@ func (gr *groupRows) Next(ses *evaluate.Session, dest []sql.Value) error {
 	return io.EOF
 }
 
-func (_ *groupRows) Delete(ses *evaluate.Session) error {
+func (_ *groupRows) Delete(ctx context.Context) error {
 	return fmt.Errorf("group rows may not be deleted")
 }
 
-func (_ *groupRows) Update(ses *evaluate.Session, updates []sql.ColumnUpdate) error {
+func (_ *groupRows) Update(ctx context.Context, updates []sql.ColumnUpdate) error {
 	return fmt.Errorf("group rows may not be updated")
 }
 
@@ -162,7 +163,7 @@ func (gctx *groupContext) CompileAggregator(c *expr.Call, maker expr.MakeAggrega
 	return len(gctx.group) + len(gctx.aggregators) - 1
 }
 
-func (gctx *groupContext) makeGroupRows(rows evaluate.Rows, fctx *fromContext) (evaluate.Rows,
+func (gctx *groupContext) makeGroupRows(rows engine.Rows, fctx *fromContext) (engine.Rows,
 	error) {
 
 	gr := &groupRows{rows: rows, columns: gctx.groupCols, groupExprs: gctx.groupExprs}
@@ -206,8 +207,8 @@ func makeGroupContext(fctx *fromContext, group []sql.Expr) (*groupContext, error
 
 }
 
-func group(rows evaluate.Rows, fctx *fromContext, results []SelectResult, group []sql.Expr,
-	having sql.Expr, orderBy []OrderBy) (evaluate.Rows, error) {
+func group(rows engine.Rows, fctx *fromContext, results []SelectResult, group []sql.Expr,
+	having sql.Expr, orderBy []OrderBy) (engine.Rows, error) {
 
 	gctx, err := makeGroupContext(fctx, group)
 

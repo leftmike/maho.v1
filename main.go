@@ -8,10 +8,11 @@ To Do:
 
 - fuzzing: parser.Parse
 
-- SHOW COLUMNS FROM [[database '.'] schema '.'] table
-- SHOW DATABASES
-- SHOW SCHEMAS [FROM database]
-- SHOW TABLES [FROM [database '.'] schema]
+- add ses, tx to expr.Compile
+- Execute: change ses to ctx
+- add ctx to CExpr.Eval
+
+- finish SHOW COLUMNS and SHOW TABLES
 - SHOW variable
 
 - Rows interface:

@@ -44,7 +44,7 @@ type updatePlan struct {
 	columns []sql.Identifier
 	types   []sql.ColumnType
 	dest    []sql.Value
-	rows    evaluate.Rows
+	rows    engine.Rows
 	updates []columnUpdate
 }
 
@@ -58,7 +58,7 @@ func (up *updatePlan) Execute(ses *evaluate.Session, tx engine.Transaction) (int
 	updates := make([]sql.ColumnUpdate, len(up.updates))
 
 	for {
-		err := up.rows.Next(ses, up.dest)
+		err := up.rows.Next(ses.Context(), up.dest)
 		if err == io.EOF {
 			return cnt, nil
 		} else if err != nil {
@@ -77,7 +77,7 @@ func (up *updatePlan) Execute(ses *evaluate.Session, tx engine.Transaction) (int
 			}
 			updates[idx] = sql.ColumnUpdate{Index: cdx, Value: val}
 		}
-		err = up.rows.Update(ses, updates)
+		err = up.rows.Update(ses.Context(), updates)
 		if err != nil {
 			return -1, err
 		}
@@ -94,7 +94,7 @@ func (stmt *Update) Plan(ses *evaluate.Session, tx engine.Transaction) (interfac
 	if err != nil {
 		return nil, err
 	}
-	var rows evaluate.Rows
+	var rows engine.Rows
 	rows = engineRows{er}
 	fctx := makeFromContext(stmt.Table.Table, rows.Columns())
 	if stmt.Where != nil {

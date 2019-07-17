@@ -1,6 +1,7 @@
 package query
 
 import (
+	"context"
 	"fmt"
 
 	"github.com/leftmike/maho/engine"
@@ -11,7 +12,7 @@ import (
 
 type FromItem interface {
 	fmt.Stringer
-	rows(ses *evaluate.Session, tx engine.Transaction) (evaluate.Rows, *fromContext, error)
+	rows(ses *evaluate.Session, tx engine.Transaction) (engine.Rows, *fromContext, error)
 }
 
 type FromTableAlias struct {
@@ -39,19 +40,19 @@ func (er engineRows) Close() error {
 	return er.Rows.Close()
 }
 
-func (er engineRows) Next(ses *evaluate.Session, dest []sql.Value) error {
-	return er.Rows.Next(ses.Context(), dest)
+func (er engineRows) Next(ctx context.Context, dest []sql.Value) error {
+	return er.Rows.Next(ctx, dest)
 }
 
-func (er engineRows) Delete(ses *evaluate.Session) error {
-	return er.Rows.Delete(ses.Context())
+func (er engineRows) Delete(ctx context.Context) error {
+	return er.Rows.Delete(ctx)
 }
 
-func (er engineRows) Update(ses *evaluate.Session, updates []sql.ColumnUpdate) error {
-	return er.Rows.Update(ses.Context(), updates)
+func (er engineRows) Update(ctx context.Context, updates []sql.ColumnUpdate) error {
+	return er.Rows.Update(ctx, updates)
 }
 
-func lookupRows(ses *evaluate.Session, tx engine.Transaction, tn sql.TableName) (evaluate.Rows,
+func lookupRows(ses *evaluate.Session, tx engine.Transaction, tn sql.TableName) (engine.Rows,
 	error) {
 
 	tbl, err := ses.Engine.LookupTable(ses.Context(), tx, ses.ResolveTableName(tn))
@@ -65,7 +66,7 @@ func lookupRows(ses *evaluate.Session, tx engine.Transaction, tn sql.TableName) 
 	return engineRows{rows}, nil
 }
 
-func (fta FromTableAlias) rows(ses *evaluate.Session, tx engine.Transaction) (evaluate.Rows,
+func (fta FromTableAlias) rows(ses *evaluate.Session, tx engine.Transaction) (engine.Rows,
 	*fromContext, error) {
 
 	rows, err := lookupRows(ses, tx, fta.TableName)
@@ -100,14 +101,14 @@ func (fs FromStmt) String() string {
 	return s
 }
 
-func (fs FromStmt) rows(ses *evaluate.Session, tx engine.Transaction) (evaluate.Rows,
+func (fs FromStmt) rows(ses *evaluate.Session, tx engine.Transaction) (engine.Rows,
 	*fromContext, error) {
 
 	ret, err := fs.Stmt.Plan(ses, tx)
 	if err != nil {
 		return nil, nil, err
 	}
-	rows := ret.(evaluate.Rows)
+	rows := ret.(engine.Rows)
 	cols := rows.Columns()
 	if fs.ColumnAliases != nil {
 		if len(fs.ColumnAliases) != len(cols) {

@@ -1,19 +1,12 @@
 package evaluate
 
 import (
+	"context"
 	"fmt"
 	"io"
 
 	"github.com/leftmike/maho/sql"
 )
-
-type Rows interface {
-	Columns() []sql.Identifier
-	Close() error
-	Next(ses *Session, dest []sql.Value) error
-	Delete(ses *Session) error
-	Update(ses *Session, updates []sql.ColumnUpdate) error
-}
 
 type Values struct {
 	Cols  []sql.Identifier
@@ -30,7 +23,7 @@ func (v *Values) Close() error {
 	return nil
 }
 
-func (v *Values) Next(ses *Session, dest []sql.Value) error {
+func (v *Values) Next(ctx context.Context, dest []sql.Value) error {
 	if v.index == len(v.Rows) {
 		return io.EOF
 	}
@@ -39,10 +32,10 @@ func (v *Values) Next(ses *Session, dest []sql.Value) error {
 	return nil
 }
 
-func (_ *Values) Delete(ses *Session) error {
+func (_ *Values) Delete(ctx context.Context) error {
 	return fmt.Errorf("values: rows may not be deleted")
 }
 
-func (_ *Values) Update(ses *Session, updates []sql.ColumnUpdate) error {
+func (_ *Values) Update(ctx context.Context, updates []sql.ColumnUpdate) error {
 	return fmt.Errorf("values: rows may not be updated")
 }

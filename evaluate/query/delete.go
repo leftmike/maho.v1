@@ -24,20 +24,20 @@ func (stmt *Delete) String() string {
 }
 
 type deletePlan struct {
-	rows evaluate.Rows
+	rows engine.Rows
 }
 
 func (dp *deletePlan) Execute(ses *evaluate.Session, tx engine.Transaction) (int64, error) {
 	dest := make([]sql.Value, len(dp.rows.Columns()))
 	cnt := int64(0)
 	for {
-		err := dp.rows.Next(ses, dest)
+		err := dp.rows.Next(ses.Context(), dest)
 		if err == io.EOF {
 			return cnt, nil
 		} else if err != nil {
 			return cnt, err
 		}
-		err = dp.rows.Delete(ses)
+		err = dp.rows.Delete(ses.Context())
 		if err != nil {
 			return cnt, err
 		}

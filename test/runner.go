@@ -81,7 +81,7 @@ func (run *Runner) RunQuery(tst *sqltest.Test) ([]string, [][]string, error) {
 			if err2 != nil {
 				return err2
 			}
-			rows, ok := ret.(evaluate.Rows)
+			rows, ok := ret.(engine.Rows)
 			if !ok {
 				return fmt.Errorf("%s:%d: expected a query", tst.Filename, tst.LineNumber)
 			}
@@ -95,7 +95,7 @@ func (run *Runner) RunQuery(tst *sqltest.Test) ([]string, [][]string, error) {
 
 			dest := make([]sql.Value, lenCols)
 			for {
-				err2 = rows.Next(run.ses, dest)
+				err2 = rows.Next(run.ses.Context(), dest)
 				if err2 == io.EOF {
 					break
 				} else if err2 != nil {

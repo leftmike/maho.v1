@@ -1108,7 +1108,7 @@ func (p *parser) parseShow() evaluate.Stmt {
 				Right: expr.StringLiteral(sn.Schema.String()),
 			}
 		} else {
-			// Where: table_schema == default_schema()
+			// XXX: Where: table_schema == default_schema()
 		}
 		return &query.Select{
 			From: query.FromTableAlias{

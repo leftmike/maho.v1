@@ -1,6 +1,7 @@
 package evaluate_test
 
 import (
+	"context"
 	"errors"
 	"io"
 	"testing"
@@ -26,7 +27,7 @@ func (tr *testRows) Close() error {
 	return nil
 }
 
-func (tr *testRows) Next(ses *evaluate.Session, dest []sql.Value) error {
+func (tr *testRows) Next(ctx context.Context, dest []sql.Value) error {
 	if len(dest) != 3 {
 		return errors.New("len(dest) should be three")
 	}
@@ -40,12 +41,12 @@ func (tr *testRows) Next(ses *evaluate.Session, dest []sql.Value) error {
 	return nil
 }
 
-func (tr *testRows) Delete(ses *evaluate.Session) error {
+func (tr *testRows) Delete(ctx context.Context) error {
 	tr.deleteCalled = true
 	return nil
 }
 
-func (tr *testRows) Update(ses *evaluate.Session, updates []sql.ColumnUpdate) error {
+func (tr *testRows) Update(ctx context.Context, updates []sql.ColumnUpdate) error {
 	tr.updateCalled = true
 	return nil
 }
