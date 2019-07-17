@@ -54,8 +54,8 @@ func (stmt *Delete) Plan(ses *evaluate.Session, tx engine.Transaction) (interfac
 		return nil, err
 	}
 	if stmt.Where != nil {
-		ce, err := expr.Compile(makeFromContext(stmt.Table.Table, rows.Columns()), stmt.Where,
-			false)
+		ce, err := expr.Compile(ses, tx, makeFromContext(stmt.Table.Table, rows.Columns()),
+			stmt.Where, false)
 		if err != nil {
 			return nil, err
 		}

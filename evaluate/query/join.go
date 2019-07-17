@@ -301,7 +301,7 @@ func (fj FromJoin) rows(ses *evaluate.Session, tx engine.Transaction) (engine.Ro
 		fctx = joinContextsOn(leftCtx, rightCtx)
 		rows.rightLen = len(rightCtx.cols)
 		if fj.On != nil {
-			rows.on, err = expr.Compile(fctx, fj.On, false)
+			rows.on, err = expr.Compile(ses, tx, fctx, fj.On, false)
 			if err != nil {
 				return nil, nil, err
 			}

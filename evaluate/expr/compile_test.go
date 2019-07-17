@@ -34,7 +34,7 @@ func TestCompile(t *testing.T) {
 		if err != nil {
 			t.Errorf("ParseExpr(%q) failed with %s", c.s, err)
 		}
-		r, err := expr.Compile(compileCtx{}, e, false)
+		r, err := expr.Compile(nil, nil, compileCtx{}, e, false)
 		if err != nil {
 			t.Errorf("expr.Compile(%q) failed with %s", c.s, err)
 		}
@@ -57,7 +57,7 @@ func TestCompile(t *testing.T) {
 		if err != nil {
 			t.Errorf("ParseExpr(%q) failed with %s", f, err)
 		}
-		r, err := expr.Compile(compileCtx{}, e, false)
+		r, err := expr.Compile(nil, nil, compileCtx{}, e, false)
 		if err == nil {
 			t.Errorf("expr.Compile(%q) did not fail, got %s", f, r)
 		}

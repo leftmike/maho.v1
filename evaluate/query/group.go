@@ -6,6 +6,7 @@ import (
 	"io"
 
 	"github.com/leftmike/maho/engine"
+	"github.com/leftmike/maho/evaluate"
 	"github.com/leftmike/maho/evaluate/expr"
 	"github.com/leftmike/maho/sql"
 )
@@ -163,14 +164,14 @@ func (gctx *groupContext) CompileAggregator(c *expr.Call, maker expr.MakeAggrega
 	return len(gctx.group) + len(gctx.aggregators) - 1
 }
 
-func (gctx *groupContext) makeGroupRows(rows engine.Rows, fctx *fromContext) (engine.Rows,
-	error) {
+func (gctx *groupContext) makeGroupRows(ses *evaluate.Session, tx engine.Transaction,
+	rows engine.Rows, fctx *fromContext) (engine.Rows, error) {
 
 	gr := &groupRows{rows: rows, columns: gctx.groupCols, groupExprs: gctx.groupExprs}
 	for idx := range gctx.aggregators {
 		agg := aggregator{maker: gctx.makers[idx]}
 		for _, a := range gctx.aggregators[idx].Args {
-			ce, err := expr.Compile(fctx, a, false)
+			ce, err := expr.Compile(ses, tx, fctx, a, false)
 			if err != nil {
 				return nil, err
 			}
@@ -182,13 +183,15 @@ func (gctx *groupContext) makeGroupRows(rows engine.Rows, fctx *fromContext) (en
 	return gr, nil
 }
 
-func makeGroupContext(fctx *fromContext, group []sql.Expr) (*groupContext, error) {
+func makeGroupContext(ses *evaluate.Session, tx engine.Transaction, fctx *fromContext,
+	group []sql.Expr) (*groupContext, error) {
+
 	var groupExprs []expr2dest
 	var groupCols []sql.Identifier
 	var groupRefs []bool
 	ddx := 0
 	for _, e := range group {
-		ce, err := expr.Compile(fctx, e, false)
+		ce, err := expr.Compile(ses, tx, fctx, e, false)
 		if err != nil {
 			return nil, err
 		}
@@ -207,10 +210,11 @@ func makeGroupContext(fctx *fromContext, group []sql.Expr) (*groupContext, error
 
 }
 
-func group(rows engine.Rows, fctx *fromContext, results []SelectResult, group []sql.Expr,
-	having sql.Expr, orderBy []OrderBy) (engine.Rows, error) {
+func group(ses *evaluate.Session, tx engine.Transaction, rows engine.Rows, fctx *fromContext,
+	results []SelectResult, group []sql.Expr, having sql.Expr, orderBy []OrderBy) (engine.Rows,
+	error) {
 
-	gctx, err := makeGroupContext(fctx, group)
+	gctx, err := makeGroupContext(ses, tx, fctx, group)
 
 	var destExprs []expr2dest
 	var resultCols []sql.Identifier
@@ -220,7 +224,7 @@ func group(rows engine.Rows, fctx *fromContext, results []SelectResult, group []
 			panic(fmt.Sprintf("unexpected type for query.SelectResult: %T: %v", sr, sr))
 		}
 		var ce expr.CExpr
-		ce, err = expr.Compile(gctx, er.Expr, true)
+		ce, err = expr.Compile(ses, tx, gctx, er.Expr, true)
 		if err != nil {
 			return nil, err
 		}
@@ -230,13 +234,13 @@ func group(rows engine.Rows, fctx *fromContext, results []SelectResult, group []
 
 	var hce expr.CExpr
 	if having != nil {
-		hce, err = expr.Compile(gctx, having, true)
+		hce, err = expr.Compile(ses, tx, gctx, having, true)
 		if err != nil {
 			return nil, err
 		}
 	}
 
-	rows, err = gctx.makeGroupRows(rows, fctx)
+	rows, err = gctx.makeGroupRows(ses, tx, rows, fctx)
 	if err != nil {
 		return nil, err
 	}

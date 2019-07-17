@@ -129,12 +129,12 @@ func (stmt *Select) Plan(ses *evaluate.Session, tx engine.Transaction) (interfac
 			return nil, err
 		}
 	}
-	rows, err = where(rows, fctx, stmt.Where)
+	rows, err = where(ses, tx, rows, fctx, stmt.Where)
 	if err != nil {
 		return nil, err
 	}
 	if stmt.GroupBy == nil && stmt.Having == nil {
-		rrows, err := results(rows, fctx, stmt.Results)
+		rrows, err := results(ses, tx, rows, fctx, stmt.Results)
 		if err == nil {
 			return order(rrows, fctx, stmt.OrderBy)
 		} else if _, ok := err.(*expr.ContextError); !ok {
@@ -142,7 +142,7 @@ func (stmt *Select) Plan(ses *evaluate.Session, tx engine.Transaction) (interfac
 		}
 		// Aggregrate function used in SELECT results causes an implicit GROUP BY
 	}
-	return group(rows, fctx, stmt.Results, stmt.GroupBy, stmt.Having, stmt.OrderBy)
+	return group(ses, tx, rows, fctx, stmt.Results, stmt.GroupBy, stmt.Having, stmt.OrderBy)
 }
 
 type orderBy struct {
@@ -348,11 +348,13 @@ func (fr *filterRows) Update(ctx context.Context, updates []sql.ColumnUpdate) er
 	return fr.rows.Update(ctx, updates)
 }
 
-func where(rows engine.Rows, fctx *fromContext, cond sql.Expr) (engine.Rows, error) {
+func where(ses *evaluate.Session, tx engine.Transaction, rows engine.Rows, fctx *fromContext,
+	cond sql.Expr) (engine.Rows, error) {
+
 	if cond == nil {
 		return rows, nil
 	}
-	ce, err := expr.Compile(fctx, cond, false)
+	ce, err := expr.Compile(ses, tx, fctx, cond, false)
 	if err != nil {
 		return nil, err
 	}
@@ -472,7 +474,9 @@ func (_ *resultRows) Update(ctx context.Context, updates []sql.ColumnUpdate) err
 	return fmt.Errorf("result rows may not be updated")
 }
 
-func results(rows engine.Rows, fctx *fromContext, results []SelectResult) (engine.Rows, error) {
+func results(ses *evaluate.Session, tx engine.Transaction, rows engine.Rows, fctx *fromContext,
+	results []SelectResult) (engine.Rows, error) {
+
 	if results == nil {
 		return &allResultRows{rows: rows, columns: fctx.columns()}, nil
 	}
@@ -484,7 +488,7 @@ func results(rows engine.Rows, fctx *fromContext, results []SelectResult) (engin
 		switch sr := sr.(type) {
 		case TableResult:
 			for _, col := range fctx.tableColumns(sr.Table) {
-				ce, err := expr.Compile(fctx, expr.Ref{sr.Table, col}, false)
+				ce, err := expr.Compile(ses, tx, fctx, expr.Ref{sr.Table, col}, false)
 				if err != nil {
 					panic(err)
 				}
@@ -493,7 +497,7 @@ func results(rows engine.Rows, fctx *fromContext, results []SelectResult) (engin
 				ddx += 1
 			}
 		case ExprResult:
-			ce, err := expr.Compile(fctx, sr.Expr, false)
+			ce, err := expr.Compile(ses, tx, fctx, sr.Expr, false)
 			if err != nil {
 				return nil, err
 			}

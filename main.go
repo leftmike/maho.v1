@@ -8,8 +8,6 @@ To Do:
 
 - fuzzing: parser.Parse
 
-- add ses, tx to expr.Compile
-
 - add scalar subqueries
 - finish SHOW COLUMNS and SHOW TABLES
 - add tests of SHOW to main_test.go

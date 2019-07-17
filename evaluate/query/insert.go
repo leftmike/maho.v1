@@ -101,7 +101,7 @@ func (stmt *InsertValues) Plan(ses *evaluate.Session, tx engine.Transaction) (in
 			}
 			var ce expr.CExpr
 			if e != nil {
-				ce, err = expr.Compile(nil, e, false)
+				ce, err = expr.Compile(ses, tx, nil, e, false)
 				if err != nil {
 					return nil, err
 				}

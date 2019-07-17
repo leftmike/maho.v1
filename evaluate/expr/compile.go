@@ -4,6 +4,8 @@ import (
 	"fmt"
 	"math"
 
+	"github.com/leftmike/maho/engine"
+	"github.com/leftmike/maho/evaluate"
 	"github.com/leftmike/maho/sql"
 )
 
@@ -28,7 +30,9 @@ func CompileRef(idx int) CExpr {
 	return colIndex(idx)
 }
 
-func Compile(ctx CompileContext, e sql.Expr, agg bool) (CExpr, error) {
+func Compile(ses *evaluate.Session, tx engine.Transaction, ctx CompileContext, e sql.Expr,
+	agg bool) (CExpr, error) {
+
 	if agg {
 		idx, ok := ctx.(AggregatorContext).MaybeRefExpr(e)
 		if ok {
@@ -40,21 +44,21 @@ func Compile(ctx CompileContext, e sql.Expr, agg bool) (CExpr, error) {
 		return e, nil
 	case *Unary:
 		if e.Op == NoOp {
-			return Compile(ctx, e.Expr, agg)
+			return Compile(ses, tx, ctx, e.Expr, agg)
 		}
 		cf := opFuncs[e.Op]
-		a1, err := Compile(ctx, e.Expr, agg)
+		a1, err := Compile(ses, tx, ctx, e.Expr, agg)
 		if err != nil {
 			return nil, err
 		}
 		return &call{cf, []CExpr{a1}}, nil
 	case *Binary:
 		cf := opFuncs[e.Op]
-		a1, err := Compile(ctx, e.Left, agg)
+		a1, err := Compile(ses, tx, ctx, e.Left, agg)
 		if err != nil {
 			return nil, err
 		}
-		a2, err := Compile(ctx, e.Right, agg)
+		a2, err := Compile(ses, tx, ctx, e.Right, agg)
 		if err != nil {
 			return nil, err
 		}
@@ -90,7 +94,7 @@ func Compile(ctx CompileContext, e sql.Expr, agg bool) (CExpr, error) {
 		args := make([]CExpr, len(e.Args))
 		for i, a := range e.Args {
 			var err error
-			args[i], err = Compile(ctx, a, agg)
+			args[i], err = Compile(ses, tx, ctx, a, agg)
 			if err != nil {
 				return nil, err
 			}

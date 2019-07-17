@@ -92,7 +92,7 @@ func (stmt *Values) Plan(ses *evaluate.Session, tx engine.Transaction) (interfac
 		row := make([]expr.CExpr, len(r))
 		for j := range r {
 			var err error
-			row[j], err = expr.Compile(nil, r[j], false)
+			row[j], err = expr.Compile(ses, tx, nil, r[j], false)
 			if err != nil {
 				return nil, err
 			}
