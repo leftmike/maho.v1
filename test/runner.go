@@ -43,9 +43,18 @@ func (run *Runner) RunExec(tst *sqltest.Test) error {
 				if err2 != nil {
 					return err2
 				}
-				_, err2 = ret.(evaluate.Executor).Execute(run.ses.Context(), tx)
-				if err2 != nil {
-					return err2
+				if exec, ok := ret.(evaluate.Executor); ok {
+					_, err2 = exec.Execute(run.ses.Context(), tx)
+					if err2 != nil {
+						return err2
+					}
+				} else if cmd, ok := ret.(evaluate.Commander); ok {
+					err2 = cmd.Command(run.ses)
+					if err2 != nil {
+						return err2
+					}
+				} else {
+					panic("expected Executor or Commander")
 				}
 
 				return nil

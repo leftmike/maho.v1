@@ -10,7 +10,7 @@ To Do:
 
 - add ses, tx to expr.Compile
 - add ctx to CExpr.Eval
-- consider removing tx from Execute; look at Begin, Commit, and Rollback
+- remove tx from Execute
 
 - finish SHOW COLUMNS and SHOW TABLES
 - add tests of SHOW to main_test.go

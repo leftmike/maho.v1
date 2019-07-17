@@ -78,26 +78,12 @@ func (stmt *DropDatabase) String() string {
 	return s
 }
 
-func (stmt *DropDatabase) Plan(ses *evaluate.Session, tx engine.Transaction) (interface{},
-	error) {
-
-	return &dropDatabasePlan{
-		DropDatabase: DropDatabase{
-			IfExists: stmt.IfExists,
-			Database: stmt.Database,
-			Options:  stmt.Options,
-		},
-		eng: ses.Engine,
-	}, nil
+func (stmt *DropDatabase) Plan(ses *evaluate.Session, tx engine.Transaction) (interface{}, error) {
+	return stmt, nil
 }
 
-type dropDatabasePlan struct {
-	DropDatabase
-	eng engine.Engine
-}
-
-func (plan *dropDatabasePlan) Execute(ctx context.Context, tx engine.Transaction) (int64, error) {
-	return -1, plan.eng.DropDatabase(plan.Database, plan.IfExists, plan.Options)
+func (stmt *DropDatabase) Command(ses *evaluate.Session) error {
+	return ses.Engine.DropDatabase(stmt.Database, stmt.IfExists, stmt.Options)
 }
 
 type DropSchema struct {

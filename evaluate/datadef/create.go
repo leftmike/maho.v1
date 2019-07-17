@@ -70,25 +70,14 @@ func (stmt *CreateDatabase) String() string {
 	return s
 }
 
-type createDatabasePlan struct {
-	CreateDatabase
-	eng engine.Engine
-}
-
 func (stmt *CreateDatabase) Plan(ses *evaluate.Session, tx engine.Transaction) (interface{},
 	error) {
 
-	return &createDatabasePlan{
-		CreateDatabase: CreateDatabase{
-			Database: stmt.Database,
-			Options:  stmt.Options,
-		},
-		eng: ses.Engine,
-	}, nil
+	return stmt, nil
 }
 
-func (plan *createDatabasePlan) Execute(ctx context.Context, tx engine.Transaction) (int64, error) {
-	return -1, plan.eng.CreateDatabase(plan.Database, plan.Options)
+func (stmt *CreateDatabase) Command(ses *evaluate.Session) error {
+	return ses.Engine.CreateDatabase(stmt.Database, stmt.Options)
 }
 
 type CreateSchema struct {
