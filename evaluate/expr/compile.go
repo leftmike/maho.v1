@@ -100,6 +100,16 @@ func Compile(ses *evaluate.Session, tx engine.Transaction, ctx CompileContext, e
 			}
 		}
 		return &call{cf, args}, nil
+	case Stmt:
+		ret, err := e.Stmt.Plan(ses, tx)
+		if err != nil {
+			return nil, err
+		}
+		rows, ok := ret.(engine.Rows)
+		if !ok {
+			return nil, fmt.Errorf("engine: expected rows: %s", e.Stmt)
+		}
+		return &rowsExpr{rows: rows}, nil
 	default:
 		panic("missing case for expr")
 	}

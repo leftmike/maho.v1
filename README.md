@@ -142,6 +142,16 @@ SET SCHEMA (TO | '=') schema
 ```
 
 ```
+SHOW COLUMNS FROM [[database '.'] schema '.'] table
+SHOW DATABASE
+SHOW DATABASES
+SHOW SCHEMA
+SHOW SCHEMAS [FROM database]
+SHOW TABLES [FROM [database '.'] schema]
+SHOW variable
+```
+
+```
 START TRANSACTION
 ```
 
@@ -161,7 +171,7 @@ VALUES '(' expr [',' ...] ')' [',' ...]
 expr = literal
     | '-' expr
     | NOT expr
-    | '(' expr ')'
+    | '(' expr | select | values | show ')'
     | expr op expr
     | ref ['.' ref ...]
     | func '(' [expr [',' ...]] ')'

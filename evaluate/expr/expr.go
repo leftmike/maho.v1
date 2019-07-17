@@ -3,6 +3,7 @@ package expr
 import (
 	"fmt"
 
+	"github.com/leftmike/maho/evaluate"
 	"github.com/leftmike/maho/sql"
 )
 
@@ -226,5 +227,21 @@ func (c *Call) HasRef() bool {
 			return true
 		}
 	}
+	return false
+}
+
+type Stmt struct {
+	Stmt evaluate.Stmt
+}
+
+func (s Stmt) String() string {
+	return fmt.Sprintf("(%s)", s.Stmt)
+}
+
+func (_ Stmt) Equal(e sql.Expr) bool {
+	return false
+}
+
+func (_ Stmt) HasRef() bool {
 	return false
 }

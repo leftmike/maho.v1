@@ -2,8 +2,11 @@ package expr
 
 import (
 	"context"
+	"errors"
 	"fmt"
+	"io"
 
+	"github.com/leftmike/maho/engine"
 	"github.com/leftmike/maho/sql"
 )
 
@@ -35,6 +38,43 @@ func ColumnIndex(ce CExpr) (int, bool) {
 		return int(ci), true
 	}
 	return 0, false
+}
+
+type rowsExpr struct {
+	rows  engine.Rows
+	value sql.Value
+	err   error
+	done  bool
+}
+
+func (re *rowsExpr) String() string {
+	return fmt.Sprintf("rows: %#v", re)
+}
+
+func (re *rowsExpr) eval(ctx context.Context, etx EvalContext) (sql.Value, error) {
+	if len(re.rows.Columns()) != 1 {
+		return nil, errors.New("engine: expected one column for scalar subquery")
+	}
+	dest := []sql.Value{nil}
+	err := re.rows.Next(ctx, dest)
+	if err != nil {
+		return nil, err
+	}
+	err = re.rows.Next(ctx, []sql.Value{nil})
+	if err == nil {
+		return nil, errors.New("engine: expected one row for scalar subquery")
+	} else if err != io.EOF {
+		return nil, err
+	}
+	return dest[0], nil
+}
+
+func (re *rowsExpr) Eval(ctx context.Context, etx EvalContext) (sql.Value, error) {
+	if !re.done {
+		re.done = true
+		re.value, re.err = re.eval(ctx, etx)
+	}
+	return re.value, re.err
 }
 
 type call struct {

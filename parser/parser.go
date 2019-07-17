@@ -592,7 +592,7 @@ func (p *parser) parseExpr() sql.Expr {
 expr = literal
     | '-' expr
     | NOT expr
-    | '(' expr ')'
+    | '(' expr | select | values | show ')'
     | expr op expr
     | ref ['.' ref ...]
     | func '(' [expr [',' ...]] ')'
@@ -677,8 +677,19 @@ func (p *parser) parseSubExpr() sql.Expr {
 		// - expr
 		e = &expr.Unary{Op: expr.NegateOp, Expr: p.parseSubExpr()}
 	} else if r == token.LParen {
-		// ( expr )
-		e = &expr.Unary{Op: expr.NoOp, Expr: p.parseSubExpr()}
+		if p.optionalReserved(sql.SELECT) {
+			// ( select )
+			e = expr.Stmt{p.parseSelect()}
+		} else if p.optionalReserved(sql.VALUES) {
+			// ( values )
+			e = expr.Stmt{p.parseValues()}
+		} else if p.optionalReserved(sql.SHOW) {
+			// ( show )
+			e = expr.Stmt{p.parseShow()}
+		} else {
+			// ( expr )
+			e = &expr.Unary{Op: expr.NoOp, Expr: p.parseSubExpr()}
+		}
 		if p.scan() != token.RParen {
 			p.error(fmt.Sprintf("expected closing parenthesis, got %s", p.got()))
 		}

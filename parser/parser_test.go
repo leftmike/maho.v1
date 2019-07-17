@@ -7,6 +7,7 @@ import (
 
 	"github.com/leftmike/maho/evaluate/datadef"
 	"github.com/leftmike/maho/evaluate/expr"
+	"github.com/leftmike/maho/evaluate/misc"
 	"github.com/leftmike/maho/evaluate/query"
 	"github.com/leftmike/maho/parser/token"
 	"github.com/leftmike/maho/sql"
@@ -351,6 +352,8 @@ func TestParseExpr(t *testing.T) {
 		{"count(1,23,456)", "count(1, 23, 456)"},
 		{"x AND y AND z", "((x AND y) AND z)"},
 		{"x * y / z", "((x * y) / z)"},
+		{"123 + (select * from t)", "(123 + (SELECT * FROM t))"},
+		{"(values (1)) + (show schema)", "((VALUES (1)) + (SHOW SCHEMA))"},
 	}
 
 	for i, c := range cases {
@@ -409,6 +412,21 @@ func TestSelect(t *testing.T) {
 				From: query.FromTableAlias{TableName: sql.TableName{Table: sql.ID("t")}},
 				Where: &expr.Binary{Op: expr.GreaterThanOp, Left: expr.Ref{sql.ID("x")},
 					Right: expr.Int64Literal(1)},
+			},
+		},
+		{
+			sql: "select * from t where x = (show schema)",
+			stmt: query.Select{
+				From: query.FromTableAlias{TableName: sql.TableName{Table: sql.ID("t")}},
+				Where: &expr.Binary{
+					Op:   expr.EqualOp,
+					Left: expr.Ref{sql.ID("x")},
+					Right: expr.Stmt{
+						Stmt: &misc.Show{
+							Variable: sql.SCHEMA,
+						},
+					},
+				},
 			},
 		},
 		{
