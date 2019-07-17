@@ -35,12 +35,12 @@ func NewEngine(e Engine) engine.Engine {
 	}
 
 	ve.CreateSystemTable(sql.ID("config"), makeConfigTable)
-	ve.CreateSystemTable(sql.ID("databases"), ve.makeDatabasesTable)
+	ve.CreateSystemTable(sql.DATABASES, ve.makeDatabasesTable)
 	ve.CreateSystemTable(sql.ID("identifiers"), makeIdentifiersTable)
 
-	ve.CreateInfoTable(sql.ID("columns"), ve.makeColumnsTable)
-	ve.CreateInfoTable(sql.ID("schemata"), ve.makeSchemataTable)
-	ve.CreateInfoTable(sql.ID("tables"), ve.makeTablesTable)
+	ve.CreateInfoTable(sql.COLUMNS, ve.makeColumnsTable)
+	ve.CreateInfoTable(sql.SCHEMATA, ve.makeSchemataTable)
+	ve.CreateInfoTable(sql.TABLES, ve.makeTablesTable)
 
 	return ve
 }

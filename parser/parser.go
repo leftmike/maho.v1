@@ -69,7 +69,7 @@ func (p *parser) Parse() (stmt evaluate.Stmt, err error) {
 			}
 			err = r.(error)
 			stmt = nil
-			p.failed = true
+			p.failed = (p.sctx.Token != token.EndOfStatement)
 		}
 	}()
 
@@ -1039,24 +1039,90 @@ func (p *parser) parseSet() evaluate.Stmt {
 }
 
 func (p *parser) parseShow() evaluate.Stmt {
-	// SHOW DATABASE
-	// SHOW SCHEMA
 	// SHOW COLUMNS FROM [[database '.'] schema '.'] table
+	// SHOW DATABASE
 	// SHOW DATABASES
+	// SHOW SCHEMA
 	// SHOW SCHEMAS [FROM database]
 	// SHOW TABLES [FROM [database '.'] schema]
 	// SHOW variable
-	var s misc.Show
 
-	if p.optionalReserved(sql.DATABASE) {
-		s.Variable = sql.DATABASE
-	} else if p.optionalReserved(sql.SCHEMA) {
-		s.Variable = sql.SCHEMA
-	} else {
-		s.Variable = p.expectIdentifier("expected a config variable")
+	t := p.scan()
+	if t != token.Reserved && t != token.Identifier {
+		p.error(
+			"expected COLUMNS, DATABASE, DATABASES, SCHEMA, SCHEMAS, TABLES, or a config variable")
 	}
 
-	return &s
+	switch p.sctx.Identifier {
+	case sql.COLUMNS:
+		p.expectReserved(sql.FROM)
+		tn := p.parseTableName()
+		return &query.Select{
+			From: query.FromTableAlias{
+				TableName: sql.TableName{
+					Database: tn.Database,
+					Schema:   sql.INFORMATION_SCHEMA,
+					Table:    sql.COLUMNS,
+				},
+			},
+			// XXX: AND table_schema = tn.Schema # need function for getting default schema
+			Where: &expr.Binary{
+				Op:    expr.EqualOp,
+				Left:  expr.Ref{sql.ID("table_name")},
+				Right: expr.StringLiteral(tn.Table.String()),
+			},
+		}
+	case sql.DATABASES:
+		return &query.Select{
+			From: query.FromTableAlias{
+				TableName: sql.TableName{
+					Database: sql.SYSTEM,
+					Schema:   sql.PUBLIC,
+					Table:    sql.DATABASES,
+				},
+			},
+		}
+	case sql.SCHEMAS:
+		var db sql.Identifier
+		if p.optionalReserved(sql.FROM) {
+			db = p.expectIdentifier("expected a database")
+		}
+		return &query.Select{
+			From: query.FromTableAlias{
+				TableName: sql.TableName{
+					Database: db,
+					Schema:   sql.INFORMATION_SCHEMA,
+					Table:    sql.SCHEMATA,
+				},
+			},
+		}
+	case sql.TABLES:
+		var sn sql.SchemaName
+		var where *expr.Binary
+
+		if p.optionalReserved(sql.FROM) {
+			sn = p.parseSchemaName()
+			where = &expr.Binary{
+				Op:    expr.EqualOp,
+				Left:  expr.Ref{sql.ID("table_schema")},
+				Right: expr.StringLiteral(sn.Schema.String()),
+			}
+		} else {
+			// Where: table_schema == default_schema()
+		}
+		return &query.Select{
+			From: query.FromTableAlias{
+				TableName: sql.TableName{
+					Database: sn.Database,
+					Schema:   sql.INFORMATION_SCHEMA,
+					Table:    sql.TABLES,
+				},
+			},
+			Where: where,
+		}
+	default:
+		return &misc.Show{p.sctx.Identifier}
+	}
 }
 
 func (p *parser) parseUse() evaluate.Stmt {

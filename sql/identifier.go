@@ -31,6 +31,7 @@ const (
 	PRECISION
 	REAL
 	SCHEMAS
+	SCHEMATA
 	SMALLINT
 	SYSTEM
 	TABLES
@@ -102,6 +103,7 @@ var knownIdentifiers = map[string]Identifier{
 	"information_schema": INFORMATION_SCHEMA,
 	"public":             PUBLIC,
 	"schemas":            SCHEMAS,
+	"schemata":           SCHEMATA,
 	"system":             SYSTEM,
 	"tables":             TABLES,
 }
