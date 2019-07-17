@@ -29,27 +29,17 @@ func (stmt *DropTable) String() string {
 }
 
 func (stmt *DropTable) Plan(ses *evaluate.Session, tx engine.Transaction) (interface{}, error) {
-	var tables []sql.TableName
-	for _, tn := range stmt.Tables {
-		tables = append(tables, ses.ResolveTableName(tn))
+	for idx, tn := range stmt.Tables {
+		stmt.Tables[idx] = ses.ResolveTableName(tn)
 	}
-	return &dropTablePlan{
-		DropTable: DropTable{
-			IfExists: stmt.IfExists,
-			Tables:   tables,
-		},
-		eng: ses.Engine,
-	}, nil
+	return stmt, nil
 }
 
-type dropTablePlan struct {
-	DropTable
-	eng engine.Engine
-}
+func (stmt *DropTable) Execute(ctx context.Context, eng engine.Engine,
+	tx engine.Transaction) (int64, error) {
 
-func (plan *dropTablePlan) Execute(ctx context.Context, tx engine.Transaction) (int64, error) {
-	for _, tn := range plan.Tables {
-		err := plan.eng.DropTable(ctx, tx, tn, plan.IfExists)
+	for _, tn := range stmt.Tables {
+		err := eng.DropTable(ctx, tx, tn, stmt.IfExists)
 		if err != nil {
 			return -1, err
 		}
@@ -100,20 +90,12 @@ func (stmt *DropSchema) String() string {
 }
 
 func (stmt *DropSchema) Plan(ses *evaluate.Session, tx engine.Transaction) (interface{}, error) {
-	return &dropSchemaPlan{
-		DropSchema: DropSchema{
-			IfExists: stmt.IfExists,
-			Schema:   stmt.Schema,
-		},
-		eng: ses.Engine,
-	}, nil
+	stmt.Schema = ses.ResolveSchemaName(stmt.Schema)
+	return stmt, nil
 }
 
-type dropSchemaPlan struct {
-	DropSchema
-	eng engine.Engine
-}
+func (stmt *DropSchema) Execute(ctx context.Context, eng engine.Engine,
+	tx engine.Transaction) (int64, error) {
 
-func (plan *dropSchemaPlan) Execute(ctx context.Context, tx engine.Transaction) (int64, error) {
-	return -1, plan.eng.DropSchema(ctx, tx, plan.Schema, plan.IfExists)
+	return -1, eng.DropSchema(ctx, tx, stmt.Schema, stmt.IfExists)
 }

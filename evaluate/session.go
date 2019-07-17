@@ -113,3 +113,10 @@ func (ses *Session) ResolveTableName(tn sql.TableName) sql.TableName {
 	}
 	return tn
 }
+
+func (ses *Session) ResolveSchemaName(sn sql.SchemaName) sql.SchemaName {
+	if sn.Database == 0 {
+		sn.Database = ses.DefaultDatabase
+	}
+	return sn
+}

@@ -34,24 +34,15 @@ func (stmt *CreateTable) String() string {
 	return s
 }
 
-type createTablePlan struct {
-	CreateTable
-	eng engine.Engine
-}
-
 func (stmt *CreateTable) Plan(ses *evaluate.Session, tx engine.Transaction) (interface{}, error) {
-	return &createTablePlan{
-		CreateTable: CreateTable{
-			Table:       ses.ResolveTableName(stmt.Table),
-			Columns:     stmt.Columns,
-			ColumnTypes: stmt.ColumnTypes,
-		},
-		eng: ses.Engine,
-	}, nil
+	stmt.Table = ses.ResolveTableName(stmt.Table)
+	return stmt, nil
 }
 
-func (plan *createTablePlan) Execute(ctx context.Context, tx engine.Transaction) (int64, error) {
-	return -1, plan.eng.CreateTable(ctx, tx, plan.Table, plan.Columns, plan.ColumnTypes)
+func (stmt *CreateTable) Execute(ctx context.Context, eng engine.Engine,
+	tx engine.Transaction) (int64, error) {
+
+	return -1, eng.CreateTable(ctx, tx, stmt.Table, stmt.Columns, stmt.ColumnTypes)
 }
 
 type CreateDatabase struct {
@@ -91,19 +82,12 @@ func (stmt *CreateSchema) String() string {
 func (stmt *CreateSchema) Plan(ses *evaluate.Session, tx engine.Transaction) (interface{},
 	error) {
 
-	return &createSchemaPlan{
-		CreateSchema: CreateSchema{
-			Schema: stmt.Schema,
-		},
-		eng: ses.Engine,
-	}, nil
+	stmt.Schema = ses.ResolveSchemaName(stmt.Schema)
+	return stmt, nil
 }
 
-type createSchemaPlan struct {
-	CreateSchema
-	eng engine.Engine
-}
+func (stmt *CreateSchema) Execute(ctx context.Context, eng engine.Engine,
+	tx engine.Transaction) (int64, error) {
 
-func (plan *createSchemaPlan) Execute(ctx context.Context, tx engine.Transaction) (int64, error) {
-	return -1, plan.eng.CreateSchema(ctx, tx, plan.Schema)
+	return -1, eng.CreateSchema(ctx, tx, stmt.Schema)
 }

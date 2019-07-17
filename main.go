@@ -10,8 +10,8 @@ To Do:
 
 - add ses, tx to expr.Compile
 - add ctx to CExpr.Eval
-- remove tx from Execute
 
+- add scalar subqueries
 - finish SHOW COLUMNS and SHOW TABLES
 - add tests of SHOW to main_test.go
 - SHOW variable
