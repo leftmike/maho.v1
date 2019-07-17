@@ -36,7 +36,7 @@ func replSQL(ses *evaluate.Session, p parser.Parser, w io.Writer) {
 
 				if exec, ok := ret.(evaluate.Executor); ok {
 					var cnt int64
-					cnt, err2 = exec.Execute(ses, tx)
+					cnt, err2 = exec.Execute(ses.Context(), tx)
 					if err2 != nil {
 						return err2
 					}

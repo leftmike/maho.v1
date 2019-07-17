@@ -1,6 +1,7 @@
 package query
 
 import (
+	"context"
 	"fmt"
 	"io"
 
@@ -27,17 +28,17 @@ type deletePlan struct {
 	rows engine.Rows
 }
 
-func (dp *deletePlan) Execute(ses *evaluate.Session, tx engine.Transaction) (int64, error) {
+func (dp *deletePlan) Execute(ctx context.Context, tx engine.Transaction) (int64, error) {
 	dest := make([]sql.Value, len(dp.rows.Columns()))
 	cnt := int64(0)
 	for {
-		err := dp.rows.Next(ses.Context(), dest)
+		err := dp.rows.Next(ctx, dest)
 		if err == io.EOF {
 			return cnt, nil
 		} else if err != nil {
 			return cnt, err
 		}
-		err = dp.rows.Delete(ses.Context())
+		err = dp.rows.Delete(ctx)
 		if err != nil {
 			return cnt, err
 		}

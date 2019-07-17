@@ -1,6 +1,7 @@
 package datadef
 
 import (
+	"context"
 	"fmt"
 
 	"github.com/leftmike/maho/engine"
@@ -33,13 +34,24 @@ func (stmt *CreateTable) String() string {
 	return s
 }
 
-func (stmt *CreateTable) Plan(ses *evaluate.Session, tx engine.Transaction) (interface{}, error) {
-	return stmt, nil
+type createTablePlan struct {
+	CreateTable
+	eng engine.Engine
 }
 
-func (stmt *CreateTable) Execute(ses *evaluate.Session, tx engine.Transaction) (int64, error) {
-	return -1, ses.Engine.CreateTable(ses.Context(), tx, ses.ResolveTableName(stmt.Table),
-		stmt.Columns, stmt.ColumnTypes)
+func (stmt *CreateTable) Plan(ses *evaluate.Session, tx engine.Transaction) (interface{}, error) {
+	return &createTablePlan{
+		CreateTable: CreateTable{
+			Table:       ses.ResolveTableName(stmt.Table),
+			Columns:     stmt.Columns,
+			ColumnTypes: stmt.ColumnTypes,
+		},
+		eng: ses.Engine,
+	}, nil
+}
+
+func (plan *createTablePlan) Execute(ctx context.Context, tx engine.Transaction) (int64, error) {
+	return -1, plan.eng.CreateTable(ctx, tx, plan.Table, plan.Columns, plan.ColumnTypes)
 }
 
 type CreateDatabase struct {
@@ -58,14 +70,25 @@ func (stmt *CreateDatabase) String() string {
 	return s
 }
 
+type createDatabasePlan struct {
+	CreateDatabase
+	eng engine.Engine
+}
+
 func (stmt *CreateDatabase) Plan(ses *evaluate.Session, tx engine.Transaction) (interface{},
 	error) {
 
-	return stmt, nil
+	return &createDatabasePlan{
+		CreateDatabase: CreateDatabase{
+			Database: stmt.Database,
+			Options:  stmt.Options,
+		},
+		eng: ses.Engine,
+	}, nil
 }
 
-func (stmt *CreateDatabase) Execute(ses *evaluate.Session, tx engine.Transaction) (int64, error) {
-	return -1, ses.Engine.CreateDatabase(stmt.Database, stmt.Options)
+func (plan *createDatabasePlan) Execute(ctx context.Context, tx engine.Transaction) (int64, error) {
+	return -1, plan.eng.CreateDatabase(plan.Database, plan.Options)
 }
 
 type CreateSchema struct {
@@ -79,9 +102,19 @@ func (stmt *CreateSchema) String() string {
 func (stmt *CreateSchema) Plan(ses *evaluate.Session, tx engine.Transaction) (interface{},
 	error) {
 
-	return stmt, nil
+	return &createSchemaPlan{
+		CreateSchema: CreateSchema{
+			Schema: stmt.Schema,
+		},
+		eng: ses.Engine,
+	}, nil
 }
 
-func (stmt *CreateSchema) Execute(ses *evaluate.Session, tx engine.Transaction) (int64, error) {
-	return -1, ses.Engine.CreateSchema(ses.Context(), tx, stmt.Schema)
+type createSchemaPlan struct {
+	CreateSchema
+	eng engine.Engine
+}
+
+func (plan *createSchemaPlan) Execute(ctx context.Context, tx engine.Transaction) (int64, error) {
+	return -1, plan.eng.CreateSchema(ctx, tx, plan.Schema)
 }

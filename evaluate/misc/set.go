@@ -1,6 +1,7 @@
 package misc
 
 import (
+	"context"
 	"fmt"
 
 	"github.com/leftmike/maho/engine"
@@ -18,9 +19,15 @@ func (stmt *Set) String() string {
 }
 
 func (stmt *Set) Plan(ses *evaluate.Session, tx engine.Transaction) (interface{}, error) {
-	return stmt, nil
+	return &setPlan{ses, stmt.Variable, stmt.Value}, nil
 }
 
-func (stmt *Set) Execute(ses *evaluate.Session, tx engine.Transaction) (int64, error) {
-	return -1, ses.Set(stmt.Variable, stmt.Value)
+type setPlan struct {
+	ses      *evaluate.Session
+	variable sql.Identifier
+	value    string
+}
+
+func (plan setPlan) Execute(ctx context.Context, tx engine.Transaction) (int64, error) {
+	return -1, plan.ses.Set(plan.variable, plan.value)
 }

@@ -1,6 +1,7 @@
 package datadef
 
 import (
+	"context"
 	"fmt"
 
 	"github.com/leftmike/maho/engine"
@@ -28,12 +29,27 @@ func (stmt *DropTable) String() string {
 }
 
 func (stmt *DropTable) Plan(ses *evaluate.Session, tx engine.Transaction) (interface{}, error) {
-	return stmt, nil
+	var tables []sql.TableName
+	for _, tn := range stmt.Tables {
+		tables = append(tables, ses.ResolveTableName(tn))
+	}
+	return &dropTablePlan{
+		DropTable: DropTable{
+			IfExists: stmt.IfExists,
+			Tables:   tables,
+		},
+		eng: ses.Engine,
+	}, nil
 }
 
-func (stmt *DropTable) Execute(ses *evaluate.Session, tx engine.Transaction) (int64, error) {
-	for _, tbl := range stmt.Tables {
-		err := ses.Engine.DropTable(ses.Context(), tx, ses.ResolveTableName(tbl), stmt.IfExists)
+type dropTablePlan struct {
+	DropTable
+	eng engine.Engine
+}
+
+func (plan *dropTablePlan) Execute(ctx context.Context, tx engine.Transaction) (int64, error) {
+	for _, tn := range plan.Tables {
+		err := plan.eng.DropTable(ctx, tx, tn, plan.IfExists)
 		if err != nil {
 			return -1, err
 		}
@@ -65,11 +81,23 @@ func (stmt *DropDatabase) String() string {
 func (stmt *DropDatabase) Plan(ses *evaluate.Session, tx engine.Transaction) (interface{},
 	error) {
 
-	return stmt, nil
+	return &dropDatabasePlan{
+		DropDatabase: DropDatabase{
+			IfExists: stmt.IfExists,
+			Database: stmt.Database,
+			Options:  stmt.Options,
+		},
+		eng: ses.Engine,
+	}, nil
 }
 
-func (stmt *DropDatabase) Execute(ses *evaluate.Session, tx engine.Transaction) (int64, error) {
-	return -1, ses.Engine.DropDatabase(stmt.Database, stmt.IfExists, stmt.Options)
+type dropDatabasePlan struct {
+	DropDatabase
+	eng engine.Engine
+}
+
+func (plan *dropDatabasePlan) Execute(ctx context.Context, tx engine.Transaction) (int64, error) {
+	return -1, plan.eng.DropDatabase(plan.Database, plan.IfExists, plan.Options)
 }
 
 type DropSchema struct {
@@ -85,12 +113,21 @@ func (stmt *DropSchema) String() string {
 	return s + stmt.Schema.String()
 }
 
-func (stmt *DropSchema) Plan(ses *evaluate.Session, tx engine.Transaction) (interface{},
-	error) {
-
-	return stmt, nil
+func (stmt *DropSchema) Plan(ses *evaluate.Session, tx engine.Transaction) (interface{}, error) {
+	return &dropSchemaPlan{
+		DropSchema: DropSchema{
+			IfExists: stmt.IfExists,
+			Schema:   stmt.Schema,
+		},
+		eng: ses.Engine,
+	}, nil
 }
 
-func (stmt *DropSchema) Execute(ses *evaluate.Session, tx engine.Transaction) (int64, error) {
-	return -1, ses.Engine.DropSchema(ses.Context(), tx, stmt.Schema, stmt.IfExists)
+type dropSchemaPlan struct {
+	DropSchema
+	eng engine.Engine
+}
+
+func (plan *dropSchemaPlan) Execute(ctx context.Context, tx engine.Transaction) (int64, error) {
+	return -1, plan.eng.DropSchema(ctx, tx, plan.Schema, plan.IfExists)
 }

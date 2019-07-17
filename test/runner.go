@@ -43,7 +43,7 @@ func (run *Runner) RunExec(tst *sqltest.Test) error {
 				if err2 != nil {
 					return err2
 				}
-				_, err2 = ret.(evaluate.Executor).Execute(run.ses, tx)
+				_, err2 = ret.(evaluate.Executor).Execute(run.ses.Context(), tx)
 				if err2 != nil {
 					return err2
 				}

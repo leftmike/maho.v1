@@ -1,6 +1,7 @@
 package query
 
 import (
+	"context"
 	"fmt"
 
 	"github.com/leftmike/maho/engine"
@@ -51,13 +52,9 @@ func (stmt *InsertValues) String() string {
 }
 
 func (stmt *InsertValues) Plan(ses *evaluate.Session, tx engine.Transaction) (interface{}, error) {
-	return stmt, nil
-}
-
-func (stmt *InsertValues) Execute(ses *evaluate.Session, tx engine.Transaction) (int64, error) {
 	tbl, err := ses.Engine.LookupTable(ses.Context(), tx, ses.ResolveTableName(stmt.Table))
 	if err != nil {
-		return -1, err
+		return nil, err
 	}
 
 	cols := tbl.Columns(ses.Context())
@@ -82,17 +79,18 @@ func (stmt *InsertValues) Execute(ses *evaluate.Session, tx engine.Transaction) 
 		for v, nam := range stmt.Columns {
 			c, ok := cmap[nam]
 			if !ok {
-				return -1, fmt.Errorf("engine: %s: column not found: %s", stmt.Table, nam)
+				return nil, fmt.Errorf("engine: %s: column not found: %s", stmt.Table, nam)
 			}
 			c2v[c] = v
 		}
 	}
 
+	var rows [][]expr.CExpr
 	for _, r := range stmt.Rows {
 		if len(r) > mv {
-			return -1, fmt.Errorf("engine: %s: too many values", stmt.Table)
+			return nil, fmt.Errorf("engine: %s: too many values", stmt.Table)
 		}
-		row := make([]sql.Value, len(cols))
+		row := make([]expr.CExpr, len(cols))
 		for i, c := range colTypes {
 			e := c.Default
 			if c2v[i] < len(r) {
@@ -101,30 +99,58 @@ func (stmt *InsertValues) Execute(ses *evaluate.Session, tx engine.Transaction) 
 					e = c.Default
 				}
 			}
-			var v sql.Value
+			var ce expr.CExpr
 			if e != nil {
-				var ce expr.CExpr
 				ce, err = expr.Compile(nil, e, false)
 				if err != nil {
-					return -1, err
+					return nil, err
 				}
+			}
+			row[i] = ce
+		}
+
+		rows = append(rows, row)
+	}
+
+	return &insertValuesPlan{stmt.Table, tbl, cols, colTypes, rows}, nil
+}
+
+type insertValuesPlan struct {
+	table    sql.TableName
+	tbl      engine.Table
+	cols     []sql.Identifier
+	colTypes []sql.ColumnType
+	rows     [][]expr.CExpr
+}
+
+func (plan *insertValuesPlan) Execute(ctx context.Context, tx engine.Transaction) (int64, error) {
+	var err error
+
+	for _, r := range plan.rows {
+		row := make([]sql.Value, len(plan.cols))
+
+		for i, c := range plan.colTypes {
+			var v sql.Value
+
+			ce := r[i]
+			if ce != nil {
 				v, err = ce.Eval(nil)
 				if err != nil {
 					return -1, err
 				}
 			}
 
-			row[i], err = c.ConvertValue(cols[i], v)
+			row[i], err = c.ConvertValue(plan.cols[i], v)
 			if err != nil {
-				return -1, fmt.Errorf("engine: table %s: %s", stmt.Table, err.Error())
+				return -1, fmt.Errorf("engine: table %s: %s", plan.table, err.Error())
 			}
 		}
 
-		err := tbl.Insert(ses.Context(), row)
+		err := plan.tbl.Insert(ctx, row)
 		if err != nil {
 			return -1, err
 		}
 	}
 
-	return int64(len(stmt.Rows)), nil
+	return int64(len(plan.rows)), nil
 }

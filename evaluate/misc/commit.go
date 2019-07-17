@@ -1,6 +1,8 @@
 package misc
 
 import (
+	"context"
+
 	"github.com/leftmike/maho/engine"
 	"github.com/leftmike/maho/evaluate"
 )
@@ -12,9 +14,13 @@ func (stmt *Commit) String() string {
 }
 
 func (stmt *Commit) Plan(ses *evaluate.Session, tx engine.Transaction) (interface{}, error) {
-	return stmt, nil
+	return commitPlan{ses}, nil
 }
 
-func (stmt *Commit) Execute(ses *evaluate.Session, tx engine.Transaction) (int64, error) {
-	return -1, ses.Commit()
+type commitPlan struct {
+	ses *evaluate.Session
+}
+
+func (plan commitPlan) Execute(ctx context.Context, tx engine.Transaction) (int64, error) {
+	return -1, plan.ses.Commit()
 }

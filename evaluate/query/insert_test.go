@@ -215,7 +215,7 @@ func statement(ses *evaluate.Session, tx engine.Transaction, s string) error {
 	if err != nil {
 		return err
 	}
-	_, err = ret.(evaluate.Executor).Execute(ses, tx)
+	_, err = ret.(evaluate.Executor).Execute(ses.Context(), tx)
 	return err
 }
 

@@ -9,10 +9,11 @@ To Do:
 - fuzzing: parser.Parse
 
 - add ses, tx to expr.Compile
-- Execute: change ses to ctx
 - add ctx to CExpr.Eval
+- consider removing tx from Execute; look at Begin, Commit, and Rollback
 
 - finish SHOW COLUMNS and SHOW TABLES
+- add tests of SHOW to main_test.go
 - SHOW variable
 
 - Rows interface:

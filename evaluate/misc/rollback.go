@@ -1,6 +1,8 @@
 package misc
 
 import (
+	"context"
+
 	"github.com/leftmike/maho/engine"
 	"github.com/leftmike/maho/evaluate"
 )
@@ -12,9 +14,13 @@ func (stmt *Rollback) String() string {
 }
 
 func (stmt *Rollback) Plan(ses *evaluate.Session, tx engine.Transaction) (interface{}, error) {
-	return stmt, nil
+	return rollbackPlan{ses}, nil
 }
 
-func (stmt *Rollback) Execute(ses *evaluate.Session, tx engine.Transaction) (int64, error) {
-	return -1, ses.Rollback()
+type rollbackPlan struct {
+	ses *evaluate.Session
+}
+
+func (plan rollbackPlan) Execute(ctx context.Context, tx engine.Transaction) (int64, error) {
+	return -1, plan.ses.Rollback()
 }

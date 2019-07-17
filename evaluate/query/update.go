@@ -1,6 +1,7 @@
 package query
 
 import (
+	"context"
 	"fmt"
 	"io"
 
@@ -52,13 +53,13 @@ func (up *updatePlan) EvalRef(idx int) sql.Value {
 	return up.dest[idx]
 }
 
-func (up *updatePlan) Execute(ses *evaluate.Session, tx engine.Transaction) (int64, error) {
+func (up *updatePlan) Execute(ctx context.Context, tx engine.Transaction) (int64, error) {
 	up.dest = make([]sql.Value, len(up.rows.Columns()))
 	cnt := int64(0)
 	updates := make([]sql.ColumnUpdate, len(up.updates))
 
 	for {
-		err := up.rows.Next(ses.Context(), up.dest)
+		err := up.rows.Next(ctx, up.dest)
 		if err == io.EOF {
 			return cnt, nil
 		} else if err != nil {
@@ -77,7 +78,7 @@ func (up *updatePlan) Execute(ses *evaluate.Session, tx engine.Transaction) (int
 			}
 			updates[idx] = sql.ColumnUpdate{Index: cdx, Value: val}
 		}
-		err = up.rows.Update(ses.Context(), updates)
+		err = up.rows.Update(ctx, updates)
 		if err != nil {
 			return -1, err
 		}
