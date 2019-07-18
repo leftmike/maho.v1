@@ -430,6 +430,19 @@ func TestSelect(t *testing.T) {
 			},
 		},
 		{
+			sql: "select * from (table t) as t",
+			stmt: query.Select{
+				From: query.FromStmt{
+					Stmt: &query.Select{
+						From: query.FromTableAlias{
+							TableName: sql.TableName{Table: sql.ID("t")},
+						},
+					},
+					Alias: sql.ID("t"),
+				},
+			},
+		},
+		{
 			sql: "select c from t",
 			stmt: query.Select{
 				From: query.FromTableAlias{TableName: sql.TableName{Table: sql.ID("t")}},

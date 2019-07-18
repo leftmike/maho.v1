@@ -529,6 +529,25 @@ func (p *parser) parseDropTable() evaluate.Stmt {
 	return &s
 }
 
+func (p *parser) optionalSubquery() (evaluate.Stmt, bool) {
+	if p.optionalReserved(sql.SELECT) {
+		// ( select )
+		return p.parseSelect(), true
+	} else if p.optionalReserved(sql.VALUES) {
+		// ( values )
+		return p.parseValues(), true
+	} else if p.optionalReserved(sql.SHOW) {
+		// ( show )
+		return p.parseShow(), true
+	} else if p.optionalReserved(sql.TABLE) {
+		// ( TABLE [[database .] schema .] table )
+		return &query.Select{
+			From: query.FromTableAlias{TableName: p.parseTableName()},
+		}, true
+	}
+	return nil, false
+}
+
 func (p *parser) ParseExpr() (e sql.Expr, err error) {
 	defer func() {
 		if r := recover(); r != nil {
@@ -677,15 +696,9 @@ func (p *parser) parseSubExpr() sql.Expr {
 		// - expr
 		e = &expr.Unary{Op: expr.NegateOp, Expr: p.parseSubExpr()}
 	} else if r == token.LParen {
-		if p.optionalReserved(sql.SELECT) {
-			// ( select )
-			e = expr.Stmt{p.parseSelect()}
-		} else if p.optionalReserved(sql.VALUES) {
-			// ( values )
-			e = expr.Stmt{p.parseValues()}
-		} else if p.optionalReserved(sql.SHOW) {
-			// ( show )
-			e = expr.Stmt{p.parseShow()}
+		if s, ok := p.optionalSubquery(); ok {
+			// ( subquery )
+			e = expr.Stmt{s}
 		} else {
 			// ( expr )
 			e = &expr.Unary{Op: expr.NoOp, Expr: p.parseSubExpr()}
@@ -908,12 +921,9 @@ join-type = [INNER] JOIN
 func (p *parser) parseFromItem() query.FromItem {
 	var fi query.FromItem
 	if p.maybeToken(token.LParen) {
-		if p.optionalReserved(sql.SELECT) {
-			fi = p.parseFromStmt(p.parseSelect())
-		} else if p.optionalReserved(sql.VALUES) {
-			fi = p.parseFromStmt(p.parseValues())
-		} else if p.optionalReserved(sql.SHOW) {
-			fi = p.parseFromStmt(p.parseShow())
+		if s, ok := p.optionalSubquery(); ok {
+			// ( subquery )
+			fi = p.parseFromStmt(s)
 		} else {
 			fi = p.parseFromList()
 			p.expectTokens(token.RParen)
