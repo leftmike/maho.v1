@@ -1,7 +1,6 @@
 package query
 
 import (
-	"context"
 	"fmt"
 
 	"github.com/leftmike/maho/engine"
@@ -28,30 +27,6 @@ func (fta FromTableAlias) String() string {
 	return s
 }
 
-type engineRows struct {
-	engine.Rows
-}
-
-func (er engineRows) Columns() []sql.Identifier {
-	return er.Rows.Columns()
-}
-
-func (er engineRows) Close() error {
-	return er.Rows.Close()
-}
-
-func (er engineRows) Next(ctx context.Context, dest []sql.Value) error {
-	return er.Rows.Next(ctx, dest)
-}
-
-func (er engineRows) Delete(ctx context.Context) error {
-	return er.Rows.Delete(ctx)
-}
-
-func (er engineRows) Update(ctx context.Context, updates []sql.ColumnUpdate) error {
-	return er.Rows.Update(ctx, updates)
-}
-
 func lookupRows(ses *evaluate.Session, tx engine.Transaction, tn sql.TableName) (engine.Rows,
 	error) {
 
@@ -59,11 +34,7 @@ func lookupRows(ses *evaluate.Session, tx engine.Transaction, tn sql.TableName) 
 	if err != nil {
 		return nil, err
 	}
-	rows, err := tbl.Rows(ses.Context())
-	if err != nil {
-		return nil, err
-	}
-	return engineRows{rows}, nil
+	return tbl.Rows(ses.Context())
 }
 
 func (fta FromTableAlias) rows(ses *evaluate.Session, tx engine.Transaction) (engine.Rows,

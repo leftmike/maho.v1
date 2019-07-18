@@ -93,12 +93,11 @@ func (stmt *Update) Plan(ses *evaluate.Session, tx engine.Transaction) (interfac
 	if err != nil {
 		return nil, err
 	}
-	er, err := tbl.Rows(ses.Context())
+	rows, err := tbl.Rows(ses.Context())
 	if err != nil {
 		return nil, err
 	}
-	var rows engine.Rows
-	rows = engineRows{er}
+
 	fctx := makeFromContext(stmt.Table.Table, rows.Columns())
 	if stmt.Where != nil {
 		ce, err := expr.Compile(ses, tx, fctx, stmt.Where, false)
