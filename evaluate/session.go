@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"io"
 
+	"github.com/leftmike/maho/config"
 	"github.com/leftmike/maho/engine"
 	"github.com/leftmike/maho/sql"
 )
@@ -132,6 +133,13 @@ func (ses *Session) Show(v sql.Identifier) (engine.Rows, error) {
 		return &values{
 			columns: []sql.Identifier{sql.SCHEMA},
 			rows:    [][]sql.Value{{sql.StringValue(ses.DefaultSchema.String())}},
+		}, nil
+	} else if cv, ok := config.Lookup(v.String()); ok {
+		return &values{
+			columns: []sql.Identifier{sql.ID("name"), sql.ID("by"), sql.ID("value")},
+			rows: [][]sql.Value{
+				{sql.StringValue(cv.Name()), sql.StringValue(cv.By()), sql.StringValue(cv.Val())},
+			},
 		}, nil
 	}
 	return nil, fmt.Errorf("show: %s not found", v)

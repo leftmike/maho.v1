@@ -8,8 +8,6 @@ To Do:
 
 - fuzzing: parser.Parse
 
-- SHOW variable
-
 - Rows interface:
 -- return a chunk of rows at a time organized as a slice of values for each column
 -- maybe get rid of Delete and Update

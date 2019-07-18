@@ -173,6 +173,15 @@ func Var(val interface{}, name string) *Variable {
 	return cfg.Var(val, name)
 }
 
+func (c *Config) Lookup(name string) (*Variable, bool) {
+	v, ok := c.vars[name]
+	return v, ok
+}
+
+func Lookup(name string) (*Variable, bool) {
+	return cfg.Lookup(name)
+}
+
 func (v *Variable) Name() string {
 	return v.name
 }
