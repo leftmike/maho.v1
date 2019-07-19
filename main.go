@@ -8,16 +8,22 @@ To Do:
 
 - fuzzing: parser.Parse
 
-- add constraints
--- [CONSTRAINT constraint]
--- NOT NULL
--- PRIMARY KEY
--- UNIQUE
--- CHECK '(' logical_expression ')'
+- add PRIMARY KEY and UNIQUE to CREATE TABLE
+-- CREATE TABLE [IF NOT EXISTS] [[database '.'] schema '.'] table
+   '(' column data_type [column_constraint] | table_constraint [',' ...] ')'
+-- column_constraint = DEFAULT expr | NOT NULL | PRIMARY KEY | UNIQUE
+-- table_constraint = (PRIMARY KEY | UNIQUE) '(' column [ASC | DESC] [',' ...] ')'
+
+- boltdb engine
+- badger engine
 
 - add indexes
 -- CREATE [UNIQUE] INDEX [[IF NOT EXISTS] index] ON table '(' column [, column ...] ')'
 -- DROP INDEX [IF EXISTS] index
+
+- [CONSTRAINT constraint]
+- CHECK '(' logical_expression ')'
+- FOREIGN KEY
 
 - Rows interface:
 -- return a chunk of rows at a time organized as a slice of values for each column
@@ -35,8 +41,6 @@ To Do:
 - memrows engine: persistence
 - memcols engine (w/ mvcc)
 - distributed memrows and/or memcols engine, using raft
-- boltdb engine
-- badger engine
 */
 
 import (

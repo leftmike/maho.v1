@@ -68,6 +68,7 @@ const (
 	INSERT
 	INTO
 	JOIN
+	KEY
 	LEFT
 	NOT
 	NULL
@@ -75,6 +76,7 @@ const (
 	OR
 	ORDER
 	OUTER
+	PRIMARY
 	RIGHT
 	ROLLBACK
 	SCHEMA
@@ -151,6 +153,7 @@ var knownKeywords = map[string]struct {
 	"INTEGER":     {INTEGER, false},
 	"INTO":        {INTO, true},
 	"JOIN":        {JOIN, true},
+	"KEY":         {KEY, true},
 	"LEFT":        {LEFT, true},
 	"NOT":         {NOT, true},
 	"NULL":        {NULL, true},
@@ -160,6 +163,7 @@ var knownKeywords = map[string]struct {
 	"OUTER":       {OUTER, true},
 	"PATH":        {PATH, false},
 	"PRECISION":   {PRECISION, false},
+	"PRIMARY":     {PRIMARY, true},
 	"REAL":        {REAL, false},
 	"RIGHT":       {RIGHT, true},
 	"ROLLBACK":    {ROLLBACK, true},

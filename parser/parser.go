@@ -392,7 +392,7 @@ func (p *parser) parseColumnAliases() []sql.Identifier {
 }
 
 func (p *parser) parseCreateTable() evaluate.Stmt {
-	// CREATE TABLE [IF NOT EXISTS] ...
+	// CREATE TABLE [IF NOT EXISTS] [[database '.'] schema '.'] table ...
 	var s datadef.CreateTable
 
 	if p.optionalReserved(sql.IF) {
@@ -402,13 +402,79 @@ func (p *parser) parseCreateTable() evaluate.Stmt {
 	}
 
 	s.Table = p.parseTableName()
-	if p.maybeToken(token.LParen) {
-		p.parseCreateColumns(&s)
-		return &s
+	p.expectTokens(token.LParen)
+	p.parseCreateDetails(&s)
+	return &s
+}
+
+func (p *parser) parseKey(typ datadef.KeyType) datadef.Key {
+	key := datadef.Key{
+		Type: typ,
 	}
 
-	p.error("CREATE TABLE ... AS ... not implemented")
-	return nil
+	p.expectTokens('(')
+	for {
+		nam := p.expectIdentifier("expected a column name")
+		for _, col := range key.Columns {
+			if col == nam {
+				p.error(fmt.Sprintf("duplicate column name: %s", nam))
+			}
+		}
+		key.Columns = append(key.Columns, nam)
+
+		if p.optionalReserved(sql.ASC) {
+			key.Reverse = append(key.Reverse, false)
+		} else if p.optionalReserved(sql.DESC) {
+			key.Reverse = append(key.Reverse, true)
+		} else {
+			key.Reverse = append(key.Reverse, false)
+		}
+
+		r := p.expectTokens(token.Comma, token.RParen)
+		if r == token.RParen {
+			break
+		}
+	}
+
+	return key
+}
+
+func (p *parser) addKey(s *datadef.CreateTable, nkey datadef.Key) {
+	for _, key := range s.Keys {
+		if nkey.Type == datadef.PrimaryKey && key.Type == datadef.PrimaryKey {
+			p.error("only one primary key allowed")
+		}
+		if nkey.Equal(key) {
+			p.error("duplicate keys not allowed")
+		}
+	}
+
+	s.Keys = append(s.Keys, nkey)
+}
+
+func (p *parser) parseCreateDetails(s *datadef.CreateTable) {
+	/*
+		CREATE TABLE [[database '.'] schema '.'] table
+			'('	(column data_type [column_constraint]
+				| table_constraint) [',' ...] ')'
+		table_constraint = (PRIMARY KEY | UNIQUE) '(' column [ASC | DESC] [',' ...] ')'
+	*/
+
+	for {
+		if p.optionalReserved(sql.PRIMARY) {
+			p.expectReserved(sql.KEY)
+			p.addKey(s, p.parseKey(datadef.PrimaryKey))
+		} else if p.optionalReserved(sql.UNIQUE) {
+			p.addKey(s, p.parseKey(datadef.UniqueKey))
+		} else {
+			p.parseColumn(s)
+		}
+
+		r := p.expectTokens(token.Comma, token.RParen)
+		if r == token.RParen {
+			break
+		}
+	}
 }
 
 var types = map[sql.Identifier]sql.ColumnType{
@@ -431,10 +497,9 @@ var types = map[sql.Identifier]sql.ColumnType{
 	sql.BIGINT:    {Type: sql.IntegerType, Size: 8},
 }
 
-func (p *parser) parseCreateColumns(s *datadef.CreateTable) {
+func (p *parser) parseColumn(s *datadef.CreateTable) {
 	/*
-		CREATE TABLE [database '.'] table '(' column [',' ...] ')'
-		column = name data_type [(DEFAULT expr) | (NOT NULL)]
+		column_constraint = DEFAULT expr | NOT NULL | PRIMARY KEY | UNIQUE
 		data_type =
 			| BINARY ['(' length ')']
 			| VARBINARY ['(' length ')']
@@ -455,58 +520,64 @@ func (p *parser) parseCreateColumns(s *datadef.CreateTable) {
 			| INT8
 	*/
 
+	nam := p.expectIdentifier("expected a column name")
+	for _, col := range s.Columns {
+		if col == nam {
+			p.error(fmt.Sprintf("duplicate column name: %s", nam))
+		}
+	}
+	s.Columns = append(s.Columns, nam)
+
+	typ := p.expectIdentifier("expected a data type")
+	def, found := types[typ]
+	if !found {
+		p.error(fmt.Sprintf("expected a data type, got %s", typ))
+	}
+
+	ct := def
+
+	if typ == sql.DOUBLE {
+		p.maybeIdentifier(sql.PRECISION)
+	}
+
+	if ct.Type == sql.CharacterType {
+		if p.maybeToken(token.LParen) {
+			ct.Size = uint32(p.expectInteger(0, sql.MaxColumnSize))
+			p.expectTokens(token.RParen)
+		}
+	}
+
 	for {
-		nam := p.expectIdentifier("expected a column name")
-		for _, col := range s.Columns {
-			if col == nam {
-				p.error(fmt.Sprintf("duplicate column name: %s", nam))
+		if p.optionalReserved(sql.DEFAULT) {
+			if ct.Default != nil {
+				p.error("DEFAULT specified more than once per column")
 			}
-		}
-		s.Columns = append(s.Columns, nam)
-
-		typ := p.expectIdentifier("expected a data type")
-		def, found := types[typ]
-		if !found {
-			p.error(fmt.Sprintf("expected a data type, got %s", typ))
-		}
-
-		ct := def
-
-		if typ == sql.DOUBLE {
-			p.maybeIdentifier(sql.PRECISION)
-		}
-
-		if ct.Type == sql.CharacterType {
-			if p.maybeToken(token.LParen) {
-				ct.Size = uint32(p.expectInteger(0, sql.MaxColumnSize))
-				p.expectTokens(token.RParen)
+			ct.Default = p.parseExpr()
+		} else if p.optionalReserved(sql.NOT) {
+			p.expectReserved(sql.NULL)
+			if ct.NotNull {
+				p.error("NOT NULL specified more than once per column")
 			}
-		}
-
-		for {
-			if p.optionalReserved(sql.DEFAULT) {
-				if ct.Default != nil {
-					p.error("DEFAULT specified more than once per column")
-				}
-				ct.Default = p.parseExpr()
-			} else if p.optionalReserved(sql.NOT) {
-				p.expectReserved(sql.NULL)
-				if ct.NotNull {
-					p.error("NOT NULL specified more than once per column")
-				}
-				ct.NotNull = true
-			} else {
-				break
-			}
-		}
-
-		s.ColumnTypes = append(s.ColumnTypes, ct)
-
-		r := p.expectTokens(token.Comma, token.RParen)
-		if r == token.RParen {
+			ct.NotNull = true
+		} else if p.optionalReserved(sql.PRIMARY) {
+			p.expectReserved(sql.KEY)
+			p.addKey(s, datadef.Key{
+				Type:    datadef.PrimaryKey,
+				Columns: []sql.Identifier{nam},
+				Reverse: []bool{false},
+			})
+		} else if p.optionalReserved(sql.UNIQUE) {
+			p.addKey(s, datadef.Key{
+				Type:    datadef.UniqueKey,
+				Columns: []sql.Identifier{nam},
+				Reverse: []bool{false},
+			})
+		} else {
 			break
 		}
 	}
+
+	s.ColumnTypes = append(s.ColumnTypes, ct)
 }
 
 func (p *parser) parseDelete() evaluate.Stmt {

@@ -235,6 +235,113 @@ c2 boolean not null default true)`,
 				},
 			},
 		},
+		{sql: "create table t (c1 int primary, c2 bool)", fail: true},
+		{sql: "create table t (c1 int unique primary key, c2 bool)", fail: true},
+		{sql: "create table t (c1 int, c2 bool, primary)", fail: true},
+		{sql: "create table t (c1 int, c2 bool, primary key)", fail: true},
+		{sql: "create table t (c1 int, c2 bool, primary key ())", fail: true},
+		{sql: "create table t (c1 int primary key, c2 bool, primary key (c1))", fail: true},
+		{sql: "create table t (c1 int, c2 bool primary key, primary key (c1))", fail: true},
+		{
+			sql: "create table t (c1 int primary key, c2 bool)",
+			stmt: datadef.CreateTable{
+				Table:   sql.TableName{Table: sql.ID("t")},
+				Columns: []sql.Identifier{sql.ID("c1"), sql.ID("c2")},
+				ColumnTypes: []sql.ColumnType{
+					{Type: sql.IntegerType, Size: 4},
+					{Type: sql.BooleanType, Size: 1},
+				},
+				Keys: []datadef.Key{
+					{
+						Type:    datadef.PrimaryKey,
+						Columns: []sql.Identifier{sql.ID("c1")},
+						Reverse: []bool{false},
+					},
+				},
+			},
+		},
+		{
+			sql: "create table t (c1 int unique, c2 bool)",
+			stmt: datadef.CreateTable{
+				Table:   sql.TableName{Table: sql.ID("t")},
+				Columns: []sql.Identifier{sql.ID("c1"), sql.ID("c2")},
+				ColumnTypes: []sql.ColumnType{
+					{Type: sql.IntegerType, Size: 4},
+					{Type: sql.BooleanType, Size: 1},
+				},
+				Keys: []datadef.Key{
+					{
+						Type:    datadef.UniqueKey,
+						Columns: []sql.Identifier{sql.ID("c1")},
+						Reverse: []bool{false},
+					},
+				},
+			},
+		},
+		{
+			sql: "create table t (c1 int, c2 bool, primary key (c1))",
+			stmt: datadef.CreateTable{
+				Table:   sql.TableName{Table: sql.ID("t")},
+				Columns: []sql.Identifier{sql.ID("c1"), sql.ID("c2")},
+				ColumnTypes: []sql.ColumnType{
+					{Type: sql.IntegerType, Size: 4},
+					{Type: sql.BooleanType, Size: 1},
+				},
+				Keys: []datadef.Key{
+					{
+						Type:    datadef.PrimaryKey,
+						Columns: []sql.Identifier{sql.ID("c1")},
+						Reverse: []bool{false},
+					},
+				},
+			},
+		},
+		{
+			sql: "create table t (c1 int, c2 bool, primary key (c1 desc))",
+			stmt: datadef.CreateTable{
+				Table:   sql.TableName{Table: sql.ID("t")},
+				Columns: []sql.Identifier{sql.ID("c1"), sql.ID("c2")},
+				ColumnTypes: []sql.ColumnType{
+					{Type: sql.IntegerType, Size: 4},
+					{Type: sql.BooleanType, Size: 1},
+				},
+				Keys: []datadef.Key{
+					{
+						Type:    datadef.PrimaryKey,
+						Columns: []sql.Identifier{sql.ID("c1")},
+						Reverse: []bool{true},
+					},
+				},
+			},
+		},
+		{
+			sql: "create table t (c1 int unique, c2 bool unique, primary key (c1 desc, c2 asc))",
+			stmt: datadef.CreateTable{
+				Table:   sql.TableName{Table: sql.ID("t")},
+				Columns: []sql.Identifier{sql.ID("c1"), sql.ID("c2")},
+				ColumnTypes: []sql.ColumnType{
+					{Type: sql.IntegerType, Size: 4},
+					{Type: sql.BooleanType, Size: 1},
+				},
+				Keys: []datadef.Key{
+					{
+						Type:    datadef.UniqueKey,
+						Columns: []sql.Identifier{sql.ID("c1")},
+						Reverse: []bool{false},
+					},
+					{
+						Type:    datadef.UniqueKey,
+						Columns: []sql.Identifier{sql.ID("c2")},
+						Reverse: []bool{false},
+					},
+					{
+						Type:    datadef.PrimaryKey,
+						Columns: []sql.Identifier{sql.ID("c1"), sql.ID("c2")},
+						Reverse: []bool{true, false},
+					},
+				},
+			},
+		},
 	}
 
 	for i, c := range cases {
