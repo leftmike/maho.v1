@@ -392,10 +392,16 @@ func (p *parser) parseColumnAliases() []sql.Identifier {
 }
 
 func (p *parser) parseCreateTable() evaluate.Stmt {
-	// CREATE TABLE ...
+	// CREATE TABLE [IF NOT EXISTS] ...
 	var s datadef.CreateTable
-	s.Table = p.parseTableName()
 
+	if p.optionalReserved(sql.IF) {
+		p.expectReserved(sql.NOT)
+		p.expectReserved(sql.EXISTS)
+		s.IfNotExists = true
+	}
+
+	s.Table = p.parseTableName()
 	if p.maybeToken(token.LParen) {
 		p.parseCreateColumns(&s)
 		return &s

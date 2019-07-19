@@ -13,10 +13,15 @@ type CreateTable struct {
 	Table       sql.TableName
 	Columns     []sql.Identifier
 	ColumnTypes []sql.ColumnType
+	IfNotExists bool
 }
 
 func (stmt *CreateTable) String() string {
-	s := fmt.Sprintf("CREATE TABLE %s (", stmt.Table)
+	s := "CREATE TABLE"
+	if stmt.IfNotExists {
+		s += " IF NOT EXISTS"
+	}
+	s = fmt.Sprintf("%s %s (", s, stmt.Table)
 
 	for i, ct := range stmt.ColumnTypes {
 		if i > 0 {
@@ -41,6 +46,13 @@ func (stmt *CreateTable) Plan(ses *evaluate.Session, tx engine.Transaction) (int
 
 func (stmt *CreateTable) Execute(ctx context.Context, eng engine.Engine,
 	tx engine.Transaction) (int64, error) {
+
+	if stmt.IfNotExists {
+		_, err := eng.LookupTable(ctx, tx, stmt.Table)
+		if err == nil {
+			return -1, nil
+		}
+	}
 
 	return -1, eng.CreateTable(ctx, tx, stmt.Table, stmt.Columns, stmt.ColumnTypes)
 }

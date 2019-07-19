@@ -77,7 +77,6 @@ func TestCreateTable(t *testing.T) {
 	}{
 		{sql: "create temp table t (c int)", fail: true},
 		{sql: "create temporary table t (c int)", fail: true},
-		{sql: "create table if not exists t (c int)", fail: true},
 		{sql: "create table test ()", fail: true},
 		{sql: "create table test (c)", fail: true},
 		{sql: "create table (c int)", fail: true},
@@ -129,6 +128,15 @@ func TestCreateTable(t *testing.T) {
 					{Type: sql.IntegerType, Size: 8},
 					{Type: sql.IntegerType, Size: 8},
 				},
+			},
+		},
+		{
+			sql: "create table if not exists t (c int)",
+			stmt: datadef.CreateTable{
+				Table:       sql.TableName{Table: sql.ID("t")},
+				Columns:     []sql.Identifier{sql.ID("c")},
+				ColumnTypes: []sql.ColumnType{{Type: sql.IntegerType, Size: 4}},
+				IfNotExists: true,
 			},
 		},
 		{

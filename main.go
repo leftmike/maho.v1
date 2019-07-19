@@ -8,6 +8,17 @@ To Do:
 
 - fuzzing: parser.Parse
 
+- add constraints
+-- [CONSTRAINT constraint]
+-- NOT NULL
+-- PRIMARY KEY
+-- UNIQUE
+-- CHECK '(' logical_expression ')'
+
+- add indexes
+-- CREATE [UNIQUE] INDEX [[IF NOT EXISTS] index] ON table '(' column [, column ...] ')'
+-- DROP INDEX [IF EXISTS] index
+
 - Rows interface:
 -- return a chunk of rows at a time organized as a slice of values for each column
 -- maybe get rid of Delete and Update

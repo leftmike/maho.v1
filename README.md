@@ -66,7 +66,7 @@ CREATE SCHEMA [database '.'] schema
 ```
 
 ```
-CREATE TABLE [[database '.'] schema '.'] table '(' column [',' ...] ')'
+CREATE TABLE [IF NOT EXISTS] [[database '.'] schema '.'] table '(' column [',' ...] ')'
 column = name data_type [(DEFAULT expr) | (NOT NULL)]
 data_type =
 	| BINARY ['(' length ')']
