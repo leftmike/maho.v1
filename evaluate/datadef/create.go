@@ -13,6 +13,7 @@ type CreateTable struct {
 	Table       sql.TableName
 	Columns     []sql.Identifier
 	ColumnTypes []sql.ColumnType
+	Primary     *sql.IndexKey
 	Keys        []sql.IndexKey
 	IfNotExists bool
 }
@@ -36,27 +37,11 @@ func (stmt *CreateTable) String() string {
 			s += fmt.Sprintf(" DEFAULT %s", ct.Default)
 		}
 	}
+	if stmt.Primary != nil {
+		s += fmt.Sprintf(", PRIMARY KEY %s", stmt.Primary)
+	}
 	for _, key := range stmt.Keys {
-		switch key.Type {
-		case sql.PrimaryKey:
-			s += ", PRIMARY KEY ("
-		case sql.UniqueKey:
-			s += ", UNIQUE ("
-		default:
-			panic(fmt.Sprintf("unexpected key type: %d", key.Type))
-		}
-
-		for i := range key.Columns {
-			if i > 0 {
-				s += ", "
-			}
-			if key.Reverse[i] {
-				s += fmt.Sprintf("%s DESC", key.Columns[i])
-			} else {
-				s += fmt.Sprintf("%s ASC", key.Columns[i])
-			}
-		}
-		s += ")"
+		s += fmt.Sprintf(", UNIQUE %s", key)
 	}
 	s += ")"
 	return s

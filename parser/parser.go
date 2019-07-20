@@ -407,9 +407,9 @@ func (p *parser) parseCreateTable() evaluate.Stmt {
 	return &s
 }
 
-func (p *parser) parseKey(typ sql.IndexKeyType) sql.IndexKey {
+func (p *parser) parseKey(unique bool) sql.IndexKey {
 	key := sql.IndexKey{
-		Type: typ,
+		Unique: unique,
 	}
 
 	p.expectTokens('(')
@@ -439,17 +439,26 @@ func (p *parser) parseKey(typ sql.IndexKeyType) sql.IndexKey {
 	return key
 }
 
-func (p *parser) addKey(s *datadef.CreateTable, nkey sql.IndexKey) {
-	for _, key := range s.Keys {
-		if nkey.Type == sql.PrimaryKey && key.Type == sql.PrimaryKey {
+func (p *parser) addKey(s *datadef.CreateTable, nkey sql.IndexKey, primary bool) {
+	if s.Primary != nil {
+		if primary {
 			p.error("only one primary key allowed")
+		} else if nkey.Equal(*s.Primary) {
+			p.error("duplicate keys not allowed")
 		}
+	}
+
+	for _, key := range s.Keys {
 		if nkey.Equal(key) {
 			p.error("duplicate keys not allowed")
 		}
 	}
 
-	s.Keys = append(s.Keys, nkey)
+	if primary {
+		s.Primary = &nkey
+	} else {
+		s.Keys = append(s.Keys, nkey)
+	}
 }
 
 func (p *parser) parseCreateDetails(s *datadef.CreateTable) {
@@ -463,9 +472,9 @@ func (p *parser) parseCreateDetails(s *datadef.CreateTable) {
 	for {
 		if p.optionalReserved(sql.PRIMARY) {
 			p.expectReserved(sql.KEY)
-			p.addKey(s, p.parseKey(sql.PrimaryKey))
+			p.addKey(s, p.parseKey(true), true)
 		} else if p.optionalReserved(sql.UNIQUE) {
-			p.addKey(s, p.parseKey(sql.UniqueKey))
+			p.addKey(s, p.parseKey(true), false)
 		} else {
 			p.parseColumn(s)
 		}
@@ -562,16 +571,16 @@ func (p *parser) parseColumn(s *datadef.CreateTable) {
 		} else if p.optionalReserved(sql.PRIMARY) {
 			p.expectReserved(sql.KEY)
 			p.addKey(s, sql.IndexKey{
-				Type:    sql.PrimaryKey,
+				Unique:  true,
 				Columns: []sql.Identifier{nam},
 				Reverse: []bool{false},
-			})
+			}, true)
 		} else if p.optionalReserved(sql.UNIQUE) {
 			p.addKey(s, sql.IndexKey{
-				Type:    sql.UniqueKey,
+				Unique:  true,
 				Columns: []sql.Identifier{nam},
 				Reverse: []bool{false},
-			})
+			}, false)
 		} else {
 			break
 		}

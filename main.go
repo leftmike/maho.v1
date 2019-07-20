@@ -14,6 +14,8 @@ To Do:
 -- column_constraint = DEFAULT expr | NOT NULL | PRIMARY KEY | UNIQUE
 -- table_constraint = (PRIMARY KEY | UNIQUE) '(' column [ASC | DESC] [',' ...] ')'
 -- PRIMARY KEY implies NOT NULL
+-- engine.CreateIndex; engine.DropIndex
+-- add Primary as an argument to engine.CreateTable
 
 - boltdb engine
 - badger engine
