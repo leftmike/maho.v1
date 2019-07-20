@@ -13,6 +13,7 @@ To Do:
    '(' column data_type [column_constraint] | table_constraint [',' ...] ')'
 -- column_constraint = DEFAULT expr | NOT NULL | PRIMARY KEY | UNIQUE
 -- table_constraint = (PRIMARY KEY | UNIQUE) '(' column [ASC | DESC] [',' ...] ')'
+-- PRIMARY KEY implies NOT NULL
 
 - boltdb engine
 - badger engine

@@ -407,8 +407,8 @@ func (p *parser) parseCreateTable() evaluate.Stmt {
 	return &s
 }
 
-func (p *parser) parseKey(typ datadef.KeyType) datadef.Key {
-	key := datadef.Key{
+func (p *parser) parseKey(typ sql.IndexKeyType) sql.IndexKey {
+	key := sql.IndexKey{
 		Type: typ,
 	}
 
@@ -439,9 +439,9 @@ func (p *parser) parseKey(typ datadef.KeyType) datadef.Key {
 	return key
 }
 
-func (p *parser) addKey(s *datadef.CreateTable, nkey datadef.Key) {
+func (p *parser) addKey(s *datadef.CreateTable, nkey sql.IndexKey) {
 	for _, key := range s.Keys {
-		if nkey.Type == datadef.PrimaryKey && key.Type == datadef.PrimaryKey {
+		if nkey.Type == sql.PrimaryKey && key.Type == sql.PrimaryKey {
 			p.error("only one primary key allowed")
 		}
 		if nkey.Equal(key) {
@@ -463,9 +463,9 @@ func (p *parser) parseCreateDetails(s *datadef.CreateTable) {
 	for {
 		if p.optionalReserved(sql.PRIMARY) {
 			p.expectReserved(sql.KEY)
-			p.addKey(s, p.parseKey(datadef.PrimaryKey))
+			p.addKey(s, p.parseKey(sql.PrimaryKey))
 		} else if p.optionalReserved(sql.UNIQUE) {
-			p.addKey(s, p.parseKey(datadef.UniqueKey))
+			p.addKey(s, p.parseKey(sql.UniqueKey))
 		} else {
 			p.parseColumn(s)
 		}
@@ -561,14 +561,14 @@ func (p *parser) parseColumn(s *datadef.CreateTable) {
 			ct.NotNull = true
 		} else if p.optionalReserved(sql.PRIMARY) {
 			p.expectReserved(sql.KEY)
-			p.addKey(s, datadef.Key{
-				Type:    datadef.PrimaryKey,
+			p.addKey(s, sql.IndexKey{
+				Type:    sql.PrimaryKey,
 				Columns: []sql.Identifier{nam},
 				Reverse: []bool{false},
 			})
 		} else if p.optionalReserved(sql.UNIQUE) {
-			p.addKey(s, datadef.Key{
-				Type:    datadef.UniqueKey,
+			p.addKey(s, sql.IndexKey{
+				Type:    sql.UniqueKey,
 				Columns: []sql.Identifier{nam},
 				Reverse: []bool{false},
 			})

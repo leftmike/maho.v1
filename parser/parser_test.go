@@ -251,9 +251,9 @@ c2 boolean not null default true)`,
 					{Type: sql.IntegerType, Size: 4},
 					{Type: sql.BooleanType, Size: 1},
 				},
-				Keys: []datadef.Key{
+				Keys: []sql.IndexKey{
 					{
-						Type:    datadef.PrimaryKey,
+						Type:    sql.PrimaryKey,
 						Columns: []sql.Identifier{sql.ID("c1")},
 						Reverse: []bool{false},
 					},
@@ -269,9 +269,9 @@ c2 boolean not null default true)`,
 					{Type: sql.IntegerType, Size: 4},
 					{Type: sql.BooleanType, Size: 1},
 				},
-				Keys: []datadef.Key{
+				Keys: []sql.IndexKey{
 					{
-						Type:    datadef.UniqueKey,
+						Type:    sql.UniqueKey,
 						Columns: []sql.Identifier{sql.ID("c1")},
 						Reverse: []bool{false},
 					},
@@ -287,9 +287,9 @@ c2 boolean not null default true)`,
 					{Type: sql.IntegerType, Size: 4},
 					{Type: sql.BooleanType, Size: 1},
 				},
-				Keys: []datadef.Key{
+				Keys: []sql.IndexKey{
 					{
-						Type:    datadef.PrimaryKey,
+						Type:    sql.PrimaryKey,
 						Columns: []sql.Identifier{sql.ID("c1")},
 						Reverse: []bool{false},
 					},
@@ -305,9 +305,9 @@ c2 boolean not null default true)`,
 					{Type: sql.IntegerType, Size: 4},
 					{Type: sql.BooleanType, Size: 1},
 				},
-				Keys: []datadef.Key{
+				Keys: []sql.IndexKey{
 					{
-						Type:    datadef.PrimaryKey,
+						Type:    sql.PrimaryKey,
 						Columns: []sql.Identifier{sql.ID("c1")},
 						Reverse: []bool{true},
 					},
@@ -323,19 +323,19 @@ c2 boolean not null default true)`,
 					{Type: sql.IntegerType, Size: 4},
 					{Type: sql.BooleanType, Size: 1},
 				},
-				Keys: []datadef.Key{
+				Keys: []sql.IndexKey{
 					{
-						Type:    datadef.UniqueKey,
+						Type:    sql.UniqueKey,
 						Columns: []sql.Identifier{sql.ID("c1")},
 						Reverse: []bool{false},
 					},
 					{
-						Type:    datadef.UniqueKey,
+						Type:    sql.UniqueKey,
 						Columns: []sql.Identifier{sql.ID("c2")},
 						Reverse: []bool{false},
 					},
 					{
-						Type:    datadef.PrimaryKey,
+						Type:    sql.PrimaryKey,
 						Columns: []sql.Identifier{sql.ID("c1"), sql.ID("c2")},
 						Reverse: []bool{true, false},
 					},

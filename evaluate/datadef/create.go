@@ -9,37 +9,11 @@ import (
 	"github.com/leftmike/maho/sql"
 )
 
-type KeyType int
-
-const (
-	PrimaryKey KeyType = iota
-	UniqueKey
-)
-
-type Key struct {
-	Type    KeyType
-	Columns []sql.Identifier
-	Reverse []bool // ASC = false, DESC = true
-}
-
-func (k1 Key) Equal(k2 Key) bool {
-	if len(k1.Columns) != len(k2.Columns) {
-		return false
-	}
-
-	for cdx := range k1.Columns {
-		if k1.Columns[cdx] != k2.Columns[cdx] || k1.Reverse[cdx] != k2.Reverse[cdx] {
-			return false
-		}
-	}
-	return true
-}
-
 type CreateTable struct {
 	Table       sql.TableName
 	Columns     []sql.Identifier
 	ColumnTypes []sql.ColumnType
-	Keys        []Key
+	Keys        []sql.IndexKey
 	IfNotExists bool
 }
 
@@ -64,9 +38,9 @@ func (stmt *CreateTable) String() string {
 	}
 	for _, key := range stmt.Keys {
 		switch key.Type {
-		case PrimaryKey:
+		case sql.PrimaryKey:
 			s += ", PRIMARY KEY ("
-		case UniqueKey:
+		case sql.UniqueKey:
 			s += ", UNIQUE ("
 		default:
 			panic(fmt.Sprintf("unexpected key type: %d", key.Type))
