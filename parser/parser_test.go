@@ -251,7 +251,7 @@ c2 boolean not null default true)`,
 					{Type: sql.IntegerType, Size: 4},
 					{Type: sql.BooleanType, Size: 1},
 				},
-				Primary: &sql.IndexKey{
+				Primary: sql.IndexKey{
 					Unique:  true,
 					Columns: []sql.Identifier{sql.ID("c1")},
 					Reverse: []bool{false},
@@ -285,7 +285,7 @@ c2 boolean not null default true)`,
 					{Type: sql.IntegerType, Size: 4},
 					{Type: sql.BooleanType, Size: 1},
 				},
-				Primary: &sql.IndexKey{
+				Primary: sql.IndexKey{
 					Unique:  true,
 					Columns: []sql.Identifier{sql.ID("c1")},
 					Reverse: []bool{false},
@@ -301,7 +301,7 @@ c2 boolean not null default true)`,
 					{Type: sql.IntegerType, Size: 4},
 					{Type: sql.BooleanType, Size: 1},
 				},
-				Primary: &sql.IndexKey{
+				Primary: sql.IndexKey{
 					Unique:  true,
 					Columns: []sql.Identifier{sql.ID("c1")},
 					Reverse: []bool{true},
@@ -317,7 +317,7 @@ c2 boolean not null default true)`,
 					{Type: sql.IntegerType, Size: 4},
 					{Type: sql.BooleanType, Size: 1},
 				},
-				Primary: &sql.IndexKey{
+				Primary: sql.IndexKey{
 					Unique:  true,
 					Columns: []sql.Identifier{sql.ID("c1"), sql.ID("c2")},
 					Reverse: []bool{true, false},

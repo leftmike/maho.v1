@@ -64,7 +64,8 @@ func (te *testEngine) LookupTable(ctx context.Context, tx engine.Transaction,
 }
 
 func (te *testEngine) CreateTable(ctx context.Context, tx engine.Transaction, tn sql.TableName,
-	cols []sql.Identifier, colTypes []sql.ColumnType) error {
+	cols []sql.Identifier, colTypes []sql.ColumnType, primary sql.IndexKey,
+	ifNotExists bool) error {
 
 	te.t.Error("CreateTable should never be called")
 	return nil

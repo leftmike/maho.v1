@@ -13,7 +13,7 @@ type CreateTable struct {
 	Table       sql.TableName
 	Columns     []sql.Identifier
 	ColumnTypes []sql.ColumnType
-	Primary     *sql.IndexKey
+	Primary     sql.IndexKey
 	Keys        []sql.IndexKey
 	IfNotExists bool
 }
@@ -37,7 +37,7 @@ func (stmt *CreateTable) String() string {
 			s += fmt.Sprintf(" DEFAULT %s", ct.Default)
 		}
 	}
-	if stmt.Primary != nil {
+	if len(stmt.Primary.Columns) > 0 {
 		s += fmt.Sprintf(", PRIMARY KEY %s", stmt.Primary)
 	}
 	for _, key := range stmt.Keys {
@@ -55,14 +55,8 @@ func (stmt *CreateTable) Plan(ses *evaluate.Session, tx engine.Transaction) (int
 func (stmt *CreateTable) Execute(ctx context.Context, eng engine.Engine,
 	tx engine.Transaction) (int64, error) {
 
-	if stmt.IfNotExists {
-		_, err := eng.LookupTable(ctx, tx, stmt.Table)
-		if err == nil {
-			return -1, nil
-		}
-	}
-
-	return -1, eng.CreateTable(ctx, tx, stmt.Table, stmt.Columns, stmt.ColumnTypes)
+	return -1, eng.CreateTable(ctx, tx, stmt.Table, stmt.Columns, stmt.ColumnTypes, stmt.Primary,
+		stmt.IfNotExists)
 }
 
 type CreateDatabase struct {

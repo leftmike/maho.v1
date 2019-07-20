@@ -135,7 +135,8 @@ func (be *basicEngine) LookupTable(ctx context.Context, tx engine.Transaction,
 }
 
 func (be *basicEngine) CreateTable(ctx context.Context, tx engine.Transaction, tn sql.TableName,
-	cols []sql.Identifier, colTypes []sql.ColumnType) error {
+	cols []sql.Identifier, colTypes []sql.ColumnType, primary sql.IndexKey,
+	ifNotExists bool) error {
 
 	be.mutex.Lock()
 	defer be.mutex.Unlock()
@@ -144,7 +145,7 @@ func (be *basicEngine) CreateTable(ctx context.Context, tx engine.Transaction, t
 	if !ok {
 		return fmt.Errorf("basic: database %s not found", tn.Database)
 	}
-	return bdb.createTable(ctx, tx, tn, cols, colTypes)
+	return bdb.createTable(ctx, tx, tn, cols, colTypes, ifNotExists)
 }
 
 func (be *basicEngine) DropTable(ctx context.Context, tx engine.Transaction, tn sql.TableName,
@@ -274,7 +275,7 @@ func (bdb *database) lookupTable(ctx context.Context, tx engine.Transaction,
 }
 
 func (bdb *database) createTable(ctx context.Context, tx engine.Transaction, tn sql.TableName,
-	cols []sql.Identifier, colTypes []sql.ColumnType) error {
+	cols []sql.Identifier, colTypes []sql.ColumnType, ifNotExists bool) error {
 
 	bsc, ok := bdb.schemas[tn.Schema]
 	if !ok {
@@ -282,6 +283,9 @@ func (bdb *database) createTable(ctx context.Context, tx engine.Transaction, tn 
 	}
 
 	if _, dup := bsc.tables[tn.Table]; dup {
+		if ifNotExists {
+			return nil
+		}
 		return fmt.Errorf("basic: table %s already exists", tn)
 	}
 

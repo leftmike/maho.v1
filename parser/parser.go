@@ -440,10 +440,10 @@ func (p *parser) parseKey(unique bool) sql.IndexKey {
 }
 
 func (p *parser) addKey(s *datadef.CreateTable, nkey sql.IndexKey, primary bool) {
-	if s.Primary != nil {
+	if len(s.Primary.Columns) > 0 {
 		if primary {
 			p.error("only one primary key allowed")
-		} else if nkey.Equal(*s.Primary) {
+		} else if nkey.Equal(s.Primary) {
 			p.error("duplicate keys not allowed")
 		}
 	}
@@ -455,7 +455,7 @@ func (p *parser) addKey(s *datadef.CreateTable, nkey sql.IndexKey, primary bool)
 	}
 
 	if primary {
-		s.Primary = &nkey
+		s.Primary = nkey
 	} else {
 		s.Keys = append(s.Keys, nkey)
 	}

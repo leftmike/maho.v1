@@ -15,14 +15,13 @@ To Do:
 -- table_constraint = (PRIMARY KEY | UNIQUE) '(' column [ASC | DESC] [',' ...] ')'
 -- PRIMARY KEY implies NOT NULL
 -- engine.CreateIndex; engine.DropIndex
--- add Primary as an argument to engine.CreateTable
 
 - boltdb engine
 - badger engine
 
 - add indexes
--- CREATE [UNIQUE] INDEX [[IF NOT EXISTS] index] ON table '(' column [, column ...] ')'
--- DROP INDEX [IF EXISTS] index
+-- CREATE [UNIQUE] INDEX [[IF NOT EXISTS] index] ON table '(' column [ASC | DESC] [, ...] ')'
+-- DROP INDEX [IF EXISTS] index ON table
 
 - [CONSTRAINT constraint]
 - CHECK '(' logical_expression ')'

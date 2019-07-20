@@ -177,7 +177,8 @@ func (me *memrowsEngine) LookupTable(ctx context.Context, tx engine.Transaction,
 }
 
 func (me *memrowsEngine) CreateTable(ctx context.Context, tx engine.Transaction, tn sql.TableName,
-	cols []sql.Identifier, colTypes []sql.ColumnType) error {
+	cols []sql.Identifier, colTypes []sql.ColumnType, primary sql.IndexKey,
+	ifNotExists bool) error {
 
 	me.mutex.Lock()
 	defer me.mutex.Unlock()
@@ -186,7 +187,7 @@ func (me *memrowsEngine) CreateTable(ctx context.Context, tx engine.Transaction,
 	if !ok {
 		return fmt.Errorf("memrows: database %s not found", tn.Database)
 	}
-	return mdb.createTable(ctx, tx, tn, cols, colTypes)
+	return mdb.createTable(ctx, tx, tn, cols, colTypes, ifNotExists)
 }
 
 func (me *memrowsEngine) DropTable(ctx context.Context, tx engine.Transaction, tn sql.TableName,
@@ -419,7 +420,7 @@ func (mdb *database) schemaVisible(tctx *tcontext, sn sql.SchemaName) bool {
 }
 
 func (mdb *database) createTable(ctx context.Context, tx engine.Transaction, tn sql.TableName,
-	cols []sql.Identifier, colTypes []sql.ColumnType) error {
+	cols []sql.Identifier, colTypes []sql.ColumnType, ifNotExists bool) error {
 
 	tctx := service.GetTxContext(tx, mdb).(*tcontext)
 	err := tctx.tx.LockSchema(ctx, tn.SchemaName(), service.ACCESS)
@@ -441,6 +442,9 @@ func (mdb *database) createTable(ctx context.Context, tx engine.Transaction, tn 
 			}
 			return nil
 		}
+		if ifNotExists {
+			return nil
+		}
 		return fmt.Errorf("memrows: table %s already exists", tn)
 	}
 
@@ -450,6 +454,9 @@ func (mdb *database) createTable(ctx context.Context, tx engine.Transaction, tn 
 
 	if ok {
 		if ti.createdVersion <= tctx.version && !ti.dropped {
+			if ifNotExists {
+				return nil
+			}
 			return fmt.Errorf("memrows: table %s already exists", tn)
 		} else if ti.createdVersion > tctx.version ||
 			(ti.dropped && ti.droppedVersion > tctx.version) {

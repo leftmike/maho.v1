@@ -128,7 +128,8 @@ func (ve *virtualEngine) LookupTable(ctx context.Context, tx engine.Transaction,
 }
 
 func (ve *virtualEngine) CreateTable(ctx context.Context, tx engine.Transaction, tn sql.TableName,
-	cols []sql.Identifier, colTypes []sql.ColumnType) error {
+	cols []sql.Identifier, colTypes []sql.ColumnType, primary sql.IndexKey,
+	ifNotExists bool) error {
 
 	if tn.Database == sql.SYSTEM {
 		return fmt.Errorf("virtual: database %s may not be modified", tn.Database)
@@ -136,7 +137,7 @@ func (ve *virtualEngine) CreateTable(ctx context.Context, tx engine.Transaction,
 	if tn.Schema == sql.INFORMATION_SCHEMA {
 		return fmt.Errorf("virtual: schema %s may not be modified", tn.Schema)
 	}
-	return ve.e.CreateTable(ctx, tx, tn, cols, colTypes)
+	return ve.e.CreateTable(ctx, tx, tn, cols, colTypes, primary, ifNotExists)
 }
 
 func (ve *virtualEngine) DropTable(ctx context.Context, tx engine.Transaction, tn sql.TableName,
