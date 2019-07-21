@@ -31,12 +31,10 @@ type Engine interface {
 		colTypes []sql.ColumnType, primary sql.IndexKey, ifNotExists bool) error
 	DropTable(ctx context.Context, tx Transaction, tn sql.TableName, ifExists bool) error
 
-	/*
-		CreateIndex(ctx context.Context, tx Transaction, idxname sql.Identifier, tn sql.TableName,
-			ik sql.IndexKey, ifNotExists bool) error
-		DropIndex(ctx context.Context, tx Transaction, idxname sql.Identifier, tn sql.TableName,
-			ifExists bool) error
-	*/
+	CreateIndex(ctx context.Context, tx Transaction, idxname sql.Identifier, tn sql.TableName,
+		ik sql.IndexKey, ifNotExists bool) error
+	DropIndex(ctx context.Context, tx Transaction, idxname sql.Identifier, tn sql.TableName,
+		ifExists bool) error
 
 	Begin(sid uint64) Transaction
 	IsTransactional() bool

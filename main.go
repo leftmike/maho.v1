@@ -8,20 +8,18 @@ To Do:
 
 - fuzzing: parser.Parse
 
-- add PRIMARY KEY and UNIQUE to CREATE TABLE
--- CREATE TABLE [IF NOT EXISTS] [[database '.'] schema '.'] table
-   '(' column data_type [column_constraint] | table_constraint [',' ...] ')'
--- column_constraint = DEFAULT expr | NOT NULL | PRIMARY KEY | UNIQUE
--- table_constraint = (PRIMARY KEY | UNIQUE) '(' column [ASC | DESC] [',' ...] ')'
--- PRIMARY KEY implies NOT NULL
--- engine.CreateIndex; engine.DropIndex
+- basic
+-- primary index
+-- indices
+
+- memrows
+-- primary index
+-- indices
+
+- update README with index syntax
 
 - boltdb engine
 - badger engine
-
-- add indexes
--- CREATE [UNIQUE] INDEX [[IF NOT EXISTS] index] ON table '(' column [ASC | DESC] [, ...] ')'
--- DROP INDEX [IF EXISTS] index ON table
 
 - [CONSTRAINT constraint]
 - CHECK '(' logical_expression ')'

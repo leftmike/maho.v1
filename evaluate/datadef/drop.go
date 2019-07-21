@@ -47,6 +47,32 @@ func (stmt *DropTable) Execute(ctx context.Context, eng engine.Engine,
 	return -1, nil
 }
 
+type DropIndex struct {
+	Table    sql.TableName
+	Index    sql.Identifier
+	IfExists bool
+}
+
+func (stmt *DropIndex) String() string {
+	s := "DROP INDEX "
+	if stmt.IfExists {
+		s += "IF EXISTS "
+	}
+	s += fmt.Sprintf("%s ON %s", stmt.Index, stmt.Table)
+	return s
+}
+
+func (stmt *DropIndex) Plan(ses *evaluate.Session, tx engine.Transaction) (interface{}, error) {
+	stmt.Table = ses.ResolveTableName(stmt.Table)
+	return stmt, nil
+}
+
+func (stmt *DropIndex) Execute(ctx context.Context, eng engine.Engine,
+	tx engine.Transaction) (int64, error) {
+
+	return -1, eng.DropIndex(ctx, tx, stmt.Index, stmt.Table, stmt.IfExists)
+}
+
 type DropDatabase struct {
 	IfExists bool
 	Database sql.Identifier

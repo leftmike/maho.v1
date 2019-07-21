@@ -152,6 +152,30 @@ func (ve *virtualEngine) DropTable(ctx context.Context, tx engine.Transaction, t
 	return ve.e.DropTable(ctx, tx, tn, ifExists)
 }
 
+func (ve *virtualEngine) CreateIndex(ctx context.Context, tx engine.Transaction,
+	idxname sql.Identifier, tn sql.TableName, ik sql.IndexKey, ifNotExists bool) error {
+
+	if tn.Database == sql.SYSTEM {
+		return fmt.Errorf("virtual: database %s may not be modified", tn.Database)
+	}
+	if tn.Schema == sql.INFORMATION_SCHEMA {
+		return fmt.Errorf("virtual: schema %s may not be modified", tn.Schema)
+	}
+	return ve.e.CreateIndex(ctx, tx, idxname, tn, ik, ifNotExists)
+}
+
+func (ve *virtualEngine) DropIndex(ctx context.Context, tx engine.Transaction,
+	idxname sql.Identifier, tn sql.TableName, ifExists bool) error {
+
+	if tn.Database == sql.SYSTEM {
+		return fmt.Errorf("virtual: database %s may not be modified", tn.Database)
+	}
+	if tn.Schema == sql.INFORMATION_SCHEMA {
+		return fmt.Errorf("virtual: schema %s may not be modified", tn.Schema)
+	}
+	return ve.e.DropIndex(ctx, tx, idxname, tn, ifExists)
+}
+
 func (ve *virtualEngine) Begin(sid uint64) engine.Transaction {
 	return ve.e.Begin(sid)
 }

@@ -268,26 +268,36 @@ func (p *parser) parseStmt() evaluate.Stmt {
 		// COMMIT
 		return &misc.Commit{}
 	case sql.CREATE:
-		switch p.expectReserved(sql.DATABASE, sql.SCHEMA, sql.TABLE) {
+		switch p.expectReserved(sql.DATABASE, sql.INDEX, sql.SCHEMA, sql.TABLE, sql.UNIQUE) {
 		case sql.DATABASE:
 			// CREATE DATABASE ...
 			return p.parseCreateDatabase()
+		case sql.INDEX:
+			// CREATE INDEX ...
+			return p.parseCreateIndex(false)
 		case sql.SCHEMA:
 			// CREATE SCHEMA ...
 			return p.parseCreateSchema()
 		case sql.TABLE:
 			// CREATE TABLE ...
 			return p.parseCreateTable()
+		case sql.UNIQUE:
+			// CREATE UNIQUE INDEX ...
+			p.expectReserved(sql.INDEX)
+			return p.parseCreateIndex(true)
 		}
 	case sql.DELETE:
 		// DELETE FROM ...
 		p.expectReserved(sql.FROM)
 		return p.parseDelete()
 	case sql.DROP:
-		switch p.expectReserved(sql.DATABASE, sql.SCHEMA, sql.TABLE) {
+		switch p.expectReserved(sql.DATABASE, sql.INDEX, sql.SCHEMA, sql.TABLE) {
 		case sql.DATABASE:
 			// DROP DATABASE ...
 			return p.parseDropDatabase()
+		case sql.INDEX:
+			// DROP INDEX ...
+			return p.parseDropIndex()
 		case sql.SCHEMA:
 			// DROP SCHEMA ...
 			return p.parseDropSchema()
@@ -448,7 +458,7 @@ func (p *parser) addKey(s *datadef.CreateTable, nkey sql.IndexKey, primary bool)
 		}
 	}
 
-	for _, key := range s.Keys {
+	for _, key := range s.Indexes {
 		if nkey.Equal(key) {
 			p.error("duplicate keys not allowed")
 		}
@@ -457,7 +467,7 @@ func (p *parser) addKey(s *datadef.CreateTable, nkey sql.IndexKey, primary bool)
 	if primary {
 		s.Primary = nkey
 	} else {
-		s.Keys = append(s.Keys, nkey)
+		s.Indexes = append(s.Indexes, nkey)
 	}
 }
 
@@ -589,6 +599,22 @@ func (p *parser) parseColumn(s *datadef.CreateTable) {
 	s.ColumnTypes = append(s.ColumnTypes, ct)
 }
 
+func (p *parser) parseCreateIndex(unique bool) evaluate.Stmt {
+	// CREATE [UNIQUE] INDEX [IF NOT EXISTS] index ON table '(' column [ASC | DESC] [, ...] ')'
+	var s datadef.CreateIndex
+
+	if p.optionalReserved(sql.IF) {
+		p.expectReserved(sql.NOT)
+		p.expectReserved(sql.EXISTS)
+		s.IfNotExists = true
+	}
+	s.Index = p.expectIdentifier("expected an index")
+	p.expectReserved(sql.ON)
+	s.Table = p.parseTableName()
+	s.Key = p.parseKey(unique)
+	return &s
+}
+
 func (p *parser) parseDelete() evaluate.Stmt {
 	// DELETE FROM [database '.'] table [WHERE expr]
 	var s query.Delete
@@ -612,6 +638,19 @@ func (p *parser) parseDropTable() evaluate.Stmt {
 	for p.maybeToken(token.Comma) {
 		s.Tables = append(s.Tables, p.parseTableName())
 	}
+	return &s
+}
+
+func (p *parser) parseDropIndex() evaluate.Stmt {
+	// DROP INDEX [IF EXISTS] index ON table
+	var s datadef.DropIndex
+	if p.optionalReserved(sql.IF) {
+		p.expectReserved(sql.EXISTS)
+		s.IfExists = true
+	}
+	s.Index = p.expectIdentifier("expected an index")
+	p.expectReserved(sql.ON)
+	s.Table = p.parseTableName()
 	return &s
 }
 

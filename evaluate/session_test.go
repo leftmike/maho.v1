@@ -78,6 +78,20 @@ func (te *testEngine) DropTable(ctx context.Context, tx engine.Transaction, tn s
 	return nil
 }
 
+func (te *testEngine) CreateIndex(ctx context.Context, tx engine.Transaction,
+	idxname sql.Identifier, tn sql.TableName, ik sql.IndexKey, ifNotExists bool) error {
+
+	te.t.Error("CreateIndex should never be called")
+	return nil
+}
+
+func (te *testEngine) DropIndex(ctx context.Context, tx engine.Transaction, idxname sql.Identifier,
+	tn sql.TableName, ifExists bool) error {
+
+	te.t.Error("DropIndex should never be called")
+	return nil
+}
+
 func (te *testEngine) Begin(sid uint64) engine.Transaction {
 	if len(te.transactions) == 0 {
 		te.t.Error("Begin called too many times on engine")

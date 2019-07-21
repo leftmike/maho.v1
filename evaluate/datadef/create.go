@@ -14,7 +14,7 @@ type CreateTable struct {
 	Columns     []sql.Identifier
 	ColumnTypes []sql.ColumnType
 	Primary     sql.IndexKey
-	Keys        []sql.IndexKey
+	Indexes     []sql.IndexKey
 	IfNotExists bool
 }
 
@@ -40,23 +40,92 @@ func (stmt *CreateTable) String() string {
 	if len(stmt.Primary.Columns) > 0 {
 		s += fmt.Sprintf(", PRIMARY KEY %s", stmt.Primary)
 	}
-	for _, key := range stmt.Keys {
+	for _, key := range stmt.Indexes {
 		s += fmt.Sprintf(", UNIQUE %s", key)
 	}
 	s += ")"
 	return s
 }
 
+func (stmt *CreateTable) findColumn(nam sql.Identifier) (int, bool) {
+	for i, col := range stmt.Columns {
+		if nam == col {
+			return i, true
+		}
+	}
+	return -1, false
+}
+
 func (stmt *CreateTable) Plan(ses *evaluate.Session, tx engine.Transaction) (interface{}, error) {
 	stmt.Table = ses.ResolveTableName(stmt.Table)
+
+	for _, col := range stmt.Primary.Columns {
+		i, ok := stmt.findColumn(col)
+		if !ok {
+			return nil, fmt.Errorf("engine: unknown column %s in primary key for table %s", col,
+				stmt.Table)
+		}
+		stmt.ColumnTypes[i].NotNull = true
+	}
+
+	for _, ik := range stmt.Indexes {
+		for _, col := range ik.Columns {
+			if _, ok := stmt.findColumn(col); !ok {
+				return nil, fmt.Errorf("engine: unknown column %s in index for table %s", col,
+					stmt.Table)
+			}
+		}
+	}
 	return stmt, nil
 }
 
 func (stmt *CreateTable) Execute(ctx context.Context, eng engine.Engine,
 	tx engine.Transaction) (int64, error) {
 
-	return -1, eng.CreateTable(ctx, tx, stmt.Table, stmt.Columns, stmt.ColumnTypes, stmt.Primary,
+	err := eng.CreateTable(ctx, tx, stmt.Table, stmt.Columns, stmt.ColumnTypes, stmt.Primary,
 		stmt.IfNotExists)
+	if err != nil {
+		return -1, err
+	}
+
+	for i, ik := range stmt.Indexes {
+		err = eng.CreateIndex(ctx, tx, sql.ID(fmt.Sprintf("index-%d", i)), stmt.Table, ik, false)
+		if err != nil {
+			return -1, err
+		}
+	}
+	return -1, nil
+}
+
+type CreateIndex struct {
+	Index       sql.Identifier
+	Table       sql.TableName
+	Key         sql.IndexKey
+	IfNotExists bool
+}
+
+func (stmt *CreateIndex) String() string {
+	s := "CREATE"
+	if stmt.Key.Unique {
+		s += " UNIQUE "
+	}
+	s += " INDEX"
+	if stmt.IfNotExists {
+		s += " IF NOT EXISTS"
+	}
+	s += fmt.Sprintf(" %s ON %s (%s)", stmt.Index, stmt.Table, stmt.Key)
+	return s
+}
+
+func (stmt *CreateIndex) Plan(ses *evaluate.Session, tx engine.Transaction) (interface{}, error) {
+	stmt.Table = ses.ResolveTableName(stmt.Table)
+	return stmt, nil
+}
+
+func (stmt *CreateIndex) Execute(ctx context.Context, eng engine.Engine,
+	tx engine.Transaction) (int64, error) {
+
+	return -1, eng.CreateIndex(ctx, tx, stmt.Index, stmt.Table, stmt.Key, stmt.IfNotExists)
 }
 
 type CreateDatabase struct {

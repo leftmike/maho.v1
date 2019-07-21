@@ -267,7 +267,7 @@ c2 boolean not null default true)`,
 					{Type: sql.IntegerType, Size: 4},
 					{Type: sql.BooleanType, Size: 1},
 				},
-				Keys: []sql.IndexKey{
+				Indexes: []sql.IndexKey{
 					{
 						Unique:  true,
 						Columns: []sql.Identifier{sql.ID("c1")},
@@ -322,7 +322,7 @@ c2 boolean not null default true)`,
 					Columns: []sql.Identifier{sql.ID("c1"), sql.ID("c2")},
 					Reverse: []bool{true, false},
 				},
-				Keys: []sql.IndexKey{
+				Indexes: []sql.IndexKey{
 					{
 						Unique:  true,
 						Columns: []sql.Identifier{sql.ID("c1")},
@@ -350,6 +350,60 @@ c2 boolean not null default true)`,
 			if err != nil {
 				t.Errorf("Parse(%q) failed with %s", c.sql, err)
 			} else if cs, ok := cs.(*datadef.CreateTable); !ok ||
+				!testutil.DeepEqual(&c.stmt, cs, &trc) {
+				t.Errorf("Parse(%q) got %s want %s\n%s", c.sql, cs.String(), c.stmt.String(), trc)
+			}
+		}
+	}
+}
+
+func TestCreateIndex(t *testing.T) {
+	cases := []struct {
+		sql  string
+		stmt datadef.CreateIndex
+		fail bool
+	}{
+		{sql: "create index unique idx on tbl (c1)", fail: true},
+		{sql: "create index idx tbl (c1)", fail: true},
+		{sql: "create index tbl (c1)", fail: true},
+		{
+			sql: "create index idx on tbl (c1 DESC, c2)",
+			stmt: datadef.CreateIndex{
+				Table: sql.TableName{Table: sql.ID("tbl")},
+				Index: sql.ID("idx"),
+				Key: sql.IndexKey{
+					Columns: []sql.Identifier{sql.ID("c1"), sql.ID("c2")},
+					Reverse: []bool{true, false},
+				},
+			},
+		},
+		{
+			sql: "create unique index if not exists idx on tbl (c1)",
+			stmt: datadef.CreateIndex{
+				Table: sql.TableName{Table: sql.ID("tbl")},
+				Index: sql.ID("idx"),
+				Key: sql.IndexKey{
+					Unique:  true,
+					Columns: []sql.Identifier{sql.ID("c1")},
+					Reverse: []bool{false},
+				},
+				IfNotExists: true,
+			},
+		},
+	}
+
+	for i, c := range cases {
+		p := NewParser(strings.NewReader(c.sql), fmt.Sprintf("tests[%d]", i))
+		cs, err := p.Parse()
+		if c.fail {
+			if err == nil {
+				t.Errorf("Parse(%q) did not fail", c.sql)
+			}
+		} else {
+			var trc string
+			if err != nil {
+				t.Errorf("Parse(%q) failed with %s", c.sql, err)
+			} else if cs, ok := cs.(*datadef.CreateIndex); !ok ||
 				!testutil.DeepEqual(&c.stmt, cs, &trc) {
 				t.Errorf("Parse(%q) got %s want %s\n%s", c.sql, cs.String(), c.stmt.String(), trc)
 			}

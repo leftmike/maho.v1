@@ -9,6 +9,7 @@ package memrows
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"math"
 	"sync"
@@ -201,6 +202,18 @@ func (me *memrowsEngine) DropTable(ctx context.Context, tx engine.Transaction, t
 		return fmt.Errorf("memrows: database %s not found", tn.Database)
 	}
 	return mdb.dropTable(ctx, tx, tn, ifExists)
+}
+
+func (_ *memrowsEngine) CreateIndex(ctx context.Context, tx engine.Transaction,
+	idxname sql.Identifier, tn sql.TableName, ik sql.IndexKey, ifNotExists bool) error {
+
+	return errors.New("memrows: create index not implemented")
+}
+
+func (_ *memrowsEngine) DropIndex(ctx context.Context, tx engine.Transaction,
+	idxname sql.Identifier, tn sql.TableName, ifExists bool) error {
+
+	return errors.New("memrows: drop index not implemented")
 }
 
 func (me *memrowsEngine) Begin(sid uint64) engine.Transaction {

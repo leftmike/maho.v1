@@ -2,6 +2,7 @@ package basic
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"io"
 	"sync"
@@ -159,6 +160,18 @@ func (be *basicEngine) DropTable(ctx context.Context, tx engine.Transaction, tn 
 		return fmt.Errorf("basic: database %s not found", tn.Database)
 	}
 	return bdb.dropTable(ctx, tx, tn, ifExists)
+}
+
+func (_ *basicEngine) CreateIndex(ctx context.Context, tx engine.Transaction,
+	idxname sql.Identifier, tn sql.TableName, ik sql.IndexKey, ifNotExists bool) error {
+
+	return errors.New("basic: create index not implemented")
+}
+
+func (_ *basicEngine) DropIndex(ctx context.Context, tx engine.Transaction, idxname sql.Identifier,
+	tn sql.TableName, ifExists bool) error {
+
+	return errors.New("basic: drop index not implemented")
 }
 
 func (_ *basicEngine) Begin(sid uint64) engine.Transaction {
