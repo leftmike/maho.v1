@@ -5,8 +5,22 @@ import (
 
 	"github.com/leftmike/maho/engine/bbolt"
 	"github.com/leftmike/maho/engine/test"
+	"github.com/leftmike/maho/testutil"
 )
 
-func TestBBoltKV(t *testing.T) {
-	test.RunKVTest(t, bbolt.Engine{})
+func TestBBolt(t *testing.T) {
+	err := testutil.CleanDir("testdata", []string{".gitignore"})
+	if err != nil {
+		t.Fatalf("CleanDir() failed with %s", err)
+	}
+
+	e := bbolt.NewEngine("testdata")
+	/*
+		test.RunDatabaseTest(t, e) // XXX
+	*/
+	test.RunSchemaTest(t, e)
+	/*
+		test.RunTableTest(t, e) // XXX
+		test.RunParallelTest(t, e) // XXX
+	*/
 }

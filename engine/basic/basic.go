@@ -54,11 +54,11 @@ func NewEngine(dataDir string) engine.Engine {
 }
 
 func (_ *basicEngine) CreateSystemTable(tblname sql.Identifier, maker engine.MakeVirtual) {
-	panic("memrows: use virtual engine with memrows engine")
+	panic("basic: use virtual engine with basic engine")
 }
 
 func (_ *basicEngine) CreateInfoTable(tblname sql.Identifier, maker engine.MakeVirtual) {
-	panic("memrows: use virtual engine with memrows engine")
+	panic("basic: use virtual engine with basic engine")
 }
 
 func (be *basicEngine) CreateDatabase(dbname sql.Identifier, options engine.Options) error {

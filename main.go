@@ -8,13 +8,17 @@ To Do:
 
 - fuzzing: parser.Parse
 
+- remove engine/kv/* and engine/test/testkv.go
+
+- keep track of databases per engine as a simple config file that gets read and written by maho
+
 - basic
 -- primary index
--- indices
+-- indexes
 
 - memrows
 -- primary index
--- indices
+-- indexes
 
 - update README with index syntax
 
@@ -59,6 +63,7 @@ import (
 	"github.com/leftmike/maho/config"
 	"github.com/leftmike/maho/engine"
 	"github.com/leftmike/maho/engine/basic"
+	"github.com/leftmike/maho/engine/bbolt"
 	"github.com/leftmike/maho/engine/memrows"
 	"github.com/leftmike/maho/evaluate"
 	"github.com/leftmike/maho/parser"
@@ -200,8 +205,9 @@ func main() {
 		e = basic.NewEngine(*dataDir)
 	case "memrows":
 		e = memrows.NewEngine(*dataDir)
+	case "bolt", "bbolt":
+		e = bbolt.NewEngine(*dataDir)
 	//"badger":  kvrows.Engine{Engine: badger.Engine{}},
-	//"bolt":    kvrows.Engine{Engine: bbolt.Engine{}},
 	default:
 		fmt.Fprintf(os.Stderr,
 			"maho: got %s for engine; want basic or memrows", *eng)

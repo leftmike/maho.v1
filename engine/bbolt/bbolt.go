@@ -1,24 +1,599 @@
 package bbolt
 
 import (
-	"bytes"
+	"context"
+	"errors"
 	"fmt"
+	"path/filepath"
+	"sync"
+	"sync/atomic"
+
+	"github.com/leftmike/maho/engine"
+	"github.com/leftmike/maho/engine/service"
+	"github.com/leftmike/maho/engine/virtual"
+	"github.com/leftmike/maho/sql"
 
 	"go.etcd.io/bbolt"
-
-	"github.com/leftmike/maho/engine/kv"
 )
 
 var (
-	bucketName = []byte("kv")
+	errNotEmpty = errors.New("not empty")
 )
 
-type Engine struct{}
-
-type database struct {
-	db *bbolt.DB
+type bboltEngine struct {
+	lockService service.LockService
+	mutex       sync.RWMutex
+	databases   map[sql.Identifier]*database
+	dataDir     string
+	lastTID     uint64
 }
 
+type database struct {
+	db   *bbolt.DB
+	path string
+	name sql.Identifier
+}
+
+type transaction struct {
+	e           *bboltEngine
+	db          *database
+	tx          *bbolt.Tx
+	tid         uint64
+	sid         uint64
+	lockerState service.LockerState
+}
+
+type table struct {
+	b *bbolt.Bucket
+}
+
+func NewEngine(dataDir string) engine.Engine {
+	be := &bboltEngine{
+		databases: map[sql.Identifier]*database{},
+		dataDir:   dataDir,
+	}
+	ve := virtual.NewEngine(be)
+	be.lockService.Init(ve)
+	return ve
+}
+
+func (_ *bboltEngine) CreateSystemTable(tblname sql.Identifier, maker engine.MakeVirtual) {
+	panic("bbolt: use virtual engine with bbolt engine")
+}
+
+func (_ *bboltEngine) CreateInfoTable(tblname sql.Identifier, maker engine.MakeVirtual) {
+	panic("bbolt: use virtual engine with bbolt engine")
+}
+
+func databasePath(dbname sql.Identifier, dataDir, ext string, options engine.Options) string {
+	var path string
+	if optionPath, ok := options[sql.PATH]; ok {
+		path = optionPath
+	} else {
+		path = filepath.Join(dataDir, dbname.String())
+	}
+
+	if filepath.Ext(path) == "" {
+		path += ext
+	}
+	return path
+}
+
+func (be *bboltEngine) CreateDatabase(dbname sql.Identifier, options engine.Options) error {
+	be.mutex.Lock()
+	defer be.mutex.Unlock()
+
+	if _, ok := be.databases[dbname]; ok {
+		return fmt.Errorf("bbolt: database %s already exists", dbname)
+	}
+	path := databasePath(dbname, be.dataDir, ".mahobbolt", options)
+	db, err := bbolt.Open(path, 0644, nil)
+	if err != nil {
+		return fmt.Errorf("bbolt: create database %s failed: %s", dbname, err)
+	}
+
+	err = db.Update(
+		func(tx *bbolt.Tx) error {
+			_, err := tx.CreateBucket([]byte(sql.PUBLIC.String()))
+			return err
+		})
+	if err != nil {
+		return fmt.Errorf("bbolt: create database %s failed: %s", dbname, err)
+	}
+
+	be.databases[dbname] = &database{
+		db:   db,
+		path: path,
+		name: dbname,
+	}
+	return nil
+}
+
+func (be *bboltEngine) DropDatabase(dbname sql.Identifier, ifExists bool,
+	options engine.Options) error {
+
+	be.mutex.Lock()
+	defer be.mutex.Unlock()
+
+	_, ok := be.databases[dbname]
+	if !ok {
+		if ifExists {
+			return nil
+		}
+		return fmt.Errorf("bbolt: database %s does not exist", dbname)
+	}
+	delete(be.databases, dbname)
+	return nil
+}
+
+func (be *bboltEngine) CreateSchema(ctx context.Context, tx engine.Transaction,
+	sn sql.SchemaName) error {
+
+	be.mutex.Lock()
+	defer be.mutex.Unlock()
+
+	bdb, ok := be.databases[sn.Database]
+	if !ok {
+		return fmt.Errorf("bbolt: database %s not found", sn.Database)
+	}
+	return bdb.createSchema(ctx, tx, sn)
+}
+
+func (be *bboltEngine) DropSchema(ctx context.Context, tx engine.Transaction, sn sql.SchemaName,
+	ifExists bool) error {
+
+	be.mutex.Lock()
+	defer be.mutex.Unlock()
+
+	bdb, ok := be.databases[sn.Database]
+	if !ok {
+		return fmt.Errorf("bbolt: database %s not found", sn.Database)
+	}
+	return bdb.dropSchema(ctx, tx, sn, ifExists)
+}
+
+func (be *bboltEngine) LookupTable(ctx context.Context, tx engine.Transaction,
+	tn sql.TableName) (engine.Table, error) {
+
+	be.mutex.RLock()
+	defer be.mutex.RUnlock()
+
+	bdb, ok := be.databases[tn.Database]
+	if !ok {
+		return nil, fmt.Errorf("bbolt: database %s not found", tn.Database)
+	}
+	return bdb.lookupTable(ctx, tx, tn)
+}
+
+func (be *bboltEngine) CreateTable(ctx context.Context, tx engine.Transaction, tn sql.TableName,
+	cols []sql.Identifier, colTypes []sql.ColumnType, primary sql.IndexKey,
+	ifNotExists bool) error {
+
+	be.mutex.Lock()
+	defer be.mutex.Unlock()
+
+	bdb, ok := be.databases[tn.Database]
+	if !ok {
+		return fmt.Errorf("bbolt: database %s not found", tn.Database)
+	}
+	return bdb.createTable(ctx, tx, tn, cols, colTypes, primary, ifNotExists)
+}
+
+func (be *bboltEngine) DropTable(ctx context.Context, tx engine.Transaction, tn sql.TableName,
+	ifExists bool) error {
+
+	be.mutex.Lock()
+	defer be.mutex.Unlock()
+
+	bdb, ok := be.databases[tn.Database]
+	if !ok {
+		return fmt.Errorf("bbolt: database %s not found", tn.Database)
+	}
+	return bdb.dropTable(ctx, tx, tn, ifExists)
+}
+
+func (_ *bboltEngine) CreateIndex(ctx context.Context, tx engine.Transaction,
+	idxname sql.Identifier, tn sql.TableName, ik sql.IndexKey, ifNotExists bool) error {
+
+	return errors.New("bbolt: create index not implemented") // XXX
+}
+
+func (_ *bboltEngine) DropIndex(ctx context.Context, tx engine.Transaction, idxname sql.Identifier,
+	tn sql.TableName, ifExists bool) error {
+
+	return errors.New("bbolt: drop index not implemented") // XXX
+}
+
+func (be *bboltEngine) Begin(sid uint64) engine.Transaction {
+	return &transaction{
+		e:   be,
+		tid: atomic.AddUint64(&be.lastTID, 1),
+		sid: sid,
+	}
+}
+
+func (_ *bboltEngine) IsTransactional() bool {
+	return true
+}
+
+func (be *bboltEngine) ListDatabases(ctx context.Context, tx engine.Transaction) ([]sql.Identifier,
+	error) {
+
+	be.mutex.RLock()
+	defer be.mutex.RUnlock()
+
+	var dbnames []sql.Identifier
+	for dbname := range be.databases {
+		dbnames = append(dbnames, dbname)
+	}
+	return dbnames, nil
+}
+
+func (be *bboltEngine) ListSchemas(ctx context.Context, tx engine.Transaction,
+	dbname sql.Identifier) ([]sql.Identifier, error) {
+
+	be.mutex.RLock()
+	defer be.mutex.RUnlock()
+
+	bdb, ok := be.databases[dbname]
+	if !ok {
+		return nil, fmt.Errorf("bbolt: database %s not found", dbname)
+	}
+
+	return bdb.listSchemas(ctx, tx)
+}
+
+func (be *bboltEngine) ListTables(ctx context.Context, tx engine.Transaction,
+	sn sql.SchemaName) ([]sql.Identifier, error) {
+
+	be.mutex.RLock()
+	defer be.mutex.RUnlock()
+
+	bdb, ok := be.databases[sn.Database]
+	if !ok {
+		return nil, fmt.Errorf("bbolt: database %s not found", sn.Database)
+	}
+
+	/*
+		bsc, ok := bdb.schemas[sn.Schema]
+		if !ok {
+			return nil, fmt.Errorf("bbolt: schema %s not found", sn)
+		}
+
+		var tblnames []sql.Identifier
+		for tblname := range bsc.tables {
+			tblnames = append(tblnames, tblname)
+		}
+		return tblnames, nil
+	*/
+	_ = bdb
+	return nil, errors.New("not implemented") // XXX
+}
+
+func (tx *transaction) Commit(ctx context.Context) error {
+	if tx.tx != nil {
+		tx.e.lockService.ReleaseLocks(tx)
+		err := tx.tx.Commit()
+		if err != nil {
+			return fmt.Errorf("bbolt: unable to commit transaction: %s", err)
+		}
+		tx.tx = nil
+	}
+	return nil
+}
+
+func (tx *transaction) Rollback() error {
+	if tx.tx != nil {
+		tx.e.lockService.ReleaseLocks(tx)
+		err := tx.tx.Rollback()
+		if err != nil {
+			return fmt.Errorf("bbolt: unable to rollback transaction: %s", err)
+		}
+		tx.tx = nil
+	}
+	return nil
+}
+
+func (_ *transaction) NextStmt() {}
+
+func (tx *transaction) LockerState() *service.LockerState {
+	return &tx.lockerState
+}
+
+func (tx *transaction) String() string {
+	return fmt.Sprintf("transaction-%d", tx.tid)
+}
+
+func (tx *transaction) lockSchema(ctx context.Context, sn sql.SchemaName,
+	ll service.LockLevel) error {
+
+	return tx.e.lockService.LockSchema(ctx, tx, sn, ll)
+}
+
+func (tx *transaction) lockTable(ctx context.Context, tn sql.TableName,
+	ll service.LockLevel) error {
+
+	return tx.e.lockService.LockTable(ctx, tx, tn, ll)
+}
+
+func (bdb *database) transaction(etx engine.Transaction) (*transaction, error) {
+	tx := etx.(*transaction)
+	if tx.db == nil {
+		var err error
+		tx.tx, err = bdb.db.Begin(true)
+		if err != nil {
+			return nil, fmt.Errorf("bbolt: unable to begin transaction: %s", err)
+		}
+		tx.db = bdb
+	} else if tx.db != bdb {
+		return nil, fmt.Errorf("bbolt: multiple database transactions not allowed: %s and %s",
+			tx.db.name, bdb.name)
+	}
+	return tx, nil
+}
+
+func (bdb *database) createSchema(ctx context.Context, etx engine.Transaction,
+	sn sql.SchemaName) error {
+
+	tx, err := bdb.transaction(etx)
+	if err != nil {
+		return err
+	}
+
+	err = tx.lockSchema(ctx, sn, service.EXCLUSIVE)
+	if err != nil {
+		return err
+	}
+
+	sb := tx.tx.Bucket([]byte(sn.Schema.String()))
+	if sb != nil {
+		return fmt.Errorf("bbolt: schema %s already exists", sn)
+	}
+
+	_, err = tx.tx.CreateBucket([]byte(sn.Schema.String()))
+	if err != nil {
+		return fmt.Errorf("bbolt: unable to create schema %s: %s", sn, err)
+	}
+	return nil
+}
+
+func (bdb *database) dropSchema(ctx context.Context, etx engine.Transaction, sn sql.SchemaName,
+	ifExists bool) error {
+
+	tx, err := bdb.transaction(etx)
+	if err != nil {
+		return err
+	}
+
+	err = tx.lockSchema(ctx, sn, service.EXCLUSIVE)
+	if err != nil {
+		return err
+	}
+
+	sb := tx.tx.Bucket([]byte(sn.Schema.String()))
+	if sb == nil {
+		if ifExists {
+			return nil
+		}
+		return fmt.Errorf("bbolt: schema %s does not exist", sn)
+	}
+
+	err = sb.ForEach(
+		func(key, val []byte) error {
+			if val != nil && !hidden(key) {
+				return errNotEmpty
+			}
+			return nil
+		})
+	if err != nil {
+		return fmt.Errorf("bbolt: schema %s is not empty", sn)
+	}
+
+	err = tx.tx.DeleteBucket([]byte(sn.Schema.String()))
+	if err != nil {
+		return fmt.Errorf("bbolt: unable to drop schema %s: %s", sn, err)
+	}
+	return nil
+}
+
+func hidden(name []byte) bool {
+	return len(name) > 0 && name[0] == 0
+}
+
+func (bdb *database) lookupTable(ctx context.Context, etx engine.Transaction,
+	tn sql.TableName) (engine.Table, error) {
+
+	tx, err := bdb.transaction(etx)
+	if err != nil {
+		return nil, err
+	}
+
+	err = tx.lockTable(ctx, tn, service.ACCESS)
+	if err != nil {
+		return nil, err
+	}
+
+	sb := tx.tx.Bucket([]byte(tn.Schema.String()))
+	if sb == nil {
+		return nil, fmt.Errorf("bbolt: schema %s not found", tn.SchemaName())
+	}
+
+	tb := sb.Bucket([]byte(tn.Table.String()))
+	if tb == nil {
+		return nil, fmt.Errorf("bbolt: table %s not found", tn)
+	}
+
+	return &table{
+		b: tb,
+	}, nil
+}
+
+func (bdb *database) createTable(ctx context.Context, etx engine.Transaction, tn sql.TableName,
+	cols []sql.Identifier, colTypes []sql.ColumnType, primary sql.IndexKey,
+	ifNotExists bool) error {
+
+	tx, err := bdb.transaction(etx)
+	if err != nil {
+		return err
+	}
+
+	err = tx.lockSchema(ctx, tn.SchemaName(), service.ACCESS)
+	if err != nil {
+		return err
+	}
+	err = tx.lockTable(ctx, tn, service.EXCLUSIVE)
+	if err != nil {
+		return err
+	}
+
+	sb := tx.tx.Bucket([]byte(tn.Schema.String()))
+	if sb == nil {
+		return fmt.Errorf("bbolt: schema %s not found", tn.SchemaName())
+	}
+
+	tb := sb.Bucket([]byte(tn.Table.String()))
+	if tb != nil {
+		if ifNotExists {
+			return nil
+		}
+		return fmt.Errorf("bbolt: table %s already exists", tn)
+	}
+
+	tb, err = sb.CreateBucket([]byte(tn.Table.String()))
+	if err != nil {
+		return fmt.Errorf("bbolt: unable to create table %s: %s", tn, err)
+	}
+
+	return nil
+}
+
+func (bdb *database) dropTable(ctx context.Context, etx engine.Transaction, tn sql.TableName,
+	ifExists bool) error {
+
+	tx, err := bdb.transaction(etx)
+	if err != nil {
+		return err
+	}
+
+	err = tx.lockSchema(ctx, tn.SchemaName(), service.ACCESS)
+	if err != nil {
+		return err
+	}
+	err = tx.lockTable(ctx, tn, service.EXCLUSIVE)
+	if err != nil {
+		return err
+	}
+
+	return errors.New("not implemented") // XXX
+}
+
+func (bdb *database) listSchemas(ctx context.Context, etx engine.Transaction) ([]sql.Identifier,
+	error) {
+
+	tx, err := bdb.transaction(etx)
+	if err != nil {
+		return nil, err
+	}
+
+	var schemas []sql.Identifier
+	err = tx.tx.ForEach(
+		func(name []byte, bkt *bbolt.Bucket) error {
+			if !hidden(name) {
+				schemas = append(schemas, sql.ID(string(name)))
+			}
+			return nil
+		})
+	if err != nil {
+		return nil, fmt.Errorf("bbolt: unable to list schemas: %s", err)
+	}
+	return schemas, nil
+}
+
+func (bt *table) Columns(ctx context.Context) []sql.Identifier {
+	return nil // XXX bt.columns
+}
+
+func (bt *table) ColumnTypes(ctx context.Context) []sql.ColumnType {
+	return nil // XXX bt.columnTypes
+}
+
+func (bt *table) Rows(ctx context.Context) (engine.Rows, error) {
+	return nil, errors.New("not implemented") // XXX
+	/*
+		bt.be.mutex.RLock()
+		defer bt.be.mutex.RUnlock()
+
+		return &rows{be: bt.be, tn: bt.tn, columns: bt.columns, rows: bt.rows}, nil
+	*/
+}
+
+func (bt *table) Insert(ctx context.Context, row []sql.Value) error {
+	return errors.New("not implemented") // XXX
+	/*
+		bt.be.mutex.Lock()
+		defer bt.be.mutex.Unlock()
+
+		bt.rows = append(bt.rows, row)
+		return nil
+	*/
+}
+
+/*
+func (br *rows) Columns() []sql.Identifier {
+	return br.columns
+}
+
+func (br *rows) Close() error {
+	br.index = len(br.rows)
+	br.haveRow = false
+	return nil
+}
+
+func (br *rows) Next(ctx context.Context, dest []sql.Value) error {
+	br.be.mutex.RLock()
+	defer br.be.mutex.RUnlock()
+
+	for br.index < len(br.rows) {
+		if br.rows[br.index] != nil {
+			copy(dest, br.rows[br.index])
+			br.index += 1
+			br.haveRow = true
+			return nil
+		}
+		br.index += 1
+	}
+
+	br.haveRow = false
+	return io.EOF
+}
+
+func (br *rows) Delete(ctx context.Context) error {
+	br.be.mutex.Lock()
+	defer br.be.mutex.Unlock()
+
+	if !br.haveRow {
+		return fmt.Errorf("basic: table %s no row to delete", br.tn)
+	}
+	br.haveRow = false
+	br.rows[br.index-1] = nil
+	return nil
+}
+
+func (br *rows) Update(ctx context.Context, updates []sql.ColumnUpdate) error {
+	br.be.mutex.Lock()
+	defer br.be.mutex.Unlock()
+
+	if !br.haveRow {
+		return fmt.Errorf("basic: table %s no row to update", br.tn)
+	}
+	row := br.rows[br.index-1]
+	for _, up := range updates {
+		row[up.Index] = up.Value
+	}
+	return nil
+}
+*/
+/*
 type readTx struct {
 	tx   *bbolt.Tx
 	done bool
@@ -180,3 +755,4 @@ func (it *iterator) Valid() bool {
 func (it *iterator) Value(vf func(val []byte) error) error {
 	return vf(it.val)
 }
+*/
