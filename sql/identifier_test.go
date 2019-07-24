@@ -1,6 +1,9 @@
 package sql
 
 import (
+	"bytes"
+	"encoding/gob"
+	"reflect"
 	"strings"
 	"testing"
 )
@@ -130,4 +133,41 @@ func TestKnownIdentifiers(t *testing.T) {
 			t.Errorf("knownIdentifiers[%q].IsReserved() got true want false", s)
 		}
 	}
+}
+
+func testGob(t *testing.T, in interface{}, out interface{}) {
+	t.Helper()
+
+	var buf bytes.Buffer
+	enc := gob.NewEncoder(&buf)
+	err := enc.Encode(in)
+	if err != nil {
+		t.Errorf("Encode(%#v) failed with %s", in, err)
+	}
+	dec := gob.NewDecoder(&buf)
+	err = dec.Decode(out)
+	if err != nil {
+		t.Errorf("Decode(%#v) failed with %s", out, err)
+	}
+
+	if !reflect.DeepEqual(in, out) {
+		t.Errorf("Encode -> Decode: got %v want %v", out, in)
+	}
+}
+
+func TestGob(t *testing.T) {
+
+	idi := ID("testing")
+	var ido Identifier
+	testGob(t, &idi, &ido)
+
+	idi = PUBLIC
+	testGob(t, &idi, &ido)
+
+	idi = CREATE
+	testGob(t, &idi, &ido)
+
+	si := []Identifier{ID("testing"), CREATE, TABLE, SYSTEM}
+	var so []Identifier
+	testGob(t, &si, &so)
 }

@@ -1,6 +1,7 @@
 package sql
 
 import (
+	"errors"
 	"strings"
 )
 
@@ -253,6 +254,25 @@ func (id Identifier) IsReserved() bool {
 		return true
 	}
 	return false
+}
+
+func (id *Identifier) GobDecode(val []byte) error {
+	if len(val) == 0 || val[0] > 1 {
+		return errors.New("unable to decode identifier")
+	}
+	if val[0] == 0 {
+		*id = QuotedID(string(val[1:]))
+	} else {
+		*id = UnquotedID(string(val[1:]))
+	}
+	return nil
+}
+
+func (id Identifier) GobEncode() ([]byte, error) {
+	if id.IsReserved() {
+		return append([]byte{1}, []byte(id.String())...), nil
+	}
+	return append([]byte{0}, []byte(id.String())...), nil
 }
 
 func init() {
