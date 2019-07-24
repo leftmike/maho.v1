@@ -15,12 +15,11 @@ func TestBBolt(t *testing.T) {
 	}
 
 	e := bbolt.NewEngine("testdata")
-	/*
-		test.RunDatabaseTest(t, e) // XXX
-	*/
+	test.RunDatabaseTest(t, e)
 	test.RunSchemaTest(t, e)
 	/*
 		test.RunTableTest(t, e) // XXX
 		test.RunParallelTest(t, e) // XXX
+		test.RunStressTest(t, e) // XXX
 	*/
 }

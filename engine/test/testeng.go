@@ -629,6 +629,13 @@ func RunSchemaTest(t *testing.T, e engine.Engine) {
 			{cmd: cmdBegin},
 			{cmd: cmdListSchemas, list: []string{"sc-b", "sc-c", "sc-d"}},
 			{cmd: cmdCommit},
+
+			{cmd: cmdBegin},
+			{cmd: cmdSetSchema, name: sql.ID("sc-z")},
+			{cmd: cmdLookupTable, name: sql.ID("tbl"), fail: true},
+			{cmd: cmdDropTable, name: sql.ID("tbl"), fail: true},
+			{cmd: cmdDropTable, name: sql.ID("tbl"), ifExists: true},
+			{cmd: cmdCommit},
 		})
 
 	for i := 0; i < 2; i++ {

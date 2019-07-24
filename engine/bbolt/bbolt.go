@@ -1,7 +1,9 @@
 package bbolt
 
 import (
+	"bytes"
 	"context"
+	"encoding/gob"
 	"errors"
 	"fmt"
 	"path/filepath"
@@ -44,7 +46,9 @@ type transaction struct {
 }
 
 type table struct {
-	b *bbolt.Bucket
+	b           *bbolt.Bucket
+	columns     []sql.Identifier
+	columnTypes []sql.ColumnType
 }
 
 func NewEngine(dataDir string) engine.Engine {
@@ -396,8 +400,31 @@ func (bdb *database) dropSchema(ctx context.Context, etx engine.Transaction, sn 
 	return nil
 }
 
-func hidden(name []byte) bool {
-	return len(name) > 0 && name[0] == 0
+func hidden(key []byte) bool {
+	return len(key) > 0 && key[0] == 0
+}
+
+func hiddenKey(key string) []byte {
+	return append([]byte{0}, []byte(key)...)
+}
+
+func putGob(b *bbolt.Bucket, key string, val interface{}) error {
+	var buf bytes.Buffer
+	enc := gob.NewEncoder(&buf)
+	err := enc.Encode(val)
+	if err != nil {
+		return err
+	}
+	return b.Put(hiddenKey(key), buf.Bytes())
+}
+
+func getGob(b *bbolt.Bucket, key string, val interface{}) error {
+	bval := b.Get(hiddenKey(key))
+	if bval == nil {
+		return fmt.Errorf("bbolt: key %s not found", key)
+	}
+	dec := gob.NewDecoder(bytes.NewBuffer(bval))
+	return dec.Decode(val)
 }
 
 func (bdb *database) lookupTable(ctx context.Context, etx engine.Transaction,
@@ -423,8 +450,21 @@ func (bdb *database) lookupTable(ctx context.Context, etx engine.Transaction,
 		return nil, fmt.Errorf("bbolt: table %s not found", tn)
 	}
 
+	var cols []sql.Identifier
+	var colTypes []sql.ColumnType
+	err = getGob(tb, "columns", &cols)
+	if err != nil {
+		return nil, fmt.Errorf("bbolt: unable to lookup table %s: %s", tn, err)
+	}
+	err = getGob(tb, "types", &colTypes)
+	if err != nil {
+		return nil, fmt.Errorf("bbolt: unable to lookup table %s: %s", tn, err)
+	}
+
 	return &table{
-		b: tb,
+		b:           tb,
+		columns:     cols,
+		columnTypes: colTypes,
 	}, nil
 }
 
@@ -463,6 +503,14 @@ func (bdb *database) createTable(ctx context.Context, etx engine.Transaction, tn
 	if err != nil {
 		return fmt.Errorf("bbolt: unable to create table %s: %s", tn, err)
 	}
+	err = putGob(tb, "columns", &cols)
+	if err != nil {
+		return fmt.Errorf("bbolt: unable to create table %s: %s", tn, err)
+	}
+	err = putGob(tb, "types", &colTypes)
+	if err != nil {
+		return fmt.Errorf("bbolt: unable to create table %s: %s", tn, err)
+	}
 
 	return nil
 }
@@ -484,7 +532,22 @@ func (bdb *database) dropTable(ctx context.Context, etx engine.Transaction, tn s
 		return err
 	}
 
-	return errors.New("not implemented") // XXX
+	sb := tx.tx.Bucket([]byte(tn.Schema.String()))
+	if sb == nil {
+		if ifExists {
+			return nil
+		}
+		return fmt.Errorf("bbolt: schema %s not found", tn.SchemaName())
+	}
+
+	err = sb.DeleteBucket([]byte(tn.Table.String()))
+	if err != nil {
+		if ifExists {
+			return nil
+		}
+		return fmt.Errorf("bbolt: table %s not found", tn)
+	}
+	return nil
 }
 
 func (bdb *database) listSchemas(ctx context.Context, etx engine.Transaction) ([]sql.Identifier,
@@ -510,11 +573,11 @@ func (bdb *database) listSchemas(ctx context.Context, etx engine.Transaction) ([
 }
 
 func (bt *table) Columns(ctx context.Context) []sql.Identifier {
-	return nil // XXX bt.columns
+	return bt.columns
 }
 
 func (bt *table) ColumnTypes(ctx context.Context) []sql.ColumnType {
-	return nil // XXX bt.columnTypes
+	return bt.columnTypes
 }
 
 func (bt *table) Rows(ctx context.Context) (engine.Rows, error) {
