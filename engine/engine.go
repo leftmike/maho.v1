@@ -38,6 +38,11 @@ type Engine interface {
 
 	Begin(sid uint64) Transaction
 	IsTransactional() bool
+
+	ListDatabases(ctx context.Context, tx Transaction) ([]sql.Identifier, error)
+	ListSchemas(ctx context.Context, tx Transaction, dbname sql.Identifier) ([]sql.Identifier,
+		error)
+	ListTables(ctx context.Context, tx Transaction, sn sql.SchemaName) ([]sql.Identifier, error)
 }
 
 type Rows interface {

@@ -258,20 +258,7 @@ func (be *bboltEngine) ListTables(ctx context.Context, tx engine.Transaction,
 		return nil, fmt.Errorf("bbolt: database %s not found", sn.Database)
 	}
 
-	/*
-		bsc, ok := bdb.schemas[sn.Schema]
-		if !ok {
-			return nil, fmt.Errorf("bbolt: schema %s not found", sn)
-		}
-
-		var tblnames []sql.Identifier
-		for tblname := range bsc.tables {
-			tblnames = append(tblnames, tblname)
-		}
-		return tblnames, nil
-	*/
-	_ = bdb
-	return nil, errors.New("not implemented") // XXX
+	return bdb.listTables(ctx, tx, sn)
 }
 
 func (tx *transaction) Commit(ctx context.Context) error {
@@ -384,7 +371,7 @@ func (bdb *database) dropSchema(ctx context.Context, etx engine.Transaction, sn 
 
 	err = sb.ForEach(
 		func(key, val []byte) error {
-			if val != nil && !hidden(key) {
+			if val == nil && !hidden(key) {
 				return errNotEmpty
 			}
 			return nil
@@ -570,6 +557,33 @@ func (bdb *database) listSchemas(ctx context.Context, etx engine.Transaction) ([
 		return nil, fmt.Errorf("bbolt: unable to list schemas: %s", err)
 	}
 	return schemas, nil
+}
+
+func (bdb *database) listTables(ctx context.Context, etx engine.Transaction,
+	sn sql.SchemaName) ([]sql.Identifier, error) {
+
+	tx, err := bdb.transaction(etx)
+	if err != nil {
+		return nil, err
+	}
+
+	sb := tx.tx.Bucket([]byte(sn.Schema.String()))
+	if sb == nil {
+		return nil, fmt.Errorf("bbolt: schema %s not found", sn)
+	}
+
+	var tables []sql.Identifier
+	err = sb.ForEach(
+		func(key, val []byte) error {
+			if val == nil && !hidden(key) {
+				tables = append(tables, sql.ID(string(key)))
+			}
+			return nil
+		})
+	if err != nil {
+		return nil, fmt.Errorf("bbolt: unable to list tables: %s", err)
+	}
+	return tables, nil
 }
 
 func (bt *table) Columns(ctx context.Context) []sql.Identifier {

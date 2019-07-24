@@ -11,23 +11,14 @@ import (
 	"github.com/leftmike/maho/sql"
 )
 
-type Engine interface {
-	engine.Engine
-	ListDatabases(ctx context.Context, tx engine.Transaction) ([]sql.Identifier, error)
-	ListSchemas(ctx context.Context, tx engine.Transaction,
-		dbname sql.Identifier) ([]sql.Identifier, error)
-	ListTables(ctx context.Context, tx engine.Transaction, sn sql.SchemaName) ([]sql.Identifier,
-		error)
-}
-
 type virtualEngine struct {
 	mutex        sync.RWMutex
-	e            Engine
+	e            engine.Engine
 	systemTables map[sql.TableName]engine.MakeVirtual
 	infoTables   map[sql.Identifier]engine.MakeVirtual
 }
 
-func NewEngine(e Engine) engine.Engine {
+func NewEngine(e engine.Engine) engine.Engine {
 	ve := &virtualEngine{
 		e:            e,
 		systemTables: map[sql.TableName]engine.MakeVirtual{},
@@ -182,6 +173,24 @@ func (ve *virtualEngine) Begin(sid uint64) engine.Transaction {
 
 func (ve *virtualEngine) IsTransactional() bool {
 	return ve.e.IsTransactional()
+}
+
+func (ve *virtualEngine) ListDatabases(ctx context.Context,
+	tx engine.Transaction) ([]sql.Identifier, error) {
+
+	return ve.e.ListDatabases(ctx, tx)
+}
+
+func (ve *virtualEngine) ListSchemas(ctx context.Context, tx engine.Transaction,
+	dbname sql.Identifier) ([]sql.Identifier, error) {
+
+	return ve.e.ListSchemas(ctx, tx, dbname)
+}
+
+func (ve *virtualEngine) ListTables(ctx context.Context, tx engine.Transaction,
+	sn sql.SchemaName) ([]sql.Identifier, error) {
+
+	return ve.e.ListTables(ctx, tx, sn)
 }
 
 func MakeTable(tn sql.TableName, cols []sql.Identifier, colTypes []sql.ColumnType,

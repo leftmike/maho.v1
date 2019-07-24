@@ -107,6 +107,27 @@ func (_ *testEngine) IsTransactional() bool {
 	return true
 }
 
+func (te *testEngine) ListDatabases(ctx context.Context,
+	tx engine.Transaction) ([]sql.Identifier, error) {
+
+	te.t.Error("ListDatabases should never be called")
+	return nil, nil
+}
+
+func (te *testEngine) ListSchemas(ctx context.Context, tx engine.Transaction,
+	dbname sql.Identifier) ([]sql.Identifier, error) {
+
+	te.t.Error("ListSchemas should never be called")
+	return nil, nil
+}
+
+func (te *testEngine) ListTables(ctx context.Context, tx engine.Transaction,
+	sn sql.SchemaName) ([]sql.Identifier, error) {
+
+	te.t.Error("ListTables should never be called")
+	return nil, nil
+}
+
 func (ttx *testTransaction) Commit(ctx context.Context) error {
 	if !ttx.wantCommit {
 		ttx.t.Error("Commit unexpected")

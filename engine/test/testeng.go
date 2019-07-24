@@ -10,7 +10,6 @@ import (
 	"testing"
 
 	"github.com/leftmike/maho/engine"
-	"github.com/leftmike/maho/engine/virtual"
 	"github.com/leftmike/maho/sql"
 	"github.com/leftmike/maho/testutil"
 )
@@ -170,11 +169,7 @@ func testTableLifecycle(t *testing.T, e engine.Engine, dbname sql.Identifier, cm
 		case cmdSetSchema:
 			scname = cmd.name
 		case cmdListSchemas:
-			ve, ok := e.(virtual.Engine)
-			if !ok {
-				break
-			}
-			scnames, err := ve.ListSchemas(ctx, state.tx, dbname)
+			scnames, err := e.ListSchemas(ctx, state.tx, dbname)
 			if err != nil {
 				t.Errorf("ListSchemas() failed with %s", err)
 			} else {
@@ -188,11 +183,7 @@ func testTableLifecycle(t *testing.T, e engine.Engine, dbname sql.Identifier, cm
 				}
 			}
 		case cmdLookupSchema:
-			ve, ok := e.(virtual.Engine)
-			if !ok {
-				break
-			}
-			scnames, err := ve.ListSchemas(ctx, state.tx, dbname)
+			scnames, err := e.ListSchemas(ctx, state.tx, dbname)
 			if err != nil {
 				t.Errorf("ListSchemas() failed with %s", err)
 			} else {
@@ -252,11 +243,7 @@ func testTableLifecycle(t *testing.T, e engine.Engine, dbname sql.Identifier, cm
 				t.Errorf("DropTable(%s) failed with %s", cmd.name, err)
 			}
 		case cmdListTables:
-			ve, ok := e.(virtual.Engine)
-			if !ok {
-				break
-			}
-			tblnames, err := ve.ListTables(ctx, state.tx, sql.SchemaName{dbname, scname})
+			tblnames, err := e.ListTables(ctx, state.tx, sql.SchemaName{dbname, scname})
 			if err != nil {
 				t.Errorf("ListTables() failed with %s", err)
 			} else {
@@ -590,44 +577,44 @@ func RunSchemaTest(t *testing.T, e engine.Engine) {
 			{cmd: cmdCommit},
 
 			{cmd: cmdBegin},
-			{cmd: cmdListSchemas, list: []string{"sc-a"}},
+			{cmd: cmdListSchemas, list: []string{"public", "sc-a"}},
 			{cmd: cmdCommit},
 			{cmd: cmdBegin},
 			{cmd: cmdCreateSchema, name: sql.ID("sc-b")},
 			{cmd: cmdCreateSchema, name: sql.ID("sc-c")},
 			{cmd: cmdCreateSchema, name: sql.ID("sc-d")},
-			{cmd: cmdListSchemas, list: []string{"sc-a", "sc-b", "sc-c", "sc-d"}},
+			{cmd: cmdListSchemas, list: []string{"public", "sc-a", "sc-b", "sc-c", "sc-d"}},
 			{cmd: cmdCommit},
 
 			{cmd: cmdBegin},
-			{cmd: cmdListSchemas, list: []string{"sc-a", "sc-b", "sc-c", "sc-d"}},
+			{cmd: cmdListSchemas, list: []string{"public", "sc-a", "sc-b", "sc-c", "sc-d"}},
 			{cmd: cmdCommit},
 
 			{cmd: cmdBegin},
 			{cmd: cmdDropSchema, name: sql.ID("sc-a")},
-			{cmd: cmdListSchemas, list: []string{"sc-b", "sc-c", "sc-d"}},
+			{cmd: cmdListSchemas, list: []string{"public", "sc-b", "sc-c", "sc-d"}},
 			{cmd: cmdCommit},
 
 			{cmd: cmdBegin},
-			{cmd: cmdListSchemas, list: []string{"sc-b", "sc-c", "sc-d"}},
+			{cmd: cmdListSchemas, list: []string{"public", "sc-b", "sc-c", "sc-d"}},
 			{cmd: cmdCommit},
 
 			{cmd: cmdBegin, needTransactions: true},
 			{cmd: cmdCreateSchema, name: sql.ID("sc-e")},
-			{cmd: cmdListSchemas, list: []string{"sc-b", "sc-c", "sc-d", "sc-e"}},
+			{cmd: cmdListSchemas, list: []string{"public", "sc-b", "sc-c", "sc-d", "sc-e"}},
 			{cmd: cmdRollback},
 
 			{cmd: cmdBegin},
-			{cmd: cmdListSchemas, list: []string{"sc-b", "sc-c", "sc-d"}},
+			{cmd: cmdListSchemas, list: []string{"public", "sc-b", "sc-c", "sc-d"}},
 			{cmd: cmdCommit},
 
 			{cmd: cmdBegin},
 			{cmd: cmdDropSchema, name: sql.ID("sc-c")},
-			{cmd: cmdListSchemas, list: []string{"sc-b", "sc-d"}},
+			{cmd: cmdListSchemas, list: []string{"public", "sc-b", "sc-d"}},
 			{cmd: cmdRollback},
 
 			{cmd: cmdBegin},
-			{cmd: cmdListSchemas, list: []string{"sc-b", "sc-c", "sc-d"}},
+			{cmd: cmdListSchemas, list: []string{"public", "sc-b", "sc-c", "sc-d"}},
 			{cmd: cmdCommit},
 
 			{cmd: cmdBegin},
