@@ -560,7 +560,7 @@ func (mdb *database) listSchemas(ctx context.Context, tx engine.Transaction) ([]
 
 	tctx := service.GetTxContext(tx, mdb).(*tcontext)
 	for sn, sc := range tctx.schemas {
-		if !sc.dropped {
+		if sc.created || !sc.dropped {
 			scnames = append(scnames, sn.Schema)
 		}
 	}
@@ -587,7 +587,7 @@ func (mdb *database) listTables(ctx context.Context, tx engine.Transaction,
 
 	tctx := service.GetTxContext(tx, mdb).(*tcontext)
 	for tn, tbl := range tctx.tables {
-		if !tbl.dropped {
+		if tbl.created || !tbl.dropped {
 			tblnames = append(tblnames, tn.Table)
 		}
 	}
