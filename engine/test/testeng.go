@@ -778,6 +778,43 @@ func RunSchemaTest(t *testing.T, e engine.Engine) {
 			{cmd: cmdDropSchema, name: sql.ID("sc8"), fail: true},
 			{cmd: cmdCommit},
 		})
+
+	testTableLifecycle(t, e, dbname,
+		[]cmd{
+			{cmd: cmdBegin},
+			{cmd: cmdCreateSchema, name: sql.ID("sc9")},
+			{cmd: cmdCreateSchema, name: sql.ID("sc10")},
+			{cmd: cmdSetSchema, name: sql.ID("sc10")},
+			{cmd: cmdCreateTable, name: sql.ID("tbl1")},
+			{cmd: cmdCreateTable, name: sql.ID("tbl2")},
+			{cmd: cmdCommit},
+
+			{cmd: cmdBegin},
+			{cmd: cmdLookupSchema, name: sql.ID("sc9")},
+			{cmd: cmdLookupSchema, name: sql.ID("sc10")},
+			{cmd: cmdDropSchema, name: sql.ID("sc9")},
+			{cmd: cmdDropSchema, name: sql.ID("sc10"), fail: true},
+			{cmd: cmdCommit},
+
+			{cmd: cmdBegin},
+			{cmd: cmdLookupSchema, name: sql.ID("sc9"), fail: true},
+			{cmd: cmdLookupSchema, name: sql.ID("sc10")},
+			{cmd: cmdCommit},
+
+			{cmd: cmdBegin},
+			{cmd: cmdDropTable, name: sql.ID("tbl1")},
+			{cmd: cmdDropTable, name: sql.ID("tbl2")},
+			{cmd: cmdCommit},
+
+			{cmd: cmdBegin},
+			{cmd: cmdDropSchema, name: sql.ID("sc10")},
+			{cmd: cmdCommit},
+
+			{cmd: cmdBegin},
+			{cmd: cmdLookupSchema, name: sql.ID("sc9"), fail: true},
+			{cmd: cmdLookupSchema, name: sql.ID("sc10"), fail: true},
+			{cmd: cmdCommit},
+		})
 }
 
 func RunTableTest(t *testing.T, e engine.Engine) {

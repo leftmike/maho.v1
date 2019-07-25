@@ -8,8 +8,6 @@ To Do:
 
 - fuzzing: parser.Parse
 
-- testeng: test dropping non empty schema
-
 - remove engine/kv/* and engine/test/testkv.go
 
 - keep track of databases per engine as a simple config file that gets read and written by maho
