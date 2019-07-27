@@ -178,7 +178,7 @@ func (me *memrowsEngine) LookupTable(ctx context.Context, tx engine.Transaction,
 }
 
 func (me *memrowsEngine) CreateTable(ctx context.Context, tx engine.Transaction, tn sql.TableName,
-	cols []sql.Identifier, colTypes []sql.ColumnType, primary sql.IndexKey,
+	cols []sql.Identifier, colTypes []sql.ColumnType, primary []engine.ColumnKey,
 	ifNotExists bool) error {
 
 	me.mutex.Lock()
@@ -205,7 +205,8 @@ func (me *memrowsEngine) DropTable(ctx context.Context, tx engine.Transaction, t
 }
 
 func (_ *memrowsEngine) CreateIndex(ctx context.Context, tx engine.Transaction,
-	idxname sql.Identifier, tn sql.TableName, ik sql.IndexKey, ifNotExists bool) error {
+	idxname sql.Identifier, tn sql.TableName, unique bool, keys []engine.ColumnKey,
+	ifNotExists bool) error {
 
 	return errors.New("memrows: create index not implemented")
 }

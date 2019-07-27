@@ -224,7 +224,7 @@ func testTableLifecycle(t *testing.T, e engine.Engine, dbname sql.Identifier, cm
 			}
 		case cmdCreateTable:
 			err := e.CreateTable(ctx, state.tx, sql.TableName{dbname, scname, cmd.name},
-				columns, columnTypes, sql.IndexKey{}, false)
+				columns, columnTypes, nil, false)
 			if cmd.fail {
 				if err == nil {
 					t.Errorf("CreateTable(%s) did not fail", cmd.name)

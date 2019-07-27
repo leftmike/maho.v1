@@ -170,7 +170,7 @@ func (be *bboltEngine) LookupTable(ctx context.Context, tx engine.Transaction,
 }
 
 func (be *bboltEngine) CreateTable(ctx context.Context, tx engine.Transaction, tn sql.TableName,
-	cols []sql.Identifier, colTypes []sql.ColumnType, primary sql.IndexKey,
+	cols []sql.Identifier, colTypes []sql.ColumnType, primary []engine.ColumnKey,
 	ifNotExists bool) error {
 
 	be.mutex.Lock()
@@ -197,7 +197,8 @@ func (be *bboltEngine) DropTable(ctx context.Context, tx engine.Transaction, tn 
 }
 
 func (_ *bboltEngine) CreateIndex(ctx context.Context, tx engine.Transaction,
-	idxname sql.Identifier, tn sql.TableName, ik sql.IndexKey, ifNotExists bool) error {
+	idxname sql.Identifier, tn sql.TableName, unique bool, keys []engine.ColumnKey,
+	ifNotExists bool) error {
 
 	return errors.New("bbolt: create index not implemented") // XXX
 }
@@ -456,7 +457,7 @@ func (bdb *database) lookupTable(ctx context.Context, etx engine.Transaction,
 }
 
 func (bdb *database) createTable(ctx context.Context, etx engine.Transaction, tn sql.TableName,
-	cols []sql.Identifier, colTypes []sql.ColumnType, primary sql.IndexKey,
+	cols []sql.Identifier, colTypes []sql.ColumnType, primary []engine.ColumnKey,
 	ifNotExists bool) error {
 
 	tx, err := bdb.transaction(etx)

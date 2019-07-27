@@ -9,13 +9,38 @@ import (
 	"github.com/leftmike/maho/sql"
 )
 
+func columnNumber(nam sql.Identifier, columns []sql.Identifier) (int, bool) {
+	for num, col := range columns {
+		if nam == col {
+			return num, true
+		}
+	}
+	return -1, false
+}
+
+func indexKeyToColumnKeys(ik sql.IndexKey, columns []sql.Identifier) ([]engine.ColumnKey, error) {
+	var colKeys []engine.ColumnKey
+
+	for cdx, col := range ik.Columns {
+		num, ok := columnNumber(col, columns)
+		if !ok {
+			return nil, fmt.Errorf("unknown column %s", col)
+		}
+		colKeys = append(colKeys, engine.MakeColumnKey(num, ik.Reverse[cdx]))
+	}
+
+	return colKeys, nil
+}
+
 type CreateTable struct {
-	Table       sql.TableName
-	Columns     []sql.Identifier
-	ColumnTypes []sql.ColumnType
-	Primary     sql.IndexKey
-	Indexes     []sql.IndexKey
-	IfNotExists bool
+	Table          sql.TableName
+	Columns        []sql.Identifier
+	ColumnTypes    []sql.ColumnType
+	Primary        sql.IndexKey
+	primaryColKeys []engine.ColumnKey
+	Indexes        []sql.IndexKey
+	indexesColKeys [][]engine.ColumnKey
+	IfNotExists    bool
 }
 
 func (stmt *CreateTable) String() string {
@@ -47,53 +72,47 @@ func (stmt *CreateTable) String() string {
 	return s
 }
 
-func (stmt *CreateTable) findColumn(nam sql.Identifier) (int, bool) {
-	for i, col := range stmt.Columns {
-		if nam == col {
-			return i, true
-		}
-	}
-	return -1, false
-}
-
 func (stmt *CreateTable) Plan(ses *evaluate.Session, tx engine.Transaction) (interface{}, error) {
 	stmt.Table = ses.ResolveTableName(stmt.Table)
 
+	var err error
+	stmt.primaryColKeys, err = indexKeyToColumnKeys(stmt.Primary, stmt.Columns)
+	if err != nil {
+		return nil, fmt.Errorf("engine: %s in primary key for table %s", err, stmt.Table)
+	}
 	for _, col := range stmt.Primary.Columns {
-		i, ok := stmt.findColumn(col)
-		if !ok {
-			return nil, fmt.Errorf("engine: unknown column %s in primary key for table %s", col,
-				stmt.Table)
-		}
-		stmt.ColumnTypes[i].NotNull = true
+		num, _ := columnNumber(col, stmt.Columns)
+		stmt.ColumnTypes[num].NotNull = true
 	}
 
 	for _, ik := range stmt.Indexes {
-		for _, col := range ik.Columns {
-			if _, ok := stmt.findColumn(col); !ok {
-				return nil, fmt.Errorf("engine: unknown column %s in index for table %s", col,
-					stmt.Table)
-			}
+		colKeys, err := indexKeyToColumnKeys(ik, stmt.Columns)
+		if err != nil {
+			return nil, fmt.Errorf("engine: %s in unique key for table %s", err, stmt.Table)
 		}
+		stmt.indexesColKeys = append(stmt.indexesColKeys, colKeys)
 	}
+
 	return stmt, nil
 }
 
 func (stmt *CreateTable) Execute(ctx context.Context, eng engine.Engine,
 	tx engine.Transaction) (int64, error) {
 
-	err := eng.CreateTable(ctx, tx, stmt.Table, stmt.Columns, stmt.ColumnTypes, stmt.Primary,
+	err := eng.CreateTable(ctx, tx, stmt.Table, stmt.Columns, stmt.ColumnTypes, stmt.primaryColKeys,
 		stmt.IfNotExists)
 	if err != nil {
 		return -1, err
 	}
 
 	for i, ik := range stmt.Indexes {
-		err = eng.CreateIndex(ctx, tx, sql.ID(fmt.Sprintf("index-%d", i)), stmt.Table, ik, false)
+		err = eng.CreateIndex(ctx, tx, sql.ID(fmt.Sprintf("index-%d", i)), stmt.Table, ik.Unique,
+			stmt.indexesColKeys[i], false)
 		if err != nil {
 			return -1, err
 		}
 	}
+
 	return -1, nil
 }
 
@@ -125,7 +144,18 @@ func (stmt *CreateIndex) Plan(ses *evaluate.Session, tx engine.Transaction) (int
 func (stmt *CreateIndex) Execute(ctx context.Context, eng engine.Engine,
 	tx engine.Transaction) (int64, error) {
 
-	return -1, eng.CreateIndex(ctx, tx, stmt.Index, stmt.Table, stmt.Key, stmt.IfNotExists)
+	tbl, err := eng.LookupTable(ctx, tx, stmt.Table)
+	if err != nil {
+		return -1, err
+	}
+
+	colKeys, err := indexKeyToColumnKeys(stmt.Key, tbl.Columns(ctx))
+	if err != nil {
+		return -1, fmt.Errorf("engine: %s in unique key for table %s", err, stmt.Table)
+	}
+
+	return -1, eng.CreateIndex(ctx, tx, stmt.Index, stmt.Table, stmt.Key.Unique, colKeys,
+		stmt.IfNotExists)
 }
 
 type CreateDatabase struct {

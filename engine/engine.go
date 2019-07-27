@@ -16,6 +16,29 @@ type Transaction interface {
 
 type MakeVirtual func(ctx context.Context, tx Transaction, tn sql.TableName) (Table, error)
 
+type ColumnKey int
+
+func MakeColumnKey(num int, reverse bool) ColumnKey {
+	if num < 0 {
+		panic("column numbers must be non-negative")
+	}
+	if reverse {
+		return ColumnKey(-num)
+	}
+	return ColumnKey(num)
+}
+
+func (ck ColumnKey) Reverse() bool {
+	return ck < 0
+}
+
+func (ck ColumnKey) Number() int {
+	if ck < 0 {
+		return int(-ck)
+	}
+	return int(ck)
+}
+
 type Engine interface {
 	CreateSystemTable(tblname sql.Identifier, maker MakeVirtual)
 	CreateInfoTable(tblname sql.Identifier, maker MakeVirtual)
@@ -28,11 +51,11 @@ type Engine interface {
 
 	LookupTable(ctx context.Context, tx Transaction, tn sql.TableName) (Table, error)
 	CreateTable(ctx context.Context, tx Transaction, tn sql.TableName, cols []sql.Identifier,
-		colTypes []sql.ColumnType, primary sql.IndexKey, ifNotExists bool) error
+		colTypes []sql.ColumnType, primary []ColumnKey, ifNotExists bool) error
 	DropTable(ctx context.Context, tx Transaction, tn sql.TableName, ifExists bool) error
 
 	CreateIndex(ctx context.Context, tx Transaction, idxname sql.Identifier, tn sql.TableName,
-		ik sql.IndexKey, ifNotExists bool) error
+		unique bool, keys []ColumnKey, ifNotExists bool) error
 	DropIndex(ctx context.Context, tx Transaction, idxname sql.Identifier, tn sql.TableName,
 		ifExists bool) error
 

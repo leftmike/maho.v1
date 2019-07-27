@@ -240,7 +240,7 @@ func testInsert(t *testing.T, e engine.Engine, ses *evaluate.Session, tn sql.Tab
 
 	for _, c := range cases {
 		tx := e.Begin(0)
-		err := e.CreateTable(ses.Context(), tx, tn, cols, colTypes, sql.IndexKey{}, false)
+		err := e.CreateTable(ses.Context(), tx, tn, cols, colTypes, nil, false)
 		if err != nil {
 			t.Error(err)
 			return
