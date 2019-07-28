@@ -12,17 +12,12 @@ To Do:
 
 - keep track of databases per engine as a simple config file that gets read and written by maho
 
-- basic
--- primary index
--- indexes
+- add test for not seeing modified rows within a single SQL statement
 
-- memrows
--- primary index
--- indexes
-
+- primary index: bbolt, basic, memrows
+- indexes: bbolt, basic, memrows
 - update README with index syntax
 
-- boltdb engine
 - badger engine
 
 - [CONSTRAINT constraint]

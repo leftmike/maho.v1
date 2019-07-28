@@ -17,9 +17,7 @@ func TestBBolt(t *testing.T) {
 	e := bbolt.NewEngine("testdata")
 	test.RunDatabaseTest(t, e)
 	test.RunSchemaTest(t, e)
-	/*
-		test.RunTableTest(t, e) // XXX
-		test.RunParallelTest(t, e) // XXX
-		test.RunStressTest(t, e) // XXX
-	*/
+	test.RunTableTest(t, e)
+	test.RunParallelTest(t, e)
+	test.RunStressTest(t, e)
 }

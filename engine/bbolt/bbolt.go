@@ -6,6 +6,7 @@ import (
 	"encoding/gob"
 	"errors"
 	"fmt"
+	"io"
 	"path/filepath"
 	"sync"
 	"sync/atomic"
@@ -46,9 +47,23 @@ type transaction struct {
 }
 
 type table struct {
-	b           *bbolt.Bucket
+	tx          *transaction
+	modifyLock  bool
+	tn          sql.TableName
+	tableBucket *bbolt.Bucket
+	rowsBucket  *bbolt.Bucket
 	columns     []sql.Identifier
 	columnTypes []sql.ColumnType
+	primary     []engine.ColumnKey
+}
+
+type rows struct {
+	table      *table
+	rowsBucket *bbolt.Bucket
+	columns    []sql.Identifier
+	cursor     *bbolt.Cursor
+	key        []byte
+	value      []byte
 }
 
 func NewEngine(dataDir string) engine.Engine {
@@ -218,7 +233,7 @@ func (be *bboltEngine) Begin(sid uint64) engine.Transaction {
 }
 
 func (_ *bboltEngine) IsTransactional() bool {
-	return true
+	return false
 }
 
 func (be *bboltEngine) ListDatabases(ctx context.Context, tx engine.Transaction) ([]sql.Identifier,
@@ -440,6 +455,8 @@ func (bdb *database) lookupTable(ctx context.Context, etx engine.Transaction,
 
 	var cols []sql.Identifier
 	var colTypes []sql.ColumnType
+	var primary []engine.ColumnKey
+
 	err = getGob(tb, "columns", &cols)
 	if err != nil {
 		return nil, fmt.Errorf("bbolt: unable to lookup table %s: %s", tn, err)
@@ -448,11 +465,23 @@ func (bdb *database) lookupTable(ctx context.Context, etx engine.Transaction,
 	if err != nil {
 		return nil, fmt.Errorf("bbolt: unable to lookup table %s: %s", tn, err)
 	}
+	err = getGob(tb, "primary", &primary)
+	if err != nil {
+		return nil, fmt.Errorf("bbolt: unable to lookup table %s: %s", tn, err)
+	}
+	rb := tb.Bucket(hiddenKey("rows"))
+	if rb == nil {
+		return nil, fmt.Errorf("bbolt: unable to lookup table %s: missing rows bucket", tn)
+	}
 
 	return &table{
-		b:           tb,
+		tn:          tn,
+		tx:          tx,
+		tableBucket: tb,
+		rowsBucket:  rb,
 		columns:     cols,
 		columnTypes: colTypes,
+		primary:     primary,
 	}, nil
 }
 
@@ -491,11 +520,19 @@ func (bdb *database) createTable(ctx context.Context, etx engine.Transaction, tn
 	if err != nil {
 		return fmt.Errorf("bbolt: unable to create table %s: %s", tn, err)
 	}
+	_, err = tb.CreateBucket(hiddenKey("rows"))
+	if err != nil {
+		return fmt.Errorf("bbolt: unable to create table %s: %s", tn, err)
+	}
 	err = putGob(tb, "columns", &cols)
 	if err != nil {
 		return fmt.Errorf("bbolt: unable to create table %s: %s", tn, err)
 	}
 	err = putGob(tb, "types", &colTypes)
+	if err != nil {
+		return fmt.Errorf("bbolt: unable to create table %s: %s", tn, err)
+	}
+	err = putGob(tb, "primary", &primary)
 	if err != nil {
 		return fmt.Errorf("bbolt: unable to create table %s: %s", tn, err)
 	}
@@ -596,81 +633,128 @@ func (bt *table) ColumnTypes(ctx context.Context) []sql.ColumnType {
 }
 
 func (bt *table) Rows(ctx context.Context) (engine.Rows, error) {
-	return nil, errors.New("not implemented") // XXX
-	/*
-		bt.be.mutex.RLock()
-		defer bt.be.mutex.RUnlock()
-
-		return &rows{be: bt.be, tn: bt.tn, columns: bt.columns, rows: bt.rows}, nil
-	*/
+	return &rows{
+		table:      bt,
+		rowsBucket: bt.rowsBucket,
+		columns:    bt.columns,
+		cursor:     bt.rowsBucket.Cursor(),
+	}, nil
 }
 
 func (bt *table) Insert(ctx context.Context, row []sql.Value) error {
-	return errors.New("not implemented") // XXX
-	/*
-		bt.be.mutex.Lock()
-		defer bt.be.mutex.Unlock()
+	err := bt.rowModifyLock(ctx)
+	if err != nil {
+		return err
+	}
 
-		bt.rows = append(bt.rows, row)
-		return nil
-	*/
+	// XXX check for primary index
+
+	seq, err := bt.rowsBucket.NextSequence()
+	if err != nil {
+		return fmt.Errorf("bbolt: unable to insert in table %s: %s", bt.tn, err)
+	}
+	err = bt.rowsBucket.Put(EncodeUint64(seq), MakeValue(row))
+	if err != nil {
+		return fmt.Errorf("bbolt: unable to insert in table %s: %s", bt.tn, err)
+	}
+	return nil
 }
 
-/*
+func (bt *table) rowModifyLock(ctx context.Context) error {
+	if bt.modifyLock {
+		return nil
+	}
+	err := bt.tx.lockTable(ctx, bt.tn, service.ROW_MODIFY)
+	if err != nil {
+		return err
+	}
+	bt.modifyLock = true
+	return nil
+}
+
 func (br *rows) Columns() []sql.Identifier {
 	return br.columns
 }
 
 func (br *rows) Close() error {
-	br.index = len(br.rows)
-	br.haveRow = false
+	br.cursor = nil
+	br.key = nil
+	br.value = nil
 	return nil
 }
 
 func (br *rows) Next(ctx context.Context, dest []sql.Value) error {
-	br.be.mutex.RLock()
-	defer br.be.mutex.RUnlock()
-
-	for br.index < len(br.rows) {
-		if br.rows[br.index] != nil {
-			copy(dest, br.rows[br.index])
-			br.index += 1
-			br.haveRow = true
-			return nil
-		}
-		br.index += 1
+	if br.cursor == nil {
+		return io.EOF
 	}
 
-	br.haveRow = false
-	return io.EOF
+	if br.key == nil {
+		br.key, br.value = br.cursor.First()
+	} else {
+		br.key, br.value = br.cursor.Next()
+	}
+
+	if br.key == nil {
+		br.cursor = nil
+		br.value = nil
+		return io.EOF
+	}
+
+	ok := ParseValue(br.value, dest)
+	if !ok {
+		return fmt.Errorf("bbolt: unable to parse row %v in table %s", br.key, br.table.tn)
+	}
+	return nil
 }
 
 func (br *rows) Delete(ctx context.Context) error {
-	br.be.mutex.Lock()
-	defer br.be.mutex.Unlock()
-
-	if !br.haveRow {
-		return fmt.Errorf("basic: table %s no row to delete", br.tn)
+	if br.key == nil {
+		return fmt.Errorf("bbolt: table %s no row to delete", br.table.tn)
 	}
-	br.haveRow = false
-	br.rows[br.index-1] = nil
+
+	err := br.table.rowModifyLock(ctx)
+	if err != nil {
+		return err
+	}
+
+	key := br.key
+	br.key = nil
+	br.value = nil
+
+	err = br.cursor.Delete()
+	if err != nil {
+		return fmt.Errorf("bbolt: unable to delete row %v in table %s: %s", key, br.table.tn, err)
+	}
 	return nil
 }
 
 func (br *rows) Update(ctx context.Context, updates []sql.ColumnUpdate) error {
-	br.be.mutex.Lock()
-	defer br.be.mutex.Unlock()
-
-	if !br.haveRow {
-		return fmt.Errorf("basic: table %s no row to update", br.tn)
+	if br.key == nil {
+		return fmt.Errorf("bbolt: table %s no row to update", br.table.tn)
 	}
-	row := br.rows[br.index-1]
+
+	err := br.table.rowModifyLock(ctx)
+	if err != nil {
+		return err
+	}
+
+	dest := make([]sql.Value, len(br.columns))
+	ok := ParseValue(br.value, dest)
+	if !ok {
+		return fmt.Errorf("bbolt: unable to parse row %v in table %s", br.key, br.table.tn)
+	}
+
 	for _, up := range updates {
-		row[up.Index] = up.Value
+		dest[up.Index] = up.Value
+	}
+
+	err = br.rowsBucket.Put(br.key, MakeValue(dest))
+	if err != nil {
+		return fmt.Errorf("bbolt: unable to insert in table %s: %s", br.table.tn, err)
 	}
 	return nil
 }
-*/
+
 /*
 type readTx struct {
 	tx   *bbolt.Tx

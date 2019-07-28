@@ -27,12 +27,20 @@ const (
 	// Value tags must be less than 16.
 )
 
-func encodeUInt64(buf []byte, reverse bool, u uint64) []byte {
+func EncodeUint64(u uint64) []byte {
+	return encodeUint64(make([]byte, 0, 8), false, u)
+}
+
+func encodeUint64(buf []byte, reverse bool, u uint64) []byte {
 	if reverse {
 		u = ^u
 	}
 	return append(buf, byte(u>>56), byte(u>>48), byte(u>>40), byte(u>>32),
 		byte(u>>24), byte(u>>16), byte(u>>8), byte(u))
+}
+
+func DecodeUint64(buf []byte) uint64 {
+	return decodeUint64(buf, false)
 }
 
 func decodeUint64(buf []byte, reverse bool) uint64 {
@@ -120,7 +128,7 @@ func MakeKey(row []sql.Value, colKeys []engine.ColumnKey) []byte {
 					} else {
 						key = encodeByte(key, ck.Reverse(), float64PosKeyTag)
 					}
-					key = encodeUInt64(key, ck.Reverse(), u)
+					key = encodeUint64(key, ck.Reverse(), u)
 				}
 			case sql.Int64Value:
 				if val < 0 {
@@ -128,7 +136,7 @@ func MakeKey(row []sql.Value, colKeys []engine.ColumnKey) []byte {
 				} else {
 					key = encodeByte(key, ck.Reverse(), int64NotNegKeyTag)
 				}
-				key = encodeUInt64(key, ck.Reverse(), uint64(val))
+				key = encodeUint64(key, ck.Reverse(), uint64(val))
 			default:
 				if val == nil {
 					key = encodeByte(key, ck.Reverse(), nullKeyTag)
@@ -290,7 +298,7 @@ func MakeValue(row []sql.Value) []byte {
 			buf = append(buf, b...)
 		case sql.Float64Value:
 			buf = encodeColNumValueTag(buf, num, float64ValueTag)
-			buf = encodeUInt64(buf, false, math.Float64bits(float64(val)))
+			buf = encodeUint64(buf, false, math.Float64bits(float64(val)))
 		case sql.Int64Value:
 			buf = encodeColNumValueTag(buf, num, int64ValueTag)
 			buf = EncodeZigzag64(buf, int64(val))
