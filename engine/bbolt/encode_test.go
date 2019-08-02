@@ -707,9 +707,15 @@ func TestMakeParseValues(t *testing.T) {
 	}
 
 	for _, c := range cases {
-		buf := bbolt.MakeValue(c.row)
+		buf := bbolt.MakeRowValue(c.row)
+		if !bbolt.IsRowValue(buf) {
+			t.Errorf("IsRowValue(%s) failed", c.s)
+		}
+		if bbolt.IsTombstoneValue(buf) {
+			t.Errorf("IsTombstoneValue(%s) succeeded", c.s)
+		}
 		dest := make([]sql.Value, len(c.row))
-		ok := bbolt.ParseValue(buf, dest)
+		ok := bbolt.ParseRowValue(buf, dest)
 		if !ok {
 			t.Errorf("ParseValue(%s) failed", c.s)
 		} else if !testutil.DeepEqual(c.row, dest) {
@@ -726,5 +732,12 @@ func TestMakeParseValues(t *testing.T) {
 		if s != c.s {
 			t.Errorf("ParseValue: got %s want %s", s, c.s)
 		}
+	}
+
+	if bbolt.IsRowValue(bbolt.MakeTombstoneValue()) {
+		t.Errorf("IsRowValue(MakeTombstoneValue()) succeeded")
+	}
+	if !bbolt.IsTombstoneValue(bbolt.MakeTombstoneValue()) {
+		t.Errorf("IsTombstoneValue(MakeTombstoneValue()) failed")
 	}
 }

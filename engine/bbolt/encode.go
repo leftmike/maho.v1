@@ -20,6 +20,9 @@ const (
 	float64PosKeyTag  = 7
 	stringKeyTag      = 8
 
+	tombstoneValue = 0
+	rowValue       = 1
+
 	boolValueTag    = 1
 	int64ValueTag   = 2
 	float64ValueTag = 3
@@ -277,8 +280,12 @@ func encodeColNumValueTag(buf []byte, cdx int, tag byte) []byte {
 	return buf
 }
 
-func MakeValue(row []sql.Value) []byte {
-	var buf []byte
+func MakeTombstoneValue() []byte {
+	return []byte{tombstoneValue}
+}
+
+func MakeRowValue(row []sql.Value) []byte {
+	buf := []byte{rowValue}
 	for num, val := range row {
 		if val == nil {
 			continue
@@ -309,7 +316,22 @@ func MakeValue(row []sql.Value) []byte {
 	return buf
 }
 
-func ParseValue(buf []byte, dest []sql.Value) bool {
+func IsTombstoneValue(buf []byte) bool {
+	return len(buf) == 1 && buf[0] == tombstoneValue
+}
+
+func IsRowValue(buf []byte) bool {
+	return len(buf) == 0 || buf[0] == rowValue
+}
+
+func ParseRowValue(buf []byte, dest []sql.Value) bool {
+	if len(buf) > 0 {
+		if buf[0] != rowValue {
+			return false
+		}
+		buf = buf[1:]
+	}
+
 	var ok bool
 	var u uint64
 

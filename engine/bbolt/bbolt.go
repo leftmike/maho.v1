@@ -653,7 +653,7 @@ func (bt *table) Insert(ctx context.Context, row []sql.Value) error {
 	if err != nil {
 		return fmt.Errorf("bbolt: unable to insert in table %s: %s", bt.tn, err)
 	}
-	err = bt.rowsBucket.Put(EncodeUint64(seq), MakeValue(row))
+	err = bt.rowsBucket.Put(EncodeUint64(seq), MakeRowValue(row))
 	if err != nil {
 		return fmt.Errorf("bbolt: unable to insert in table %s: %s", bt.tn, err)
 	}
@@ -700,7 +700,7 @@ func (br *rows) Next(ctx context.Context, dest []sql.Value) error {
 		return io.EOF
 	}
 
-	ok := ParseValue(br.value, dest)
+	ok := ParseRowValue(br.value, dest)
 	if !ok {
 		return fmt.Errorf("bbolt: unable to parse row %v in table %s", br.key, br.table.tn)
 	}
@@ -739,7 +739,7 @@ func (br *rows) Update(ctx context.Context, updates []sql.ColumnUpdate) error {
 	}
 
 	dest := make([]sql.Value, len(br.columns))
-	ok := ParseValue(br.value, dest)
+	ok := ParseRowValue(br.value, dest)
 	if !ok {
 		return fmt.Errorf("bbolt: unable to parse row %v in table %s", br.key, br.table.tn)
 	}
@@ -748,7 +748,7 @@ func (br *rows) Update(ctx context.Context, updates []sql.ColumnUpdate) error {
 		dest[up.Index] = up.Value
 	}
 
-	err = br.rowsBucket.Put(br.key, MakeValue(dest))
+	err = br.rowsBucket.Put(br.key, MakeRowValue(dest))
 	if err != nil {
 		return fmt.Errorf("bbolt: unable to insert in table %s: %s", br.table.tn, err)
 	}
