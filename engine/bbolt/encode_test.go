@@ -3,6 +3,7 @@ package bbolt_test
 import (
 	"bytes"
 	"math"
+	"math/rand"
 	"testing"
 
 	"github.com/golang/protobuf/proto"
@@ -19,13 +20,64 @@ type testCase struct {
 	ret     []byte
 }
 
+func testProposalKey(t *testing.T, prevKey []byte, row []sql.Value, colKeys []engine.ColumnKey,
+	tid, sid uint32) []byte {
+
+	t.Helper()
+
+	key := bbolt.MakeProposalKey(row, colKeys, tid, sid)
+	if bytes.Compare(prevKey, key) >= 0 {
+		t.Errorf("MakeProposalKey(%v, %v) keys not ordered correctly; %v and %v",
+			row, colKeys, prevKey, key)
+	}
+
+	dest := make([]sql.Value, len(row))
+	rettid, retsid, ok := bbolt.ParseProposalKey(key, colKeys, dest)
+	if !ok {
+		t.Errorf("ParseProposalKey(%v) failed", key)
+	} else {
+		if rettid != tid {
+			t.Errorf("ParseProposalKey(%v) got %d for tid; want %d", key, rettid, tid)
+		}
+		if retsid != sid {
+			t.Errorf("ParseProposalKey(%v) got %d for sid; want %d", key, retsid, sid)
+		}
+	}
+
+	return key
+}
+
+func testDurableKey(t *testing.T, prevKey []byte, row []sql.Value, colKeys []engine.ColumnKey,
+	ver uint64) []byte {
+
+	t.Helper()
+
+	key := bbolt.MakeDurableKey(row, colKeys, ver)
+	if bytes.Compare(prevKey, key) >= 0 {
+		t.Errorf("MakeDurableKey(%v, %v) keys not ordered correctly; %v and %v",
+			row, colKeys, prevKey, key)
+	}
+
+	dest := make([]sql.Value, len(row))
+	retver, ok := bbolt.ParseDurableKey(key, colKeys, dest)
+	if !ok {
+		t.Errorf("ParseDurableKey(%v) failed", key)
+	} else {
+		if retver != ver {
+			t.Errorf("ParseDurableKey(%v) got %d for version; want %d", key, retver, ver)
+		}
+	}
+
+	return key
+}
+
 func testMakeKey(t *testing.T, cases []testCase) {
 	t.Helper()
 
 	var prevKey []byte
 	for i, c := range cases {
 		key := bbolt.MakeBareKey(c.row, c.colKeys)
-		ret := append(c.ret, bbolt.BareKeyType) // XXX
+		ret := append(c.ret, bbolt.BareKeyType)
 		if bytes.Compare(key, ret) != 0 {
 			t.Errorf("MakeBareKey(%d) got %v want %v", i, key, ret)
 		}
@@ -33,6 +85,20 @@ func testMakeKey(t *testing.T, cases []testCase) {
 			t.Errorf("MakeBareKey(%d) keys not ordered correctly; %v and %v", i, prevKey, key)
 		}
 		prevKey = key
+
+		tid := rand.Uint32()
+		sid := uint32(rand.Intn(99999)) + 99
+		prevKey = testProposalKey(t, prevKey, c.row, c.colKeys, tid, sid)
+		prevKey = testProposalKey(t, prevKey, c.row, c.colKeys, tid, sid-1)
+		prevKey = testProposalKey(t, prevKey, c.row, c.colKeys, tid, 1)
+		prevKey = testProposalKey(t, prevKey, c.row, c.colKeys, tid, 0)
+
+		ver := uint64(rand.Intn(99999)) + 99
+		prevKey = testDurableKey(t, prevKey, c.row, c.colKeys, ver)
+		prevKey = testDurableKey(t, prevKey, c.row, c.colKeys, ver-1)
+		prevKey = testDurableKey(t, prevKey, c.row, c.colKeys, 1)
+		prevKey = testDurableKey(t, prevKey, c.row, c.colKeys, 0)
+
 	}
 }
 
@@ -114,6 +180,16 @@ func TestMakeKey(t *testing.T) {
 				row:     []sql.Value{sql.Float64Value(456.789)},
 				colKeys: []engine.ColumnKey{engine.MakeColumnKey(0, false)},
 				ret:     []byte{153, 64, 124, 140, 159, 190, 118, 200, 180},
+			},
+			{
+				row:     []sql.Value{sql.StringValue([]byte{0})},
+				colKeys: []engine.ColumnKey{engine.MakeColumnKey(0, false)},
+				ret:     []byte{160, 1, 0, 0},
+			},
+			{
+				row:     []sql.Value{sql.StringValue([]byte{0, 0})},
+				colKeys: []engine.ColumnKey{engine.MakeColumnKey(0, false)},
+				ret:     []byte{160, 1, 0, 1, 0, 0},
 			},
 			{
 				row:     []sql.Value{sql.StringValue([]byte{0, 1, 2, 3, 4})},

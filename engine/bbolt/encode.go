@@ -10,10 +10,10 @@ import (
 )
 
 const (
-	BareKeyType      = 0
-	ProposedKeyType  = 1
-	CommittedKeyType = 2
-	UnknownKeyType   = 255
+	BareKeyType     = 0
+	ProposalKeyType = 1
+	DurableKeyType  = 2
+	UnknownKeyType  = 255
 
 	nullKeyTag        = 130
 	boolKeyTag        = 131
@@ -53,6 +53,21 @@ func DecodeUint64(buf []byte) uint64 {
 
 func decodeUint64(buf []byte, reverse bool) uint64 {
 	u := binary.BigEndian.Uint64(buf)
+	if reverse {
+		u = ^u
+	}
+	return u
+}
+
+func encodeUint32(buf []byte, reverse bool, u uint32) []byte {
+	if reverse {
+		u = ^u
+	}
+	return append(buf, byte(u>>24), byte(u>>16), byte(u>>8), byte(u))
+}
+
+func decodeUint32(buf []byte, reverse bool) uint32 {
+	u := binary.BigEndian.Uint32(buf)
 	if reverse {
 		u = ^u
 	}
@@ -159,7 +174,33 @@ func makeKey(row []sql.Value, colKeys []engine.ColumnKey) []byte {
 }
 
 func MakeBareKey(row []sql.Value, colKeys []engine.ColumnKey) []byte {
-	return append(makeKey(row, colKeys), BareKeyType)
+	// <sql-key> 0x00
+	key := makeKey(row, colKeys)
+	key = append(key, BareKeyType)
+	return key
+}
+
+func MakeProposalKey(row []sql.Value, colKeys []engine.ColumnKey, tid, sid uint32) []byte {
+	// <sql-key> 0x01 <tid> <sid> 0x01
+	key := makeKey(row, colKeys)
+	key = append(key, ProposalKeyType)
+	key = encodeUint32(key, false, tid)
+	// Encode the statement id _descending_ so that the most recent statement id will be
+	// encountered first in a key scan.
+	key = encodeUint32(key, true, sid)
+	key = append(key, ProposalKeyType)
+	return key
+}
+
+func MakeDurableKey(row []sql.Value, colKeys []engine.ColumnKey, version uint64) []byte {
+	// <sql-key> 0x02 <version> 0x02
+	key := makeKey(row, colKeys)
+	key = append(key, DurableKeyType)
+	// Encode the version _descending_ so that the most recent version will be encountered
+	// first in a key scan.
+	key = encodeUint64(key, true, version)
+	key = append(key, DurableKeyType)
+	return key
 }
 
 func GetKeyType(key []byte) byte {
@@ -242,10 +283,31 @@ func parseKey(key []byte, colKeys []engine.ColumnKey, dest []sql.Value) bool {
 }
 
 func ParseBareKey(key []byte, colKeys []engine.ColumnKey, dest []sql.Value) bool {
-	if len(key) == 0 || key[len(key)-1] != byte(BareKeyType) {
+	if len(key) == 0 || key[len(key)-1] != BareKeyType {
 		return false
 	}
 	return parseKey(key[:len(key)-1], colKeys, dest)
+}
+
+func ParseProposalKey(key []byte, colKeys []engine.ColumnKey, dest []sql.Value) (tid, sid uint32,
+	ok bool) {
+
+	if len(key) < 10 || key[len(key)-1] != ProposalKeyType || key[len(key)-10] != ProposalKeyType {
+		return 0, 0, false
+	}
+	tid = decodeUint32(key[len(key)-9:len(key)-5], false)
+	sid = decodeUint32(key[len(key)-5:len(key)-1], true)
+	return tid, sid, parseKey(key[:len(key)-10], colKeys, dest)
+}
+
+func ParseDurableKey(key []byte, colKeys []engine.ColumnKey, dest []sql.Value) (version uint64,
+	ok bool) {
+
+	if len(key) < 10 || key[len(key)-1] != DurableKeyType || key[len(key)-10] != DurableKeyType {
+		return 0, false
+	}
+	version = decodeUint64(key[len(key)-9:len(key)-1], true)
+	return version, parseKey(key[:len(key)-10], colKeys, dest)
 }
 
 func EncodeVarint(buf []byte, n uint64) []byte {

@@ -8,6 +8,8 @@ To Do:
 
 - fuzzing: parser.Parse
 
+- rename sid to sessionID so sid can be used for statement id
+
 - remove engine/kv/* and engine/test/testkv.go
 
 - keep track of databases per engine as a simple config file that gets read and written by maho
