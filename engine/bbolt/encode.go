@@ -10,15 +10,20 @@ import (
 )
 
 const (
-	nullKeyTag        = 0
-	boolKeyTag        = 1
-	int64NegKeyTag    = 2
-	int64NotNegKeyTag = 3
-	float64NaNKeyTag  = 4
-	float64NegKeyTag  = 5
-	float64ZeroKeyTag = 6
-	float64PosKeyTag  = 7
-	stringKeyTag      = 8
+	BareKeyType      = 0
+	ProposedKeyType  = 1
+	CommittedKeyType = 2
+	UnknownKeyType   = 255
+
+	nullKeyTag        = 130
+	boolKeyTag        = 131
+	int64NegKeyTag    = 140
+	int64NotNegKeyTag = 141
+	float64NaNKeyTag  = 150
+	float64NegKeyTag  = 151
+	float64ZeroKeyTag = 152
+	float64PosKeyTag  = 153
+	stringKeyTag      = 160
 
 	tombstoneValue = 0
 	rowValue       = 1
@@ -99,7 +104,7 @@ func decodeByte(reverse bool, b byte) byte {
 	return b
 }
 
-func MakeKey(row []sql.Value, colKeys []engine.ColumnKey) []byte {
+func makeKey(row []sql.Value, colKeys []engine.ColumnKey) []byte {
 	var key []byte
 
 	for _, ck := range colKeys {
@@ -153,7 +158,18 @@ func MakeKey(row []sql.Value, colKeys []engine.ColumnKey) []byte {
 	return key
 }
 
-func ParseKey(key []byte, colKeys []engine.ColumnKey, dest []sql.Value) bool {
+func MakeBareKey(row []sql.Value, colKeys []engine.ColumnKey) []byte {
+	return append(makeKey(row, colKeys), BareKeyType)
+}
+
+func GetKeyType(key []byte) byte {
+	if len(key) == 0 {
+		return UnknownKeyType
+	}
+	return key[0]
+}
+
+func parseKey(key []byte, colKeys []engine.ColumnKey, dest []sql.Value) bool {
 	for _, ck := range colKeys {
 		if len(key) < 1 {
 			return false
@@ -223,6 +239,13 @@ func ParseKey(key []byte, colKeys []engine.ColumnKey, dest []sql.Value) bool {
 	}
 
 	return true
+}
+
+func ParseBareKey(key []byte, colKeys []engine.ColumnKey, dest []sql.Value) bool {
+	if len(key) == 0 || key[len(key)-1] != byte(BareKeyType) {
+		return false
+	}
+	return parseKey(key[:len(key)-1], colKeys, dest)
 }
 
 func EncodeVarint(buf []byte, n uint64) []byte {
