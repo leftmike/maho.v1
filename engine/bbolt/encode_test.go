@@ -71,8 +71,29 @@ func testDurableKey(t *testing.T, prevKey []byte, row []sql.Value, colKeys []eng
 	return key
 }
 
+func checkPrefixes(t *testing.T, prefixes [][]byte, i int, key []byte) {
+	t.Helper()
+
+	for j, prefix := range prefixes {
+		if i == j {
+			if !bytes.HasPrefix(key, prefix) {
+				t.Errorf("MakePrefix(%d): key %v should have prefix %v", i, key, prefix)
+			}
+		} else {
+			if bytes.HasPrefix(key, prefix) {
+				t.Errorf("MakePrefix(%d, %d): key %v should not have prefix %v", i, j, key, prefix)
+			}
+		}
+	}
+}
+
 func testMakeKey(t *testing.T, cases []testCase) {
 	t.Helper()
+
+	var prefixes [][]byte
+	for _, c := range cases {
+		prefixes = append(prefixes, bbolt.MakePrefix(c.row, c.colKeys))
+	}
 
 	var prevKey []byte
 	for i, c := range cases {
@@ -84,6 +105,7 @@ func testMakeKey(t *testing.T, cases []testCase) {
 		if bytes.Compare(prevKey, key) >= 0 {
 			t.Errorf("MakeBareKey(%d) keys not ordered correctly; %v and %v", i, prevKey, key)
 		}
+		checkPrefixes(t, prefixes, i, key)
 		prevKey = key
 
 		tid := rand.Uint32()
@@ -108,113 +130,143 @@ func TestMakeKey(t *testing.T) {
 			{
 				row:     []sql.Value{nil},
 				colKeys: []engine.ColumnKey{engine.MakeColumnKey(0, false)},
-				ret:     []byte{130},
+				ret:     []byte{1, 130},
+			},
+			{
+				row:     []sql.Value{sql.BoolValue(false)},
+				colKeys: []engine.ColumnKey{engine.MakeColumnKey(0, false)},
+				ret:     []byte{1, 131, 0},
+			},
+			{
+				row:     []sql.Value{sql.BoolValue(true)},
+				colKeys: []engine.ColumnKey{engine.MakeColumnKey(0, false)},
+				ret:     []byte{1, 131, 1},
+			},
+			{
+				row:     []sql.Value{sql.Int64Value(-456)},
+				colKeys: []engine.ColumnKey{engine.MakeColumnKey(0, false)},
+				ret:     []byte{1, 140, 255, 255, 255, 255, 255, 255, 254, 56},
+			},
+			{
+				row:     []sql.Value{sql.Int64Value(-123)},
+				colKeys: []engine.ColumnKey{engine.MakeColumnKey(0, false)},
+				ret:     []byte{1, 140, 255, 255, 255, 255, 255, 255, 255, 133},
+			},
+			{
+				row:     []sql.Value{sql.Int64Value(0)},
+				colKeys: []engine.ColumnKey{engine.MakeColumnKey(0, false)},
+				ret:     []byte{1, 141, 0, 0, 0, 0, 0, 0, 0, 0},
+			},
+			{
+				row:     []sql.Value{sql.Int64Value(123)},
+				colKeys: []engine.ColumnKey{engine.MakeColumnKey(0, false)},
+				ret:     []byte{1, 141, 0, 0, 0, 0, 0, 0, 0, 123},
+			},
+			{
+				row:     []sql.Value{sql.Int64Value(456)},
+				colKeys: []engine.ColumnKey{engine.MakeColumnKey(0, false)},
+				ret:     []byte{1, 141, 0, 0, 0, 0, 0, 0, 1, 200},
+			},
+			{
+				row:     []sql.Value{sql.Float64Value(math.NaN())},
+				colKeys: []engine.ColumnKey{engine.MakeColumnKey(0, false)},
+				ret:     []byte{1, 150},
+			},
+			{
+				row:     []sql.Value{sql.Float64Value(-456.789)},
+				colKeys: []engine.ColumnKey{engine.MakeColumnKey(0, false)},
+				ret:     []byte{1, 151, 63, 131, 115, 96, 65, 137, 55, 75},
+			},
+			{
+				row:     []sql.Value{sql.Float64Value(-123.456)},
+				colKeys: []engine.ColumnKey{engine.MakeColumnKey(0, false)},
+				ret:     []byte{1, 151, 63, 161, 34, 208, 229, 96, 65, 136},
+			},
+			{
+				row:     []sql.Value{sql.Float64Value(0.0)},
+				colKeys: []engine.ColumnKey{engine.MakeColumnKey(0, false)},
+				ret:     []byte{1, 152},
+			},
+			{
+				row:     []sql.Value{sql.Float64Value(123.456)},
+				colKeys: []engine.ColumnKey{engine.MakeColumnKey(0, false)},
+				ret:     []byte{1, 153, 64, 94, 221, 47, 26, 159, 190, 119},
+			},
+			{
+				row:     []sql.Value{sql.Float64Value(456.789)},
+				colKeys: []engine.ColumnKey{engine.MakeColumnKey(0, false)},
+				ret:     []byte{1, 153, 64, 124, 140, 159, 190, 118, 200, 180},
+			},
+			{
+				row:     []sql.Value{sql.StringValue([]byte{})},
+				colKeys: []engine.ColumnKey{engine.MakeColumnKey(0, false)},
+				ret:     []byte{1, 160, 0},
+			},
+			{
+				row:     []sql.Value{sql.StringValue([]byte{0})},
+				colKeys: []engine.ColumnKey{engine.MakeColumnKey(0, false)},
+				ret:     []byte{1, 160, 1, 0, 0},
+			},
+			{
+				row:     []sql.Value{sql.StringValue([]byte{0, 0})},
+				colKeys: []engine.ColumnKey{engine.MakeColumnKey(0, false)},
+				ret:     []byte{1, 160, 1, 0, 1, 0, 0},
+			},
+			{
+				row:     []sql.Value{sql.StringValue([]byte{0, 1, 2, 3, 4, 5, 6})},
+				colKeys: []engine.ColumnKey{engine.MakeColumnKey(0, false)},
+				ret:     []byte{1, 160, 1, 0, 1, 1, 2, 3, 4, 5, 6, 0},
+			},
+			{
+				row:     []sql.Value{sql.StringValue([]byte{1})},
+				colKeys: []engine.ColumnKey{engine.MakeColumnKey(0, false)},
+				ret:     []byte{1, 160, 1, 1, 0},
+			},
+			{
+				row:     []sql.Value{sql.StringValue([]byte{1, 1})},
+				colKeys: []engine.ColumnKey{engine.MakeColumnKey(0, false)},
+				ret:     []byte{1, 160, 1, 1, 1, 1, 0},
+			},
+			{
+				row:     []sql.Value{sql.StringValue([]byte{2})},
+				colKeys: []engine.ColumnKey{engine.MakeColumnKey(0, false)},
+				ret:     []byte{1, 160, 2, 0},
+			},
+			{
+				row:     []sql.Value{sql.StringValue([]byte{2, 2})},
+				colKeys: []engine.ColumnKey{engine.MakeColumnKey(0, false)},
+				ret:     []byte{1, 160, 2, 2, 0},
+			},
+			{
+				row:     []sql.Value{sql.StringValue([]byte{2, 3, 4, 5, 6})},
+				colKeys: []engine.ColumnKey{engine.MakeColumnKey(0, false)},
+				ret:     []byte{1, 160, 2, 3, 4, 5, 6, 0},
+			},
+			{
+				row:     []sql.Value{sql.StringValue("ABCD")},
+				colKeys: []engine.ColumnKey{engine.MakeColumnKey(0, false)},
+				ret:     []byte{1, 160, 65, 66, 67, 68, 0},
+			},
+			{
+				row:     []sql.Value{sql.StringValue("ab")},
+				colKeys: []engine.ColumnKey{engine.MakeColumnKey(0, false)},
+				ret:     []byte{1, 160, 97, 98, 0},
+			},
+			{
+				row:     []sql.Value{sql.StringValue("abc")},
+				colKeys: []engine.ColumnKey{engine.MakeColumnKey(0, false)},
+				ret:     []byte{1, 160, 97, 98, 99, 0},
+			},
+			{
+				row:     []sql.Value{sql.StringValue("abcd")},
+				colKeys: []engine.ColumnKey{engine.MakeColumnKey(0, false)},
+				ret:     []byte{1, 160, 97, 98, 99, 100, 0},
 			},
 			{
 				row: []sql.Value{nil},
 				colKeys: []engine.ColumnKey{engine.MakeColumnKey(0, false),
 					engine.MakeColumnKey(1, false)},
-				ret: []byte{130, 130},
-			},
-			{
-				row:     []sql.Value{sql.BoolValue(false)},
-				colKeys: []engine.ColumnKey{engine.MakeColumnKey(0, false)},
-				ret:     []byte{131, 0},
-			},
-			{
-				row:     []sql.Value{sql.BoolValue(true)},
-				colKeys: []engine.ColumnKey{engine.MakeColumnKey(0, false)},
-				ret:     []byte{131, 1},
-			},
-			{
-				row:     []sql.Value{sql.Int64Value(-456)},
-				colKeys: []engine.ColumnKey{engine.MakeColumnKey(0, false)},
-				ret:     []byte{140, 255, 255, 255, 255, 255, 255, 254, 56},
-			},
-			{
-				row:     []sql.Value{sql.Int64Value(-123)},
-				colKeys: []engine.ColumnKey{engine.MakeColumnKey(0, false)},
-				ret:     []byte{140, 255, 255, 255, 255, 255, 255, 255, 133},
-			},
-			{
-				row:     []sql.Value{sql.Int64Value(0)},
-				colKeys: []engine.ColumnKey{engine.MakeColumnKey(0, false)},
-				ret:     []byte{141, 0, 0, 0, 0, 0, 0, 0, 0},
-			},
-			{
-				row:     []sql.Value{sql.Int64Value(123)},
-				colKeys: []engine.ColumnKey{engine.MakeColumnKey(0, false)},
-				ret:     []byte{141, 0, 0, 0, 0, 0, 0, 0, 123},
-			},
-			{
-				row:     []sql.Value{sql.Int64Value(456)},
-				colKeys: []engine.ColumnKey{engine.MakeColumnKey(0, false)},
-				ret:     []byte{141, 0, 0, 0, 0, 0, 0, 1, 200},
-			},
-			{
-				row:     []sql.Value{sql.Float64Value(math.NaN())},
-				colKeys: []engine.ColumnKey{engine.MakeColumnKey(0, false)},
-				ret:     []byte{150},
-			},
-			{
-				row:     []sql.Value{sql.Float64Value(-456.789)},
-				colKeys: []engine.ColumnKey{engine.MakeColumnKey(0, false)},
-				ret:     []byte{151, 63, 131, 115, 96, 65, 137, 55, 75},
-			},
-			{
-				row:     []sql.Value{sql.Float64Value(-123.456)},
-				colKeys: []engine.ColumnKey{engine.MakeColumnKey(0, false)},
-				ret:     []byte{151, 63, 161, 34, 208, 229, 96, 65, 136},
-			},
-			{
-				row:     []sql.Value{sql.Float64Value(0.0)},
-				colKeys: []engine.ColumnKey{engine.MakeColumnKey(0, false)},
-				ret:     []byte{152},
-			},
-			{
-				row:     []sql.Value{sql.Float64Value(123.456)},
-				colKeys: []engine.ColumnKey{engine.MakeColumnKey(0, false)},
-				ret:     []byte{153, 64, 94, 221, 47, 26, 159, 190, 119},
-			},
-			{
-				row:     []sql.Value{sql.Float64Value(456.789)},
-				colKeys: []engine.ColumnKey{engine.MakeColumnKey(0, false)},
-				ret:     []byte{153, 64, 124, 140, 159, 190, 118, 200, 180},
-			},
-			{
-				row:     []sql.Value{sql.StringValue([]byte{0})},
-				colKeys: []engine.ColumnKey{engine.MakeColumnKey(0, false)},
-				ret:     []byte{160, 1, 0, 0},
-			},
-			{
-				row:     []sql.Value{sql.StringValue([]byte{0, 0})},
-				colKeys: []engine.ColumnKey{engine.MakeColumnKey(0, false)},
-				ret:     []byte{160, 1, 0, 1, 0, 0},
-			},
-			{
-				row:     []sql.Value{sql.StringValue([]byte{0, 1, 2, 3, 4})},
-				colKeys: []engine.ColumnKey{engine.MakeColumnKey(0, false)},
-				ret:     []byte{160, 1, 0, 1, 1, 2, 3, 4, 0},
-			},
-			{
-				row:     []sql.Value{sql.StringValue("ABCD")},
-				colKeys: []engine.ColumnKey{engine.MakeColumnKey(0, false)},
-				ret:     []byte{160, 65, 66, 67, 68, 0},
-			},
-			{
-				row:     []sql.Value{sql.StringValue("ab")},
-				colKeys: []engine.ColumnKey{engine.MakeColumnKey(0, false)},
-				ret:     []byte{160, 97, 98, 0},
-			},
-			{
-				row:     []sql.Value{sql.StringValue("abc")},
-				colKeys: []engine.ColumnKey{engine.MakeColumnKey(0, false)},
-				ret:     []byte{160, 97, 98, 99, 0},
-			},
-			{
-				row:     []sql.Value{sql.StringValue("abcd")},
-				colKeys: []engine.ColumnKey{engine.MakeColumnKey(0, false)},
-				ret:     []byte{160, 97, 98, 99, 100, 0},
+				ret: []byte{2, 130, 130},
 			},
 		})
 
@@ -230,97 +282,97 @@ func TestMakeKey(t *testing.T) {
 			{
 				row:     row,
 				colKeys: []engine.ColumnKey{engine.MakeColumnKey(0, false)},
-				ret:     []byte{130},
+				ret:     []byte{1, 130},
 			},
 			{
 				row:     row,
 				colKeys: []engine.ColumnKey{engine.MakeColumnKey(1, false)},
-				ret:     []byte{131, 0},
+				ret:     []byte{1, 131, 0},
 			},
 			{
 				row:     row,
 				colKeys: []engine.ColumnKey{engine.MakeColumnKey(2, false)},
-				ret:     []byte{131, 1},
+				ret:     []byte{1, 131, 1},
 			},
 			{
 				row:     row,
 				colKeys: []engine.ColumnKey{engine.MakeColumnKey(3, false)},
-				ret:     []byte{140, 255, 255, 255, 255, 255, 255, 254, 56},
+				ret:     []byte{1, 140, 255, 255, 255, 255, 255, 255, 254, 56},
 			},
 			{
 				row:     row,
 				colKeys: []engine.ColumnKey{engine.MakeColumnKey(4, false)},
-				ret:     []byte{140, 255, 255, 255, 255, 255, 255, 255, 133},
+				ret:     []byte{1, 140, 255, 255, 255, 255, 255, 255, 255, 133},
 			},
 			{
 				row:     row,
 				colKeys: []engine.ColumnKey{engine.MakeColumnKey(5, false)},
-				ret:     []byte{141, 0, 0, 0, 0, 0, 0, 0, 0},
+				ret:     []byte{1, 141, 0, 0, 0, 0, 0, 0, 0, 0},
 			},
 			{
 				row:     row,
 				colKeys: []engine.ColumnKey{engine.MakeColumnKey(6, false)},
-				ret:     []byte{141, 0, 0, 0, 0, 0, 0, 0, 123},
+				ret:     []byte{1, 141, 0, 0, 0, 0, 0, 0, 0, 123},
 			},
 			{
 				row:     row,
 				colKeys: []engine.ColumnKey{engine.MakeColumnKey(7, false)},
-				ret:     []byte{141, 0, 0, 0, 0, 0, 0, 1, 200},
+				ret:     []byte{1, 141, 0, 0, 0, 0, 0, 0, 1, 200},
 			},
 			{
 				row:     row,
 				colKeys: []engine.ColumnKey{engine.MakeColumnKey(8, false)},
-				ret:     []byte{150},
+				ret:     []byte{1, 150},
 			},
 			{
 				row:     row,
 				colKeys: []engine.ColumnKey{engine.MakeColumnKey(9, false)},
-				ret:     []byte{151, 63, 131, 115, 96, 65, 137, 55, 75},
+				ret:     []byte{1, 151, 63, 131, 115, 96, 65, 137, 55, 75},
 			},
 			{
 				row:     row,
 				colKeys: []engine.ColumnKey{engine.MakeColumnKey(10, false)},
-				ret:     []byte{151, 63, 161, 34, 208, 229, 96, 65, 136},
+				ret:     []byte{1, 151, 63, 161, 34, 208, 229, 96, 65, 136},
 			},
 			{
 				row:     row,
 				colKeys: []engine.ColumnKey{engine.MakeColumnKey(11, false)},
-				ret:     []byte{152},
+				ret:     []byte{1, 152},
 			},
 			{
 				row:     row,
 				colKeys: []engine.ColumnKey{engine.MakeColumnKey(12, false)},
-				ret:     []byte{153, 64, 94, 221, 47, 26, 159, 190, 119},
+				ret:     []byte{1, 153, 64, 94, 221, 47, 26, 159, 190, 119},
 			},
 			{
 				row:     row,
 				colKeys: []engine.ColumnKey{engine.MakeColumnKey(13, false)},
-				ret:     []byte{153, 64, 124, 140, 159, 190, 118, 200, 180},
+				ret:     []byte{1, 153, 64, 124, 140, 159, 190, 118, 200, 180},
 			},
 			{
 				row:     row,
 				colKeys: []engine.ColumnKey{engine.MakeColumnKey(14, false)},
-				ret:     []byte{160, 1, 0, 1, 1, 2, 3, 4, 0},
+				ret:     []byte{1, 160, 1, 0, 1, 1, 2, 3, 4, 0},
 			},
 			{
 				row:     row,
 				colKeys: []engine.ColumnKey{engine.MakeColumnKey(15, false)},
-				ret:     []byte{160, 65, 66, 67, 68, 0},
+				ret:     []byte{1, 160, 65, 66, 67, 68, 0},
 			},
 			{
 				row:     row,
 				colKeys: []engine.ColumnKey{engine.MakeColumnKey(16, false)},
-				ret:     []byte{160, 97, 98, 0},
+				ret:     []byte{1, 160, 97, 98, 0},
 			},
 			{
 				row:     row,
 				colKeys: []engine.ColumnKey{engine.MakeColumnKey(17, false)},
-				ret:     []byte{160, 97, 98, 99, 0},
+				ret:     []byte{1, 160, 97, 98, 99, 0},
 			},
 			{
 				row:     row,
 				colKeys: []engine.ColumnKey{engine.MakeColumnKey(18, false)},
-				ret:     []byte{160, 97, 98, 99, 100, 0},
+				ret:     []byte{1, 160, 97, 98, 99, 100, 0},
 			},
 		})
 
@@ -330,115 +382,115 @@ func TestMakeKey(t *testing.T) {
 				row: []sql.Value{sql.BoolValue(true), nil},
 				colKeys: []engine.ColumnKey{engine.MakeColumnKey(0, false),
 					engine.MakeColumnKey(1, false)},
-				ret: []byte{131, 1, 130},
+				ret: []byte{2, 131, 1, 130},
 			},
 			{
 				row: []sql.Value{sql.BoolValue(true), sql.BoolValue(false)},
 				colKeys: []engine.ColumnKey{engine.MakeColumnKey(0, false),
 					engine.MakeColumnKey(1, false)},
-				ret: []byte{131, 1, 131, 0},
+				ret: []byte{2, 131, 1, 131, 0},
 			},
 			{
 				row: []sql.Value{sql.BoolValue(true), sql.BoolValue(true)},
 				colKeys: []engine.ColumnKey{engine.MakeColumnKey(0, false),
 					engine.MakeColumnKey(1, false)},
-				ret: []byte{131, 1, 131, 1},
+				ret: []byte{2, 131, 1, 131, 1},
 			},
 			{
 				row: []sql.Value{sql.BoolValue(true), sql.Int64Value(-456)},
 				colKeys: []engine.ColumnKey{engine.MakeColumnKey(0, false),
 					engine.MakeColumnKey(1, false)},
-				ret: []byte{131, 1, 140, 255, 255, 255, 255, 255, 255, 254, 56},
+				ret: []byte{2, 131, 1, 140, 255, 255, 255, 255, 255, 255, 254, 56},
 			},
 			{
 				row: []sql.Value{sql.BoolValue(true), sql.Int64Value(-123)},
 				colKeys: []engine.ColumnKey{engine.MakeColumnKey(0, false),
 					engine.MakeColumnKey(1, false)},
-				ret: []byte{131, 1, 140, 255, 255, 255, 255, 255, 255, 255, 133},
+				ret: []byte{2, 131, 1, 140, 255, 255, 255, 255, 255, 255, 255, 133},
 			},
 			{
 				row: []sql.Value{sql.BoolValue(true), sql.Int64Value(0)},
 				colKeys: []engine.ColumnKey{engine.MakeColumnKey(0, false),
 					engine.MakeColumnKey(1, false)},
-				ret: []byte{131, 1, 141, 0, 0, 0, 0, 0, 0, 0, 0},
+				ret: []byte{2, 131, 1, 141, 0, 0, 0, 0, 0, 0, 0, 0},
 			},
 			{
 				row: []sql.Value{sql.BoolValue(true), sql.Int64Value(123)},
 				colKeys: []engine.ColumnKey{engine.MakeColumnKey(0, false),
 					engine.MakeColumnKey(1, false)},
-				ret: []byte{131, 1, 141, 0, 0, 0, 0, 0, 0, 0, 123},
+				ret: []byte{2, 131, 1, 141, 0, 0, 0, 0, 0, 0, 0, 123},
 			},
 			{
 				row: []sql.Value{sql.BoolValue(true), sql.Int64Value(456)},
 				colKeys: []engine.ColumnKey{engine.MakeColumnKey(0, false),
 					engine.MakeColumnKey(1, false)},
-				ret: []byte{131, 1, 141, 0, 0, 0, 0, 0, 0, 1, 200},
+				ret: []byte{2, 131, 1, 141, 0, 0, 0, 0, 0, 0, 1, 200},
 			},
 			{
 				row: []sql.Value{sql.BoolValue(true), sql.Float64Value(math.NaN())},
 				colKeys: []engine.ColumnKey{engine.MakeColumnKey(0, false),
 					engine.MakeColumnKey(1, false)},
-				ret: []byte{131, 1, 150},
+				ret: []byte{2, 131, 1, 150},
 			},
 			{
 				row: []sql.Value{sql.BoolValue(true), sql.Float64Value(-456.789)},
 				colKeys: []engine.ColumnKey{engine.MakeColumnKey(0, false),
 					engine.MakeColumnKey(1, false)},
-				ret: []byte{131, 1, 151, 63, 131, 115, 96, 65, 137, 55, 75},
+				ret: []byte{2, 131, 1, 151, 63, 131, 115, 96, 65, 137, 55, 75},
 			},
 			{
 				row: []sql.Value{sql.BoolValue(true), sql.Float64Value(-123.456)},
 				colKeys: []engine.ColumnKey{engine.MakeColumnKey(0, false),
 					engine.MakeColumnKey(1, false)},
-				ret: []byte{131, 1, 151, 63, 161, 34, 208, 229, 96, 65, 136},
+				ret: []byte{2, 131, 1, 151, 63, 161, 34, 208, 229, 96, 65, 136},
 			},
 			{
 				row: []sql.Value{sql.BoolValue(true), sql.Float64Value(0.0)},
 				colKeys: []engine.ColumnKey{engine.MakeColumnKey(0, false),
 					engine.MakeColumnKey(1, false)},
-				ret: []byte{131, 1, 152},
+				ret: []byte{2, 131, 1, 152},
 			},
 			{
 				row: []sql.Value{sql.BoolValue(true), sql.Float64Value(123.456)},
 				colKeys: []engine.ColumnKey{engine.MakeColumnKey(0, false),
 					engine.MakeColumnKey(1, false)},
-				ret: []byte{131, 1, 153, 64, 94, 221, 47, 26, 159, 190, 119},
+				ret: []byte{2, 131, 1, 153, 64, 94, 221, 47, 26, 159, 190, 119},
 			},
 			{
 				row: []sql.Value{sql.BoolValue(true), sql.Float64Value(456.789)},
 				colKeys: []engine.ColumnKey{engine.MakeColumnKey(0, false),
 					engine.MakeColumnKey(1, false)},
-				ret: []byte{131, 1, 153, 64, 124, 140, 159, 190, 118, 200, 180},
+				ret: []byte{2, 131, 1, 153, 64, 124, 140, 159, 190, 118, 200, 180},
 			},
 			{
 				row: []sql.Value{sql.BoolValue(true), sql.StringValue([]byte{0, 1, 2, 3, 4})},
 				colKeys: []engine.ColumnKey{engine.MakeColumnKey(0, false),
 					engine.MakeColumnKey(1, false)},
-				ret: []byte{131, 1, 160, 1, 0, 1, 1, 2, 3, 4, 0},
+				ret: []byte{2, 131, 1, 160, 1, 0, 1, 1, 2, 3, 4, 0},
 			},
 			{
 				row: []sql.Value{sql.BoolValue(true), sql.StringValue("ABCD")},
 				colKeys: []engine.ColumnKey{engine.MakeColumnKey(0, false),
 					engine.MakeColumnKey(1, false)},
-				ret: []byte{131, 1, 160, 65, 66, 67, 68, 0},
+				ret: []byte{2, 131, 1, 160, 65, 66, 67, 68, 0},
 			},
 			{
 				row: []sql.Value{sql.BoolValue(true), sql.StringValue("ab")},
 				colKeys: []engine.ColumnKey{engine.MakeColumnKey(0, false),
 					engine.MakeColumnKey(1, false)},
-				ret: []byte{131, 1, 160, 97, 98, 0},
+				ret: []byte{2, 131, 1, 160, 97, 98, 0},
 			},
 			{
 				row: []sql.Value{sql.BoolValue(true), sql.StringValue("abc")},
 				colKeys: []engine.ColumnKey{engine.MakeColumnKey(0, false),
 					engine.MakeColumnKey(1, false)},
-				ret: []byte{131, 1, 160, 97, 98, 99, 0},
+				ret: []byte{2, 131, 1, 160, 97, 98, 99, 0},
 			},
 			{
 				row: []sql.Value{sql.BoolValue(true), sql.StringValue("abcd")},
 				colKeys: []engine.ColumnKey{engine.MakeColumnKey(0, false),
 					engine.MakeColumnKey(1, false)},
-				ret: []byte{131, 1, 160, 97, 98, 99, 100, 0},
+				ret: []byte{2, 131, 1, 160, 97, 98, 99, 100, 0},
 			},
 		})
 
@@ -448,115 +500,115 @@ func TestMakeKey(t *testing.T) {
 				row: []sql.Value{sql.BoolValue(true), sql.StringValue("abcd")},
 				colKeys: []engine.ColumnKey{engine.MakeColumnKey(0, false),
 					engine.MakeColumnKey(1, true)},
-				ret: []byte{131, 1, 95, 158, 157, 156, 155, 255},
+				ret: []byte{2, 131, 1, 95, 158, 157, 156, 155, 255},
 			},
 			{
 				row: []sql.Value{sql.BoolValue(true), sql.StringValue("abc")},
 				colKeys: []engine.ColumnKey{engine.MakeColumnKey(0, false),
 					engine.MakeColumnKey(1, true)},
-				ret: []byte{131, 1, 95, 158, 157, 156, 255},
+				ret: []byte{2, 131, 1, 95, 158, 157, 156, 255},
 			},
 			{
 				row: []sql.Value{sql.BoolValue(true), sql.StringValue("ab")},
 				colKeys: []engine.ColumnKey{engine.MakeColumnKey(0, false),
 					engine.MakeColumnKey(1, true)},
-				ret: []byte{131, 1, 95, 158, 157, 255},
+				ret: []byte{2, 131, 1, 95, 158, 157, 255},
 			},
 			{
 				row: []sql.Value{sql.BoolValue(true), sql.StringValue("ABCD")},
 				colKeys: []engine.ColumnKey{engine.MakeColumnKey(0, false),
 					engine.MakeColumnKey(1, true)},
-				ret: []byte{131, 1, 95, 190, 189, 188, 187, 255},
+				ret: []byte{2, 131, 1, 95, 190, 189, 188, 187, 255},
 			},
 			{
 				row: []sql.Value{sql.BoolValue(true), sql.StringValue([]byte{0, 1, 2, 3, 4})},
 				colKeys: []engine.ColumnKey{engine.MakeColumnKey(0, false),
 					engine.MakeColumnKey(1, true)},
-				ret: []byte{131, 1, 95, 254, 255, 254, 254, 253, 252, 251, 255},
+				ret: []byte{2, 131, 1, 95, 254, 255, 254, 254, 253, 252, 251, 255},
 			},
 			{
 				row: []sql.Value{sql.BoolValue(true), sql.Float64Value(456.789)},
 				colKeys: []engine.ColumnKey{engine.MakeColumnKey(0, false),
 					engine.MakeColumnKey(1, true)},
-				ret: []byte{131, 1, 102, 191, 131, 115, 96, 65, 137, 55, 75},
+				ret: []byte{2, 131, 1, 102, 191, 131, 115, 96, 65, 137, 55, 75},
 			},
 			{
 				row: []sql.Value{sql.BoolValue(true), sql.Float64Value(123.456)},
 				colKeys: []engine.ColumnKey{engine.MakeColumnKey(0, false),
 					engine.MakeColumnKey(1, true)},
-				ret: []byte{131, 1, 102, 191, 161, 34, 208, 229, 96, 65, 136},
+				ret: []byte{2, 131, 1, 102, 191, 161, 34, 208, 229, 96, 65, 136},
 			},
 			{
 				row: []sql.Value{sql.BoolValue(true), sql.Float64Value(0.0)},
 				colKeys: []engine.ColumnKey{engine.MakeColumnKey(0, false),
 					engine.MakeColumnKey(1, true)},
-				ret: []byte{131, 1, 103},
+				ret: []byte{2, 131, 1, 103},
 			},
 			{
 				row: []sql.Value{sql.BoolValue(true), sql.Float64Value(-123.456)},
 				colKeys: []engine.ColumnKey{engine.MakeColumnKey(0, false),
 					engine.MakeColumnKey(1, true)},
-				ret: []byte{131, 1, 104, 192, 94, 221, 47, 26, 159, 190, 119},
+				ret: []byte{2, 131, 1, 104, 192, 94, 221, 47, 26, 159, 190, 119},
 			},
 			{
 				row: []sql.Value{sql.BoolValue(true), sql.Float64Value(-456.789)},
 				colKeys: []engine.ColumnKey{engine.MakeColumnKey(0, false),
 					engine.MakeColumnKey(1, true)},
-				ret: []byte{131, 1, 104, 192, 124, 140, 159, 190, 118, 200, 180},
+				ret: []byte{2, 131, 1, 104, 192, 124, 140, 159, 190, 118, 200, 180},
 			},
 			{
 				row: []sql.Value{sql.BoolValue(true), sql.Float64Value(math.NaN())},
 				colKeys: []engine.ColumnKey{engine.MakeColumnKey(0, false),
 					engine.MakeColumnKey(1, true)},
-				ret: []byte{131, 1, 105},
+				ret: []byte{2, 131, 1, 105},
 			},
 			{
 				row: []sql.Value{sql.BoolValue(true), sql.Int64Value(456)},
 				colKeys: []engine.ColumnKey{engine.MakeColumnKey(0, false),
 					engine.MakeColumnKey(1, true)},
-				ret: []byte{131, 1, 114, 255, 255, 255, 255, 255, 255, 254, 55},
+				ret: []byte{2, 131, 1, 114, 255, 255, 255, 255, 255, 255, 254, 55},
 			},
 			{
 				row: []sql.Value{sql.BoolValue(true), sql.Int64Value(123)},
 				colKeys: []engine.ColumnKey{engine.MakeColumnKey(0, false),
 					engine.MakeColumnKey(1, true)},
-				ret: []byte{131, 1, 114, 255, 255, 255, 255, 255, 255, 255, 132},
+				ret: []byte{2, 131, 1, 114, 255, 255, 255, 255, 255, 255, 255, 132},
 			},
 			{
 				row: []sql.Value{sql.BoolValue(true), sql.Int64Value(0)},
 				colKeys: []engine.ColumnKey{engine.MakeColumnKey(0, false),
 					engine.MakeColumnKey(1, true)},
-				ret: []byte{131, 1, 114, 255, 255, 255, 255, 255, 255, 255, 255},
+				ret: []byte{2, 131, 1, 114, 255, 255, 255, 255, 255, 255, 255, 255},
 			},
 			{
 				row: []sql.Value{sql.BoolValue(true), sql.Int64Value(-123)},
 				colKeys: []engine.ColumnKey{engine.MakeColumnKey(0, false),
 					engine.MakeColumnKey(1, true)},
-				ret: []byte{131, 1, 115, 0, 0, 0, 0, 0, 0, 0, 122},
+				ret: []byte{2, 131, 1, 115, 0, 0, 0, 0, 0, 0, 0, 122},
 			},
 			{
 				row: []sql.Value{sql.BoolValue(true), sql.Int64Value(-456)},
 				colKeys: []engine.ColumnKey{engine.MakeColumnKey(0, false),
 					engine.MakeColumnKey(1, true)},
-				ret: []byte{131, 1, 115, 0, 0, 0, 0, 0, 0, 1, 199},
+				ret: []byte{2, 131, 1, 115, 0, 0, 0, 0, 0, 0, 1, 199},
 			},
 			{
 				row: []sql.Value{sql.BoolValue(true), sql.BoolValue(true)},
 				colKeys: []engine.ColumnKey{engine.MakeColumnKey(0, false),
 					engine.MakeColumnKey(1, true)},
-				ret: []byte{131, 1, 124, 254},
+				ret: []byte{2, 131, 1, 124, 254},
 			},
 			{
 				row: []sql.Value{sql.BoolValue(true), sql.BoolValue(false)},
 				colKeys: []engine.ColumnKey{engine.MakeColumnKey(0, false),
 					engine.MakeColumnKey(1, true)},
-				ret: []byte{131, 1, 124, 255},
+				ret: []byte{2, 131, 1, 124, 255},
 			},
 			{
 				row: []sql.Value{sql.BoolValue(true), nil},
 				colKeys: []engine.ColumnKey{engine.MakeColumnKey(0, false),
 					engine.MakeColumnKey(1, true)},
-				ret: []byte{131, 1, 125},
+				ret: []byte{2, 131, 1, 125},
 			},
 		})
 }

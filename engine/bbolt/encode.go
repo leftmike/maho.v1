@@ -119,9 +119,12 @@ func decodeByte(reverse bool, b byte) byte {
 	return b
 }
 
-func makeKey(row []sql.Value, colKeys []engine.ColumnKey) []byte {
-	var key []byte
+func MakePrefix(row []sql.Value, colKeys []engine.ColumnKey) []byte {
+	if len(colKeys) < 1 || len(colKeys) > 255 {
+		panic(fmt.Sprintf("a column key must have been 1 and 255 columns: %d", len(colKeys)))
+	}
 
+	key := []byte{byte(len(colKeys))}
 	for _, ck := range colKeys {
 		num := ck.Number()
 		if num >= len(row) {
@@ -175,14 +178,14 @@ func makeKey(row []sql.Value, colKeys []engine.ColumnKey) []byte {
 
 func MakeBareKey(row []sql.Value, colKeys []engine.ColumnKey) []byte {
 	// <sql-key> 0x00
-	key := makeKey(row, colKeys)
+	key := MakePrefix(row, colKeys)
 	key = append(key, BareKeyType)
 	return key
 }
 
 func MakeProposalKey(row []sql.Value, colKeys []engine.ColumnKey, tid, sid uint32) []byte {
 	// <sql-key> 0x01 <tid> <sid> 0x01
-	key := makeKey(row, colKeys)
+	key := MakePrefix(row, colKeys)
 	key = append(key, ProposalKeyType)
 	key = encodeUint32(key, false, tid)
 	// Encode the statement id _descending_ so that the most recent statement id will be
@@ -194,7 +197,7 @@ func MakeProposalKey(row []sql.Value, colKeys []engine.ColumnKey, tid, sid uint3
 
 func MakeDurableKey(row []sql.Value, colKeys []engine.ColumnKey, version uint64) []byte {
 	// <sql-key> 0x02 <version> 0x02
-	key := makeKey(row, colKeys)
+	key := MakePrefix(row, colKeys)
 	key = append(key, DurableKeyType)
 	// Encode the version _descending_ so that the most recent version will be encountered
 	// first in a key scan.
@@ -211,6 +214,11 @@ func GetKeyType(key []byte) byte {
 }
 
 func parseKey(key []byte, colKeys []engine.ColumnKey, dest []sql.Value) bool {
+	if len(key) < 1 || key[0] != byte(len(colKeys)) {
+		return false
+	}
+	key = key[1:]
+
 	for _, ck := range colKeys {
 		if len(key) < 1 {
 			return false
