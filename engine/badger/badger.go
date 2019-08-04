@@ -1,13 +1,6 @@
 package badger
 
-import (
-	"os"
-
-	"github.com/dgraph-io/badger"
-
-	"github.com/leftmike/maho/engine/kv"
-)
-
+/*
 type Engine struct{}
 
 type database struct {
@@ -135,3 +128,4 @@ func (it *iterator) Valid() bool {
 func (it *iterator) Value(vf func(val []byte) error) error {
 	return it.it.Item().Value(vf)
 }
+*/
