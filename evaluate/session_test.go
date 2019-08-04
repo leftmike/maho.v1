@@ -16,7 +16,7 @@ type testEngine struct {
 
 type testTransaction struct {
 	t               *testing.T
-	sid             uint64
+	sesid           uint64
 	wantRollback    bool
 	wantCommit      bool
 	nextStmtAllowed int
@@ -93,14 +93,14 @@ func (te *testEngine) DropIndex(ctx context.Context, tx engine.Transaction, idxn
 	return nil
 }
 
-func (te *testEngine) Begin(sid uint64) engine.Transaction {
+func (te *testEngine) Begin(sesid uint64) engine.Transaction {
 	if len(te.transactions) == 0 {
 		te.t.Error("Begin called too many times on engine")
 	}
 	tx := te.transactions[0]
 	te.transactions = te.transactions[1:]
 	tx.t = te.t
-	tx.sid = sid
+	tx.sesid = sesid
 	return &tx
 }
 
@@ -164,9 +164,9 @@ func TestSessionCommit(t *testing.T) {
 	}
 
 	ses := Session{Engine: te}
-	ses.SetSID(123)
-	if ses.String() != "session-123" || ses.sid != 123 {
-		t.Errorf("SetSid: got %s want session-123", ses.String())
+	ses.SetSessionID(123)
+	if ses.String() != "session-123" || ses.sesid != 123 {
+		t.Errorf("SetSessionID: got %s want session-123", ses.String())
 	}
 	err := ses.Begin()
 	if err != nil {

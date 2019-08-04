@@ -21,10 +21,10 @@ type Server struct {
 	Engine          engine.Engine
 	DefaultDatabase sql.Identifier
 
-	mutex    sync.Mutex
-	servers  map[server]struct{}
-	sessions map[*evaluate.Session]struct{}
-	lastSID  uint64
+	mutex         sync.Mutex
+	servers       map[server]struct{}
+	sessions      map[*evaluate.Session]struct{}
+	lastSessionID uint64
 }
 
 type server interface {
@@ -51,8 +51,8 @@ func (svr *Server) addSession(ses *evaluate.Session) {
 		svr.Engine.CreateSystemTable(sql.ID("sessions"), svr.makeSessionsVirtual)
 	}
 	svr.sessions[ses] = struct{}{}
-	svr.lastSID += 1
-	ses.SetSID(svr.lastSID)
+	svr.lastSessionID += 1
+	ses.SetSessionID(svr.lastSessionID)
 }
 
 func (svr *Server) removeSession(ses *evaluate.Session) {

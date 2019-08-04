@@ -8,8 +8,6 @@ To Do:
 
 - fuzzing: parser.Parse
 
-- rename sid to sessionID so sid can be used for statement id
-
 - keep track of databases per engine as a simple config file that gets read and written by maho
 
 - add test for not seeing modified rows within a single SQL statement

@@ -42,7 +42,7 @@ type transaction struct {
 	db          *database
 	tx          *bbolt.Tx
 	tid         uint64
-	sid         uint64
+	sesid       uint64
 	lockerState service.LockerState
 }
 
@@ -224,11 +224,11 @@ func (_ *bboltEngine) DropIndex(ctx context.Context, tx engine.Transaction, idxn
 	return errors.New("bbolt: drop index not implemented") // XXX
 }
 
-func (be *bboltEngine) Begin(sid uint64) engine.Transaction {
+func (be *bboltEngine) Begin(sesid uint64) engine.Transaction {
 	return &transaction{
-		e:   be,
-		tid: atomic.AddUint64(&be.lastTID, 1),
-		sid: sid,
+		e:     be,
+		tid:   atomic.AddUint64(&be.lastTID, 1),
+		sesid: sesid,
 	}
 }
 

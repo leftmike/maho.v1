@@ -22,7 +22,7 @@ type Transaction struct {
 	lockerState LockerState
 	contexts    map[Database]interface{}
 	tid         uint64
-	sid         uint64
+	sesid       uint64
 }
 
 type Database interface {
@@ -49,7 +49,7 @@ func (ts *TransactionService) removeTransaction(tx *Transaction) {
 }
 
 // Begin a new transaction.
-func (ts *TransactionService) Begin(sid uint64) *Transaction {
+func (ts *TransactionService) Begin(sesid uint64) *Transaction {
 	ts.mutex.Lock()
 	defer ts.mutex.Unlock()
 
@@ -58,7 +58,7 @@ func (ts *TransactionService) Begin(sid uint64) *Transaction {
 		ts:       ts,
 		contexts: map[Database]interface{}{},
 		tid:      ts.lastTID,
-		sid:      sid,
+		sesid:    sesid,
 	}
 	ts.transactions[tx] = struct{}{}
 	return tx
@@ -152,7 +152,7 @@ func (ts *TransactionService) makeTransactionsTable(ctx context.Context, tx engi
 	for tx := range ts.transactions {
 		values = append(values, []sql.Value{
 			sql.StringValue(fmt.Sprintf("transaction-%d", tx.tid)),
-			sql.StringValue(fmt.Sprintf("session-%d", tx.sid)),
+			sql.StringValue(fmt.Sprintf("session-%d", tx.sesid)),
 		})
 	}
 

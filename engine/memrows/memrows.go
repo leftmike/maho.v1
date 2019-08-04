@@ -217,8 +217,8 @@ func (_ *memrowsEngine) DropIndex(ctx context.Context, tx engine.Transaction,
 	return errors.New("memrows: drop index not implemented")
 }
 
-func (me *memrowsEngine) Begin(sid uint64) engine.Transaction {
-	return me.txService.Begin(sid)
+func (me *memrowsEngine) Begin(sesid uint64) engine.Transaction {
+	return me.txService.Begin(sesid)
 }
 
 func (_ *memrowsEngine) IsTransactional() bool {

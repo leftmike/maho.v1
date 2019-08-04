@@ -168,8 +168,8 @@ func (ve *virtualEngine) DropIndex(ctx context.Context, tx engine.Transaction,
 	return ve.e.DropIndex(ctx, tx, idxname, tn, ifExists)
 }
 
-func (ve *virtualEngine) Begin(sid uint64) engine.Transaction {
-	return ve.e.Begin(sid)
+func (ve *virtualEngine) Begin(sesid uint64) engine.Transaction {
+	return ve.e.Begin(sesid)
 }
 
 func (ve *virtualEngine) IsTransactional() bool {

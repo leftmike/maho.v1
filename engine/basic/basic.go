@@ -175,7 +175,7 @@ func (_ *basicEngine) DropIndex(ctx context.Context, tx engine.Transaction, idxn
 	return errors.New("basic: drop index not implemented")
 }
 
-func (_ *basicEngine) Begin(sid uint64) engine.Transaction {
+func (_ *basicEngine) Begin(sesid uint64) engine.Transaction {
 	return &transaction{}
 }
 

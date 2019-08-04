@@ -59,7 +59,7 @@ type Engine interface {
 	DropIndex(ctx context.Context, tx Transaction, idxname sql.Identifier, tn sql.TableName,
 		ifExists bool) error
 
-	Begin(sid uint64) Transaction
+	Begin(sesid uint64) Transaction
 	IsTransactional() bool
 
 	ListDatabases(ctx context.Context, tx Transaction) ([]sql.Identifier, error)

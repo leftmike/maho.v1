@@ -18,16 +18,16 @@ type Session struct {
 	Type            string
 	Addr            string
 	Interactive     bool
-	sid             uint64
+	sesid           uint64
 	tx              engine.Transaction
 }
 
-func (ses *Session) SetSID(sid uint64) {
-	ses.sid = sid
+func (ses *Session) SetSessionID(sesid uint64) {
+	ses.sesid = sesid
 }
 
 func (ses *Session) String() string {
-	return fmt.Sprintf("session-%d", ses.sid)
+	return fmt.Sprintf("session-%d", ses.sesid)
 }
 
 func (ses *Session) Context() context.Context {
@@ -38,7 +38,7 @@ func (ses *Session) Begin() error {
 	if ses.tx != nil {
 		return fmt.Errorf("execute: session already has active transaction")
 	}
-	ses.tx = ses.Engine.Begin(ses.sid)
+	ses.tx = ses.Engine.Begin(ses.sesid)
 	return nil
 }
 
@@ -67,7 +67,7 @@ func (ses *Session) Run(stmt Stmt, run func(tx engine.Transaction, stmt Stmt) er
 		return run(ses.tx, stmt)
 	}
 
-	tx := ses.Engine.Begin(ses.sid)
+	tx := ses.Engine.Begin(ses.sesid)
 	err := run(tx, stmt)
 	if err != nil {
 		rerr := tx.Rollback()
