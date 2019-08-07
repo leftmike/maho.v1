@@ -8,7 +8,10 @@ import (
 )
 
 func TestBasic(t *testing.T) {
-	e := basic.NewEngine("testdata")
+	e, err := basic.NewEngine("testdata")
+	if err != nil {
+		t.Fatal(err)
+	}
 	test.RunDatabaseTest(t, e)
 	test.RunSchemaTest(t, e)
 	test.RunTableTest(t, e)

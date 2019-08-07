@@ -87,13 +87,13 @@ type rows struct {
 	haveRow bool
 }
 
-func NewEngine(dataDir string) engine.Engine {
+func NewEngine(dataDir string) (engine.Engine, error) {
 	me := &memrowsEngine{
 		databases: map[sql.Identifier]*database{},
 	}
 	ve := virtual.NewEngine(me)
 	me.txService.Init(ve)
-	return ve
+	return ve, nil
 }
 
 func (_ *memrowsEngine) CreateSystemTable(tblname sql.Identifier, maker engine.MakeVirtual) {

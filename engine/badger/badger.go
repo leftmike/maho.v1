@@ -1,5 +1,41 @@
 package badger
 
+import (
+	"errors"
+
+	"github.com/leftmike/maho/engine"
+	"github.com/leftmike/maho/engine/kvrows"
+	"github.com/leftmike/maho/engine/virtual"
+	"github.com/leftmike/maho/sql"
+)
+
+var (
+	notImplemented = errors.New("badger: not implemented")
+)
+
+type badgerEngine struct {
+	kvrows.KVRows
+}
+
+func NewEngine(dataDir string) (engine.Engine, error) {
+	be := &badgerEngine{}
+	be.KVRows.Init(&badgerStore{})
+	ve := virtual.NewEngine(be)
+	return ve, nil
+}
+
+func (_ *badgerEngine) CreateSystemTable(tblname sql.Identifier, maker engine.MakeVirtual) {
+	panic("badger: use virtual engine with badger engine")
+}
+
+func (_ *badgerEngine) CreateInfoTable(tblname sql.Identifier, maker engine.MakeVirtual) {
+	panic("badger: use virtual engine with badger engine")
+}
+
+func (_ *badgerEngine) IsTransactional() bool {
+	return true
+}
+
 /*
 type Engine struct{}
 

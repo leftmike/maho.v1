@@ -45,12 +45,12 @@ type rows struct {
 	haveRow bool
 }
 
-func NewEngine(dataDir string) engine.Engine {
+func NewEngine(dataDir string) (engine.Engine, error) {
 	be := &basicEngine{
 		databases: map[sql.Identifier]*database{},
 	}
 	ve := virtual.NewEngine(be)
-	return ve
+	return ve, nil
 }
 
 func (_ *basicEngine) CreateSystemTable(tblname sql.Identifier, maker engine.MakeVirtual) {

@@ -53,13 +53,17 @@ func testSQL(t *testing.T, typ string, dbname sql.Identifier) {
 	t.Helper()
 
 	var e engine.Engine
+	var err error
 	switch typ {
 	case "basic":
-		e = basic.NewEngine("testdata")
+		e, err = basic.NewEngine("testdata")
 	case "memrows":
-		e = memrows.NewEngine("testdata")
+		e, err = memrows.NewEngine("testdata")
 	}
-	err := e.CreateDatabase(dbname, nil)
+	if err != nil {
+		t.Fatal(err)
+	}
+	err = e.CreateDatabase(dbname, nil)
 	if err != nil {
 		// If the test is run multiple times, then the database will already exist.
 	}

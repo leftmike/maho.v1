@@ -1,4 +1,4 @@
-package bbolt_test
+package kvrows_test
 
 import (
 	"bytes"
@@ -9,7 +9,7 @@ import (
 	"github.com/golang/protobuf/proto"
 	"github.com/leftmike/maho.old/engine/kvrows/encoding"
 	"github.com/leftmike/maho/engine"
-	"github.com/leftmike/maho/engine/bbolt"
+	"github.com/leftmike/maho/engine/kvrows"
 	"github.com/leftmike/maho/sql"
 	"github.com/leftmike/maho/testutil"
 )
@@ -25,14 +25,14 @@ func testProposalKey(t *testing.T, prevKey []byte, row []sql.Value, colKeys []en
 
 	t.Helper()
 
-	key := bbolt.MakeProposalKey(row, colKeys, tid, sid)
+	key := kvrows.MakeProposalKey(row, colKeys, tid, sid)
 	if bytes.Compare(prevKey, key) >= 0 {
 		t.Errorf("MakeProposalKey(%v, %v) keys not ordered correctly; %v and %v",
 			row, colKeys, prevKey, key)
 	}
 
 	dest := make([]sql.Value, len(row))
-	rettid, retsid, ok := bbolt.ParseProposalKey(key, colKeys, dest)
+	rettid, retsid, ok := kvrows.ParseProposalKey(key, colKeys, dest)
 	if !ok {
 		t.Errorf("ParseProposalKey(%v) failed", key)
 	} else {
@@ -52,14 +52,14 @@ func testDurableKey(t *testing.T, prevKey []byte, row []sql.Value, colKeys []eng
 
 	t.Helper()
 
-	key := bbolt.MakeDurableKey(row, colKeys, ver)
+	key := kvrows.MakeDurableKey(row, colKeys, ver)
 	if bytes.Compare(prevKey, key) >= 0 {
 		t.Errorf("MakeDurableKey(%v, %v) keys not ordered correctly; %v and %v",
 			row, colKeys, prevKey, key)
 	}
 
 	dest := make([]sql.Value, len(row))
-	retver, ok := bbolt.ParseDurableKey(key, colKeys, dest)
+	retver, ok := kvrows.ParseDurableKey(key, colKeys, dest)
 	if !ok {
 		t.Errorf("ParseDurableKey(%v) failed", key)
 	} else {
@@ -92,13 +92,13 @@ func testMakeKey(t *testing.T, cases []testCase) {
 
 	var prefixes [][]byte
 	for _, c := range cases {
-		prefixes = append(prefixes, bbolt.MakePrefix(c.row, c.colKeys))
+		prefixes = append(prefixes, kvrows.MakePrefix(c.row, c.colKeys))
 	}
 
 	var prevKey []byte
 	for i, c := range cases {
-		key := bbolt.MakeBareKey(c.row, c.colKeys)
-		ret := append(c.ret, bbolt.BareKeyType)
+		key := kvrows.MakeBareKey(c.row, c.colKeys)
+		ret := append(c.ret, kvrows.BareKeyType)
 		if bytes.Compare(key, ret) != 0 {
 			t.Errorf("MakeBareKey(%d) got %v want %v", i, key, ret)
 		}
@@ -616,9 +616,9 @@ func TestMakeKey(t *testing.T) {
 func testParseKey(t *testing.T, row []sql.Value, colKeys []engine.ColumnKey) {
 	t.Helper()
 
-	key := bbolt.MakeBareKey(row, colKeys)
+	key := kvrows.MakeBareKey(row, colKeys)
 	dest := make([]sql.Value, len(row))
-	ok := bbolt.ParseBareKey(key, colKeys, dest)
+	ok := kvrows.ParseBareKey(key, colKeys, dest)
 	if !ok {
 		t.Errorf("ParseKey(%v, %v) failed", row, colKeys)
 	}
@@ -726,12 +726,12 @@ func TestEncodeVarint(t *testing.T) {
 	}
 
 	for _, n := range numbers {
-		buf := bbolt.EncodeVarint(nil, n)
+		buf := kvrows.EncodeVarint(nil, n)
 		pbuf := proto.EncodeVarint(n)
 		if !testutil.DeepEqual(buf, pbuf) {
 			t.Errorf("EncodeVarint(%d): got %v want %v", n, buf, pbuf)
 		}
-		ret, r, ok := bbolt.DecodeVarint(buf)
+		ret, r, ok := kvrows.DecodeVarint(buf)
 		if !ok {
 			t.Errorf("DecodeVarint(%v) failed", buf)
 		} else if len(ret) != 0 {
@@ -836,15 +836,15 @@ func TestMakeParseValues(t *testing.T) {
 	}
 
 	for _, c := range cases {
-		buf := bbolt.MakeRowValue(c.row)
-		if !bbolt.IsRowValue(buf) {
+		buf := kvrows.MakeRowValue(c.row)
+		if !kvrows.IsRowValue(buf) {
 			t.Errorf("IsRowValue(%s) failed", c.s)
 		}
-		if bbolt.IsTombstoneValue(buf) {
+		if kvrows.IsTombstoneValue(buf) {
 			t.Errorf("IsTombstoneValue(%s) succeeded", c.s)
 		}
 		dest := make([]sql.Value, len(c.row))
-		ok := bbolt.ParseRowValue(buf, dest)
+		ok := kvrows.ParseRowValue(buf, dest)
 		if !ok {
 			t.Errorf("ParseValue(%s) failed", c.s)
 		} else if !testutil.DeepEqual(c.row, dest) {
@@ -863,10 +863,10 @@ func TestMakeParseValues(t *testing.T) {
 		}
 	}
 
-	if bbolt.IsRowValue(bbolt.MakeTombstoneValue()) {
+	if kvrows.IsRowValue(kvrows.MakeTombstoneValue()) {
 		t.Errorf("IsRowValue(MakeTombstoneValue()) succeeded")
 	}
-	if !bbolt.IsTombstoneValue(bbolt.MakeTombstoneValue()) {
+	if !kvrows.IsTombstoneValue(kvrows.MakeTombstoneValue()) {
 		t.Errorf("IsTombstoneValue(MakeTombstoneValue()) failed")
 	}
 }

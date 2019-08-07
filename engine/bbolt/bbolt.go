@@ -1,24 +1,237 @@
 package bbolt
 
 import (
-	"bytes"
 	"context"
-	"encoding/gob"
 	"errors"
 	"fmt"
-	"io"
 	"path/filepath"
 	"sync"
-	"sync/atomic"
 
 	"github.com/leftmike/maho/engine"
-	"github.com/leftmike/maho/engine/service"
+	"github.com/leftmike/maho/engine/kvrows"
 	"github.com/leftmike/maho/engine/virtual"
 	"github.com/leftmike/maho/sql"
-
-	"go.etcd.io/bbolt"
 )
 
+var (
+	notImplemented = errors.New("bbolt: not implemented")
+)
+
+type bboltEngine struct {
+	mutex     sync.RWMutex
+	databases map[sql.Identifier]*kvrows.KVRows
+	dataDir   string
+}
+
+func NewEngine(dataDir string) (engine.Engine, error) {
+	be := &bboltEngine{
+		databases: map[sql.Identifier]*kvrows.KVRows{},
+		dataDir:   dataDir,
+	}
+	ve := virtual.NewEngine(be)
+	return ve, nil
+}
+
+func (_ *bboltEngine) CreateSystemTable(tblname sql.Identifier, maker engine.MakeVirtual) {
+	panic("bbolt: use virtual engine with bbolt engine")
+}
+
+func (_ *bboltEngine) CreateInfoTable(tblname sql.Identifier, maker engine.MakeVirtual) {
+	panic("bbolt: use virtual engine with bbolt engine")
+}
+
+func databasePath(dbname sql.Identifier, dataDir, ext string, options engine.Options) string {
+	var path string
+	if optionPath, ok := options[sql.PATH]; ok {
+		path = optionPath
+	} else {
+		path = filepath.Join(dataDir, dbname.String())
+	}
+
+	if filepath.Ext(path) == "" {
+		path += ext
+	}
+	return path
+}
+
+func (be *bboltEngine) CreateDatabase(dbname sql.Identifier, options engine.Options) error {
+	be.mutex.Lock()
+	defer be.mutex.Unlock()
+
+	if _, ok := be.databases[dbname]; ok {
+		return fmt.Errorf("bbolt: database %s already exists", dbname)
+	}
+
+	path := databasePath(dbname, be.dataDir, ".mahobbolt", options)
+	st, err := openStore(path)
+	if err != nil {
+		return fmt.Errorf("bbolt: create database %s failed: %s", dbname, err)
+	}
+
+	var kv kvrows.KVRows
+	kv.Init(st)
+	be.databases[dbname] = &kv
+	return nil
+}
+
+func (be *bboltEngine) DropDatabase(dbname sql.Identifier, ifExists bool,
+	options engine.Options) error {
+
+	be.mutex.Lock()
+	defer be.mutex.Unlock()
+
+	_, ok := be.databases[dbname]
+	if !ok {
+		if ifExists {
+			return nil
+		}
+		return fmt.Errorf("bbolt: database %s does not exist", dbname)
+	}
+	delete(be.databases, dbname) // XXX need to close the store
+	return nil
+}
+
+func (be *bboltEngine) CreateSchema(ctx context.Context, tx engine.Transaction,
+	sn sql.SchemaName) error {
+
+	be.mutex.RLock()
+	defer be.mutex.RUnlock()
+
+	bdb, ok := be.databases[sn.Database]
+	if !ok {
+		return fmt.Errorf("bbolt: database %s not found", sn.Database)
+	}
+	return bdb.CreateSchema(ctx, tx, sn)
+}
+
+func (be *bboltEngine) DropSchema(ctx context.Context, tx engine.Transaction, sn sql.SchemaName,
+	ifExists bool) error {
+
+	be.mutex.RLock()
+	defer be.mutex.RUnlock()
+
+	bdb, ok := be.databases[sn.Database]
+	if !ok {
+		return fmt.Errorf("bbolt: database %s not found", sn.Database)
+	}
+	return bdb.DropSchema(ctx, tx, sn, ifExists)
+}
+
+func (be *bboltEngine) LookupTable(ctx context.Context, tx engine.Transaction,
+	tn sql.TableName) (engine.Table, error) {
+
+	be.mutex.RLock()
+	defer be.mutex.RUnlock()
+
+	bdb, ok := be.databases[tn.Database]
+	if !ok {
+		return nil, fmt.Errorf("bbolt: database %s not found", tn.Database)
+	}
+	return bdb.LookupTable(ctx, tx, tn)
+}
+
+func (be *bboltEngine) CreateTable(ctx context.Context, tx engine.Transaction, tn sql.TableName,
+	cols []sql.Identifier, colTypes []sql.ColumnType, primary []engine.ColumnKey,
+	ifNotExists bool) error {
+
+	be.mutex.RLock()
+	defer be.mutex.RUnlock()
+
+	bdb, ok := be.databases[tn.Database]
+	if !ok {
+		return fmt.Errorf("bbolt: database %s not found", tn.Database)
+	}
+	return bdb.CreateTable(ctx, tx, tn, cols, colTypes, primary, ifNotExists)
+}
+
+func (be *bboltEngine) DropTable(ctx context.Context, tx engine.Transaction, tn sql.TableName,
+	ifExists bool) error {
+
+	be.mutex.RLock()
+	defer be.mutex.RUnlock()
+
+	bdb, ok := be.databases[tn.Database]
+	if !ok {
+		return fmt.Errorf("bbolt: database %s not found", tn.Database)
+	}
+	return bdb.DropTable(ctx, tx, tn, ifExists)
+}
+
+func (be *bboltEngine) CreateIndex(ctx context.Context, tx engine.Transaction,
+	idxname sql.Identifier, tn sql.TableName, unique bool, keys []engine.ColumnKey,
+	ifNotExists bool) error {
+
+	be.mutex.RLock()
+	defer be.mutex.RUnlock()
+
+	bdb, ok := be.databases[tn.Database]
+	if !ok {
+		return fmt.Errorf("bbolt: database %s not found", tn.Database)
+	}
+	return bdb.CreateIndex(ctx, tx, idxname, tn, unique, keys, ifNotExists)
+}
+
+func (be *bboltEngine) DropIndex(ctx context.Context, tx engine.Transaction, idxname sql.Identifier,
+	tn sql.TableName, ifExists bool) error {
+
+	be.mutex.RLock()
+	defer be.mutex.RUnlock()
+
+	bdb, ok := be.databases[tn.Database]
+	if !ok {
+		return fmt.Errorf("bbolt: database %s not found", tn.Database)
+	}
+	return bdb.DropIndex(ctx, tx, idxname, tn, ifExists)
+}
+
+func (be *bboltEngine) Begin(sesid uint64) engine.Transaction {
+	return nil // XXX need to make sure there are no cross database transactions
+}
+
+func (_ *bboltEngine) IsTransactional() bool {
+	return true
+}
+
+func (be *bboltEngine) ListDatabases(ctx context.Context, tx engine.Transaction) ([]sql.Identifier,
+	error) {
+
+	be.mutex.RLock()
+	defer be.mutex.RUnlock()
+
+	var dbnames []sql.Identifier
+	for dbname := range be.databases {
+		dbnames = append(dbnames, dbname)
+	}
+	return dbnames, nil
+}
+
+func (be *bboltEngine) ListSchemas(ctx context.Context, tx engine.Transaction,
+	dbname sql.Identifier) ([]sql.Identifier, error) {
+
+	be.mutex.RLock()
+	defer be.mutex.RUnlock()
+
+	bdb, ok := be.databases[dbname]
+	if !ok {
+		return nil, fmt.Errorf("bbolt: database %s not found", dbname)
+	}
+	return bdb.ListSchemas(ctx, tx, dbname)
+}
+
+func (be *bboltEngine) ListTables(ctx context.Context, tx engine.Transaction,
+	sn sql.SchemaName) ([]sql.Identifier, error) {
+
+	be.mutex.RLock()
+	defer be.mutex.RUnlock()
+
+	bdb, ok := be.databases[sn.Database]
+	if !ok {
+		return nil, fmt.Errorf("bbolt: database %s not found", sn.Database)
+	}
+	return bdb.ListTables(ctx, tx, sn)
+}
+
+/*
 var (
 	errNotEmpty = errors.New("not empty")
 )
@@ -82,20 +295,6 @@ func (_ *bboltEngine) CreateSystemTable(tblname sql.Identifier, maker engine.Mak
 
 func (_ *bboltEngine) CreateInfoTable(tblname sql.Identifier, maker engine.MakeVirtual) {
 	panic("bbolt: use virtual engine with bbolt engine")
-}
-
-func databasePath(dbname sql.Identifier, dataDir, ext string, options engine.Options) string {
-	var path string
-	if optionPath, ok := options[sql.PATH]; ok {
-		path = optionPath
-	} else {
-		path = filepath.Join(dataDir, dbname.String())
-	}
-
-	if filepath.Ext(path) == "" {
-		path += ext
-	}
-	return path
 }
 
 func (be *bboltEngine) CreateDatabase(dbname sql.Identifier, options engine.Options) error {
@@ -754,6 +953,7 @@ func (br *rows) Update(ctx context.Context, updates []sql.ColumnUpdate) error {
 	}
 	return nil
 }
+*/
 
 /*
 type readTx struct {

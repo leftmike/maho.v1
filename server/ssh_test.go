@@ -84,11 +84,15 @@ func testSSHServer(t *testing.T, fail bool, cfg *ssh.ClientConfig, port int, aut
 	addr := fmt.Sprintf("localhost:%d", port)
 
 	served := make(chan struct{}, 1)
+	e, err := basic.NewEngine("testdata")
+	if err != nil {
+		t.Fatal(err)
+	}
 	s := server.Server{
 		Handler: func(ses *evaluate.Session, rr io.RuneReader, w io.Writer) {
 			served <- struct{}{}
 		},
-		Engine: basic.NewEngine("testdata"),
+		Engine: e,
 	}
 
 	go func() {

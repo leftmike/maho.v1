@@ -8,7 +8,16 @@ To Do:
 
 - fuzzing: parser.Parse
 
-- keep track of databases per engine as a simple config file that gets read and written by maho
+- kvrows
+-- bbolt: each db is a separate file; no cross db transactions
+-- badger: one file for all db
+-- type Key struct {mid uint64, key []byte}
+-- epoch for transient state, eg. transactions
+-- in memory mapping of table and index to mids
+-- mid <= 16K are reserved
+
+- keep track of databases per engine as a simple config file that gets read and written by maho;
+  depends on the engine: yes for bbolt, no for badger
 
 - add test for not seeing modified rows within a single SQL statement
 
@@ -55,6 +64,7 @@ import (
 
 	"github.com/leftmike/maho/config"
 	"github.com/leftmike/maho/engine"
+	"github.com/leftmike/maho/engine/badger"
 	"github.com/leftmike/maho/engine/basic"
 	"github.com/leftmike/maho/engine/bbolt"
 	"github.com/leftmike/maho/engine/memrows"
@@ -193,17 +203,23 @@ func main() {
 	log.WithField("pid", os.Getpid()).Info("maho starting")
 
 	var e engine.Engine
+	var err error
 	switch *eng {
 	case "basic":
-		e = basic.NewEngine(*dataDir)
+		e, err = basic.NewEngine(*dataDir)
 	case "memrows":
-		e = memrows.NewEngine(*dataDir)
+		e, err = memrows.NewEngine(*dataDir)
 	case "bolt", "bbolt":
-		e = bbolt.NewEngine(*dataDir)
-	//"badger":  kvrows.Engine{Engine: badger.Engine{}},
+		e, err = bbolt.NewEngine(*dataDir)
+	case "badger":
+		e, err = badger.NewEngine(*dataDir)
 	default:
 		fmt.Fprintf(os.Stderr,
-			"maho: got %s for engine; want basic or memrows", *eng)
+			"maho: got %s for engine; want basic, memrows, bbolt, or badger", *eng)
+		return
+	}
+	if err != nil {
+		fmt.Fprintf(os.Stderr, "maho: %s", err)
 		return
 	}
 
@@ -220,7 +236,7 @@ func main() {
 		DefaultDatabase: sql.ID(*database),
 	}
 
-	err := e.CreateDatabase(sql.ID(*database), nil)
+	err = e.CreateDatabase(sql.ID(*database), nil)
 	if err != nil {
 		fmt.Fprintf(os.Stderr, "maho: %s: %s\n", *database, err)
 		return

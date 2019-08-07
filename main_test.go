@@ -73,7 +73,10 @@ func TestMain(t *testing.T) {
 `},
 	}
 
-	e := memrows.NewEngine("testdata")
+	e, err := memrows.NewEngine("testdata")
+	if err != nil {
+		t.Fatal(err)
+	}
 
 	for i, c := range cases {
 		var b bytes.Buffer
