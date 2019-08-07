@@ -23,6 +23,12 @@ type bboltEngine struct {
 	dataDir   string
 }
 
+type bboltTransaction struct {
+	sesid uint64
+	db    *kvrows.KVRows
+	tx    engine.Transaction
+}
+
 func NewEngine(dataDir string) (engine.Engine, error) {
 	be := &bboltEngine{
 		databases: map[sql.Identifier]*kvrows.KVRows{},
@@ -91,7 +97,7 @@ func (be *bboltEngine) DropDatabase(dbname sql.Identifier, ifExists bool,
 	return nil
 }
 
-func (be *bboltEngine) CreateSchema(ctx context.Context, tx engine.Transaction,
+func (be *bboltEngine) CreateSchema(ctx context.Context, etx engine.Transaction,
 	sn sql.SchemaName) error {
 
 	be.mutex.RLock()
@@ -101,10 +107,14 @@ func (be *bboltEngine) CreateSchema(ctx context.Context, tx engine.Transaction,
 	if !ok {
 		return fmt.Errorf("bbolt: database %s not found", sn.Database)
 	}
+	tx, ok := toKVRowsTransaction(etx, bdb)
+	if !ok {
+		return fmt.Errorf("bbolt: multiple database transactions not allowed: %s", sn.Database)
+	}
 	return bdb.CreateSchema(ctx, tx, sn)
 }
 
-func (be *bboltEngine) DropSchema(ctx context.Context, tx engine.Transaction, sn sql.SchemaName,
+func (be *bboltEngine) DropSchema(ctx context.Context, etx engine.Transaction, sn sql.SchemaName,
 	ifExists bool) error {
 
 	be.mutex.RLock()
@@ -114,10 +124,14 @@ func (be *bboltEngine) DropSchema(ctx context.Context, tx engine.Transaction, sn
 	if !ok {
 		return fmt.Errorf("bbolt: database %s not found", sn.Database)
 	}
+	tx, ok := toKVRowsTransaction(etx, bdb)
+	if !ok {
+		return fmt.Errorf("bbolt: multiple database transactions not allowed: %s", sn.Database)
+	}
 	return bdb.DropSchema(ctx, tx, sn, ifExists)
 }
 
-func (be *bboltEngine) LookupTable(ctx context.Context, tx engine.Transaction,
+func (be *bboltEngine) LookupTable(ctx context.Context, etx engine.Transaction,
 	tn sql.TableName) (engine.Table, error) {
 
 	be.mutex.RLock()
@@ -127,10 +141,14 @@ func (be *bboltEngine) LookupTable(ctx context.Context, tx engine.Transaction,
 	if !ok {
 		return nil, fmt.Errorf("bbolt: database %s not found", tn.Database)
 	}
+	tx, ok := toKVRowsTransaction(etx, bdb)
+	if !ok {
+		return nil, fmt.Errorf("bbolt: multiple database transactions not allowed: %s", tn.Database)
+	}
 	return bdb.LookupTable(ctx, tx, tn)
 }
 
-func (be *bboltEngine) CreateTable(ctx context.Context, tx engine.Transaction, tn sql.TableName,
+func (be *bboltEngine) CreateTable(ctx context.Context, etx engine.Transaction, tn sql.TableName,
 	cols []sql.Identifier, colTypes []sql.ColumnType, primary []engine.ColumnKey,
 	ifNotExists bool) error {
 
@@ -141,10 +159,14 @@ func (be *bboltEngine) CreateTable(ctx context.Context, tx engine.Transaction, t
 	if !ok {
 		return fmt.Errorf("bbolt: database %s not found", tn.Database)
 	}
+	tx, ok := toKVRowsTransaction(etx, bdb)
+	if !ok {
+		return fmt.Errorf("bbolt: multiple database transactions not allowed: %s", tn.Database)
+	}
 	return bdb.CreateTable(ctx, tx, tn, cols, colTypes, primary, ifNotExists)
 }
 
-func (be *bboltEngine) DropTable(ctx context.Context, tx engine.Transaction, tn sql.TableName,
+func (be *bboltEngine) DropTable(ctx context.Context, etx engine.Transaction, tn sql.TableName,
 	ifExists bool) error {
 
 	be.mutex.RLock()
@@ -154,10 +176,14 @@ func (be *bboltEngine) DropTable(ctx context.Context, tx engine.Transaction, tn 
 	if !ok {
 		return fmt.Errorf("bbolt: database %s not found", tn.Database)
 	}
+	tx, ok := toKVRowsTransaction(etx, bdb)
+	if !ok {
+		return fmt.Errorf("bbolt: multiple database transactions not allowed: %s", tn.Database)
+	}
 	return bdb.DropTable(ctx, tx, tn, ifExists)
 }
 
-func (be *bboltEngine) CreateIndex(ctx context.Context, tx engine.Transaction,
+func (be *bboltEngine) CreateIndex(ctx context.Context, etx engine.Transaction,
 	idxname sql.Identifier, tn sql.TableName, unique bool, keys []engine.ColumnKey,
 	ifNotExists bool) error {
 
@@ -168,11 +194,15 @@ func (be *bboltEngine) CreateIndex(ctx context.Context, tx engine.Transaction,
 	if !ok {
 		return fmt.Errorf("bbolt: database %s not found", tn.Database)
 	}
+	tx, ok := toKVRowsTransaction(etx, bdb)
+	if !ok {
+		return fmt.Errorf("bbolt: multiple database transactions not allowed: %s", tn.Database)
+	}
 	return bdb.CreateIndex(ctx, tx, idxname, tn, unique, keys, ifNotExists)
 }
 
-func (be *bboltEngine) DropIndex(ctx context.Context, tx engine.Transaction, idxname sql.Identifier,
-	tn sql.TableName, ifExists bool) error {
+func (be *bboltEngine) DropIndex(ctx context.Context, etx engine.Transaction,
+	idxname sql.Identifier, tn sql.TableName, ifExists bool) error {
 
 	be.mutex.RLock()
 	defer be.mutex.RUnlock()
@@ -181,18 +211,24 @@ func (be *bboltEngine) DropIndex(ctx context.Context, tx engine.Transaction, idx
 	if !ok {
 		return fmt.Errorf("bbolt: database %s not found", tn.Database)
 	}
+	tx, ok := toKVRowsTransaction(etx, bdb)
+	if !ok {
+		return fmt.Errorf("bbolt: multiple database transactions not allowed: %s", tn.Database)
+	}
 	return bdb.DropIndex(ctx, tx, idxname, tn, ifExists)
 }
 
 func (be *bboltEngine) Begin(sesid uint64) engine.Transaction {
-	return nil // XXX need to make sure there are no cross database transactions
+	return &bboltTransaction{
+		sesid: sesid,
+	}
 }
 
 func (_ *bboltEngine) IsTransactional() bool {
 	return true
 }
 
-func (be *bboltEngine) ListDatabases(ctx context.Context, tx engine.Transaction) ([]sql.Identifier,
+func (be *bboltEngine) ListDatabases(ctx context.Context, etx engine.Transaction) ([]sql.Identifier,
 	error) {
 
 	be.mutex.RLock()
@@ -205,7 +241,7 @@ func (be *bboltEngine) ListDatabases(ctx context.Context, tx engine.Transaction)
 	return dbnames, nil
 }
 
-func (be *bboltEngine) ListSchemas(ctx context.Context, tx engine.Transaction,
+func (be *bboltEngine) ListSchemas(ctx context.Context, etx engine.Transaction,
 	dbname sql.Identifier) ([]sql.Identifier, error) {
 
 	be.mutex.RLock()
@@ -215,10 +251,14 @@ func (be *bboltEngine) ListSchemas(ctx context.Context, tx engine.Transaction,
 	if !ok {
 		return nil, fmt.Errorf("bbolt: database %s not found", dbname)
 	}
+	tx, ok := toKVRowsTransaction(etx, bdb)
+	if !ok {
+		return nil, fmt.Errorf("bbolt: multiple database transactions not allowed: %s", dbname)
+	}
 	return bdb.ListSchemas(ctx, tx, dbname)
 }
 
-func (be *bboltEngine) ListTables(ctx context.Context, tx engine.Transaction,
+func (be *bboltEngine) ListTables(ctx context.Context, etx engine.Transaction,
 	sn sql.SchemaName) ([]sql.Identifier, error) {
 
 	be.mutex.RLock()
@@ -228,7 +268,42 @@ func (be *bboltEngine) ListTables(ctx context.Context, tx engine.Transaction,
 	if !ok {
 		return nil, fmt.Errorf("bbolt: database %s not found", sn.Database)
 	}
+	tx, ok := toKVRowsTransaction(etx, bdb)
+	if !ok {
+		return nil, fmt.Errorf("bbolt: multiple database transactions not allowed: %s", sn.Database)
+	}
 	return bdb.ListTables(ctx, tx, sn)
+}
+
+func toKVRowsTransaction(etx engine.Transaction, db *kvrows.KVRows) (engine.Transaction, bool) {
+	tx := etx.(*bboltTransaction)
+	if tx.db == nil {
+		tx.tx = db.Begin(tx.sesid)
+		tx.db = db
+	} else if tx.db != db {
+		return nil, false
+	}
+	return tx.tx, true
+}
+
+func (btx *bboltTransaction) Commit(ctx context.Context) error {
+	if btx.tx == nil {
+		return nil
+	}
+	return btx.tx.Commit(ctx)
+}
+
+func (btx *bboltTransaction) Rollback() error {
+	if btx.tx == nil {
+		return nil
+	}
+	return btx.tx.Rollback()
+}
+
+func (btx *bboltTransaction) NextStmt() {
+	if btx.tx != nil {
+		btx.tx.NextStmt()
+	}
 }
 
 /*

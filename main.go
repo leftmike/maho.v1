@@ -9,8 +9,7 @@ To Do:
 - fuzzing: parser.Parse
 
 - kvrows
--- bbolt: each db is a separate file; no cross db transactions
--- badger: one file for all db
+-- add store test: engine/test/teststore.go
 -- type Key struct {mid uint64, key []byte}
 -- epoch for transient state, eg. transactions
 -- in memory mapping of table and index to mids
