@@ -2,7 +2,6 @@ package bbolt
 
 import (
 	"context"
-	"errors"
 	"fmt"
 	"path/filepath"
 	"sync"
@@ -11,10 +10,6 @@ import (
 	"github.com/leftmike/maho/engine/kvrows"
 	"github.com/leftmike/maho/engine/virtual"
 	"github.com/leftmike/maho/sql"
-)
-
-var (
-	notImplemented = errors.New("bbolt: not implemented")
 )
 
 type bboltEngine struct {

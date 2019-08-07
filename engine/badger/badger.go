@@ -1,7 +1,8 @@
 package badger
 
 import (
-	"errors"
+	"fmt"
+	"path/filepath"
 
 	"github.com/leftmike/maho/engine"
 	"github.com/leftmike/maho/engine/kvrows"
@@ -9,17 +10,18 @@ import (
 	"github.com/leftmike/maho/sql"
 )
 
-var (
-	notImplemented = errors.New("badger: not implemented")
-)
-
 type badgerEngine struct {
 	kvrows.KVRows
 }
 
 func NewEngine(dataDir string) (engine.Engine, error) {
+	path := filepath.Join(dataDir, "mahobadger")
+	st, err := openStore(path)
+	if err != nil {
+		return nil, fmt.Errorf("badger: creating engine at %s failed: %s", path, err)
+	}
 	be := &badgerEngine{}
-	be.KVRows.Init(&badgerStore{})
+	be.KVRows.Init(st)
 	ve := virtual.NewEngine(be)
 	return ve, nil
 }
