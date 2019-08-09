@@ -23,6 +23,7 @@ type badgerMapper struct {
 
 type badgerWalker struct {
 	it     *badger.Iterator
+	tx     *badgerTx
 	prefix []byte
 }
 
@@ -63,10 +64,8 @@ func (bm *badgerMapper) addPrefix(key []byte) []byte {
 	return append(bm.prefix, key...)
 }
 
-func (bm *badgerMapper) Delete(key []byte) error {
-	return bm.tx.tx.Delete(bm.addPrefix(key))
-}
-
+/*
+XXX
 func (bm *badgerMapper) Get(key []byte, vf func(val []byte) error) error {
 	item, err := bm.tx.tx.Get(bm.addPrefix(key))
 	if err == badger.ErrKeyNotFound {
@@ -76,6 +75,7 @@ func (bm *badgerMapper) Get(key []byte, vf func(val []byte) error) error {
 	}
 	return item.Value(vf)
 }
+*/
 
 func (bm *badgerMapper) Set(key, val []byte) error {
 	return bm.tx.tx.Set(bm.addPrefix(key), val)
@@ -86,6 +86,7 @@ func (bm *badgerMapper) Walk(prefix []byte) kvrows.Walker {
 	opts.Prefix = prefix
 	return &badgerWalker{
 		it:     bm.tx.tx.NewIterator(opts),
+		tx:     bm.tx,
 		prefix: bm.addPrefix(prefix),
 	}
 }
@@ -100,7 +101,18 @@ func (bw *badgerWalker) currentKey() ([]byte, bool) {
 	} else if bw.prefix != nil && !bw.it.ValidForPrefix(bw.prefix) {
 		return nil, false
 	}
-	return bw.it.Item().Key(), true
+	key := bw.it.Item().Key()
+	if len(key) < 8 {
+		return nil, false
+	}
+	return key[8:], true
+}
+
+func (bw *badgerWalker) Delete() error {
+	if !bw.it.Valid() {
+		return kvrows.ErrKeyNotFound
+	}
+	return bw.tx.tx.Delete(bw.it.Item().Key())
 }
 
 func (bw *badgerWalker) Next() ([]byte, bool) {
@@ -120,7 +132,7 @@ func (bw *badgerWalker) Seek(seek []byte) ([]byte, bool) {
 
 func (bw *badgerWalker) Value(vf func(val []byte) error) error {
 	if !bw.it.Valid() {
-		return kvrows.ErrMissingValue
+		return kvrows.ErrKeyNotFound
 	}
 	return bw.it.Item().Value(vf)
 }

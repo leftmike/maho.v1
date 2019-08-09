@@ -70,10 +70,8 @@ func (btx *bboltTx) Rollback() error {
 	return btx.tx.Rollback()
 }
 
-func (bm *bboltMapper) Delete(key []byte) error {
-	return bm.bkt.Delete(key)
-}
-
+/*
+XXX
 func (bm *bboltMapper) Get(key []byte, vf func(val []byte) error) error {
 	val := bm.bkt.Get(key)
 	if val == nil {
@@ -81,6 +79,7 @@ func (bm *bboltMapper) Get(key []byte, vf func(val []byte) error) error {
 	}
 	return vf(val)
 }
+*/
 
 func (bm *bboltMapper) Set(key, val []byte) error {
 	return bm.bkt.Put(key, val)
@@ -96,6 +95,10 @@ func (bm *bboltMapper) Walk(prefix []byte) kvrows.Walker {
 func (bw *bboltWalker) Close() {
 	bw.cursor = nil
 	bw.value = nil
+}
+
+func (bw *bboltWalker) Delete() error {
+	return bw.cursor.Delete()
 }
 
 func (bw *bboltWalker) Next() ([]byte, bool) {
@@ -139,7 +142,7 @@ func (bw *bboltWalker) Seek(seek []byte) ([]byte, bool) {
 
 func (bw *bboltWalker) Value(vf func(val []byte) error) error {
 	if bw.value == nil {
-		return kvrows.ErrMissingValue
+		return kvrows.ErrKeyNotFound
 	}
 	return vf(bw.value)
 }

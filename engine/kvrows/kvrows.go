@@ -9,9 +9,8 @@ import (
 )
 
 var (
-	notImplemented  = errors.New("kvrows: not implemented")
-	ErrKeyNotFound  = errors.New("kvrows: key not found")
-	ErrMissingValue = errors.New("kvrows: missing value")
+	notImplemented = errors.New("kvrows: not implemented")
+	ErrKeyNotFound = errors.New("kvrows: key not found")
 )
 
 type Store interface {
@@ -25,14 +24,15 @@ type Tx interface {
 }
 
 type Mapper interface {
-	Delete(key []byte) error
-	Get(key []byte, vf func(val []byte) error) error
+	// XXX: is Get really needed?
+	//Get(key []byte, vf func(val []byte) error) error
 	Set(key, val []byte) error
 	Walk(prefix []byte) Walker
 }
 
 type Walker interface {
 	Close()
+	Delete() error
 	Next() ([]byte, bool)
 	Rewind() ([]byte, bool)
 	Seek(seek []byte) ([]byte, bool)

@@ -9,7 +9,6 @@ To Do:
 - fuzzing: parser.Parse
 
 - kvrows
--- add store test: engine/test/teststore.go
 -- type Key struct {mid uint64, key []byte}
 -- epoch for transient state, eg. transactions
 -- in memory mapping of table and index to mids
