@@ -72,6 +72,8 @@ data_type =
 	| BINARY ['(' length ')']
 	| VARBINARY ['(' length ')']
 	| BLOB ['(' length ')']
+	| BYTEA ['(' length ')']
+	| BYTES ['(' length ')']
 	| CHAR ['(' length ')']
 	| VARCHAR ['(' length ')']
 	| TEXT ['(' length ')']

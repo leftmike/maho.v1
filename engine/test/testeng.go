@@ -17,7 +17,7 @@ import (
 var (
 	int32ColType  = sql.ColumnType{Type: sql.IntegerType, Size: 4, NotNull: true}
 	int64ColType  = sql.ColumnType{Type: sql.IntegerType, Size: 8, NotNull: true}
-	stringColType = sql.ColumnType{Type: sql.CharacterType, Size: 4096, NotNull: true}
+	stringColType = sql.ColumnType{Type: sql.StringType, Size: 4096, NotNull: true}
 )
 
 const (

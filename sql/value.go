@@ -1,6 +1,7 @@
 package sql
 
 import (
+	"bytes"
 	"fmt"
 	"strings"
 )
@@ -111,6 +112,19 @@ func (s1 StringValue) Compare(v2 Value) (int, error) {
 	return 0, fmt.Errorf("engine: want string got %v", v2)
 }
 
+type BytesValue []byte
+
+func (b BytesValue) String() string {
+	return fmt.Sprintf("%v", []byte(b)) // XXX
+}
+
+func (b1 BytesValue) Compare(v2 Value) (int, error) {
+	if b2, ok := v2.(BytesValue); ok {
+		return bytes.Compare([]byte(b1), []byte(b2)), nil
+	}
+	return 0, fmt.Errorf("engine: want bytes got %v", v2)
+}
+
 func Compare(v1, v2 Value) int {
 	if v1 == nil {
 		if v2 == nil {
@@ -127,7 +141,7 @@ func Compare(v1, v2 Value) int {
 		case BoolValue:
 			cmp, _ := v1.Compare(v2)
 			return cmp
-		case Float64Value, Int64Value, StringValue:
+		case Float64Value, Int64Value, StringValue, BytesValue:
 			return -1
 		default:
 			panic(fmt.Sprintf("unexpected type for sql.Value: %T: %v", v2, v2))
@@ -139,7 +153,7 @@ func Compare(v1, v2 Value) int {
 		case Float64Value, Int64Value:
 			cmp, _ := v1.Compare(v2)
 			return cmp
-		case StringValue:
+		case StringValue, BytesValue:
 			return -1
 		default:
 			panic(fmt.Sprintf("unexpected type for sql.Value: %T: %v", v2, v2))
@@ -149,6 +163,18 @@ func Compare(v1, v2 Value) int {
 		case BoolValue, Float64Value, Int64Value:
 			return 1
 		case StringValue:
+			cmp, _ := v1.Compare(v2)
+			return cmp
+		case BytesValue:
+			return -1
+		default:
+			panic(fmt.Sprintf("unexpected type for sql.Value: %T: %v", v2, v2))
+		}
+	case BytesValue:
+		switch v2 := v2.(type) {
+		case BoolValue, Float64Value, Int64Value, StringValue:
+			return 1
+		case BytesValue:
 			cmp, _ := v1.Compare(v2)
 			return cmp
 		default:

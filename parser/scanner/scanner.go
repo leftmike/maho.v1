@@ -298,18 +298,41 @@ func (s *Scanner) scanString(sctx *ScanCtx) rune {
 			return token.Error
 		}
 		if r == '\'' {
-			break
-		}
-		if r == '\\' {
 			r = s.readRune(sctx)
-			if r == token.EOF {
-				sctx.Error = fmt.Errorf("scanner: incomplete string escape")
-				return token.Error
-			}
-			if r == token.Error {
-				return token.Error
+			if unicode.IsSpace(r) {
+				var nl bool
+				for unicode.IsSpace(r) {
+					if r == 10 || r == 13 {
+						nl = true
+					}
+					r = s.readRune(sctx)
+				}
+				if r == '\'' && nl {
+					// Concatenate strings only separated by whitespace with at least one newline.
+					continue
+				} else if r == token.Error {
+					return token.Error
+				} else {
+					s.unreadRune()
+					break
+				}
+			} else if r != '\'' {
+				s.unreadRune()
+				break
 			}
 		}
+		/*
+			if r == '\\' {
+				r = s.readRune(sctx)
+				if r == token.EOF {
+					sctx.Error = fmt.Errorf("scanner: incomplete string escape")
+					return token.Error
+				}
+				if r == token.Error {
+					return token.Error
+				}
+			}
+		*/
 		s.buffer.WriteRune(r)
 	}
 

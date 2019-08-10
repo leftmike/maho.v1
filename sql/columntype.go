@@ -20,45 +20,42 @@ type ColumnType struct {
 	Type DataType
 
 	// Size of the column in bytes for integers and in characters for character columns
-	Size   uint32
-	Fixed  bool // fixed sized character column
-	Binary bool // binary character column
+	Size  uint32
+	Fixed bool // fixed sized character column
 
 	NotNull bool // not allowed to be NULL
 	Default Expr
 }
 
 var (
-	IdColType         = ColumnType{Type: CharacterType, Size: MaxIdentifier, NotNull: true}
+	IdColType         = ColumnType{Type: StringType, Size: MaxIdentifier, NotNull: true}
 	Int32ColType      = ColumnType{Type: IntegerType, Size: 4, NotNull: true}
 	Int64ColType      = ColumnType{Type: IntegerType, Size: 8, NotNull: true}
 	NullInt64ColType  = ColumnType{Type: IntegerType, Size: 8}
 	BoolColType       = ColumnType{Type: BooleanType, NotNull: true}
-	StringColType     = ColumnType{Type: CharacterType, Size: 4096, NotNull: true}
-	NullStringColType = ColumnType{Type: CharacterType, Size: 4096}
+	StringColType     = ColumnType{Type: StringType, Size: 4096, NotNull: true}
+	NullStringColType = ColumnType{Type: StringType, Size: 4096}
 )
 
 func (ct ColumnType) DataType() string {
 	switch ct.Type {
 	case BooleanType:
 		return "BOOL"
-	case CharacterType:
-		if ct.Binary {
-			if ct.Fixed {
-				return fmt.Sprintf("BINARY(%d)", ct.Size)
-			} else if ct.Size == MaxColumnSize {
-				return "BLOB"
-			} else {
-				return fmt.Sprintf("VARBINARY(%d)", ct.Size)
-			}
+	case StringType:
+		if ct.Fixed {
+			return fmt.Sprintf("CHAR(%d)", ct.Size)
+		} else if ct.Size == MaxColumnSize {
+			return "TEXT"
 		} else {
-			if ct.Fixed {
-				return fmt.Sprintf("CHAR(%d)", ct.Size)
-			} else if ct.Size == MaxColumnSize {
-				return "TEXT"
-			} else {
-				return fmt.Sprintf("VARCHAR(%d)", ct.Size)
-			}
+			return fmt.Sprintf("VARCHAR(%d)", ct.Size)
+		}
+	case BytesType:
+		if ct.Fixed {
+			return fmt.Sprintf("BINARY(%d)", ct.Size)
+		} else if ct.Size == MaxColumnSize {
+			return "BYTES"
+		} else {
+			return fmt.Sprintf("VARBINARY(%d)", ct.Size)
 		}
 	case FloatType:
 		return "DOUBLE"
@@ -97,13 +94,21 @@ func (ct ColumnType) ConvertValue(n Identifier, v Value) (Value, error) {
 		} else if _, ok := v.(BoolValue); !ok {
 			return nil, fmt.Errorf("column \"%s\": expected a boolean value: %v", n, v)
 		}
-	case CharacterType:
+	case StringType:
 		if i, ok := v.(Int64Value); ok {
 			return StringValue(strconv.FormatInt(int64(i), 10)), nil
 		} else if f, ok := v.(Float64Value); ok {
 			return StringValue(strconv.FormatFloat(float64(f), 'g', -1, 64)), nil
+		} else if b, ok := v.(BytesValue); ok {
+			return StringValue(b), nil // XXX: check for a valid unicode string
 		} else if _, ok := v.(StringValue); !ok {
-			return nil, fmt.Errorf("column \"%s\": expected a string value: %v", n, v)
+			return nil, fmt.Errorf(`column "%s": expected a string value: %v`, n, v)
+		}
+	case BytesType:
+		if s, ok := v.(StringValue); ok {
+			return BytesValue(s), nil
+		} else if _, ok := v.(BytesValue); !ok {
+			return nil, fmt.Errorf(`column "%s": expected a bytes value: %v`, n, v)
 		}
 	case FloatType:
 		if i, ok := v.(Int64Value); ok {

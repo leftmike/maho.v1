@@ -24,7 +24,7 @@ var (
 	insertColumns1     = []sql.Identifier{sql.ID("c1"), sql.ID("c2"), sql.ID("c3"), sql.ID("c4")}
 	insertColumnTypes1 = []sql.ColumnType{
 		{Type: sql.BooleanType, Size: 1},
-		{Type: sql.CharacterType, Size: 128},
+		{Type: sql.StringType, Size: 128},
 		{Type: sql.FloatType, Size: 8},
 		{Type: sql.IntegerType, Size: 4},
 	}

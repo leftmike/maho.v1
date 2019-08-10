@@ -7,7 +7,6 @@ import (
 	"testing"
 
 	"github.com/golang/protobuf/proto"
-	"github.com/leftmike/maho.old/engine/kvrows/encoding"
 	"github.com/leftmike/maho/engine"
 	"github.com/leftmike/maho/engine/kvrows"
 	"github.com/leftmike/maho/sql"
@@ -263,6 +262,71 @@ func TestMakeKey(t *testing.T) {
 				ret:     []byte{1, 160, 97, 98, 99, 100, 0},
 			},
 			{
+				row:     []sql.Value{sql.BytesValue([]byte{})},
+				colKeys: []engine.ColumnKey{engine.MakeColumnKey(0, false)},
+				ret:     []byte{1, 170, 0},
+			},
+			{
+				row:     []sql.Value{sql.BytesValue([]byte{0})},
+				colKeys: []engine.ColumnKey{engine.MakeColumnKey(0, false)},
+				ret:     []byte{1, 170, 1, 0, 0},
+			},
+			{
+				row:     []sql.Value{sql.BytesValue([]byte{0, 0})},
+				colKeys: []engine.ColumnKey{engine.MakeColumnKey(0, false)},
+				ret:     []byte{1, 170, 1, 0, 1, 0, 0},
+			},
+			{
+				row:     []sql.Value{sql.BytesValue([]byte{0, 1, 2, 3, 4, 5, 6})},
+				colKeys: []engine.ColumnKey{engine.MakeColumnKey(0, false)},
+				ret:     []byte{1, 170, 1, 0, 1, 1, 2, 3, 4, 5, 6, 0},
+			},
+			{
+				row:     []sql.Value{sql.BytesValue([]byte{1})},
+				colKeys: []engine.ColumnKey{engine.MakeColumnKey(0, false)},
+				ret:     []byte{1, 170, 1, 1, 0},
+			},
+			{
+				row:     []sql.Value{sql.BytesValue([]byte{1, 1})},
+				colKeys: []engine.ColumnKey{engine.MakeColumnKey(0, false)},
+				ret:     []byte{1, 170, 1, 1, 1, 1, 0},
+			},
+			{
+				row:     []sql.Value{sql.BytesValue([]byte{2})},
+				colKeys: []engine.ColumnKey{engine.MakeColumnKey(0, false)},
+				ret:     []byte{1, 170, 2, 0},
+			},
+			{
+				row:     []sql.Value{sql.BytesValue([]byte{2, 2})},
+				colKeys: []engine.ColumnKey{engine.MakeColumnKey(0, false)},
+				ret:     []byte{1, 170, 2, 2, 0},
+			},
+			{
+				row:     []sql.Value{sql.BytesValue([]byte{2, 3, 4, 5, 6})},
+				colKeys: []engine.ColumnKey{engine.MakeColumnKey(0, false)},
+				ret:     []byte{1, 170, 2, 3, 4, 5, 6, 0},
+			},
+			{
+				row:     []sql.Value{sql.BytesValue("ABCD")},
+				colKeys: []engine.ColumnKey{engine.MakeColumnKey(0, false)},
+				ret:     []byte{1, 170, 65, 66, 67, 68, 0},
+			},
+			{
+				row:     []sql.Value{sql.BytesValue("ab")},
+				colKeys: []engine.ColumnKey{engine.MakeColumnKey(0, false)},
+				ret:     []byte{1, 170, 97, 98, 0},
+			},
+			{
+				row:     []sql.Value{sql.BytesValue("abc")},
+				colKeys: []engine.ColumnKey{engine.MakeColumnKey(0, false)},
+				ret:     []byte{1, 170, 97, 98, 99, 0},
+			},
+			{
+				row:     []sql.Value{sql.BytesValue("abcd")},
+				colKeys: []engine.ColumnKey{engine.MakeColumnKey(0, false)},
+				ret:     []byte{1, 170, 97, 98, 99, 100, 0},
+			},
+			{
 				row: []sql.Value{nil},
 				colKeys: []engine.ColumnKey{engine.MakeColumnKey(0, false),
 					engine.MakeColumnKey(1, false)},
@@ -275,7 +339,8 @@ func TestMakeKey(t *testing.T) {
 		sql.Float64Value(math.NaN()), sql.Float64Value(-456.789), sql.Float64Value(-123.456),
 		sql.Float64Value(0.0), sql.Float64Value(123.456), sql.Float64Value(456.789),
 		sql.StringValue([]byte{0, 1, 2, 3, 4}), sql.StringValue("ABCD"), sql.StringValue("ab"),
-		sql.StringValue("abc"), sql.StringValue("abcd")}
+		sql.StringValue("abc"), sql.StringValue("abcd"), sql.BytesValue{0, 1, 2, 3},
+		sql.BytesValue{1, 2, 3}, sql.BytesValue("abcd")}
 
 	testMakeKey(t,
 		[]testCase{
@@ -373,6 +438,21 @@ func TestMakeKey(t *testing.T) {
 				row:     row,
 				colKeys: []engine.ColumnKey{engine.MakeColumnKey(18, false)},
 				ret:     []byte{1, 160, 97, 98, 99, 100, 0},
+			},
+			{
+				row:     row,
+				colKeys: []engine.ColumnKey{engine.MakeColumnKey(19, false)},
+				ret:     []byte{1, 170, 1, 0, 1, 1, 2, 3, 0},
+			},
+			{
+				row:     row,
+				colKeys: []engine.ColumnKey{engine.MakeColumnKey(20, false)},
+				ret:     []byte{1, 170, 1, 1, 2, 3, 0},
+			},
+			{
+				row:     row,
+				colKeys: []engine.ColumnKey{engine.MakeColumnKey(21, false)},
+				ret:     []byte{1, 170, 97, 98, 99, 100, 0},
 			},
 		})
 
@@ -492,10 +572,70 @@ func TestMakeKey(t *testing.T) {
 					engine.MakeColumnKey(1, false)},
 				ret: []byte{2, 131, 1, 160, 97, 98, 99, 100, 0},
 			},
+			{
+				row: []sql.Value{sql.BoolValue(true), sql.BytesValue([]byte{0, 1, 2, 3, 4})},
+				colKeys: []engine.ColumnKey{engine.MakeColumnKey(0, false),
+					engine.MakeColumnKey(1, false)},
+				ret: []byte{2, 131, 1, 170, 1, 0, 1, 1, 2, 3, 4, 0},
+			},
+			{
+				row: []sql.Value{sql.BoolValue(true), sql.BytesValue("ABCD")},
+				colKeys: []engine.ColumnKey{engine.MakeColumnKey(0, false),
+					engine.MakeColumnKey(1, false)},
+				ret: []byte{2, 131, 1, 170, 65, 66, 67, 68, 0},
+			},
+			{
+				row: []sql.Value{sql.BoolValue(true), sql.BytesValue("ab")},
+				colKeys: []engine.ColumnKey{engine.MakeColumnKey(0, false),
+					engine.MakeColumnKey(1, false)},
+				ret: []byte{2, 131, 1, 170, 97, 98, 0},
+			},
+			{
+				row: []sql.Value{sql.BoolValue(true), sql.BytesValue("abc")},
+				colKeys: []engine.ColumnKey{engine.MakeColumnKey(0, false),
+					engine.MakeColumnKey(1, false)},
+				ret: []byte{2, 131, 1, 170, 97, 98, 99, 0},
+			},
+			{
+				row: []sql.Value{sql.BoolValue(true), sql.BytesValue("abcd")},
+				colKeys: []engine.ColumnKey{engine.MakeColumnKey(0, false),
+					engine.MakeColumnKey(1, false)},
+				ret: []byte{2, 131, 1, 170, 97, 98, 99, 100, 0},
+			},
 		})
 
 	testMakeKey(t,
 		[]testCase{
+			{
+				row: []sql.Value{sql.BoolValue(true), sql.BytesValue("abcd")},
+				colKeys: []engine.ColumnKey{engine.MakeColumnKey(0, false),
+					engine.MakeColumnKey(1, true)},
+				ret: []byte{2, 131, 1, 85, 158, 157, 156, 155, 255},
+			},
+			{
+				row: []sql.Value{sql.BoolValue(true), sql.BytesValue("abc")},
+				colKeys: []engine.ColumnKey{engine.MakeColumnKey(0, false),
+					engine.MakeColumnKey(1, true)},
+				ret: []byte{2, 131, 1, 85, 158, 157, 156, 255},
+			},
+			{
+				row: []sql.Value{sql.BoolValue(true), sql.BytesValue("ab")},
+				colKeys: []engine.ColumnKey{engine.MakeColumnKey(0, false),
+					engine.MakeColumnKey(1, true)},
+				ret: []byte{2, 131, 1, 85, 158, 157, 255},
+			},
+			{
+				row: []sql.Value{sql.BoolValue(true), sql.BytesValue("ABCD")},
+				colKeys: []engine.ColumnKey{engine.MakeColumnKey(0, false),
+					engine.MakeColumnKey(1, true)},
+				ret: []byte{2, 131, 1, 85, 190, 189, 188, 187, 255},
+			},
+			{
+				row: []sql.Value{sql.BoolValue(true), sql.BytesValue([]byte{0, 1, 2, 3, 4})},
+				colKeys: []engine.ColumnKey{engine.MakeColumnKey(0, false),
+					engine.MakeColumnKey(1, true)},
+				ret: []byte{2, 131, 1, 85, 254, 255, 254, 254, 253, 252, 251, 255},
+			},
 			{
 				row: []sql.Value{sql.BoolValue(true), sql.StringValue("abcd")},
 				colKeys: []engine.ColumnKey{engine.MakeColumnKey(0, false),
@@ -702,7 +842,8 @@ func TestParseKey(t *testing.T) {
 		sql.Float64Value(-456.789), sql.Float64Value(-123.456), sql.Float64Value(0.0),
 		sql.Float64Value(123.456), sql.Float64Value(456.789),
 		sql.StringValue([]byte{0, 1, 2, 3, 4}), sql.StringValue("ABCD"), sql.StringValue("ab"),
-		sql.StringValue("abc"), sql.StringValue("abcd")}
+		sql.StringValue("abc"), sql.StringValue("abcd"), sql.BytesValue{0, 1, 2, 3},
+		sql.BytesValue{0xFF, 0, 0, 0xFF}, sql.BytesValue{0xFF, 1, 1, 1, 1}}
 
 	testParseKeyReverse(t, row, false)
 	testParseKeyReverse(t, row, true)
@@ -773,7 +914,7 @@ func TestEncodeZigzag64(t *testing.T) {
 	}
 
 	for _, n := range numbers {
-		buf := encoding.EncodeZigzag64(nil, n)
+		buf := kvrows.EncodeZigzag64(nil, n)
 		enc := proto.NewBuffer(nil)
 		err := enc.EncodeZigzag64(uint64(n))
 		if err != nil {
@@ -784,7 +925,7 @@ func TestEncodeZigzag64(t *testing.T) {
 				t.Errorf("EncodeZigzag64(%d): got %v want %v", n, buf, pbuf)
 			}
 		}
-		ret, r, ok := encoding.DecodeZigzag64(buf)
+		ret, r, ok := kvrows.DecodeZigzag64(buf)
 		if !ok {
 			t.Errorf("DecodeZigzag64(%v) failed", buf)
 		} else if len(ret) != 0 {

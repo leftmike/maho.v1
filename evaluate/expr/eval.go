@@ -208,6 +208,8 @@ func concatCall(ctx EvalContext, args []sql.Value) (sql.Value, error) {
 			}
 		case sql.StringValue:
 			s += string(v)
+		case sql.BytesValue:
+			s += fmt.Sprintf("%v", v)
 		case sql.Float64Value:
 			s += fmt.Sprintf("%v", v)
 		case sql.Int64Value:

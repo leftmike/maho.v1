@@ -15,6 +15,8 @@ const (
 	BLOB
 	BOOL
 	BOOLEAN
+	BYTEA
+	BYTES
 	CHAR
 	COLUMNS
 	COUNT
@@ -126,6 +128,8 @@ var knownKeywords = map[string]struct {
 	"BLOB":        {BLOB, false},
 	"BOOL":        {BOOL, false},
 	"BOOLEAN":     {BOOLEAN, false},
+	"BYTEA":       {BYTEA, false},
+	"BYTES":       {BYTES, false},
 	"CHAR":        {CHAR, false},
 	"COMMIT":      {COMMIT, true},
 	"CREATE":      {CREATE, true},

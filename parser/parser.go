@@ -497,12 +497,14 @@ func (p *parser) parseCreateDetails(s *datadef.CreateTable) {
 }
 
 var types = map[sql.Identifier]sql.ColumnType{
-	sql.BINARY:    {Type: sql.CharacterType, Fixed: true, Binary: true, Size: 1},
-	sql.VARBINARY: {Type: sql.CharacterType, Fixed: false, Binary: true},
-	sql.BLOB:      {Type: sql.CharacterType, Fixed: false, Binary: true, Size: sql.MaxColumnSize},
-	sql.CHAR:      {Type: sql.CharacterType, Fixed: true, Size: 1},
-	sql.VARCHAR:   {Type: sql.CharacterType, Fixed: false},
-	sql.TEXT:      {Type: sql.CharacterType, Fixed: false, Size: sql.MaxColumnSize},
+	sql.BINARY:    {Type: sql.BytesType, Fixed: true, Size: 1},
+	sql.VARBINARY: {Type: sql.BytesType, Fixed: false},
+	sql.BLOB:      {Type: sql.BytesType, Fixed: false, Size: sql.MaxColumnSize},
+	sql.BYTEA:     {Type: sql.BytesType, Fixed: false, Size: sql.MaxColumnSize},
+	sql.BYTES:     {Type: sql.BytesType, Fixed: false, Size: sql.MaxColumnSize},
+	sql.CHAR:      {Type: sql.StringType, Fixed: true, Size: 1},
+	sql.VARCHAR:   {Type: sql.StringType, Fixed: false},
+	sql.TEXT:      {Type: sql.StringType, Fixed: false, Size: sql.MaxColumnSize},
 	sql.BOOL:      {Type: sql.BooleanType, Size: 1},
 	sql.BOOLEAN:   {Type: sql.BooleanType, Size: 1},
 	sql.DOUBLE:    {Type: sql.FloatType, Size: 8},
@@ -523,6 +525,8 @@ func (p *parser) parseColumn(s *datadef.CreateTable) {
 			| BINARY ['(' length ')']
 			| VARBINARY ['(' length ')']
 			| BLOB ['(' length ')']
+			| BYTEA ['(' length ')']
+			| BYTES ['(' length ')']
 			| CHAR ['(' length ')']
 			| VARCHAR ['(' length ')']
 			| TEXT ['(' length ')']
@@ -559,7 +563,7 @@ func (p *parser) parseColumn(s *datadef.CreateTable) {
 		p.maybeIdentifier(sql.PRECISION)
 	}
 
-	if ct.Type == sql.CharacterType {
+	if ct.Type == sql.StringType || ct.Type == sql.BytesType {
 		if p.maybeToken(token.LParen) {
 			ct.Size = uint32(p.expectInteger(0, sql.MaxColumnSize))
 			p.expectTokens(token.RParen)

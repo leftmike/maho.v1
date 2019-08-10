@@ -65,6 +65,35 @@ func TestScan(t *testing.T) {
 		}
 	}
 
+	string_cases := []struct {
+		s   string
+		ret string
+	}{
+		{"'abc'", "abc"},
+		{"'abc' 123", "abc"},
+		{"'abc' 'def'", "abc"},
+		{"'abc'\n'def'", "abcdef"},
+		{"'abc'\r'def'", "abcdef"},
+		{"'abc'\n 'def'", "abcdef"},
+		{"'abc' \r\n  \r  \n 'def'", "abcdef"},
+		{"'abc' \r\n  \r  \n 123", "abc"},
+		{"'abc' \r\n  \r  \n", "abc"},
+		{"'abc''def' 123", "abc'def"},
+	}
+
+	for i, c := range string_cases {
+		var s Scanner
+		s.Init(strings.NewReader(c.s), fmt.Sprintf("integers[%d]", i))
+		var sctx ScanCtx
+		s.Scan(&sctx)
+		if sctx.Token != token.String {
+			t.Errorf("Scan(%q) got %d want String", c.s, sctx.Token)
+		}
+		if sctx.String != c.ret {
+			t.Errorf("Scan(%q).String got %s want %s", c.s, sctx.String, c.ret)
+		}
+	}
+
 	integers := []struct {
 		s string
 		n int64

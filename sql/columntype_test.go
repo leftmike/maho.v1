@@ -16,28 +16,28 @@ func TestDataType(t *testing.T) {
 			"BOOL",
 		},
 		{
-			sql.ColumnType{Type: sql.CharacterType, Binary: false, Fixed: false, Size: 123},
+			sql.ColumnType{Type: sql.StringType, Fixed: false, Size: 123},
 			"VARCHAR(123)",
 		},
 		{
-			sql.ColumnType{Type: sql.CharacterType, Binary: false, Fixed: true, Size: 123},
+			sql.ColumnType{Type: sql.StringType, Fixed: true, Size: 123},
 			"CHAR(123)",
 		},
 		{
-			sql.ColumnType{Type: sql.CharacterType, Binary: false, Size: sql.MaxColumnSize},
+			sql.ColumnType{Type: sql.StringType, Size: sql.MaxColumnSize},
 			"TEXT",
 		},
 		{
-			sql.ColumnType{Type: sql.CharacterType, Binary: true, Fixed: false, Size: 123},
+			sql.ColumnType{Type: sql.BytesType, Fixed: false, Size: 123},
 			"VARBINARY(123)",
 		},
 		{
-			sql.ColumnType{Type: sql.CharacterType, Binary: true, Fixed: true, Size: 123},
+			sql.ColumnType{Type: sql.BytesType, Fixed: true, Size: 123},
 			"BINARY(123)",
 		},
 		{
-			sql.ColumnType{Type: sql.CharacterType, Binary: true, Size: sql.MaxColumnSize},
-			"BLOB",
+			sql.ColumnType{Type: sql.BytesType, Size: sql.MaxColumnSize},
+			"BYTES",
 		},
 		{
 			sql.ColumnType{Type: sql.FloatType},

@@ -24,6 +24,7 @@ const (
 	float64ZeroKeyTag = 152
 	float64PosKeyTag  = 153
 	stringKeyTag      = 160
+	bytesKeyTag       = 170
 
 	tombstoneValue = 0
 	rowValue       = 1
@@ -32,6 +33,7 @@ const (
 	int64ValueTag   = 2
 	float64ValueTag = 3
 	stringValueTag  = 4
+	bytesValueTag   = 5
 	// Value tags must be less than 16.
 )
 
@@ -141,6 +143,9 @@ func MakePrefix(row []sql.Value, colKeys []engine.ColumnKey) []byte {
 			case sql.StringValue:
 				key = encodeByte(key, ck.Reverse(), stringKeyTag)
 				key = encodeKeyBytes(key, ck.Reverse(), []byte(val))
+			case sql.BytesValue:
+				key = encodeByte(key, ck.Reverse(), bytesKeyTag)
+				key = encodeKeyBytes(key, ck.Reverse(), []byte(val))
 			case sql.Float64Value:
 				if math.IsNaN(float64(val)) {
 					key = encodeByte(key, ck.Reverse(), float64NaNKeyTag)
@@ -240,13 +245,21 @@ func parseKey(key []byte, colKeys []engine.ColumnKey, dest []sql.Value) bool {
 			}
 			key = key[2:]
 		case stringKeyTag:
-			var s []byte
+			var b []byte
 			var ok bool
-			key, s, ok = decodeKeyBytes(key[1:], ck.Reverse())
+			key, b, ok = decodeKeyBytes(key[1:], ck.Reverse())
 			if !ok {
 				return false
 			}
-			val = sql.StringValue(s)
+			val = sql.StringValue(b)
+		case bytesKeyTag:
+			var b []byte
+			var ok bool
+			key, b, ok = decodeKeyBytes(key[1:], ck.Reverse())
+			if !ok {
+				return false
+			}
+			val = sql.BytesValue(b)
 		case float64NaNKeyTag:
 			val = sql.Float64Value(math.NaN())
 			key = key[1:]
@@ -396,6 +409,11 @@ func MakeRowValue(row []sql.Value) []byte {
 			buf = encodeColNumValueTag(buf, num, stringValueTag)
 			buf = EncodeVarint(buf, uint64(len(b)))
 			buf = append(buf, b...)
+		case sql.BytesValue:
+			b := []byte(val)
+			buf = encodeColNumValueTag(buf, num, bytesValueTag)
+			buf = EncodeVarint(buf, uint64(len(b)))
+			buf = append(buf, b...)
 		case sql.Float64Value:
 			buf = encodeColNumValueTag(buf, num, float64ValueTag)
 			buf = encodeUint64(buf, false, math.Float64bits(float64(val)))
@@ -461,6 +479,16 @@ func ParseRowValue(buf []byte, dest []sql.Value) bool {
 				return false
 			}
 			val = sql.StringValue(buf[:u])
+			buf = buf[u:]
+		case bytesValueTag:
+			buf, u, ok = DecodeVarint(buf)
+			if !ok {
+				return false
+			}
+			if len(buf) < int(u) {
+				return false
+			}
+			val = sql.BytesValue(buf[:u])
 			buf = buf[u:]
 		case float64ValueTag:
 			if len(buf) < 8 {
