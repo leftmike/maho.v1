@@ -193,3 +193,8 @@ Aggregate Functions:
 * `max(<number>)`
 * `min(<number>)`
 * `sum(<number>)`
+
+String Literals:
+
+Maho accepts the same string contants and escape string constants as
+[PostgreSQL](https://www.postgresql.org/docs/current/sql-syntax-lexical.html#SQL-SYNTAX-CONSTANTS).

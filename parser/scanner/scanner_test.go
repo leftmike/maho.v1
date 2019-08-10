@@ -79,6 +79,11 @@ func TestScan(t *testing.T) {
 		{"'abc' \r\n  \r  \n 123", "abc"},
 		{"'abc' \r\n  \r  \n", "abc"},
 		{"'abc''def' 123", "abc'def"},
+		{"e'abc'\n 'def'", "abcdef"},
+		{"E'abc'\n 'def'", "abcdef"},
+		{`e'\000abc'`, "\000abc"},
+		{`e'\000\141bc'`, "\000abc"},
+		{`e'\141\x62\u0063\U00000064e'`, "abcde"},
 	}
 
 	for i, c := range string_cases {

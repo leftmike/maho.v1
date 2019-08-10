@@ -129,7 +129,14 @@ SkipWhitespace:
 	sctx.Column = s.column
 	sctx.Line = s.line
 
-	if unicode.IsLetter(r) || r == '_' {
+	if r == 'e' || r == 'E' {
+		if s.readRune(sctx) == '\'' {
+			return s.scanString(sctx, true)
+		} else {
+			s.unreadRune()
+			return s.scanIdentifier(sctx, r)
+		}
+	} else if unicode.IsLetter(r) || r == '_' {
 		return s.scanIdentifier(sctx, r)
 	} else if unicode.IsDigit(r) {
 		return s.scanNumber(sctx, r, 1)
@@ -152,7 +159,7 @@ SkipWhitespace:
 	} else if r == '[' {
 		return s.scanQuotedIdentifier(sctx, ']')
 	} else if r == '\'' {
-		return s.scanString(sctx)
+		return s.scanString(sctx, false)
 	} else if token.IsOpRune(r) {
 		s.buffer.WriteRune(r)
 		r2 := s.readRune(sctx)
@@ -287,7 +294,72 @@ func (s *Scanner) scanQuotedIdentifier(sctx *ScanCtx, delim rune) rune {
 	return token.Identifier
 }
 
-func (s *Scanner) scanString(sctx *ScanCtx) rune {
+func (s *Scanner) scanHexDigit(sctx *ScanCtx) (uint, bool) {
+	r := s.readRune(sctx)
+	if r >= '0' && r <= '9' {
+		return uint(r - '0'), true
+	} else if r >= 'A' && r <= 'F' {
+		return uint(r - 'A' + 10), true
+	} else if r >= 'a' && r <= 'f' {
+		return uint(r - 'a' + 10), true
+	}
+	if r != token.Error {
+		sctx.Error = fmt.Errorf("scanner: expected hex digit")
+	}
+	return 0, false
+}
+
+func (s *Scanner) scanHex(sctx *ScanCtx) rune {
+	hex, ok := s.scanHexDigit(sctx)
+	if !ok {
+		return token.Error
+	}
+	d, ok := s.scanHexDigit(sctx)
+	if !ok {
+		return token.Error
+	}
+	return rune(hex*16 + d)
+}
+
+func (s *Scanner) scanUnicode(sctx *ScanCtx, digits int) rune {
+	u := uint(0)
+	for digits > 0 {
+		d, ok := s.scanHexDigit(sctx)
+		if !ok {
+			return token.Error
+		}
+		u = u*16 + d
+		digits -= 1
+	}
+	return rune(u)
+}
+
+func (s *Scanner) scanOctalDigit(sctx *ScanCtx) (byte, bool) {
+	r := s.readRune(sctx)
+	if r >= '0' && r <= '7' {
+		return byte(r - '0'), true
+	}
+	if r != token.Error {
+		sctx.Error = fmt.Errorf("scanner: expected octal digit")
+	}
+	return 0, false
+}
+
+func (s *Scanner) scanOctal(sctx *ScanCtx, r rune) rune {
+	octal := byte(r - '0')
+	d, ok := s.scanOctalDigit(sctx)
+	if !ok {
+		return token.Error
+	}
+	octal = octal*8 + d
+	d, ok = s.scanOctalDigit(sctx)
+	if !ok {
+		return token.Error
+	}
+	return rune(octal*8 + d)
+}
+
+func (s *Scanner) scanString(sctx *ScanCtx, esc bool) rune {
 	for {
 		r := s.readRune(sctx)
 		if r == token.EOF {
@@ -321,18 +393,40 @@ func (s *Scanner) scanString(sctx *ScanCtx) rune {
 				break
 			}
 		}
-		/*
-			if r == '\\' {
-				r = s.readRune(sctx)
-				if r == token.EOF {
-					sctx.Error = fmt.Errorf("scanner: incomplete string escape")
-					return token.Error
-				}
-				if r == token.Error {
-					return token.Error
-				}
+		if r == '\\' && esc {
+			r = s.readRune(sctx)
+			switch r {
+			case 'a':
+				r = 7 // bell
+			case 'b':
+				r = 8 // backspace
+			case 't':
+				r = 9 // tab
+			case 'n':
+				r = 10 // newline
+			case 'v':
+				r = 11 // vertical tab
+			case 'f':
+				r = 12 // form feed
+			case 'r':
+				r = 13 // carriage return
+			case 'x':
+				r = s.scanHex(sctx)
+			case 'u':
+				r = s.scanUnicode(sctx, 4)
+			case 'U':
+				r = s.scanUnicode(sctx, 8)
+			case '0', '1', '2', '3', '4', '5', '6', '7':
+				r = s.scanOctal(sctx, r)
 			}
-		*/
+
+			if r == token.EOF {
+				sctx.Error = fmt.Errorf("scanner: incomplete string escape")
+				return token.Error
+			} else if r == token.Error {
+				return token.Error
+			}
+		}
 		s.buffer.WriteRune(r)
 	}
 
