@@ -8,11 +8,6 @@ To Do:
 
 - fuzzing: parser.Parse
 
-- value.go: BytesValue.String
-- columntype.go: BytesValue to StringValue: check for a valid unicode string
-- parsing literal bytes values
-- encode_test.go: test BytesValue
-
 - kvrows
 -- type table struct {mid uint64, cols []sql.Identifier, colTypes []sql.ColumnType,
    primary []engine.ColumnKey, ...} // Use for all tables including system ones

@@ -112,6 +112,10 @@ func StringLiteral(s string) *Literal {
 	return &Literal{sql.StringValue(s)}
 }
 
+func BytesLiteral(b []byte) *Literal {
+	return &Literal{sql.BytesValue(b)}
+}
+
 type Unary struct {
 	Op   Op
 	Expr sql.Expr

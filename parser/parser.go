@@ -124,6 +124,8 @@ func (p *parser) got() string {
 		return fmt.Sprintf("reserved identifier %s", p.sctx.Identifier)
 	case token.String:
 		return fmt.Sprintf("string %q", p.sctx.String)
+	case token.Bytes:
+		return fmt.Sprintf("bytes %v", p.sctx.String)
 	case token.Integer:
 		return fmt.Sprintf("integer %d", p.sctx.Integer)
 	case token.Float:
@@ -789,6 +791,8 @@ func (p *parser) parseSubExpr() sql.Expr {
 		}
 	} else if r == token.String {
 		e = expr.StringLiteral(p.sctx.String)
+	} else if r == token.Bytes {
+		e = expr.BytesLiteral(p.sctx.Bytes)
 	} else if r == token.Integer {
 		e = expr.Int64Literal(p.sctx.Integer)
 	} else if r == token.Float {
@@ -1333,6 +1337,8 @@ func (p *parser) parseOptions() map[sql.Identifier]string {
 			val = p.sctx.Identifier.String()
 		case token.String:
 			val = p.sctx.String
+		case token.Bytes:
+			val = string(p.sctx.Bytes)
 		case token.Integer:
 			val = strconv.FormatInt(p.sctx.Integer, 10)
 		case token.Float:

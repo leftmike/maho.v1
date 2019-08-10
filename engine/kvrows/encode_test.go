@@ -974,6 +974,11 @@ func TestMakeParseValues(t *testing.T) {
 			row: []sql.Value{sql.Int64Value(1234567890), sql.StringValue(""), sql.BoolValue(true)},
 			s:   "1234567890, '', true",
 		},
+		{
+			row: []sql.Value{sql.Int64Value(123), sql.StringValue(""),
+				sql.BytesValue{0xFF, 1, 2, 3}},
+			s: "123, '', x'ff010203'",
+		},
 	}
 
 	for _, c := range cases {

@@ -5,6 +5,7 @@ import (
 	"math"
 	"strconv"
 	"strings"
+	"unicode/utf8"
 )
 
 type ColumnUpdate struct {
@@ -100,7 +101,10 @@ func (ct ColumnType) ConvertValue(n Identifier, v Value) (Value, error) {
 		} else if f, ok := v.(Float64Value); ok {
 			return StringValue(strconv.FormatFloat(float64(f), 'g', -1, 64)), nil
 		} else if b, ok := v.(BytesValue); ok {
-			return StringValue(b), nil // XXX: check for a valid unicode string
+			if !utf8.Valid([]byte(b)) {
+				return nil, fmt.Errorf(`column "%s": expected a valid utf8 string: %v`, n, v)
+			}
+			return StringValue(b), nil
 		} else if _, ok := v.(StringValue); !ok {
 			return nil, fmt.Errorf(`column "%s": expected a string value: %v`, n, v)
 		}

@@ -1,6 +1,8 @@
 package token
 
-import "fmt"
+import (
+	"fmt"
+)
 
 const (
 	EOF = -(iota + 1)
@@ -9,6 +11,7 @@ const (
 	Identifier
 	Reserved
 	String
+	Bytes
 	Integer
 	Float
 

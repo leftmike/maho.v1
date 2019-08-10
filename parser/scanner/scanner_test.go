@@ -1,6 +1,7 @@
 package scanner_test
 
 import (
+	"bytes"
 	"fmt"
 	"strings"
 	"testing"
@@ -88,7 +89,7 @@ func TestScan(t *testing.T) {
 
 	for i, c := range string_cases {
 		var s Scanner
-		s.Init(strings.NewReader(c.s), fmt.Sprintf("integers[%d]", i))
+		s.Init(strings.NewReader(c.s), fmt.Sprintf("strings[%d]", i))
 		var sctx ScanCtx
 		s.Scan(&sctx)
 		if sctx.Token != token.String {
@@ -96,6 +97,27 @@ func TestScan(t *testing.T) {
 		}
 		if sctx.String != c.ret {
 			t.Errorf("Scan(%q).String got %s want %s", c.s, sctx.String, c.ret)
+		}
+	}
+
+	bytes_cases := []struct {
+		s string
+		b []byte
+	}{
+		{`x'6263646566'`, []byte{0x62, 0x63, 0x64, 0x65, 0x66}},
+		{`x''`, []byte{}},
+	}
+
+	for i, c := range bytes_cases {
+		var s Scanner
+		s.Init(strings.NewReader(c.s), fmt.Sprintf("bytes[%d]", i))
+		var sctx ScanCtx
+		s.Scan(&sctx)
+		if sctx.Token != token.Bytes {
+			t.Errorf("Scan(%q) got %d want Bytes", c.s, sctx.Token)
+		}
+		if bytes.Compare(sctx.Bytes, c.b) != 0 {
+			t.Errorf("Scan(%q).Bytes got %v want %v", c.s, sctx.Bytes, c.b)
 		}
 	}
 

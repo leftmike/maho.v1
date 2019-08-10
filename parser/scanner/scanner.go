@@ -2,6 +2,7 @@ package scanner
 
 import (
 	"bytes"
+	"errors"
 	"fmt"
 	"io"
 	"strconv"
@@ -9,6 +10,11 @@ import (
 
 	"github.com/leftmike/maho/parser/token"
 	"github.com/leftmike/maho/sql"
+)
+
+var (
+	errMissingQuote     = errors.New(`scanner: missing terminating "'"`)
+	errIncompleteEscape = errors.New("scanner: incomplete escape")
 )
 
 type Position struct {
@@ -22,6 +28,7 @@ type ScanCtx struct {
 	Error      error
 	Identifier sql.Identifier // Identifier and Reserved
 	String     string
+	Bytes      []byte
 	Integer    int64
 	Float      float64
 	Position
@@ -132,6 +139,20 @@ SkipWhitespace:
 	if r == 'e' || r == 'E' {
 		if s.readRune(sctx) == '\'' {
 			return s.scanString(sctx, true)
+		} else {
+			s.unreadRune()
+			return s.scanIdentifier(sctx, r)
+		}
+	} else if r == 'b' {
+		if s.readRune(sctx) == '\'' {
+			return s.scanBytes(sctx, true)
+		} else {
+			s.unreadRune()
+			return s.scanIdentifier(sctx, r)
+		}
+	} else if r == 'x' || r == 'X' {
+		if s.readRune(sctx) == '\'' {
+			return s.scanHexBytes(sctx)
 		} else {
 			s.unreadRune()
 			return s.scanIdentifier(sctx, r)
@@ -310,15 +331,15 @@ func (s *Scanner) scanHexDigit(sctx *ScanCtx) (uint, bool) {
 }
 
 func (s *Scanner) scanHex(sctx *ScanCtx) rune {
-	hex, ok := s.scanHexDigit(sctx)
+	d1, ok := s.scanHexDigit(sctx)
 	if !ok {
 		return token.Error
 	}
-	d, ok := s.scanHexDigit(sctx)
+	d2, ok := s.scanHexDigit(sctx)
 	if !ok {
 		return token.Error
 	}
-	return rune(hex*16 + d)
+	return rune(d1*16 + d2)
 }
 
 func (s *Scanner) scanUnicode(sctx *ScanCtx, digits int) rune {
@@ -360,10 +381,28 @@ func (s *Scanner) scanOctal(sctx *ScanCtx, r rune) rune {
 }
 
 func (s *Scanner) scanString(sctx *ScanCtx, esc bool) rune {
+	r := s.scanQuotedConstant(sctx, esc)
+	if r == token.Error {
+		return token.Error
+	}
+	sctx.String = s.buffer.String()
+	return token.String
+}
+
+func (s *Scanner) scanBytes(sctx *ScanCtx, esc bool) rune {
+	r := s.scanQuotedConstant(sctx, esc)
+	if r == token.Error {
+		return token.Error
+	}
+	sctx.Bytes = s.buffer.Bytes()
+	return token.Bytes
+}
+
+func (s *Scanner) scanQuotedConstant(sctx *ScanCtx, esc bool) rune {
 	for {
 		r := s.readRune(sctx)
 		if r == token.EOF {
-			sctx.Error = fmt.Errorf("scanner: string missing terminating \"'\"")
+			sctx.Error = errMissingQuote
 			return token.Error
 		}
 		if r == token.Error {
@@ -421,7 +460,7 @@ func (s *Scanner) scanString(sctx *ScanCtx, esc bool) rune {
 			}
 
 			if r == token.EOF {
-				sctx.Error = fmt.Errorf("scanner: incomplete string escape")
+				sctx.Error = errIncompleteEscape
 				return token.Error
 			} else if r == token.Error {
 				return token.Error
@@ -430,6 +469,33 @@ func (s *Scanner) scanString(sctx *ScanCtx, esc bool) rune {
 		s.buffer.WriteRune(r)
 	}
 
-	sctx.String = s.buffer.String()
 	return token.String
+}
+
+func (s *Scanner) scanHexBytes(sctx *ScanCtx) rune {
+	for {
+		r := s.readRune(sctx)
+		if r == token.EOF {
+			sctx.Error = errMissingQuote
+			return token.Error
+		} else if r == token.Error {
+			return token.Error
+		} else if r == '\'' {
+			break
+		}
+
+		s.unreadRune()
+		d1, ok := s.scanHexDigit(sctx)
+		if !ok {
+			return token.Error
+		}
+		d2, ok := s.scanHexDigit(sctx)
+		if !ok {
+			return token.Error
+		}
+		s.buffer.WriteByte(byte(d1*16 + d2))
+	}
+
+	sctx.Bytes = s.buffer.Bytes()
+	return token.Bytes
 }

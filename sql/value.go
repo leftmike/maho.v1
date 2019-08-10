@@ -114,8 +114,21 @@ func (s1 StringValue) Compare(v2 Value) (int, error) {
 
 type BytesValue []byte
 
+var (
+	hexDigits = [16]rune{'0', '1', '2', '3', '4', '5', '6', '7', '8', '9', 'a', 'b', 'c', 'd',
+		'e', 'f'}
+)
+
 func (b BytesValue) String() string {
-	return fmt.Sprintf("%v", []byte(b)) // XXX
+	var buf bytes.Buffer
+	buf.WriteString("x'")
+	for _, v := range b {
+		buf.WriteRune(hexDigits[v>>4])
+		buf.WriteRune(hexDigits[v&0xF])
+	}
+
+	buf.WriteRune('\'')
+	return buf.String()
 }
 
 func (b1 BytesValue) Compare(v2 Value) (int, error) {
