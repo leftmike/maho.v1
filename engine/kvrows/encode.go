@@ -123,7 +123,7 @@ func decodeByte(reverse bool, b byte) byte {
 
 func MakePrefix(row []sql.Value, colKeys []engine.ColumnKey) []byte {
 	if len(colKeys) < 1 || len(colKeys) > 255 {
-		panic(fmt.Sprintf("a column key must have been 1 and 255 columns: %d", len(colKeys)))
+		panic(fmt.Sprintf("a column key must have between 1 and 255 columns: %d", len(colKeys)))
 	}
 
 	key := []byte{byte(len(colKeys))}

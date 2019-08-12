@@ -123,7 +123,7 @@ func selectRows(t *testing.T, tx kvrows.Tx, mid uint64, seek string, rows []row)
 func withCommit(t *testing.T, st kvrows.Store, tf func(t *testing.T, tx kvrows.Tx)) {
 	t.Helper()
 
-	tx, err := st.Begin()
+	tx, err := st.Begin(true)
 	if err != nil {
 		t.Errorf("Begin() failed with %s", err)
 		return
@@ -133,12 +133,20 @@ func withCommit(t *testing.T, st kvrows.Store, tf func(t *testing.T, tx kvrows.T
 	if err != nil {
 		t.Errorf("Commit() failed with %s", err)
 	}
+
+	// Rollback should be a no-op after Commit
+	err = tx.Rollback()
+	if err != nil {
+		t.Errorf("Rollback() failed with %s", err)
+	}
 }
 
-func withRollback(t *testing.T, st kvrows.Store, tf func(t *testing.T, tx kvrows.Tx)) {
+func withRollback(t *testing.T, st kvrows.Store, writable bool,
+	tf func(t *testing.T, tx kvrows.Tx)) {
+
 	t.Helper()
 
-	tx, err := st.Begin()
+	tx, err := st.Begin(writable)
 	if err != nil {
 		t.Errorf("Begin() failed with %s", err)
 		return
@@ -152,7 +160,8 @@ func withRollback(t *testing.T, st kvrows.Store, tf func(t *testing.T, tx kvrows
 
 func RunStoreTest(t *testing.T, st kvrows.Store) {
 	withCommit(t, st, func(t *testing.T, tx kvrows.Tx) {})
-	withRollback(t, st, func(t *testing.T, tx kvrows.Tx) {})
+	withRollback(t, st, true, func(t *testing.T, tx kvrows.Tx) {})
+	withRollback(t, st, false, func(t *testing.T, tx kvrows.Tx) {})
 
 	rows1 := []row{
 		{"ABC", 1},
@@ -174,12 +183,16 @@ func RunStoreTest(t *testing.T, st kvrows.Store) {
 			insertRows(t, tx, 1024, rows1)
 			selectRows(t, tx, 1024, "", rows1)
 		})
-	withRollback(t, st,
+	withRollback(t, st, true,
 		func(t *testing.T, tx kvrows.Tx) {
 			insertRows(t, tx, 1024, rows2)
 			selectRows(t, tx, 1024, "", rows2)
 		})
 	withCommit(t, st,
+		func(t *testing.T, tx kvrows.Tx) {
+			selectRows(t, tx, 1024, "", rows1)
+		})
+	withRollback(t, st, false,
 		func(t *testing.T, tx kvrows.Tx) {
 			selectRows(t, tx, 1024, "", rows1)
 		})
@@ -195,7 +208,7 @@ func RunStoreTest(t *testing.T, st kvrows.Store) {
 		"a":   200,
 		"abc": 400,
 	}
-	withRollback(t, st,
+	withRollback(t, st, true,
 		func(t *testing.T, tx kvrows.Tx) {
 			selectRows(t, tx, 1024, "", rows1)
 			updateRows(t, tx, 1024, update1)
@@ -207,6 +220,10 @@ func RunStoreTest(t *testing.T, st kvrows.Store) {
 			updateRows(t, tx, 1024, update1)
 		})
 	withCommit(t, st,
+		func(t *testing.T, tx kvrows.Tx) {
+			selectRows(t, tx, 1024, "", rows3)
+		})
+	withRollback(t, st, false,
 		func(t *testing.T, tx kvrows.Tx) {
 			selectRows(t, tx, 1024, "", rows3)
 		})
@@ -220,7 +237,7 @@ func RunStoreTest(t *testing.T, st kvrows.Store) {
 		"ABC": struct{}{},
 		"xyz": struct{}{},
 	}
-	withRollback(t, st,
+	withRollback(t, st, true,
 		func(t *testing.T, tx kvrows.Tx) {
 			selectRows(t, tx, 1024, "", rows3)
 			deleteRows(t, tx, 1024, delete1)
@@ -232,6 +249,10 @@ func RunStoreTest(t *testing.T, st kvrows.Store) {
 			deleteRows(t, tx, 1024, delete1)
 		})
 	withCommit(t, st,
+		func(t *testing.T, tx kvrows.Tx) {
+			selectRows(t, tx, 1024, "", rows4)
+		})
+	withRollback(t, st, false,
 		func(t *testing.T, tx kvrows.Tx) {
 			selectRows(t, tx, 1024, "", rows4)
 		})
@@ -241,6 +262,11 @@ func RunStoreTest(t *testing.T, st kvrows.Store) {
 			insertRows(t, tx, 9999, rows1)
 		})
 	withCommit(t, st,
+		func(t *testing.T, tx kvrows.Tx) {
+			selectRows(t, tx, 9999, "", rows1)
+			selectRows(t, tx, 1024, "", rows4)
+		})
+	withRollback(t, st, false,
 		func(t *testing.T, tx kvrows.Tx) {
 			selectRows(t, tx, 9999, "", rows1)
 			selectRows(t, tx, 1024, "", rows4)
@@ -262,6 +288,15 @@ func RunStoreTest(t *testing.T, st kvrows.Store) {
 			insertRows(t, tx, 1, rows5)
 		})
 	withCommit(t, st,
+		func(t *testing.T, tx kvrows.Tx) {
+			selectRows(t, tx, 1, "", rows5)
+			selectRows(t, tx, 1, "ABC", rows5)
+			selectRows(t, tx, 1, "a", rows5)
+			selectRows(t, tx, 1, "ab", rows5[1:])
+			selectRows(t, tx, 1, "bcd", rows5[3:])
+			selectRows(t, tx, 1, "z", nil)
+		})
+	withRollback(t, st, false,
 		func(t *testing.T, tx kvrows.Tx) {
 			selectRows(t, tx, 1, "", rows5)
 			selectRows(t, tx, 1, "ABC", rows5)

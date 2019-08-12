@@ -203,4 +203,4 @@ Maho accepts the same string contants (`' ... '`) and escaped string constants
 Bytes Literals:
 
 Maho accepts `x'<hex-digit> ...'` and `X'<hex-digit> ...'` for bytes constants. In addition,
-`b' ...'` works like `e' ... '` escaped string contants, but is an escaped bytes constant.
+`b' ... '` works like `e' ... '` escaped string contants, but is an escaped bytes constant.

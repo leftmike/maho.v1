@@ -38,9 +38,9 @@ func openStore(path string) (*badgerStore, error) {
 	}, nil
 }
 
-func (bs *badgerStore) Begin() (kvrows.Tx, error) {
+func (bs *badgerStore) Begin(writable bool) (kvrows.Tx, error) {
 	return &badgerTx{
-		tx: bs.db.NewTransaction(true),
+		tx: bs.db.NewTransaction(writable),
 	}, nil
 }
 
@@ -83,16 +83,19 @@ func (bm *badgerMapper) Set(key, val []byte) error {
 
 func (bm *badgerMapper) Walk(prefix []byte) kvrows.Walker {
 	opts := badger.DefaultIteratorOptions
-	opts.Prefix = prefix
+	opts.Prefix = bm.addPrefix(prefix)
 	return &badgerWalker{
 		it:     bm.tx.tx.NewIterator(opts),
 		tx:     bm.tx,
-		prefix: bm.addPrefix(prefix),
+		prefix: opts.Prefix,
 	}
 }
 
 func (bw *badgerWalker) Close() {
-	bw.it.Close()
+	if bw.it != nil {
+		bw.it.Close()
+		bw.it = nil
+	}
 }
 
 func (bw *badgerWalker) currentKey() ([]byte, bool) {

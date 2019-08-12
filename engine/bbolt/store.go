@@ -2,6 +2,7 @@ package bbolt
 
 import (
 	"bytes"
+	"errors"
 	"strconv"
 
 	"go.etcd.io/bbolt"
@@ -9,12 +10,19 @@ import (
 	"github.com/leftmike/maho/engine/kvrows"
 )
 
+var (
+	errTransactionDone = errors.New("bbolt: transaction done")
+	errNoCurrentValue  = errors.New("bbolt: no current value")
+)
+
 type bboltStore struct {
 	db *bbolt.DB
 }
 
 type bboltTx struct {
-	tx *bbolt.Tx
+	tx       *bbolt.Tx
+	done     bool
+	writable bool
 }
 
 type bboltMapper struct {
@@ -37,20 +45,21 @@ func openStore(path string) (*bboltStore, error) {
 	}, nil
 }
 
-func (bs *bboltStore) Begin() (kvrows.Tx, error) {
-	tx, err := bs.db.Begin(true)
+func (bs *bboltStore) Begin(writable bool) (kvrows.Tx, error) {
+	tx, err := bs.db.Begin(writable)
 	if err != nil {
 		return nil, err
 	}
 	return &bboltTx{
-		tx: tx,
+		tx:       tx,
+		writable: writable,
 	}, nil
 }
 
 func (btx *bboltTx) Map(mid uint64) (kvrows.Mapper, error) {
 	key := []byte(strconv.FormatUint(mid, 10))
 	bkt := btx.tx.Bucket(key)
-	if bkt == nil {
+	if bkt == nil && btx.writable {
 		var err error
 		bkt, err = btx.tx.CreateBucket(key)
 		if err != nil {
@@ -63,10 +72,18 @@ func (btx *bboltTx) Map(mid uint64) (kvrows.Mapper, error) {
 }
 
 func (btx *bboltTx) Commit() error {
+	if btx.done {
+		return errTransactionDone
+	}
+	btx.done = true
 	return btx.tx.Commit()
 }
 
 func (btx *bboltTx) Rollback() error {
+	if btx.done {
+		return nil
+	}
+	btx.done = true
 	return btx.tx.Rollback()
 }
 
@@ -86,10 +103,13 @@ func (bm *bboltMapper) Set(key, val []byte) error {
 }
 
 func (bm *bboltMapper) Walk(prefix []byte) kvrows.Walker {
-	return &bboltWalker{
-		cursor: bm.bkt.Cursor(),
+	bw := &bboltWalker{
 		prefix: prefix,
 	}
+	if bm.bkt != nil {
+		bw.cursor = bm.bkt.Cursor()
+	}
+	return bw
 }
 
 func (bw *bboltWalker) Close() {
@@ -115,6 +135,10 @@ func (bw *bboltWalker) Next() ([]byte, bool) {
 }
 
 func (bw *bboltWalker) Rewind() ([]byte, bool) {
+	if bw.cursor == nil {
+		return nil, false
+	}
+
 	var key []byte
 	key, bw.value = bw.cursor.First()
 	if key == nil {
@@ -128,6 +152,10 @@ func (bw *bboltWalker) Rewind() ([]byte, bool) {
 }
 
 func (bw *bboltWalker) Seek(seek []byte) ([]byte, bool) {
+	if bw.cursor == nil {
+		return nil, false
+	}
+
 	var key []byte
 	key, bw.value = bw.cursor.Seek(seek)
 	if key == nil {
@@ -142,7 +170,7 @@ func (bw *bboltWalker) Seek(seek []byte) ([]byte, bool) {
 
 func (bw *bboltWalker) Value(vf func(val []byte) error) error {
 	if bw.value == nil {
-		return kvrows.ErrKeyNotFound
+		return errNoCurrentValue
 	}
 	return vf(bw.value)
 }

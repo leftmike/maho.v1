@@ -9,8 +9,16 @@ To Do:
 - fuzzing: parser.Parse
 
 - kvrows
--- type table struct {mid uint64, cols []sql.Identifier, colTypes []sql.ColumnType,
-   primary []engine.ColumnKey, ...} // Use for all tables including system ones
+-- finish testing versioned tables
+-- metadata: mid: 0, <metadata-revision> -> <epoch>
+--  value version tables
+--- databases: dbname <value-version> -> 2 <nothing>
+--- transactions: tid <value-version> -> 2 <state> <epoch>, []keys
+-- transactional tables
+--- schemas: SchemaName -> <nothing>
+--- tables: TableName -> mid
+-- type TransactedTable struct {mid uint64, cols []sql.Identifier, colTypes []sql.ColumnType,
+   primary []engine.ColumnKey, ...}
 -- type Key struct {mid uint64, key []byte}
 -- epoch for transient state, eg. transactions
 -- in memory mapping of table and index to mids
@@ -21,11 +29,9 @@ To Do:
 
 - add test for not seeing modified rows within a single SQL statement
 
-- primary index: bbolt, basic, memrows
-- indexes: bbolt, basic, memrows
+- primary index: kvrows, memrows
+- indexes: kvrows, memrows
 - update README with index syntax
-
-- badger engine
 
 - [CONSTRAINT constraint]
 - CHECK '(' logical_expression ')'
