@@ -9,17 +9,15 @@ To Do:
 - fuzzing: parser.Parse
 
 - kvrows
--- engine/kvrows/vertbl.go
 -- metadata: mid: 0, <metadata-revision> -> <epoch>
 --  value version tables
 --- databases: dbname <value-version> -> 2 <nothing>
 --- transactions: tid <value-version> -> 2 <state> <epoch>, []keys
--- transactional tables
+-- transactional tables: engine/kvrows/txtbl.go
 --- schemas: SchemaName -> <nothing>
 --- tables: TableName -> mid
 -- type TransactedTable struct {mid uint64, cols []sql.Identifier, colTypes []sql.ColumnType,
    primary []engine.ColumnKey, ...}
--- type Key struct {mid uint64, key []byte}
 -- epoch for transient state, eg. transactions
 -- in memory mapping of table and index to mids
 -- mid <= 16K are reserved

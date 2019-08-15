@@ -12,7 +12,14 @@ import (
 const (
 	cmdVersionedGet = iota
 	cmdVersionedSet
+	cmdVersionedList
 )
+
+type keyVerVal struct {
+	key string
+	ver uint64
+	val []byte
+}
 
 type versionedCmd struct {
 	cmd  int
@@ -20,6 +27,7 @@ type versionedCmd struct {
 	ver  uint64
 	val  []byte
 	fail bool
+	list []keyVerVal
 }
 
 func testVersionedTable(t *testing.T, st kvrows.Store, mid uint64, cmds []versionedCmd) {
@@ -53,12 +61,38 @@ func testVersionedTable(t *testing.T, st kvrows.Store, mid uint64, cmds []versio
 			} else if err != nil {
 				t.Errorf("Set(%s, %d) failed with %s", cmd.key, cmd.ver, err)
 			}
+		case cmdVersionedList:
+			i := 0
+			err := vtbl.List(
+				func(key sql.Value, ver uint64, val []byte) error {
+					if i >= len(cmd.list) {
+						t.Errorf("List(%d): too many results: %s %d %v", i, key, ver, val)
+						return nil
+					}
+
+					if sql.Compare(key, sql.StringValue(cmd.list[i].key)) != 0 {
+						t.Errorf("List(%d): got key %s want key %s", i, key, cmd.list[i].key)
+					}
+					if ver != cmd.list[i].ver {
+						t.Errorf("List(%d): got ver %d want ver %d", i, ver, cmd.list[i].ver)
+					}
+					if bytes.Compare(val, cmd.list[i].val) != 0 {
+						t.Errorf("List(%d): got key %v want key %v", i, val, cmd.list[i].val)
+					}
+					i += 1
+					return nil
+				})
+			if err != nil {
+				t.Errorf("List(%d) failed with %s", i, err)
+			}
 		}
 	}
 }
 
 func RunKVRowsTest(t *testing.T, st kvrows.Store) {
 	versionedCmds := []versionedCmd{
+		{cmd: cmdVersionedList},
+
 		{cmd: cmdVersionedGet, key: "abcxyz", fail: true},
 		{cmd: cmdVersionedSet, key: "abcxyz", val: []byte{1, 2, 3, 4, 5}},
 		{cmd: cmdVersionedGet, key: "abcxyz", ver: 1, val: []byte{1, 2, 3, 4, 5}},
@@ -101,6 +135,18 @@ func RunKVRowsTest(t *testing.T, st kvrows.Store) {
 		{cmd: cmdVersionedGet, key: "abc3", ver: 2, val: []byte{2, 3}},
 		{cmd: cmdVersionedGet, key: "abc4", ver: 3, val: []byte{3, 4}},
 		{cmd: cmdVersionedGet, key: "abc5", ver: 1, val: []byte{1, 5}},
+
+		{cmd: cmdVersionedList,
+			list: []keyVerVal{
+				{key: "abc0", ver: 1, val: []byte{1, 0}},
+				{key: "abc1", ver: 2, val: []byte{2, 1}},
+				{key: "abc2", ver: 1, val: []byte{1, 2}},
+				{key: "abc3", ver: 2, val: []byte{2, 3}},
+				{key: "abc4", ver: 3, val: []byte{3, 4}},
+				{key: "abc5", ver: 1, val: []byte{1, 5}},
+				{key: "abcxyz", ver: 1, val: []byte{1, 2, 3, 4, 5}},
+			},
+		},
 	}
 
 	testVersionedTable(t, st, 1, versionedCmds)

@@ -104,3 +104,40 @@ func (vtbl *versionedTable) Set(key sql.Value, ver uint64, value []byte) error {
 	w.Close()
 	return tx.Commit()
 }
+
+// List all keys and values.
+func (vtbl *versionedTable) List(kvf func(key sql.Value, ver uint64, val []byte) error) error {
+	tx, err := vtbl.st.Begin(false)
+	if err != nil {
+		return err
+	}
+	defer tx.Rollback()
+
+	m, err := tx.Map(vtbl.mid)
+	if err != nil {
+		return err
+	}
+
+	w := m.Walk(nil)
+	defer w.Close()
+	k, ok := w.Rewind()
+	for ok {
+		key := []sql.Value{nil}
+		ver, parsed := ParseDurableKey(k, versionedPrimary, key)
+		if !parsed {
+			return fmt.Errorf("kvrows: unable to parse key %v", k)
+		}
+
+		err = w.Value(
+			func(val []byte) error {
+				return kvf(key[0], ver, val)
+			})
+		if err != nil {
+			return err
+		}
+
+		k, ok = w.Next()
+	}
+
+	return nil
+}
