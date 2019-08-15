@@ -11,8 +11,7 @@ type Tx interface {
 }
 
 type Mapper interface {
-	// XXX: is Get really needed?
-	//Get(key []byte, vf func(val []byte) error) error
+	Get(key []byte, vf func(val []byte) error) error
 	Set(key, val []byte) error
 	Walk(prefix []byte) Walker
 }

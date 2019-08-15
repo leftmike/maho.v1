@@ -1,6 +1,7 @@
 package test
 
 import (
+	"bytes"
 	"fmt"
 	"math/rand"
 	"testing"
@@ -117,6 +118,45 @@ func selectRows(t *testing.T, tx kvrows.Tx, mid uint64, seek string, rows []row)
 			t.Error(err)
 		}
 		key, ok = w.Next()
+	}
+}
+
+func testGetSet(t *testing.T, tx kvrows.Tx, mid uint64) {
+	t.Helper()
+
+	m, err := tx.Map(mid)
+	if err != nil {
+		t.Errorf("Map(%d) failed with %s", mid, err)
+		return
+	}
+
+	cases := []struct {
+		key string
+		val []byte
+	}{
+		{"abcd", []byte{9, 8, 7, 6, 5, 4}},
+	}
+
+	for _, c := range cases {
+		vf := func(val []byte) error {
+			if bytes.Compare(val, c.val) != 0 {
+				t.Errorf("Get(%s): got %v want %v", c.key, val, c.val)
+			}
+			return nil
+		}
+
+		err = m.Get([]byte(c.key), vf)
+		if err == nil {
+			t.Errorf("Get(%s) did not fail", c.key)
+		}
+		err = m.Set([]byte(c.key), c.val)
+		if err != nil {
+			t.Errorf("Set(%s) failed with %s", c.key, err)
+		}
+		err = m.Get([]byte(c.key), vf)
+		if err != nil {
+			t.Errorf("Get(%s) failed with %s", c.key, err)
+		}
 	}
 }
 
@@ -304,5 +344,15 @@ func RunStoreTest(t *testing.T, st kvrows.Store) {
 			selectRows(t, tx, 1, "ab", rows5[1:])
 			selectRows(t, tx, 1, "bcd", rows5[3:])
 			selectRows(t, tx, 1, "z", nil)
+		})
+
+	withCommit(t, st,
+		func(t *testing.T, tx kvrows.Tx) {
+			testGetSet(t, tx, 123)
+		})
+
+	withRollback(t, st, true,
+		func(t *testing.T, tx kvrows.Tx) {
+			testGetSet(t, tx, 234)
 		})
 }

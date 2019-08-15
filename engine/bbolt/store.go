@@ -87,8 +87,6 @@ func (btx *bboltTx) Rollback() error {
 	return btx.tx.Rollback()
 }
 
-/*
-XXX
 func (bm *bboltMapper) Get(key []byte, vf func(val []byte) error) error {
 	val := bm.bkt.Get(key)
 	if val == nil {
@@ -96,7 +94,6 @@ func (bm *bboltMapper) Get(key []byte, vf func(val []byte) error) error {
 	}
 	return vf(val)
 }
-*/
 
 func (bm *bboltMapper) Set(key, val []byte) error {
 	return bm.bkt.Put(key, val)

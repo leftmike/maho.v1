@@ -64,8 +64,6 @@ func (bm *badgerMapper) addPrefix(key []byte) []byte {
 	return append(bm.prefix, key...)
 }
 
-/*
-XXX
 func (bm *badgerMapper) Get(key []byte, vf func(val []byte) error) error {
 	item, err := bm.tx.tx.Get(bm.addPrefix(key))
 	if err == badger.ErrKeyNotFound {
@@ -75,7 +73,6 @@ func (bm *badgerMapper) Get(key []byte, vf func(val []byte) error) error {
 	}
 	return item.Value(vf)
 }
-*/
 
 func (bm *badgerMapper) Set(key, val []byte) error {
 	return bm.tx.tx.Set(bm.addPrefix(key), val)
