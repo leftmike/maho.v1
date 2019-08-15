@@ -140,7 +140,11 @@ func (bw *bboltWalker) Rewind() ([]byte, bool) {
 	}
 
 	var key []byte
-	key, bw.value = bw.cursor.First()
+	if bw.prefix == nil {
+		key, bw.value = bw.cursor.First()
+	} else {
+		key, bw.value = bw.cursor.Seek(bw.prefix)
+	}
 	if key == nil {
 		return nil, false
 	}

@@ -9,7 +9,7 @@ To Do:
 - fuzzing: parser.Parse
 
 - kvrows
--- finish testing versioned tables
+-- engine/kvrows/vertbl.go
 -- metadata: mid: 0, <metadata-revision> -> <epoch>
 --  value version tables
 --- databases: dbname <value-version> -> 2 <nothing>
