@@ -989,12 +989,15 @@ func TestMakeParseValues(t *testing.T) {
 		if kvrows.IsTombstoneValue(buf) {
 			t.Errorf("IsTombstoneValue(%s) succeeded", c.s)
 		}
+		if kvrows.IsGobValue(buf) {
+			t.Errorf("IsGobValue(%s) succeeded", c.s)
+		}
 		dest := make([]sql.Value, len(c.row))
 		ok := kvrows.ParseRowValue(buf, dest)
 		if !ok {
-			t.Errorf("ParseValue(%s) failed", c.s)
+			t.Errorf("ParseRowValue(%s) failed", c.s)
 		} else if !testutil.DeepEqual(c.row, dest) {
-			t.Errorf("ParseValue(%s) got %v want %v", c.s, dest, c.row)
+			t.Errorf("ParseRowValue(%s) got %v want %v", c.s, dest, c.row)
 		}
 
 		var s string
@@ -1012,7 +1015,41 @@ func TestMakeParseValues(t *testing.T) {
 	if kvrows.IsRowValue(kvrows.MakeTombstoneValue()) {
 		t.Errorf("IsRowValue(MakeTombstoneValue()) succeeded")
 	}
+	if kvrows.IsGobValue(kvrows.MakeTombstoneValue()) {
+		t.Errorf("IsGobValue(MakeTombstoneValue()) succeeded")
+	}
 	if !kvrows.IsTombstoneValue(kvrows.MakeTombstoneValue()) {
 		t.Errorf("IsTombstoneValue(MakeTombstoneValue()) failed")
+	}
+}
+
+func TestGobValues(t *testing.T) {
+	type testValue struct {
+		Bool   bool
+		Int    int
+		String string
+	}
+	value := testValue{true, 12345, "string value"}
+
+	buf, err := kvrows.MakeGobValue(&value)
+	if err != nil {
+		t.Errorf("MakeGobValue() failed with %s", err)
+	}
+	if !kvrows.IsGobValue(buf) {
+		t.Errorf("IsGobValue(MakeGobValue()) failed")
+	}
+	if kvrows.IsRowValue(buf) {
+		t.Errorf("IsRowValue(MakeGobValue()) succeeded")
+	}
+	if kvrows.IsTombstoneValue(buf) {
+		t.Errorf("IsTombstoneValue(MakeGobValue()) succeeded")
+	}
+
+	var result testValue
+	ok := kvrows.ParseGobValue(buf, &result)
+	if !ok {
+		t.Errorf("ParseGobValue() failed")
+	} else if !testutil.DeepEqual(&result, &value) {
+		t.Errorf("ParseGobValue() got %v want %v", &result, &value)
 	}
 }

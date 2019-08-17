@@ -1,7 +1,9 @@
 package kvrows
 
 import (
+	"bytes"
 	"encoding/binary"
+	"encoding/gob"
 	"fmt"
 	"math"
 
@@ -28,6 +30,7 @@ const (
 
 	tombstoneValue = 0
 	rowValue       = 1
+	gobValue       = 2
 
 	boolValueTag    = 1
 	int64ValueTag   = 2
@@ -427,12 +430,30 @@ func MakeRowValue(row []sql.Value) []byte {
 	return buf
 }
 
+func MakeGobValue(value interface{}) ([]byte, error) {
+	var buf bytes.Buffer
+	err := buf.WriteByte(gobValue)
+	if err != nil {
+		return nil, err
+	}
+	enc := gob.NewEncoder(&buf)
+	err = enc.Encode(value)
+	if err != nil {
+		return nil, err
+	}
+	return buf.Bytes(), nil
+}
+
 func IsTombstoneValue(buf []byte) bool {
 	return len(buf) == 1 && buf[0] == tombstoneValue
 }
 
 func IsRowValue(buf []byte) bool {
-	return len(buf) == 0 || buf[0] == rowValue
+	return len(buf) > 0 && buf[0] == rowValue
+}
+
+func IsGobValue(buf []byte) bool {
+	return len(buf) > 0 && buf[0] == gobValue
 }
 
 func ParseRowValue(buf []byte, dest []sql.Value) bool {
@@ -441,6 +462,8 @@ func ParseRowValue(buf []byte, dest []sql.Value) bool {
 			return false
 		}
 		buf = buf[1:]
+	} else {
+		return false
 	}
 
 	var ok bool
@@ -514,4 +537,18 @@ func ParseRowValue(buf []byte, dest []sql.Value) bool {
 	}
 
 	return true
+}
+
+func ParseGobValue(buf []byte, value interface{}) bool {
+	if len(buf) > 0 {
+		if buf[0] != gobValue {
+			return false
+		}
+		buf = buf[1:]
+	} else {
+		return false
+	}
+
+	dec := gob.NewDecoder(bytes.NewBuffer(buf))
+	return dec.Decode(value) == nil
 }
