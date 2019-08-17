@@ -1,11 +1,22 @@
 package kvrows
 
 import (
+	"bytes"
 	"context"
+	"encoding/gob"
 	"errors"
+	"fmt"
+	"sync"
 
 	"github.com/leftmike/maho/engine"
 	"github.com/leftmike/maho/sql"
+)
+
+const (
+	configMID    = 0
+	databasesMID = 1
+
+	metadataKey = "metadata"
 )
 
 var (
@@ -14,21 +25,161 @@ var (
 	ErrValueVersionMismatch = errors.New("kvrows: value version mismatch")
 )
 
-type KVRows struct {
-	st Store
+type metadata struct {
+	Epoch uint64
 }
 
-func (kv *KVRows) Init(st Store) {
+type databaseState struct {
+	Active bool
+}
+
+type KVRows struct {
+	mutex     sync.RWMutex
+	st        Store
+	epoch     uint64
+	databases map[sql.Identifier]databaseState
+}
+
+func getGob(m Mapper, key string, value interface{}) error {
+	return m.Get([]byte(key),
+		func(val []byte) error {
+			dec := gob.NewDecoder(bytes.NewBuffer(val))
+			return dec.Decode(value)
+		})
+}
+
+func setGob(m Mapper, key string, value interface{}) error {
+	var buf bytes.Buffer
+	enc := gob.NewEncoder(&buf)
+	err := enc.Encode(value)
+	if err != nil {
+		return err
+	}
+	return m.Set([]byte(key), buf.Bytes())
+}
+
+func (kv *KVRows) loadMetadata() error {
+	tx, err := kv.st.Begin(true)
+	if err != nil {
+		return err
+	}
+	defer tx.Rollback()
+
+	m, err := tx.Map(configMID)
+	if err != nil {
+		return err
+	}
+
+	var md metadata
+	err = getGob(m, metadataKey, &md)
+	if err != nil {
+		md.Epoch = 0
+	}
+
+	md.Epoch += 1
+	kv.epoch = md.Epoch
+	err = setGob(m, metadataKey, &md)
+	if err != nil {
+		return err
+	}
+	return tx.Commit()
+}
+
+func (kv *KVRows) loadDatabases() error {
+	vtbl := MakeVersionedTable(kv.st, databasesMID)
+	return vtbl.List(
+		func(key sql.Value, ver uint64, val []byte) error {
+			s, ok := key.(sql.StringValue)
+			if !ok {
+				return fmt.Errorf("kvrows: databases: expected string key: %s", key)
+			}
+			var ds databaseState
+			if !ParseGobValue(val, &ds) {
+				return fmt.Errorf("kvrows: databases: %s: unable to parse value: %v", s, val)
+			}
+			kv.databases[sql.ID(string(s))] = ds
+			return nil
+		})
+}
+
+func (kv *KVRows) Startup(st Store) error {
 	kv.st = st
+	kv.databases = map[sql.Identifier]databaseState{}
+
+	err := kv.loadMetadata()
+	if err != nil {
+		return err
+	}
+	err = kv.loadDatabases()
+	return err
+}
+
+func (kv *KVRows) updateDatabase(dbname sql.Identifier, ds *databaseState) error {
+	vtbl := MakeVersionedTable(kv.st, databasesMID)
+	key := sql.StringValue(dbname.String())
+	ver, err := vtbl.Get(key,
+		func(val []byte) error {
+			return nil
+		})
+	if err != nil {
+		ver = 0
+	}
+	val, err := MakeGobValue(ds)
+	if err != nil {
+		return err
+	}
+	return vtbl.Set(key, ver, val)
 }
 
 func (kv *KVRows) CreateDatabase(dbname sql.Identifier, options engine.Options) error {
-	return notImplemented
+	if len(options) != 0 {
+		return fmt.Errorf("kvrows: unexpected option to create database: %s", dbname)
+	}
+
+	kv.mutex.Lock()
+	defer kv.mutex.Unlock()
+
+	if ds, ok := kv.databases[dbname]; ok && ds.Active {
+		return fmt.Errorf("kvrows: database %s already exists", dbname)
+	}
+
+	ds := databaseState{
+		Active: true,
+	}
+	err := kv.updateDatabase(dbname, &ds)
+	if err != nil {
+		return err
+	}
+
+	kv.databases[dbname] = ds
+	return nil
 }
 
 func (kv *KVRows) DropDatabase(dbname sql.Identifier, ifExists bool, options engine.Options) error {
+	if len(options) != 0 {
+		return fmt.Errorf("kvrows: unexpected option to drop database: %s", dbname)
+	}
 
-	return notImplemented
+	kv.mutex.Lock()
+	defer kv.mutex.Unlock()
+
+	if ds, ok := kv.databases[dbname]; !ok || !ds.Active {
+		if ifExists {
+			return nil
+		}
+		return fmt.Errorf("kvrows: database %s does not exist", dbname)
+	}
+
+	ds := databaseState{
+		Active: false,
+	}
+	err := kv.updateDatabase(dbname, &ds)
+	if err != nil {
+		return err
+	}
+
+	kv.databases[dbname] = ds
+	return nil
 }
 
 func (kv *KVRows) CreateSchema(ctx context.Context, tx engine.Transaction,

@@ -21,7 +21,10 @@ func NewEngine(dataDir string) (engine.Engine, error) {
 		return nil, fmt.Errorf("badger: creating engine at %s failed: %s", path, err)
 	}
 	be := &badgerEngine{}
-	be.KVRows.Init(st)
+	err = be.KVRows.Startup(st)
+	if err != nil {
+		return nil, err
+	}
 	ve := virtual.NewEngine(be)
 	return ve, nil
 }

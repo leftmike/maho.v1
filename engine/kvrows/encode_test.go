@@ -1008,7 +1008,7 @@ func TestMakeParseValues(t *testing.T) {
 			s += sql.Format(val)
 		}
 		if s != c.s {
-			t.Errorf("ParseValue: got %s want %s", s, c.s)
+			t.Errorf("ParseRowValue: got %s want %s", s, c.s)
 		}
 	}
 

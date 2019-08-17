@@ -126,6 +126,10 @@ func testTableLifecycle(t *testing.T, e engine.Engine, dbname sql.Identifier, cm
 				return // Engine does not support transactions, so skip these tests.
 			}
 			state.tx = e.Begin(uint64(state.tdx))
+			if state.tx == nil {
+				t.Errorf("Begin() failed")
+				return
+			}
 		case cmdCommit:
 			err := state.tx.Commit(ctx)
 			if cmd.fail {

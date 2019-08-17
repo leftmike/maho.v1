@@ -45,6 +45,7 @@ func databasePath(dbname sql.Identifier, dataDir, ext string, options engine.Opt
 	var path string
 	if optionPath, ok := options[sql.PATH]; ok {
 		path = optionPath
+		delete(options, sql.PATH)
 	} else {
 		path = filepath.Join(dataDir, dbname.String())
 	}
@@ -70,7 +71,14 @@ func (be *bboltEngine) CreateDatabase(dbname sql.Identifier, options engine.Opti
 	}
 
 	var kv kvrows.KVRows
-	kv.Init(st)
+	err = kv.Startup(st)
+	if err != nil {
+		return err
+	}
+	err = kv.CreateDatabase(dbname, options)
+	if err != nil {
+		return err
+	}
 	be.databases[dbname] = &kv
 	return nil
 }

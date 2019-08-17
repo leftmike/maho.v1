@@ -23,7 +23,7 @@ func MakeVersionedTable(st Store, mid uint64) *versionedTable {
 	}
 }
 
-// Get the value of a key; return the value version or an error.
+// Get the value of a key; return the version or an error.
 func (vtbl *versionedTable) Get(key sql.Value, vf func(val []byte) error) (uint64, error) {
 	tx, err := vtbl.st.Begin(false)
 	if err != nil {
