@@ -4,7 +4,6 @@ import (
 	"testing"
 
 	"github.com/leftmike/maho/engine/badger"
-	"github.com/leftmike/maho/engine/test"
 	"github.com/leftmike/maho/testutil"
 )
 
@@ -18,11 +17,12 @@ func TestKV(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	test.RunDatabaseTest(t, e)
 	/*
+		test.RunDatabaseTest(t, e)
 		test.RunSchemaTest(t, e)
 		test.RunTableTest(t, e)
 		test.RunParallelTest(t, e)
 		test.RunStressTest(t, e)
 	*/
+	_ = e
 }

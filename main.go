@@ -9,9 +9,8 @@ To Do:
 - fuzzing: parser.Parse
 
 - kvrows
--- versioned tables
---- databases: dbname <value-version> -> 2 <nothing>
---- transactions: tid <value-version> -> 2 <state> <epoch>, []keys
+-- cleaner
+-- test database recovery
 -- transacted tables: engine/kvrows/txtbl.go
 --- schemas: SchemaName -> <nothing>
 --- tables: TableName -> mid
