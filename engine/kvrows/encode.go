@@ -218,7 +218,30 @@ func GetKeyType(key []byte) byte {
 	if len(key) == 0 {
 		return UnknownKeyType
 	}
-	return key[0]
+	switch key[len(key)-1] {
+	case BareKeyType:
+		return BareKeyType
+	case ProposalKeyType:
+		return ProposalKeyType
+	case DurableKeyType:
+		return DurableKeyType
+	}
+	return UnknownKeyType
+}
+
+func KeyPrefix(key []byte) []byte {
+	if len(key) == 0 {
+		panic("KeyPrefix: len(key) == 0")
+	}
+	switch key[len(key)-1] {
+	case BareKeyType:
+		return key[:len(key)-1]
+	case ProposalKeyType:
+		return key[:len(key)-10]
+	case DurableKeyType:
+		return key[:len(key)-10]
+	}
+	panic(fmt.Sprintf("KeyPrefix: unknown key type: %d", key[0]))
 }
 
 func parseKey(key []byte, colKeys []engine.ColumnKey, dest []sql.Value) bool {

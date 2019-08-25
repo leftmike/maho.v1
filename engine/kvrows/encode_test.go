@@ -73,14 +73,21 @@ func testDurableKey(t *testing.T, prevKey []byte, row []sql.Value, colKeys []eng
 func checkPrefixes(t *testing.T, prefixes [][]byte, i int, key []byte) {
 	t.Helper()
 
+	keyPrefix := kvrows.KeyPrefix(key)
 	for j, prefix := range prefixes {
 		if i == j {
 			if !bytes.HasPrefix(key, prefix) {
 				t.Errorf("MakePrefix(%d): key %v should have prefix %v", i, key, prefix)
 			}
+			if bytes.Compare(keyPrefix, prefix) != 0 {
+				t.Errorf("KeyPrefix(%d): got %v want %v", i, keyPrefix, prefix)
+			}
 		} else {
 			if bytes.HasPrefix(key, prefix) {
 				t.Errorf("MakePrefix(%d, %d): key %v should not have prefix %v", i, j, key, prefix)
+			}
+			if bytes.Compare(keyPrefix, prefix) == 0 {
+				t.Errorf("KeyPrefix(%d): key %v should not have prefix %v", i, key, prefix)
 			}
 		}
 	}
