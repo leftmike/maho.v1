@@ -29,6 +29,10 @@ func TestStore(t *testing.T) {
 	runTest(t, test.RunStoreTest)
 }
 
-func TestKVRows(t *testing.T) {
-	runTest(t, test.RunKVRowsTest)
+func TestVersionedTable(t *testing.T) {
+	runTest(t, test.RunVersionedTableTest)
+}
+
+func TestTransactedTable(t *testing.T) {
+	runTest(t, test.RunTransactedTableTest)
 }

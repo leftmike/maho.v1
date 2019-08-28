@@ -8,14 +8,19 @@ To Do:
 
 - fuzzing: parser.Parse
 
+- run some of the engine/test/* so as to be able to check code coverage
+
+- MakeBareKey might be unnecessary: just use MakePrefix
+
 - kvrows
+-- might need a way to convert between key types
 -- cleaner
 -- test database recovery
--- transacted tables: engine/kvrows/txtbl.go
---- schemas: SchemaName -> <nothing>
+-- transacted tables
+--- separate txtbl from waiting for a transaction to complete
+--- schemas: SchemaName -> active: boolean
 --- tables: TableName -> mid
---- type TransactedTable struct {mid uint64, cols []sql.Identifier, colTypes []sql.ColumnType,
-    primary []engine.ColumnKey, ...}
+-- indexes should just be a transactedTable, but the value is a pointer to the primary key
 -- epoch for transient state, eg. transactions
 -- in memory mapping of table and index to mids
 -- mid <= 16K are reserved

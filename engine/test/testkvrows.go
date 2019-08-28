@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"testing"
 
+	"github.com/leftmike/maho/engine"
 	"github.com/leftmike/maho/engine/kvrows"
 	"github.com/leftmike/maho/sql"
 )
@@ -89,7 +90,7 @@ func testVersionedTable(t *testing.T, st kvrows.Store, mid uint64, cmds []versio
 	}
 }
 
-func RunKVRowsTest(t *testing.T, st kvrows.Store) {
+func RunVersionedTableTest(t *testing.T, st kvrows.Store) {
 	versionedCmds := []versionedCmd{
 		{cmd: cmdVersionedList},
 
@@ -152,4 +153,56 @@ func RunKVRowsTest(t *testing.T, st kvrows.Store) {
 	testVersionedTable(t, st, 1, versionedCmds)
 	testVersionedTable(t, st, 2, versionedCmds)
 	testVersionedTable(t, st, 1919191, versionedCmds)
+}
+
+const (
+	cmdVersionedNextStmt = iota
+	cmdVersionedInsert
+)
+
+type transactedCmd struct {
+	cmd  int
+	row  []sql.Value
+	fail bool
+}
+
+func getTx(tid uint32) (kvrows.TransactionState, uint64, error) {
+	return kvrows.AbortedTransaction, 0, nil
+}
+
+func testTransactedTable(t *testing.T, st kvrows.Store, ver, mid uint64, tid uint32,
+	colKeys []engine.ColumnKey, cmds []transactedCmd) {
+
+	txtbl := kvrows.MakeTransactedTable(st, getTx, ver, mid, tid, colKeys)
+	sid := uint32(1)
+
+	for _, cmd := range cmds {
+		switch cmd.cmd {
+		case cmdVersionedNextStmt:
+			sid += 1
+		case cmdVersionedInsert:
+			err := txtbl.Insert(sid, cmd.row)
+			if cmd.fail {
+				if err == nil {
+					t.Errorf("Insert(%v) did not fail", cmd.row)
+				}
+			} else if err != nil {
+				t.Errorf("Insert(%v) failed with %s", cmd.row, err)
+			}
+		}
+	}
+}
+
+func RunTransactedTableTest(t *testing.T, st kvrows.Store) {
+	transactedCmds := []transactedCmd{
+		{cmd: cmdVersionedInsert, row: []sql.Value{sql.Int64Value(1), sql.StringValue("one")}},
+		{cmd: cmdVersionedInsert, row: []sql.Value{sql.Int64Value(2), sql.StringValue("two")}},
+		{cmd: cmdVersionedInsert, row: []sql.Value{sql.Int64Value(3), sql.StringValue("three")}},
+		{cmd: cmdVersionedInsert, row: []sql.Value{sql.Int64Value(4), sql.StringValue("four")}},
+		{cmd: cmdVersionedInsert, fail: true,
+			row: []sql.Value{sql.Int64Value(1), sql.StringValue("1")}},
+	}
+
+	testTransactedTable(t, st, 1, 1, 123, []engine.ColumnKey{engine.MakeColumnKey(0, false)},
+		transactedCmds)
 }
