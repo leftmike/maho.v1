@@ -62,12 +62,22 @@ CREATE DATABASE database
 ```
 
 ```
+CREATE [UNIQUE] INDEX [IF NOT EXISTS] index ON table
+    '(' column [ASC | DESC] [, ...] ')'
+```
+
+```
 CREATE SCHEMA [database '.'] schema
 ```
 
 ```
-CREATE TABLE [IF NOT EXISTS] [[database '.'] schema '.'] table '(' column [',' ...] ')'
-column = name data_type [(DEFAULT expr) | (NOT NULL)]
+CREATE TABLE [IF NOT EXISTS] [[database '.'] schema '.'] table
+    '('
+        ( column data_type [column_constraint]
+        | table_constraint ) [',' ...]
+    ')'
+table_constraint = (PRIMARY KEY | UNIQUE) '(' column [ASC | DESC] [',' ...] ')'
+column_constraint = DEFAULT expr | NOT NULL | PRIMARY KEY | UNIQUE
 data_type =
 	| BINARY ['(' length ')']
 	| VARBINARY ['(' length ')']
@@ -96,6 +106,10 @@ DELETE FROM [[database '.'] schema '.'] table [WHERE expr]
 
 ```
 DROP DATABASE [IF EXISTS] database
+```
+
+```
+DROP INDEX [IF EXISTS] index ON table
 ```
 
 ```

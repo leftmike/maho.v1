@@ -2,7 +2,6 @@ package basic
 
 import (
 	"context"
-	"errors"
 	"fmt"
 	"io"
 	"sync"
@@ -166,13 +165,15 @@ func (_ *basicEngine) CreateIndex(ctx context.Context, tx engine.Transaction,
 	idxname sql.Identifier, tn sql.TableName, unique bool, keys []engine.ColumnKey,
 	ifNotExists bool) error {
 
-	return errors.New("basic: create index not implemented")
+	// XXX: create index not implemented
+	return nil
 }
 
 func (_ *basicEngine) DropIndex(ctx context.Context, tx engine.Transaction, idxname sql.Identifier,
 	tn sql.TableName, ifExists bool) error {
 
-	return errors.New("basic: drop index not implemented")
+	// XXX: drop index not implemented
+	return nil
 }
 
 func (_ *basicEngine) Begin(sesid uint64) engine.Transaction {

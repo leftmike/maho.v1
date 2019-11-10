@@ -32,7 +32,6 @@ To Do:
 
 - primary index: kvrows, memrows
 - indexes: kvrows, memrows
-- update README with index syntax
 
 - [CONSTRAINT constraint]
 - CHECK '(' logical_expression ')'
