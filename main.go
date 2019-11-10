@@ -32,6 +32,7 @@ To Do:
 
 - primary index: kvrows, memrows
 - indexes: kvrows, memrows
+- memrows: creating and drop indexes is not transactional
 
 - [CONSTRAINT constraint]
 - CHECK '(' logical_expression ')'

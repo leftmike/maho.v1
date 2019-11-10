@@ -27,12 +27,18 @@ type schema struct {
 	tables map[sql.Identifier]*table
 }
 
+type index struct {
+	keys   []engine.ColumnKey
+	unique bool
+}
+
 type table struct {
 	be          *basicEngine
 	tn          sql.TableName
 	columns     []sql.Identifier
 	columnTypes []sql.ColumnType
 	rows        [][]sql.Value
+	indexes     map[sql.Identifier]*index
 }
 
 type rows struct {
@@ -145,7 +151,7 @@ func (be *basicEngine) CreateTable(ctx context.Context, tx engine.Transaction, t
 	if !ok {
 		return fmt.Errorf("basic: database %s not found", tn.Database)
 	}
-	return bdb.createTable(ctx, tx, tn, cols, colTypes, ifNotExists)
+	return bdb.createTable(ctx, tx, tn, cols, colTypes, primary, ifNotExists)
 }
 
 func (be *basicEngine) DropTable(ctx context.Context, tx engine.Transaction, tn sql.TableName,
@@ -161,19 +167,31 @@ func (be *basicEngine) DropTable(ctx context.Context, tx engine.Transaction, tn 
 	return bdb.dropTable(ctx, tx, tn, ifExists)
 }
 
-func (_ *basicEngine) CreateIndex(ctx context.Context, tx engine.Transaction,
+func (be *basicEngine) CreateIndex(ctx context.Context, tx engine.Transaction,
 	idxname sql.Identifier, tn sql.TableName, unique bool, keys []engine.ColumnKey,
 	ifNotExists bool) error {
 
-	// XXX: create index not implemented
-	return nil
+	be.mutex.Lock()
+	defer be.mutex.Unlock()
+
+	bdb, ok := be.databases[tn.Database]
+	if !ok {
+		return fmt.Errorf("basic: database %s not found", tn.Database)
+	}
+	return bdb.createIndex(ctx, tx, idxname, tn, unique, keys, ifNotExists)
 }
 
-func (_ *basicEngine) DropIndex(ctx context.Context, tx engine.Transaction, idxname sql.Identifier,
+func (be *basicEngine) DropIndex(ctx context.Context, tx engine.Transaction, idxname sql.Identifier,
 	tn sql.TableName, ifExists bool) error {
 
-	// XXX: drop index not implemented
-	return nil
+	be.mutex.Lock()
+	defer be.mutex.Unlock()
+
+	bdb, ok := be.databases[tn.Database]
+	if !ok {
+		return fmt.Errorf("basic: database %s not found", tn.Database)
+	}
+	return bdb.dropIndex(ctx, tx, idxname, tn, ifExists)
 }
 
 func (_ *basicEngine) Begin(sesid uint64) engine.Transaction {
@@ -290,7 +308,8 @@ func (bdb *database) lookupTable(ctx context.Context, tx engine.Transaction,
 }
 
 func (bdb *database) createTable(ctx context.Context, tx engine.Transaction, tn sql.TableName,
-	cols []sql.Identifier, colTypes []sql.ColumnType, ifNotExists bool) error {
+	cols []sql.Identifier, colTypes []sql.ColumnType, primary []engine.ColumnKey,
+	ifNotExists bool) error {
 
 	bsc, ok := bdb.schemas[tn.Schema]
 	if !ok {
@@ -304,13 +323,21 @@ func (bdb *database) createTable(ctx context.Context, tx engine.Transaction, tn 
 		return fmt.Errorf("basic: table %s already exists", tn)
 	}
 
-	bsc.tables[tn.Table] = &table{
+	tbl := &table{
 		be:          bdb.be,
 		tn:          tn,
 		columns:     cols,
 		columnTypes: colTypes,
 		rows:        nil,
+		indexes:     map[sql.Identifier]*index{},
 	}
+	if primary != nil {
+		tbl.indexes[sql.PRIMARY] = &index{
+			keys:   primary,
+			unique: true,
+		}
+	}
+	bsc.tables[tn.Table] = tbl
 	return nil
 }
 
@@ -329,6 +356,57 @@ func (bdb *database) dropTable(ctx context.Context, tx engine.Transaction, tn sq
 		return fmt.Errorf("basic: table %s does not exist", tn)
 	}
 	delete(bsc.tables, tn.Table)
+	return nil
+}
+
+func (bdb *database) createIndex(ctx context.Context, tx engine.Transaction,
+	idxname sql.Identifier, tn sql.TableName, unique bool, keys []engine.ColumnKey,
+	ifNotExists bool) error {
+
+	bsc, ok := bdb.schemas[tn.Schema]
+	if !ok {
+		return fmt.Errorf("basic: schema %s not found", tn.SchemaName())
+	}
+
+	tbl, ok := bsc.tables[tn.Table]
+	if !ok {
+		return fmt.Errorf("basic: table %s not found", tn)
+	}
+
+	if _, dup := tbl.indexes[idxname]; dup {
+		if ifNotExists {
+			return nil
+		}
+		return fmt.Errorf("basic: index %s already exists in table %s", idxname, tn)
+	}
+
+	tbl.indexes[idxname] = &index{
+		keys:   keys,
+		unique: unique,
+	}
+	return nil
+}
+
+func (bdb *database) dropIndex(ctx context.Context, tx engine.Transaction, idxname sql.Identifier,
+	tn sql.TableName, ifExists bool) error {
+
+	bsc, ok := bdb.schemas[tn.Schema]
+	if !ok {
+		return fmt.Errorf("basic: schema %s not found", tn.SchemaName())
+	}
+
+	tbl, ok := bsc.tables[tn.Table]
+	if !ok {
+		return fmt.Errorf("basic: table %s not found", tn)
+	}
+
+	if _, ok := tbl.indexes[idxname]; !ok {
+		if ifExists {
+			return nil
+		}
+		return fmt.Errorf("basic: index %s does not exist in table %s", idxname, tn)
+	}
+	delete(tbl.indexes, idxname)
 	return nil
 }
 

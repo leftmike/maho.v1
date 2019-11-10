@@ -173,7 +173,7 @@ func (me *memrowsEngine) LookupTable(ctx context.Context, tx engine.Transaction,
 	if !ok {
 		return nil, fmt.Errorf("memrows: database %s not found", tn.Database)
 	}
-	return mdb.lookupTable(ctx, tx, tn)
+	return mdb.lookupTable(ctx, tx, tn, service.ACCESS)
 }
 
 func (me *memrowsEngine) CreateTable(ctx context.Context, tx engine.Transaction, tn sql.TableName,
@@ -187,7 +187,7 @@ func (me *memrowsEngine) CreateTable(ctx context.Context, tx engine.Transaction,
 	if !ok {
 		return fmt.Errorf("memrows: database %s not found", tn.Database)
 	}
-	return mdb.createTable(ctx, tx, tn, cols, colTypes, ifNotExists)
+	return mdb.createTable(ctx, tx, tn, cols, colTypes, primary, ifNotExists)
 }
 
 func (me *memrowsEngine) DropTable(ctx context.Context, tx engine.Transaction, tn sql.TableName,
@@ -203,19 +203,31 @@ func (me *memrowsEngine) DropTable(ctx context.Context, tx engine.Transaction, t
 	return mdb.dropTable(ctx, tx, tn, ifExists)
 }
 
-func (_ *memrowsEngine) CreateIndex(ctx context.Context, tx engine.Transaction,
+func (me *memrowsEngine) CreateIndex(ctx context.Context, tx engine.Transaction,
 	idxname sql.Identifier, tn sql.TableName, unique bool, keys []engine.ColumnKey,
 	ifNotExists bool) error {
 
-	// XXX: create index not implemented
-	return nil
+	me.mutex.Lock()
+	defer me.mutex.Unlock()
+
+	mdb, ok := me.databases[tn.Database]
+	if !ok {
+		return fmt.Errorf("memrows: database %s not found", tn.Database)
+	}
+	return mdb.createIndex(ctx, tx, idxname, tn, unique, keys, ifNotExists)
 }
 
-func (_ *memrowsEngine) DropIndex(ctx context.Context, tx engine.Transaction,
+func (me *memrowsEngine) DropIndex(ctx context.Context, tx engine.Transaction,
 	idxname sql.Identifier, tn sql.TableName, ifExists bool) error {
 
-	// XXX: drop index not implemented
-	return nil
+	me.mutex.Lock()
+	defer me.mutex.Unlock()
+
+	mdb, ok := me.databases[tn.Database]
+	if !ok {
+		return fmt.Errorf("memrows: database %s not found", tn.Database)
+	}
+	return mdb.dropIndex(ctx, tx, idxname, tn, ifExists)
 }
 
 func (me *memrowsEngine) Begin(sesid uint64) engine.Transaction {
@@ -374,7 +386,7 @@ func visibleTableVersion(ti *tableImpl, v version) *tableImpl {
 }
 
 func (mdb *database) lookupTable(ctx context.Context, tx engine.Transaction,
-	tn sql.TableName) (engine.Table, error) {
+	tn sql.TableName, ll service.LockLevel) (*table, error) {
 
 	tctx := service.GetTxContext(tx, mdb).(*tcontext)
 	tbl, ok := tctx.tables[tn]
@@ -385,7 +397,7 @@ func (mdb *database) lookupTable(ctx context.Context, tx engine.Transaction,
 		return tbl, nil
 	}
 
-	err := tctx.tx.LockTable(ctx, tn, service.ACCESS)
+	err := tctx.tx.LockTable(ctx, tn, ll)
 	if err != nil {
 		return nil, err
 	}
@@ -435,7 +447,8 @@ func (mdb *database) schemaVisible(tctx *tcontext, sn sql.SchemaName) bool {
 }
 
 func (mdb *database) createTable(ctx context.Context, tx engine.Transaction, tn sql.TableName,
-	cols []sql.Identifier, colTypes []sql.ColumnType, ifNotExists bool) error {
+	cols []sql.Identifier, colTypes []sql.ColumnType, primary []engine.ColumnKey,
+	ifNotExists bool) error {
 
 	tctx := service.GetTxContext(tx, mdb).(*tcontext)
 	err := tctx.tx.LockSchema(ctx, tn.SchemaName(), service.ACCESS)
@@ -447,11 +460,20 @@ func (mdb *database) createTable(ctx context.Context, tx engine.Transaction, tn 
 		return err
 	}
 
+	indexes := map[sql.Identifier]*indexImpl{}
+	if primary != nil {
+		indexes[sql.PRIMARY] = &indexImpl{
+			keys:   primary,
+			unique: true,
+		}
+	}
+
 	if tbl, ok := tctx.tables[tn]; ok {
 		if tbl.dropped && !tbl.created {
 			tbl.created = true
 			tbl.table = &tableImpl{
 				tn:          tn,
+				indexes:     indexes,
 				columns:     cols,
 				columnTypes: colTypes,
 			}
@@ -491,6 +513,7 @@ func (mdb *database) createTable(ctx context.Context, tx engine.Transaction, tn 
 		created: true,
 		table: &tableImpl{
 			tn:          tn,
+			indexes:     indexes,
 			columns:     cols,
 			columnTypes: colTypes,
 		},
@@ -553,6 +576,27 @@ func (mdb *database) dropTable(ctx context.Context, tx engine.Transaction, tn sq
 		dropped: true,
 	}
 	return nil
+}
+
+func (mdb *database) createIndex(ctx context.Context, tx engine.Transaction,
+	idxname sql.Identifier, tn sql.TableName, unique bool, keys []engine.ColumnKey,
+	ifNotExists bool) error {
+
+	tbl, err := mdb.lookupTable(ctx, tx, tn, service.EXCLUSIVE)
+	if err != nil {
+		return err
+	}
+	return tbl.table.createIndex(idxname, unique, keys, ifNotExists)
+}
+
+func (mdb *database) dropIndex(ctx context.Context, tx engine.Transaction,
+	idxname sql.Identifier, tn sql.TableName, ifExists bool) error {
+
+	tbl, err := mdb.lookupTable(ctx, tx, tn, service.EXCLUSIVE)
+	if err != nil {
+		return err
+	}
+	return tbl.table.dropIndex(idxname, ifExists)
 }
 
 func (mdb *database) listSchemas(ctx context.Context, tx engine.Transaction) ([]sql.Identifier,

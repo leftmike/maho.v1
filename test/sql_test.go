@@ -49,7 +49,7 @@ func (_ mahoDialect) DriverName() string {
 	return "maho"
 }
 
-func testSQL(t *testing.T, typ string, dbname sql.Identifier) {
+func testSQL(t *testing.T, typ string, dbname sql.Identifier, testData string) {
 	t.Helper()
 
 	var e engine.Engine
@@ -73,9 +73,9 @@ func testSQL(t *testing.T, typ string, dbname sql.Identifier) {
 		Database: dbname,
 	}
 	var rptr reporter
-	err = sqltest.RunTests(*testData, &run, &rptr, mahoDialect{}, *update)
+	err = sqltest.RunTests(testData, &run, &rptr, mahoDialect{}, *update)
 	if err != nil {
-		t.Errorf("RunTests(%q) failed with %s", *testData, err)
+		t.Errorf("RunTests(%q) failed with %s", testData, err)
 		return
 	}
 	for _, report := range rptr {
@@ -86,9 +86,11 @@ func testSQL(t *testing.T, typ string, dbname sql.Identifier) {
 }
 
 func TestSQLBasic(t *testing.T) {
-	testSQL(t, "basic", sql.ID("test_basic"))
+	testSQL(t, "basic", sql.ID("test_basic"), "testdata")
+	testSQL(t, "basic", sql.ID("sqltest_basic"), *testData)
 }
 
 func TestSQLMemRows(t *testing.T) {
-	testSQL(t, "memrows", sql.ID("test_memrows"))
+	testSQL(t, "memrows", sql.ID("test_memrows"), "testdata")
+	testSQL(t, "memrows", sql.ID("sqltest_memrows"), *testData)
 }

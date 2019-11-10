@@ -5,8 +5,14 @@ import (
 	"io"
 	"sync"
 
+	"github.com/leftmike/maho/engine"
 	"github.com/leftmike/maho/sql"
 )
+
+type indexImpl struct {
+	keys   []engine.ColumnKey
+	unique bool
+}
 
 type tableImpl struct {
 	tn             sql.TableName
@@ -16,6 +22,7 @@ type tableImpl struct {
 	previous       *tableImpl
 
 	mutex       sync.RWMutex
+	indexes     map[sql.Identifier]*indexImpl
 	columns     []sql.Identifier
 	columnTypes []sql.ColumnType
 	rows        []*rowImpl
@@ -25,6 +32,34 @@ type rowImpl struct {
 	version  version
 	values   []sql.Value // values == nil means the row has been deleted
 	previous *rowImpl
+}
+
+func (mt *tableImpl) createIndex(idxname sql.Identifier, unique bool, keys []engine.ColumnKey,
+	ifNotExists bool) error {
+
+	if _, dup := mt.indexes[idxname]; dup {
+		if ifNotExists {
+			return nil
+		}
+		return fmt.Errorf("basic: index %s already exists in table %s", idxname, mt.tn)
+	}
+
+	mt.indexes[idxname] = &indexImpl{
+		keys:   keys,
+		unique: unique,
+	}
+	return nil
+}
+
+func (mt *tableImpl) dropIndex(idxname sql.Identifier, ifExists bool) error {
+	if _, ok := mt.indexes[idxname]; !ok {
+		if ifExists {
+			return nil
+		}
+		return fmt.Errorf("basic: index %s does not exist in table %s", idxname, mt.tn)
+	}
+	delete(mt.indexes, idxname)
+	return nil
 }
 
 func (mt *tableImpl) getColumns(tctx *tcontext) []sql.Identifier {
