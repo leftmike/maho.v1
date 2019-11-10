@@ -8,22 +8,7 @@ To Do:
 
 - fuzzing: parser.Parse
 
-- run some of the engine/test/* so as to be able to check code coverage
-
-- MakeBareKey might be unnecessary: just use MakePrefix
-
-- kvrows
--- might need a way to convert between key types
--- cleaner
--- test database recovery
--- transacted tables
---- separate txtbl from waiting for a transaction to complete
---- schemas: SchemaName -> active: boolean
---- tables: TableName -> mid
--- indexes should just be a transactedTable, but the value is a pointer to the primary key
--- epoch for transient state, eg. transactions
--- in memory mapping of table and index to mids
--- mid <= 16K are reserved
+- run engine/test/testkvrows.go and teststore.go so as to be able to check code coverage
 
 - keep track of databases per engine as a simple config file that gets read and written by maho;
   depends on the engine: yes for bbolt, no for badger
@@ -33,6 +18,7 @@ To Do:
 - primary index: kvrows, memrows
 - indexes: kvrows, memrows
 - memrows: creating and drop indexes is not transactional
+- maybe just get rid of memrows and use something like memkv instead
 
 - [CONSTRAINT constraint]
 - CHECK '(' logical_expression ')'
@@ -50,10 +36,6 @@ To Do:
 
 - ALTER TABLE ...
 - memrows: tableImpl: add versioned metadata and use METADATA_MODIFY locking level
-
-- memrows engine: persistence
-- memcols engine (w/ mvcc)
-- distributed memrows and/or memcols engine, using raft
 */
 
 import (
