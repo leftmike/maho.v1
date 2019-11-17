@@ -4,6 +4,7 @@ import (
 	"testing"
 
 	"github.com/leftmike/maho/engine/badger"
+	"github.com/leftmike/maho/engine/test"
 	"github.com/leftmike/maho/testutil"
 )
 
@@ -15,15 +16,15 @@ func TestKV(t *testing.T) {
 
 	e, err := badger.NewEngine("testdata")
 	if err != nil {
-		// XXX
-		// t.Fatal(err)
+		t.Fatal(err)
 	}
+	test.RunDatabaseTest(t, e, true)
 	/*
-		test.RunDatabaseTest(t, e)
+		XXX
+		test.RunTableLifecycleTest(t, e)
 		test.RunSchemaTest(t, e)
-		test.RunTableTest(t, e)
+		test.RunTableDataTest(t, e)
 		test.RunParallelTest(t, e)
 		test.RunStressTest(t, e)
 	*/
-	_ = e
 }

@@ -4,6 +4,7 @@ import (
 	"testing"
 
 	"github.com/leftmike/maho/engine/bbolt"
+	"github.com/leftmike/maho/engine/test"
 	"github.com/leftmike/maho/testutil"
 )
 
@@ -17,12 +18,13 @@ func TestBBolt(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
+	test.RunDatabaseTest(t, e, false) // XXX: should be true
 	/*
-		test.RunDatabaseTest(t, e)
+		XXX
+		test.RunTableLifecycleTest(t, e)
 		test.RunSchemaTest(t, e)
-		test.RunTableTest(t, e)
+		test.RunTableDataTest(t, e)
 		test.RunParallelTest(t, e)
 		test.RunStressTest(t, e)
 	*/
-	_ = e
 }

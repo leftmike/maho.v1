@@ -23,6 +23,7 @@ const (
 	ProposalKeyType    KeyType = 1
 	DurableKeyType     KeyType = 2
 	TransactionKeyType KeyType = 3
+	MetadataKeyType    KeyType = 4
 
 	nullKeyTag        = 130
 	boolKeyTag        = 131

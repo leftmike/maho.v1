@@ -12,8 +12,9 @@ func TestBasic(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	test.RunDatabaseTest(t, e)
+	test.RunDatabaseTest(t, e, true)
+	test.RunTableLifecycleTest(t, e)
 	test.RunSchemaTest(t, e)
-	test.RunTableTest(t, e)
+	test.RunTableRowsTest(t, e)
 	test.RunParallelTest(t, e)
 }

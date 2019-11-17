@@ -39,6 +39,8 @@ const (
 	cmdInsert
 	cmdUpdate
 	cmdDelete
+	cmdCreateDatabase
+	cmdDropDatabase
 )
 
 type engCmd struct {
@@ -86,7 +88,7 @@ func allRows(t *testing.T, ctx context.Context, rows engine.Rows) [][]sql.Value 
 	return all
 }
 
-func testTableLifecycle(t *testing.T, e engine.Engine, dbname sql.Identifier, cmds []engCmd) {
+func testDatabase(t *testing.T, e engine.Engine, dbname sql.Identifier, cmds []engCmd) {
 	transactions := [4]transactionState{}
 	state := &transactions[0]
 	state.tdx = 0
@@ -333,11 +335,68 @@ func testTableLifecycle(t *testing.T, e engine.Engine, dbname sql.Identifier, cm
 					}
 				}
 			}
+		default:
+			panic("unexpected command")
 		}
 	}
 }
 
-func RunDatabaseTest(t *testing.T, e engine.Engine) {
+func testEngine(t *testing.T, e engine.Engine, cmds []engCmd) {
+	for _, cmd := range cmds {
+		switch cmd.cmd {
+		case cmdCreateDatabase:
+			err := e.CreateDatabase(cmd.name, nil)
+			if cmd.fail {
+				if err == nil {
+					t.Errorf("CreateDatabase(%s) did not fail", cmd.name)
+				}
+			} else if err != nil {
+				t.Errorf("CreateDatabase(%s) failed with %s", cmd.name, err)
+			}
+		case cmdDropDatabase:
+			err := e.DropDatabase(cmd.name, cmd.ifExists, nil)
+			if cmd.fail {
+				if err == nil {
+					t.Errorf("DropDatabase(%s) did not fail", cmd.name)
+				}
+			} else if err != nil {
+				t.Errorf("DropDatabase(%s) failed with %s", cmd.name, err)
+			}
+		default:
+			panic("unexpected command")
+		}
+	}
+}
+
+func RunDatabaseTest(t *testing.T, e engine.Engine, recreate bool) {
+	t.Helper()
+
+	testEngine(t, e,
+		[]engCmd{
+			{cmd: cmdCreateDatabase, name: sql.ID("dbtest-db1")},
+			{cmd: cmdCreateDatabase, name: sql.ID("dbtest-db1"), fail: true},
+			{cmd: cmdCreateDatabase, name: sql.ID("dbtest-db2")},
+			{cmd: cmdCreateDatabase, name: sql.ID("dbtest-db3")},
+			{cmd: cmdDropDatabase, name: sql.ID("dbtest-not-found"), fail: true},
+			{cmd: cmdDropDatabase, name: sql.ID("dbtest-not-found"), ifExists: true},
+			{cmd: cmdDropDatabase, name: sql.ID("dbtest-db1")},
+			{cmd: cmdDropDatabase, name: sql.ID("dbtest-db1"), fail: true},
+		})
+
+	if recreate {
+		testEngine(t, e,
+			[]engCmd{
+				{cmd: cmdCreateDatabase, name: sql.ID("dbtest-db4")},
+				{cmd: cmdCreateDatabase, name: sql.ID("dbtest-db1")},
+				{cmd: cmdCreateDatabase, name: sql.ID("dbtest-db3"), fail: true},
+				{cmd: cmdDropDatabase, name: sql.ID("dbtest-db3")},
+				{cmd: cmdDropDatabase, name: sql.ID("dbtest-db3"), fail: true},
+				{cmd: cmdCreateDatabase, name: sql.ID("dbtest-db3")},
+			})
+	}
+}
+
+func RunTableLifecycleTest(t *testing.T, e engine.Engine) {
 	t.Helper()
 
 	dbname := sql.ID("database_test")
@@ -346,7 +405,7 @@ func RunDatabaseTest(t *testing.T, e engine.Engine) {
 		t.Fatal(err)
 	}
 
-	testTableLifecycle(t, e, dbname,
+	testDatabase(t, e, dbname,
 		[]engCmd{
 			{cmd: cmdBegin},
 			{cmd: cmdLookupTable, name: sql.ID("tbl-a"), fail: true},
@@ -403,7 +462,7 @@ func RunDatabaseTest(t *testing.T, e engine.Engine) {
 		})
 
 	for i := 0; i < 2; i++ {
-		testTableLifecycle(t, e, dbname,
+		testDatabase(t, e, dbname,
 			[]engCmd{
 				{cmd: cmdBegin},
 				{cmd: cmdLookupTable, name: sql.ID("tbl1"), fail: true},
@@ -418,7 +477,7 @@ func RunDatabaseTest(t *testing.T, e engine.Engine) {
 			})
 	}
 
-	testTableLifecycle(t, e, dbname,
+	testDatabase(t, e, dbname,
 		[]engCmd{
 			{cmd: cmdBegin},
 			{cmd: cmdLookupTable, name: sql.ID("tbl2"), fail: true},
@@ -427,7 +486,7 @@ func RunDatabaseTest(t *testing.T, e engine.Engine) {
 			{cmd: cmdCommit},
 		})
 
-	testTableLifecycle(t, e, dbname,
+	testDatabase(t, e, dbname,
 		[]engCmd{
 			{cmd: cmdBegin},
 			{cmd: cmdLookupTable, name: sql.ID("tbl2"), fail: true},
@@ -436,7 +495,7 @@ func RunDatabaseTest(t *testing.T, e engine.Engine) {
 			{cmd: cmdCommit},
 		})
 
-	testTableLifecycle(t, e, dbname,
+	testDatabase(t, e, dbname,
 		[]engCmd{
 			{cmd: cmdBegin},
 			{cmd: cmdCreateTable, name: sql.ID("tbl3")},
@@ -455,7 +514,7 @@ func RunDatabaseTest(t *testing.T, e engine.Engine) {
 		})
 
 	for i := 0; i < 2; i++ {
-		testTableLifecycle(t, e, dbname,
+		testDatabase(t, e, dbname,
 			[]engCmd{
 				{cmd: cmdBegin},
 				{cmd: cmdCreateTable, name: sql.ID("tbl4")},
@@ -470,7 +529,7 @@ func RunDatabaseTest(t *testing.T, e engine.Engine) {
 			})
 	}
 
-	testTableLifecycle(t, e, dbname,
+	testDatabase(t, e, dbname,
 		[]engCmd{
 			{cmd: cmdBegin},
 			{cmd: cmdCreateTable, name: sql.ID("tbl5")},
@@ -488,7 +547,7 @@ func RunDatabaseTest(t *testing.T, e engine.Engine) {
 			{cmd: cmdCommit},
 		})
 
-	testTableLifecycle(t, e, dbname,
+	testDatabase(t, e, dbname,
 		[]engCmd{
 			{cmd: cmdBegin},
 			{cmd: cmdCreateTable, name: sql.ID("tbl6")},
@@ -501,7 +560,7 @@ func RunDatabaseTest(t *testing.T, e engine.Engine) {
 			{cmd: cmdCommit},
 		})
 
-	testTableLifecycle(t, e, dbname,
+	testDatabase(t, e, dbname,
 		[]engCmd{
 			{cmd: cmdBegin},
 			{cmd: cmdCreateTable, name: sql.ID("tbl7")},
@@ -510,7 +569,7 @@ func RunDatabaseTest(t *testing.T, e engine.Engine) {
 		})
 
 	for i := 0; i < 8; i++ {
-		testTableLifecycle(t, e, dbname,
+		testDatabase(t, e, dbname,
 			[]engCmd{
 				{cmd: cmdBegin},
 				{cmd: cmdLookupTable, name: sql.ID("tbl7")},
@@ -522,14 +581,14 @@ func RunDatabaseTest(t *testing.T, e engine.Engine) {
 			})
 	}
 
-	testTableLifecycle(t, e, dbname,
+	testDatabase(t, e, dbname,
 		[]engCmd{
 			{cmd: cmdBegin},
 			{cmd: cmdLookupTable, name: sql.ID("tbl7")},
 			{cmd: cmdCommit},
 		})
 
-	testTableLifecycle(t, e, dbname,
+	testDatabase(t, e, dbname,
 		[]engCmd{
 			{cmd: cmdTransaction, tdx: 0},
 			{cmd: cmdBegin},
@@ -566,7 +625,7 @@ func RunSchemaTest(t *testing.T, e engine.Engine) {
 		t.Fatal(err)
 	}
 
-	testTableLifecycle(t, e, dbname,
+	testDatabase(t, e, dbname,
 		[]engCmd{
 			{cmd: cmdBegin},
 			{cmd: cmdLookupSchema, name: sql.ID("sc-a"), fail: true},
@@ -630,7 +689,7 @@ func RunSchemaTest(t *testing.T, e engine.Engine) {
 		})
 
 	for i := 0; i < 2; i++ {
-		testTableLifecycle(t, e, dbname,
+		testDatabase(t, e, dbname,
 			[]engCmd{
 				{cmd: cmdBegin},
 				{cmd: cmdLookupSchema, name: sql.ID("sc1"), fail: true},
@@ -645,7 +704,7 @@ func RunSchemaTest(t *testing.T, e engine.Engine) {
 			})
 	}
 
-	testTableLifecycle(t, e, dbname,
+	testDatabase(t, e, dbname,
 		[]engCmd{
 			{cmd: cmdBegin},
 			{cmd: cmdLookupSchema, name: sql.ID("sc2"), fail: true},
@@ -654,7 +713,7 @@ func RunSchemaTest(t *testing.T, e engine.Engine) {
 			{cmd: cmdCommit},
 		})
 
-	testTableLifecycle(t, e, dbname,
+	testDatabase(t, e, dbname,
 		[]engCmd{
 			{cmd: cmdBegin},
 			{cmd: cmdLookupSchema, name: sql.ID("sc2"), fail: true},
@@ -663,7 +722,7 @@ func RunSchemaTest(t *testing.T, e engine.Engine) {
 			{cmd: cmdCommit},
 		})
 
-	testTableLifecycle(t, e, dbname,
+	testDatabase(t, e, dbname,
 		[]engCmd{
 			{cmd: cmdBegin},
 			{cmd: cmdCreateSchema, name: sql.ID("sc3")},
@@ -682,7 +741,7 @@ func RunSchemaTest(t *testing.T, e engine.Engine) {
 		})
 
 	for i := 0; i < 2; i++ {
-		testTableLifecycle(t, e, dbname,
+		testDatabase(t, e, dbname,
 			[]engCmd{
 				{cmd: cmdBegin},
 				{cmd: cmdCreateSchema, name: sql.ID("sc4")},
@@ -697,7 +756,7 @@ func RunSchemaTest(t *testing.T, e engine.Engine) {
 			})
 	}
 
-	testTableLifecycle(t, e, dbname,
+	testDatabase(t, e, dbname,
 		[]engCmd{
 			{cmd: cmdBegin},
 			{cmd: cmdCreateSchema, name: sql.ID("sc5")},
@@ -715,7 +774,7 @@ func RunSchemaTest(t *testing.T, e engine.Engine) {
 			{cmd: cmdCommit},
 		})
 
-	testTableLifecycle(t, e, dbname,
+	testDatabase(t, e, dbname,
 		[]engCmd{
 			{cmd: cmdBegin},
 			{cmd: cmdCreateSchema, name: sql.ID("sc6")},
@@ -728,7 +787,7 @@ func RunSchemaTest(t *testing.T, e engine.Engine) {
 			{cmd: cmdCommit},
 		})
 
-	testTableLifecycle(t, e, dbname,
+	testDatabase(t, e, dbname,
 		[]engCmd{
 			{cmd: cmdBegin},
 			{cmd: cmdCreateSchema, name: sql.ID("sc7")},
@@ -737,7 +796,7 @@ func RunSchemaTest(t *testing.T, e engine.Engine) {
 		})
 
 	for i := 0; i < 8; i++ {
-		testTableLifecycle(t, e, dbname,
+		testDatabase(t, e, dbname,
 			[]engCmd{
 				{cmd: cmdBegin},
 				{cmd: cmdLookupSchema, name: sql.ID("sc7")},
@@ -749,14 +808,14 @@ func RunSchemaTest(t *testing.T, e engine.Engine) {
 			})
 	}
 
-	testTableLifecycle(t, e, dbname,
+	testDatabase(t, e, dbname,
 		[]engCmd{
 			{cmd: cmdBegin},
 			{cmd: cmdLookupSchema, name: sql.ID("sc7")},
 			{cmd: cmdCommit},
 		})
 
-	testTableLifecycle(t, e, dbname,
+	testDatabase(t, e, dbname,
 		[]engCmd{
 			{cmd: cmdTransaction, tdx: 0},
 			{cmd: cmdBegin},
@@ -783,7 +842,7 @@ func RunSchemaTest(t *testing.T, e engine.Engine) {
 			{cmd: cmdCommit},
 		})
 
-	testTableLifecycle(t, e, dbname,
+	testDatabase(t, e, dbname,
 		[]engCmd{
 			{cmd: cmdBegin},
 			{cmd: cmdCreateSchema, name: sql.ID("sc9")},
@@ -821,7 +880,7 @@ func RunSchemaTest(t *testing.T, e engine.Engine) {
 		})
 }
 
-func RunTableTest(t *testing.T, e engine.Engine) {
+func RunTableRowsTest(t *testing.T, e engine.Engine) {
 	t.Helper()
 
 	dbname := sql.ID("table_test")
@@ -830,7 +889,7 @@ func RunTableTest(t *testing.T, e engine.Engine) {
 		t.Fatal(err)
 	}
 
-	testTableLifecycle(t, e, dbname,
+	testDatabase(t, e, dbname,
 		[]engCmd{
 			{cmd: cmdBegin},
 			{cmd: cmdCreateTable, name: sql.ID("tbl1")},
@@ -940,7 +999,7 @@ func RunTableTest(t *testing.T, e engine.Engine) {
 			{cmd: cmdCommit},
 		})
 
-	testTableLifecycle(t, e, dbname,
+	testDatabase(t, e, dbname,
 		[]engCmd{
 			{cmd: cmdBegin},
 			{cmd: cmdCreateTable, name: sql.ID("tbl2")},
@@ -1031,7 +1090,7 @@ func RunTableTest(t *testing.T, e engine.Engine) {
 			{cmd: cmdCommit},
 		})
 
-	testTableLifecycle(t, e, dbname,
+	testDatabase(t, e, dbname,
 		[]engCmd{
 			{cmd: cmdBegin},
 			{cmd: cmdCreateTable, name: sql.ID("tbl3")},
@@ -1135,7 +1194,7 @@ func RunTableTest(t *testing.T, e engine.Engine) {
 			{cmd: cmdCommit},
 		})
 
-	testTableLifecycle(t, e, dbname,
+	testDatabase(t, e, dbname,
 		[]engCmd{
 			{cmd: cmdBegin, needTransactions: true},
 			{cmd: cmdCreateTable, name: sql.ID("tbl4")},
@@ -1207,7 +1266,7 @@ func RunParallelTest(t *testing.T, e engine.Engine) {
 		t.Fatal(err)
 	}
 
-	testTableLifecycle(t, e, dbname,
+	testDatabase(t, e, dbname,
 		[]engCmd{
 			{cmd: cmdBegin},
 			{cmd: cmdCreateTable, name: sql.ID("tbl")},
@@ -1221,7 +1280,7 @@ func RunParallelTest(t *testing.T, e engine.Engine) {
 			defer wg.Done()
 
 			for j := 0; j < r; j++ {
-				testTableLifecycle(t, e, dbname,
+				testDatabase(t, e, dbname,
 					[]engCmd{
 						{cmd: cmdBegin},
 						{cmd: cmdLookupTable, name: sql.ID("tbl")},
@@ -1232,7 +1291,7 @@ func RunParallelTest(t *testing.T, e engine.Engine) {
 			}
 
 			for j := 0; j < r; j++ {
-				testTableLifecycle(t, e, dbname,
+				testDatabase(t, e, dbname,
 					[]engCmd{
 						{cmd: cmdBegin},
 						{cmd: cmdLookupTable, name: sql.ID("tbl")},
@@ -1290,7 +1349,7 @@ func RunStressTest(t *testing.T, e engine.Engine) {
 		t.Fatal(err)
 	}
 
-	testTableLifecycle(t, e, dbname,
+	testDatabase(t, e, dbname,
 		[]engCmd{
 			{cmd: cmdBegin},
 			{cmd: cmdCreateTable, name: sql.ID("tbl")},
@@ -1300,7 +1359,7 @@ func RunStressTest(t *testing.T, e engine.Engine) {
 	const rcnt = 100
 
 	for i := 0; i < rcnt; i++ {
-		testTableLifecycle(t, e, dbname,
+		testDatabase(t, e, dbname,
 			[]engCmd{
 				{cmd: cmdBegin},
 				{cmd: cmdLookupTable, name: sql.ID("tbl")},
@@ -1347,7 +1406,7 @@ func RunStressTest(t *testing.T, e engine.Engine) {
 			sql.StringValue(fmt.Sprintf("row %d", i))})
 	}
 
-	testTableLifecycle(t, e, dbname,
+	testDatabase(t, e, dbname,
 		[]engCmd{
 			{cmd: cmdBegin},
 			{cmd: cmdLookupTable, name: sql.ID("tbl")},
