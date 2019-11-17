@@ -19,7 +19,16 @@ type Key struct {
 	Type    KeyType
 }
 
+type TransactionKey struct {
+	MID   uint64
+	Key   []byte
+	TID   uint64
+	Epoch uint64
+}
+
 const (
+	MaximumVersion uint64 = math.MaxUint64
+
 	ProposalKeyType    KeyType = 1
 	DurableKeyType     KeyType = 2
 	TransactionKeyType KeyType = 3
@@ -301,6 +310,16 @@ func ParseKey(key []byte) (Key, bool) {
 		Version: decodeUint64(key[len(key)-9:len(key)-1], true),
 		Type:    KeyType(key[len(key)-1]),
 	}, true
+}
+
+func (txk TransactionKey) EncodeKey() Key {
+	key := append(make([]byte, 0, len(txk.Key)+16), txk.Key...)
+	key = encodeUint64(key, false, txk.TID)
+	key = encodeUint64(key, false, txk.Epoch)
+	return Key{
+		Key:  key,
+		Type: TransactionKeyType,
+	}
 }
 
 func EncodeVarint(buf []byte, n uint64) []byte {

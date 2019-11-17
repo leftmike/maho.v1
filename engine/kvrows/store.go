@@ -2,7 +2,7 @@ package kvrows
 
 type ProposedWrites struct {
 	Keys   []Key
-	TxKeys []byte
+	TxKeys []TransactionKey
 }
 
 func (pw ProposedWrites) Error() string {
@@ -49,11 +49,11 @@ type Store interface {
 	//   transaction key of the proposed write are in the instance. Note that
 	//   zero or more valid keys and values, which were scanned before the proposed
 	//    write, will also be returned.
-	ReadRows(txInfo *TransactionInfo, mid uint64, prefix []byte, lastKey []byte, ver uint64) ([]Key,
-		[][]byte, error)
+	ReadRows(txKey TransactionKey, sid uint64, mid uint64, prefix []byte, lastKey []byte,
+		ver uint64) ([]Key, [][]byte, error)
 
 	// WriteRows will update, delete, or insert one or more rows for the
-	// transaction specified by txInfo.
+	// transaction specified by txKey.
 	//
 	// For update and delete, the keys, including version, must be the same as
 	// returned from ReadRows. For insert, the version must be zero.
@@ -69,5 +69,5 @@ type Store interface {
 	// * If there is an existing conflicting value for a key, error will be an
 	//   instance of kvrows.ConflictingWrite. The key of the conflicting write will
 	//   be in the instance.
-	WriteRows(txInfo *TransactionInfo, mid uint64, keys []Key, rows [][]byte) error
+	WriteRows(txKey TransactionKey, sid uint64, mid uint64, keys []Key, rows [][]byte) error
 }

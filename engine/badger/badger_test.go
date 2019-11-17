@@ -19,6 +19,7 @@ func TestKV(t *testing.T) {
 		t.Fatal(err)
 	}
 	test.RunDatabaseTest(t, e, true)
+	//test.RunTableTest(t, e)
 	/*
 		XXX
 		test.RunTableLifecycleTest(t, e)

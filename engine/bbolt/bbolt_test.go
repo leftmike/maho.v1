@@ -19,6 +19,7 @@ func TestBBolt(t *testing.T) {
 		t.Fatal(err)
 	}
 	test.RunDatabaseTest(t, e, false) // XXX: should be true
+	//test.RunTableTest(t, e)
 	/*
 		XXX
 		test.RunTableLifecycleTest(t, e)

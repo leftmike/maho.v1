@@ -22,6 +22,7 @@ func testEngine(t *testing.T, st kvrows.Store) {
 	}
 
 	test.RunDatabaseTest(t, &kv, true)
+	//test.RunTableTest(t, &kv)
 	/*
 		XXX
 		test.RunTableLifecycleTest(t, &kv)

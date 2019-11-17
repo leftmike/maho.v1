@@ -396,10 +396,35 @@ func RunDatabaseTest(t *testing.T, e engine.Engine, recreate bool) {
 	}
 }
 
+func RunTableTest(t *testing.T, e engine.Engine) {
+	t.Helper()
+
+	dbname := sql.ID("table_test")
+	err := e.CreateDatabase(dbname, nil)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	testDatabase(t, e, dbname,
+		[]engCmd{
+			{cmd: cmdBegin},
+			{cmd: cmdLookupSchema, name: sql.ID("sc-a"), fail: true},
+			{cmd: cmdCreateSchema, name: sql.ID("sc-a")},
+			{cmd: cmdLookupSchema, name: sql.ID("sc-a")},
+			{cmd: cmdCommit},
+
+			{cmd: cmdBegin},
+			{cmd: cmdLookupTable, name: sql.ID("tbl-a"), fail: true},
+			{cmd: cmdCreateTable, name: sql.ID("tbl-a")},
+			{cmd: cmdLookupTable, name: sql.ID("tbl-a")},
+			{cmd: cmdCommit},
+		})
+}
+
 func RunTableLifecycleTest(t *testing.T, e engine.Engine) {
 	t.Helper()
 
-	dbname := sql.ID("database_test")
+	dbname := sql.ID("tbl_lifecycle_test")
 	err := e.CreateDatabase(dbname, nil)
 	if err != nil {
 		t.Fatal(err)
@@ -883,7 +908,7 @@ func RunSchemaTest(t *testing.T, e engine.Engine) {
 func RunTableRowsTest(t *testing.T, e engine.Engine) {
 	t.Helper()
 
-	dbname := sql.ID("table_test")
+	dbname := sql.ID("table_rows_test")
 	err := e.CreateDatabase(dbname, nil)
 	if err != nil {
 		t.Fatal(err)

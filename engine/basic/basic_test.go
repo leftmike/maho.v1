@@ -13,6 +13,7 @@ func TestBasic(t *testing.T) {
 		t.Fatal(err)
 	}
 	test.RunDatabaseTest(t, e, true)
+	test.RunTableTest(t, e)
 	test.RunTableLifecycleTest(t, e)
 	test.RunSchemaTest(t, e)
 	test.RunTableRowsTest(t, e)

@@ -143,13 +143,13 @@ func (lkv localKV) WriteValue(mid uint64, key kvrows.Key, ver uint64, val []byte
 	return tx.Commit()
 }
 
-func (lkv localKV) ReadRows(txInfo *kvrows.TransactionInfo, mid uint64, prefix []byte,
+func (lkv localKV) ReadRows(txKey kvrows.TransactionKey, sid uint64, mid uint64, prefix []byte,
 	lastKey []byte, ver uint64) ([]kvrows.Key, [][]byte, error) {
 
 	return nil, nil, nil
 }
 
-func (lkv localKV) WriteRows(txInfo *kvrows.TransactionInfo, mid uint64, keys []kvrows.Key,
+func (lkv localKV) WriteRows(txKey kvrows.TransactionKey, sid uint64, mid uint64, keys []kvrows.Key,
 	rows [][]byte) error {
 
 	return nil
