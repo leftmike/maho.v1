@@ -6,6 +6,7 @@ import (
 	"github.com/dgraph-io/badger"
 
 	"github.com/leftmike/maho/engine/kvrows"
+	"github.com/leftmike/maho/engine/localkv"
 )
 
 type badgerStore struct {
@@ -27,7 +28,7 @@ type badgerWalker struct {
 	prefix []byte
 }
 
-func openStore(path string) (*badgerStore, error) {
+func OpenStore(path string) (*badgerStore, error) {
 	os.MkdirAll(path, 0755)
 	db, err := badger.Open(badger.DefaultOptions(path))
 	if err != nil {
@@ -38,13 +39,13 @@ func openStore(path string) (*badgerStore, error) {
 	}, nil
 }
 
-func (bs *badgerStore) Begin(writable bool) (kvrows.Tx, error) {
+func (bs *badgerStore) Begin(writable bool) (localkv.Tx, error) {
 	return &badgerTx{
 		tx: bs.db.NewTransaction(writable),
 	}, nil
 }
 
-func (btx *badgerTx) Map(mid uint64) (kvrows.Mapper, error) {
+func (btx *badgerTx) Map(mid uint64) (localkv.Mapper, error) {
 	return &badgerMapper{
 		tx:     btx,
 		prefix: kvrows.EncodeUint64(mid),
@@ -78,7 +79,7 @@ func (bm *badgerMapper) Set(key, val []byte) error {
 	return bm.tx.tx.Set(bm.addPrefix(key), val)
 }
 
-func (bm *badgerMapper) Walk(prefix []byte) kvrows.Walker {
+func (bm *badgerMapper) Walk(prefix []byte) localkv.Walker {
 	opts := badger.DefaultIteratorOptions
 	opts.Prefix = bm.addPrefix(prefix)
 	return &badgerWalker{

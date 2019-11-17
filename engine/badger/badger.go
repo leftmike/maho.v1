@@ -6,6 +6,7 @@ import (
 
 	"github.com/leftmike/maho/engine"
 	"github.com/leftmike/maho/engine/kvrows"
+	"github.com/leftmike/maho/engine/localkv"
 	"github.com/leftmike/maho/engine/virtual"
 	"github.com/leftmike/maho/sql"
 )
@@ -16,12 +17,12 @@ type badgerEngine struct {
 
 func NewEngine(dataDir string) (engine.Engine, error) {
 	path := filepath.Join(dataDir, "mahobadger")
-	st, err := openStore(path)
+	st, err := OpenStore(path)
 	if err != nil {
 		return nil, fmt.Errorf("badger: creating engine at %s failed: %s", path, err)
 	}
 	be := &badgerEngine{}
-	err = be.KVRows.Startup(st)
+	err = be.KVRows.Startup(localkv.NewStore(st))
 	if err != nil {
 		return nil, err
 	}

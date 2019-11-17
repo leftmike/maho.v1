@@ -6,7 +6,7 @@ import (
 	"testing"
 
 	"github.com/leftmike/maho/engine"
-	"github.com/leftmike/maho/engine/kvrows"
+	kvrows "github.com/leftmike/maho/engine/kvrows.old"
 	"github.com/leftmike/maho/sql"
 )
 

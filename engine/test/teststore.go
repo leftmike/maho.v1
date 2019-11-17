@@ -7,6 +7,7 @@ import (
 	"testing"
 
 	"github.com/leftmike/maho/engine/kvrows"
+	"github.com/leftmike/maho/engine/localkv"
 )
 
 type row struct {
@@ -14,7 +15,7 @@ type row struct {
 	value uint64
 }
 
-func insertRows(t *testing.T, tx kvrows.Tx, mid uint64, rows []row) {
+func insertRows(t *testing.T, tx localkv.Tx, mid uint64, rows []row) {
 	t.Helper()
 
 	m, err := tx.Map(mid)
@@ -32,7 +33,7 @@ func insertRows(t *testing.T, tx kvrows.Tx, mid uint64, rows []row) {
 	}
 }
 
-func deleteRows(t *testing.T, tx kvrows.Tx, mid uint64, rows map[string]struct{}) {
+func deleteRows(t *testing.T, tx localkv.Tx, mid uint64, rows map[string]struct{}) {
 	t.Helper()
 
 	m, err := tx.Map(mid)
@@ -56,7 +57,7 @@ func deleteRows(t *testing.T, tx kvrows.Tx, mid uint64, rows map[string]struct{}
 	}
 }
 
-func updateRows(t *testing.T, tx kvrows.Tx, mid uint64, rows map[string]uint64) {
+func updateRows(t *testing.T, tx localkv.Tx, mid uint64, rows map[string]uint64) {
 	t.Helper()
 
 	m, err := tx.Map(mid)
@@ -80,7 +81,7 @@ func updateRows(t *testing.T, tx kvrows.Tx, mid uint64, rows map[string]uint64) 
 	}
 }
 
-func selectRows(t *testing.T, tx kvrows.Tx, mid uint64, seek string, rows []row) {
+func selectRows(t *testing.T, tx localkv.Tx, mid uint64, seek string, rows []row) {
 	t.Helper()
 
 	m, err := tx.Map(mid)
@@ -121,7 +122,7 @@ func selectRows(t *testing.T, tx kvrows.Tx, mid uint64, seek string, rows []row)
 	}
 }
 
-func testGetSet(t *testing.T, tx kvrows.Tx, mid uint64) {
+func testGetSet(t *testing.T, tx localkv.Tx, mid uint64) {
 	t.Helper()
 
 	m, err := tx.Map(mid)
@@ -160,7 +161,7 @@ func testGetSet(t *testing.T, tx kvrows.Tx, mid uint64) {
 	}
 }
 
-func withCommit(t *testing.T, st kvrows.Store, tf func(t *testing.T, tx kvrows.Tx)) {
+func withCommit(t *testing.T, st localkv.Store, tf func(t *testing.T, tx localkv.Tx)) {
 	t.Helper()
 
 	tx, err := st.Begin(true)
@@ -181,8 +182,8 @@ func withCommit(t *testing.T, st kvrows.Store, tf func(t *testing.T, tx kvrows.T
 	}
 }
 
-func withRollback(t *testing.T, st kvrows.Store, writable bool,
-	tf func(t *testing.T, tx kvrows.Tx)) {
+func withRollback(t *testing.T, st localkv.Store, writable bool,
+	tf func(t *testing.T, tx localkv.Tx)) {
 
 	t.Helper()
 
@@ -198,10 +199,10 @@ func withRollback(t *testing.T, st kvrows.Store, writable bool,
 	}
 }
 
-func RunStoreTest(t *testing.T, st kvrows.Store) {
-	withCommit(t, st, func(t *testing.T, tx kvrows.Tx) {})
-	withRollback(t, st, true, func(t *testing.T, tx kvrows.Tx) {})
-	withRollback(t, st, false, func(t *testing.T, tx kvrows.Tx) {})
+func RunLocalKVTest(t *testing.T, st localkv.Store) {
+	withCommit(t, st, func(t *testing.T, tx localkv.Tx) {})
+	withRollback(t, st, true, func(t *testing.T, tx localkv.Tx) {})
+	withRollback(t, st, false, func(t *testing.T, tx localkv.Tx) {})
 
 	rows1 := []row{
 		{"ABC", 1},
@@ -219,21 +220,21 @@ func RunStoreTest(t *testing.T, st kvrows.Store) {
 		{"xyz", 50},
 	}
 	withCommit(t, st,
-		func(t *testing.T, tx kvrows.Tx) {
+		func(t *testing.T, tx localkv.Tx) {
 			insertRows(t, tx, 1024, rows1)
 			selectRows(t, tx, 1024, "", rows1)
 		})
 	withRollback(t, st, true,
-		func(t *testing.T, tx kvrows.Tx) {
+		func(t *testing.T, tx localkv.Tx) {
 			insertRows(t, tx, 1024, rows2)
 			selectRows(t, tx, 1024, "", rows2)
 		})
 	withCommit(t, st,
-		func(t *testing.T, tx kvrows.Tx) {
+		func(t *testing.T, tx localkv.Tx) {
 			selectRows(t, tx, 1024, "", rows1)
 		})
 	withRollback(t, st, false,
-		func(t *testing.T, tx kvrows.Tx) {
+		func(t *testing.T, tx localkv.Tx) {
 			selectRows(t, tx, 1024, "", rows1)
 		})
 
@@ -249,22 +250,22 @@ func RunStoreTest(t *testing.T, st kvrows.Store) {
 		"abc": 400,
 	}
 	withRollback(t, st, true,
-		func(t *testing.T, tx kvrows.Tx) {
+		func(t *testing.T, tx localkv.Tx) {
 			selectRows(t, tx, 1024, "", rows1)
 			updateRows(t, tx, 1024, update1)
 			selectRows(t, tx, 1024, "", rows3)
 		})
 	withCommit(t, st,
-		func(t *testing.T, tx kvrows.Tx) {
+		func(t *testing.T, tx localkv.Tx) {
 			selectRows(t, tx, 1024, "", rows1)
 			updateRows(t, tx, 1024, update1)
 		})
 	withCommit(t, st,
-		func(t *testing.T, tx kvrows.Tx) {
+		func(t *testing.T, tx localkv.Tx) {
 			selectRows(t, tx, 1024, "", rows3)
 		})
 	withRollback(t, st, false,
-		func(t *testing.T, tx kvrows.Tx) {
+		func(t *testing.T, tx localkv.Tx) {
 			selectRows(t, tx, 1024, "", rows3)
 		})
 
@@ -278,36 +279,36 @@ func RunStoreTest(t *testing.T, st kvrows.Store) {
 		"xyz": struct{}{},
 	}
 	withRollback(t, st, true,
-		func(t *testing.T, tx kvrows.Tx) {
+		func(t *testing.T, tx localkv.Tx) {
 			selectRows(t, tx, 1024, "", rows3)
 			deleteRows(t, tx, 1024, delete1)
 			selectRows(t, tx, 1024, "", rows4)
 		})
 	withCommit(t, st,
-		func(t *testing.T, tx kvrows.Tx) {
+		func(t *testing.T, tx localkv.Tx) {
 			selectRows(t, tx, 1024, "", rows3)
 			deleteRows(t, tx, 1024, delete1)
 		})
 	withCommit(t, st,
-		func(t *testing.T, tx kvrows.Tx) {
+		func(t *testing.T, tx localkv.Tx) {
 			selectRows(t, tx, 1024, "", rows4)
 		})
 	withRollback(t, st, false,
-		func(t *testing.T, tx kvrows.Tx) {
+		func(t *testing.T, tx localkv.Tx) {
 			selectRows(t, tx, 1024, "", rows4)
 		})
 
 	withCommit(t, st,
-		func(t *testing.T, tx kvrows.Tx) {
+		func(t *testing.T, tx localkv.Tx) {
 			insertRows(t, tx, 9999, rows1)
 		})
 	withCommit(t, st,
-		func(t *testing.T, tx kvrows.Tx) {
+		func(t *testing.T, tx localkv.Tx) {
 			selectRows(t, tx, 9999, "", rows1)
 			selectRows(t, tx, 1024, "", rows4)
 		})
 	withRollback(t, st, false,
-		func(t *testing.T, tx kvrows.Tx) {
+		func(t *testing.T, tx localkv.Tx) {
 			selectRows(t, tx, 9999, "", rows1)
 			selectRows(t, tx, 1024, "", rows4)
 		})
@@ -324,11 +325,11 @@ func RunStoreTest(t *testing.T, st kvrows.Store) {
 		{"xyz", 9},
 	}
 	withCommit(t, st,
-		func(t *testing.T, tx kvrows.Tx) {
+		func(t *testing.T, tx localkv.Tx) {
 			insertRows(t, tx, 1, rows5)
 		})
 	withCommit(t, st,
-		func(t *testing.T, tx kvrows.Tx) {
+		func(t *testing.T, tx localkv.Tx) {
 			selectRows(t, tx, 1, "", rows5)
 			selectRows(t, tx, 1, "ABC", rows5)
 			selectRows(t, tx, 1, "a", rows5)
@@ -337,7 +338,7 @@ func RunStoreTest(t *testing.T, st kvrows.Store) {
 			selectRows(t, tx, 1, "z", nil)
 		})
 	withRollback(t, st, false,
-		func(t *testing.T, tx kvrows.Tx) {
+		func(t *testing.T, tx localkv.Tx) {
 			selectRows(t, tx, 1, "", rows5)
 			selectRows(t, tx, 1, "ABC", rows5)
 			selectRows(t, tx, 1, "a", rows5)
@@ -347,12 +348,12 @@ func RunStoreTest(t *testing.T, st kvrows.Store) {
 		})
 
 	withCommit(t, st,
-		func(t *testing.T, tx kvrows.Tx) {
+		func(t *testing.T, tx localkv.Tx) {
 			testGetSet(t, tx, 123)
 		})
 
 	withRollback(t, st, true,
-		func(t *testing.T, tx kvrows.Tx) {
+		func(t *testing.T, tx localkv.Tx) {
 			testGetSet(t, tx, 234)
 		})
 }

@@ -8,6 +8,7 @@ import (
 	"go.etcd.io/bbolt"
 
 	"github.com/leftmike/maho/engine/kvrows"
+	"github.com/leftmike/maho/engine/localkv"
 )
 
 var (
@@ -35,7 +36,7 @@ type bboltWalker struct {
 	value  []byte
 }
 
-func openStore(path string) (*bboltStore, error) {
+func OpenStore(path string) (*bboltStore, error) {
 	db, err := bbolt.Open(path, 0644, nil)
 	if err != nil {
 		return nil, err
@@ -45,7 +46,7 @@ func openStore(path string) (*bboltStore, error) {
 	}, nil
 }
 
-func (bs *bboltStore) Begin(writable bool) (kvrows.Tx, error) {
+func (bs *bboltStore) Begin(writable bool) (localkv.Tx, error) {
 	tx, err := bs.db.Begin(writable)
 	if err != nil {
 		return nil, err
@@ -56,7 +57,7 @@ func (bs *bboltStore) Begin(writable bool) (kvrows.Tx, error) {
 	}, nil
 }
 
-func (btx *bboltTx) Map(mid uint64) (kvrows.Mapper, error) {
+func (btx *bboltTx) Map(mid uint64) (localkv.Mapper, error) {
 	key := []byte(strconv.FormatUint(mid, 10))
 	bkt := btx.tx.Bucket(key)
 	if bkt == nil && btx.writable {
@@ -99,7 +100,7 @@ func (bm *bboltMapper) Set(key, val []byte) error {
 	return bm.bkt.Put(key, val)
 }
 
-func (bm *bboltMapper) Walk(prefix []byte) kvrows.Walker {
+func (bm *bboltMapper) Walk(prefix []byte) localkv.Walker {
 	bw := &bboltWalker{
 		prefix: prefix,
 	}

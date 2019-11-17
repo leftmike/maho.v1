@@ -8,6 +8,7 @@ import (
 
 	"github.com/leftmike/maho/engine"
 	"github.com/leftmike/maho/engine/kvrows"
+	"github.com/leftmike/maho/engine/localkv"
 	"github.com/leftmike/maho/engine/virtual"
 	"github.com/leftmike/maho/sql"
 )
@@ -65,13 +66,13 @@ func (be *bboltEngine) CreateDatabase(dbname sql.Identifier, options engine.Opti
 	}
 
 	path := databasePath(dbname, be.dataDir, ".mahobbolt", options)
-	st, err := openStore(path)
+	st, err := OpenStore(path)
 	if err != nil {
 		return fmt.Errorf("bbolt: create database %s failed: %s", dbname, err)
 	}
 
 	var kv kvrows.KVRows
-	err = kv.Startup(st)
+	err = kv.Startup(localkv.NewStore(st))
 	if err != nil {
 		return err
 	}

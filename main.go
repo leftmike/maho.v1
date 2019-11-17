@@ -8,17 +8,17 @@ To Do:
 
 - fuzzing: parser.Parse
 
-- run engine/test/testkvrows.go and teststore.go so as to be able to check code coverage
+- run engine/test/testkvrows.go and teststore.go so as to be able to check code coverage; look
+  at engine/localkv/localkv_test.go
 
-- keep track of databases per engine as a simple config file that gets read and written by maho;
-  depends on the engine: yes for bbolt, no for badger
+- keep track of databases per engine as a simple config file that gets read and written by maho
+--  depends on the engine: yes for bbolt, no for badger
 
 - add test for not seeing modified rows within a single SQL statement
 
-- primary index: kvrows, memrows
-- indexes: kvrows, memrows
-- memrows: creating and drop indexes is not transactional
-- maybe just get rid of memrows and use something like memkv instead
+- primary index: kvrows, basic
+- indexes: kvrows, basic
+- get rid of memrows and use something like memkv instead
 
 - [CONSTRAINT constraint]
 - CHECK '(' logical_expression ')'

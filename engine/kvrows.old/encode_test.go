@@ -8,7 +8,7 @@ import (
 
 	"github.com/golang/protobuf/proto"
 	"github.com/leftmike/maho/engine"
-	"github.com/leftmike/maho/engine/kvrows"
+	kvrows "github.com/leftmike/maho/engine/kvrows.old"
 	"github.com/leftmike/maho/sql"
 	"github.com/leftmike/maho/testutil"
 )
@@ -19,35 +19,51 @@ type testCase struct {
 	ret     []byte
 }
 
-func testKey(t *testing.T, prevKey []byte, row []sql.Value, colKeys []engine.ColumnKey,
-	ver uint64, keyType kvrows.KeyType) []byte {
+func testProposalKey(t *testing.T, prevKey []byte, row []sql.Value, colKeys []engine.ColumnKey,
+	tid, sid uint32) []byte {
 
 	t.Helper()
 
-	sqlKey := kvrows.MakeSQLKey(row, colKeys)
-	k := kvrows.Key{
-		Key:     sqlKey,
-		Version: ver,
-		Type:    keyType,
-	}
-	key := k.Encode()
+	key := kvrows.MakeProposalKey(row, colKeys, tid, sid)
 	if bytes.Compare(prevKey, key) >= 0 {
-		t.Errorf("MakeKey(%v, %v) keys not ordered correctly; %v and %v",
+		t.Errorf("MakeProposalKey(%v, %v) keys not ordered correctly; %v and %v",
 			row, colKeys, prevKey, key)
 	}
 
-	k, ok := kvrows.ParseKey(key)
+	dest := make([]sql.Value, len(row))
+	rettid, retsid, ok := kvrows.ParseProposalKey(key, colKeys, dest)
 	if !ok {
-		t.Errorf("ParseKey(%v) failed", key)
+		t.Errorf("ParseProposalKey(%v) failed", key)
 	} else {
-		if k.Version != ver {
-			t.Errorf("ParseKey(%v) got %d for version; want %d", key, k.Version, ver)
+		if rettid != tid {
+			t.Errorf("ParseProposalKey(%v) got %d for tid; want %d", key, rettid, tid)
 		}
-		if k.Type != keyType {
-			t.Errorf("ParseKey(%v) got %d for type; want %d", key, k.Type, keyType)
+		if retsid != sid {
+			t.Errorf("ParseProposalKey(%v) got %d for sid; want %d", key, retsid, sid)
 		}
-		if bytes.Compare(sqlKey, k.Key) != 0 {
-			t.Errorf("ParseKey(%v) got %v for sql key; want %v", key, k.Key, sqlKey)
+	}
+
+	return key
+}
+
+func testDurableKey(t *testing.T, prevKey []byte, row []sql.Value, colKeys []engine.ColumnKey,
+	ver uint64) []byte {
+
+	t.Helper()
+
+	key := kvrows.MakeDurableKey(row, colKeys, ver)
+	if bytes.Compare(prevKey, key) >= 0 {
+		t.Errorf("MakeDurableKey(%v, %v) keys not ordered correctly; %v and %v",
+			row, colKeys, prevKey, key)
+	}
+
+	dest := make([]sql.Value, len(row))
+	retver, ok := kvrows.ParseDurableKey(key, colKeys, dest)
+	if !ok {
+		t.Errorf("ParseDurableKey(%v) failed", key)
+	} else {
+		if retver != ver {
+			t.Errorf("ParseDurableKey(%v) got %d for version; want %d", key, retver, ver)
 		}
 	}
 
@@ -57,10 +73,21 @@ func testKey(t *testing.T, prevKey []byte, row []sql.Value, colKeys []engine.Col
 func checkPrefixes(t *testing.T, prefixes [][]byte, i int, key []byte) {
 	t.Helper()
 
+	keyPrefix := kvrows.KeyPrefix(key)
 	for j, prefix := range prefixes {
-		if i != j {
+		if i == j {
+			if !bytes.HasPrefix(key, prefix) {
+				t.Errorf("MakePrefix(%d): key %v should have prefix %v", i, key, prefix)
+			}
+			if bytes.Compare(keyPrefix, prefix) != 0 {
+				t.Errorf("KeyPrefix(%d): got %v want %v", i, keyPrefix, prefix)
+			}
+		} else {
 			if bytes.HasPrefix(key, prefix) {
 				t.Errorf("MakePrefix(%d, %d): key %v should not have prefix %v", i, j, key, prefix)
+			}
+			if bytes.Compare(keyPrefix, prefix) == 0 {
+				t.Errorf("KeyPrefix(%d): key %v should not have prefix %v", i, key, prefix)
 			}
 		}
 	}
@@ -71,38 +98,35 @@ func testMakeKey(t *testing.T, cases []testCase) {
 
 	var prefixes [][]byte
 	for _, c := range cases {
-		prefixes = append(prefixes, kvrows.MakeSQLKey(c.row, c.colKeys))
+		prefixes = append(prefixes, kvrows.MakePrefix(c.row, c.colKeys))
 	}
 
 	var prevKey []byte
 	for i, c := range cases {
-		key := kvrows.MakeSQLKey(c.row, c.colKeys)
-		if bytes.Compare(key, c.ret) != 0 {
-			t.Errorf("MakeSQLKey(%d) got %v want %v", i, key, c.ret)
+		key := kvrows.MakeBareKey(c.row, c.colKeys)
+		ret := append(c.ret, kvrows.BareKeyType)
+		if bytes.Compare(key, ret) != 0 {
+			t.Errorf("MakeBareKey(%d) got %v want %v", i, key, ret)
 		}
 		if bytes.Compare(prevKey, key) >= 0 {
-			t.Errorf("MakeSQLKey(%d) keys not ordered correctly; %v and %v", i, prevKey, key)
+			t.Errorf("MakeBareKey(%d) keys not ordered correctly; %v and %v", i, prevKey, key)
 		}
 		checkPrefixes(t, prefixes, i, key)
 		prevKey = key
 
+		tid := rand.Uint32()
+		sid := uint32(rand.Intn(99999)) + 99
+		prevKey = testProposalKey(t, prevKey, c.row, c.colKeys, tid, sid)
+		prevKey = testProposalKey(t, prevKey, c.row, c.colKeys, tid, sid-1)
+		prevKey = testProposalKey(t, prevKey, c.row, c.colKeys, tid, 1)
+		prevKey = testProposalKey(t, prevKey, c.row, c.colKeys, tid, 0)
+
 		ver := uint64(rand.Intn(99999)) + 99
-		prevKey = testKey(t, prevKey, c.row, c.colKeys, ver, kvrows.ProposalKeyType)
-		prevKey = testKey(t, prevKey, c.row, c.colKeys, ver-1, kvrows.ProposalKeyType)
-		prevKey = testKey(t, prevKey, c.row, c.colKeys, 1, kvrows.ProposalKeyType)
-		prevKey = testKey(t, prevKey, c.row, c.colKeys, 0, kvrows.ProposalKeyType)
+		prevKey = testDurableKey(t, prevKey, c.row, c.colKeys, ver)
+		prevKey = testDurableKey(t, prevKey, c.row, c.colKeys, ver-1)
+		prevKey = testDurableKey(t, prevKey, c.row, c.colKeys, 1)
+		prevKey = testDurableKey(t, prevKey, c.row, c.colKeys, 0)
 
-		ver = uint64(rand.Intn(99999)) + 99
-		prevKey = testKey(t, prevKey, c.row, c.colKeys, ver, kvrows.DurableKeyType)
-		prevKey = testKey(t, prevKey, c.row, c.colKeys, ver-1, kvrows.DurableKeyType)
-		prevKey = testKey(t, prevKey, c.row, c.colKeys, 1, kvrows.DurableKeyType)
-		prevKey = testKey(t, prevKey, c.row, c.colKeys, 0, kvrows.DurableKeyType)
-
-		ver = uint64(rand.Intn(99999)) + 99
-		prevKey = testKey(t, prevKey, c.row, c.colKeys, ver, kvrows.TransactionKeyType)
-		prevKey = testKey(t, prevKey, c.row, c.colKeys, ver-1, kvrows.TransactionKeyType)
-		prevKey = testKey(t, prevKey, c.row, c.colKeys, 1, kvrows.TransactionKeyType)
-		prevKey = testKey(t, prevKey, c.row, c.colKeys, 0, kvrows.TransactionKeyType)
 	}
 }
 
@@ -739,16 +763,16 @@ func TestMakeKey(t *testing.T) {
 func testParseKey(t *testing.T, row []sql.Value, colKeys []engine.ColumnKey) {
 	t.Helper()
 
-	key := kvrows.MakeSQLKey(row, colKeys)
+	key := kvrows.MakeBareKey(row, colKeys)
 	dest := make([]sql.Value, len(row))
-	ok := kvrows.ParseSQLKey(key, colKeys, dest)
+	ok := kvrows.ParseBareKey(key, colKeys, dest)
 	if !ok {
-		t.Errorf("ParseSQLKey(%v, %v) failed", row, colKeys)
+		t.Errorf("ParseKey(%v, %v) failed", row, colKeys)
 	}
 	for _, ck := range colKeys {
 		num := ck.Number()
 		if !testutil.DeepEqual(dest[num], row[num]) {
-			t.Errorf("ParseSQLKey: at %d got %v want %v", num, dest[num], row[num])
+			t.Errorf("ParseKey: at %d got %v want %v", num, dest[num], row[num])
 		}
 	}
 }
