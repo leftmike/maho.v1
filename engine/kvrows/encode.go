@@ -45,9 +45,10 @@ const (
 	stringKeyTag      = 160
 	bytesKeyTag       = 170
 
-	tombstoneValue = 0
+	TombstoneValue = 0
 	rowValue       = 1
 	gobValue       = 2
+	ProposalValue  = 3
 
 	boolValueTag    = 1
 	int64ValueTag   = 2
@@ -300,6 +301,14 @@ func (k Key) Encode() []byte {
 	return key
 }
 
+func (k Key) Copy() Key {
+	return Key{
+		Key:     append(make([]byte, 0, len(k.Key)), k.Key...),
+		Version: k.Version,
+		Type:    k.Type,
+	}
+}
+
 func ParseKey(key []byte) (Key, bool) {
 	if len(key) < 10 || key[len(key)-1] != key[len(key)-10] {
 		return Key{}, false
@@ -320,6 +329,21 @@ func (txk TransactionKey) EncodeKey() Key {
 		Key:  key,
 		Type: TransactionKeyType,
 	}
+}
+
+func (txk TransactionKey) Equal(txk2 TransactionKey) bool {
+	return txk.MID == txk2.MID && txk.TID == txk2.TID && txk.Epoch == txk2.Epoch &&
+		bytes.Equal(txk.Key, txk2.Key)
+}
+
+func ParseProposalValue(buf []byte) (TransactionKey, []byte, error) {
+	// XXX
+	return TransactionKey{}, nil, nil
+}
+
+func EncodeProposalValue(txk TransactionKey, val []byte) []byte {
+	// XXX
+	return nil
 }
 
 func EncodeVarint(buf []byte, n uint64) []byte {
@@ -378,7 +402,7 @@ func encodeColNumValueTag(buf []byte, cdx int, tag byte) []byte {
 }
 
 func MakeTombstoneValue() []byte {
-	return []byte{tombstoneValue}
+	return []byte{TombstoneValue}
 }
 
 func MakeRowValue(row []sql.Value) []byte {
@@ -433,7 +457,7 @@ func MakeGobValue(value interface{}) ([]byte, error) {
 }
 
 func IsTombstoneValue(buf []byte) bool {
-	return len(buf) == 1 && buf[0] == tombstoneValue
+	return len(buf) == 1 && buf[0] == TombstoneValue
 }
 
 func IsRowValue(buf []byte) bool {

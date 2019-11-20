@@ -6,10 +6,9 @@ import (
 
 type Relation interface {
 	TxKey() TransactionKey
-	StatementID() uint64
+	CurrentStatement() uint64
 	MapID() uint64
-	MaximumVersion() uint64
-	// XXX: CheckTransaction(txKey TransactionKey) (bool, error)
+	AbortedTransaction(txKey TransactionKey) bool
 }
 
 type Store interface {
@@ -24,8 +23,8 @@ type Store interface {
 	// greater than key.Version.
 	WriteValue(ctx context.Context, mid uint64, key Key, ver uint64, val []byte) error
 
-	ScanRelation(ctx context.Context, rel Relation, prefix []byte, next interface{}) ([]Key,
-		[][]byte, interface{}, error)
+	ScanRelation(ctx context.Context, rel Relation, maxVer uint64, prefix []byte,
+		num int, next interface{}) ([]Key, [][]byte, interface{}, error)
 	DeleteRelation(ctx context.Context, rel Relation, keys []Key) error
 	UpdateRelation(ctx context.Context, rel Relation, keys []Key, vals []byte) error
 	InsertRelation(ctx context.Context, rel Relation, keys []Key, vals []byte) error
