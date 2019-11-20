@@ -2,6 +2,7 @@ package localkv_test
 
 import (
 	"bytes"
+	"context"
 	"path/filepath"
 	"testing"
 
@@ -29,10 +30,12 @@ type cmd struct {
 }
 
 func runCmds(t *testing.T, st kvrows.Store, mid uint64, cmds []cmd) {
+	ctx := context.Background()
+
 	for i, cmd := range cmds {
 		switch cmd.cmd {
 		case cmdReadValue:
-			ver, val, err := st.ReadValue(mid, cmd.key)
+			ver, val, err := st.ReadValue(ctx, mid, cmd.key)
 			if err != nil {
 				if !cmd.fail {
 					t.Errorf("ReadValue(%d, %v) failed with %s", i, cmd.key, err)
@@ -52,7 +55,7 @@ func runCmds(t *testing.T, st kvrows.Store, mid uint64, cmds []cmd) {
 				}
 			}
 		case cmdListValues:
-			keys, vals, err := st.ListValues(mid)
+			keys, vals, err := st.ListValues(ctx, mid)
 			if err != nil {
 				if !cmd.fail {
 					t.Errorf("ListValues(%d) failed with %s", i, err)
@@ -70,7 +73,7 @@ func runCmds(t *testing.T, st kvrows.Store, mid uint64, cmds []cmd) {
 				}
 			}
 		case cmdWriteValue:
-			err := st.WriteValue(mid, cmd.key, cmd.ver, cmd.val)
+			err := st.WriteValue(ctx, mid, cmd.key, cmd.ver, cmd.val)
 			if err != nil {
 				if !cmd.fail {
 					t.Errorf("WriteValue(%d, %v) failed with %s", i, cmd.key, err)
@@ -84,7 +87,7 @@ func runCmds(t *testing.T, st kvrows.Store, mid uint64, cmds []cmd) {
 	}
 }
 
-func testReadWrite(t *testing.T, st kvrows.Store) {
+func testReadWriteList(t *testing.T, st kvrows.Store) {
 	t.Helper()
 
 	runCmds(t, st, 1, []cmd{
@@ -208,6 +211,12 @@ func testReadWrite(t *testing.T, st kvrows.Store) {
 	})
 }
 
+func testRelation(t *testing.T, st kvrows.Store) {
+	t.Helper()
+
+	// XXX
+}
+
 func TestBadger(t *testing.T) {
 	err := testutil.CleanDir("testdata", []string{".gitignore"})
 	if err != nil {
@@ -218,7 +227,8 @@ func TestBadger(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	testReadWrite(t, localkv.NewStore(st))
+	testReadWriteList(t, localkv.NewStore(st))
+	testRelation(t, localkv.NewStore(st))
 }
 
 func TestBBolt(t *testing.T) {
@@ -231,5 +241,6 @@ func TestBBolt(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	testReadWrite(t, localkv.NewStore(st))
+	testReadWriteList(t, localkv.NewStore(st))
+	testRelation(t, localkv.NewStore(st))
 }

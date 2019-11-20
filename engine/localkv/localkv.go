@@ -1,6 +1,7 @@
 package localkv
 
 import (
+	"context"
 	"fmt"
 
 	"github.com/leftmike/maho/engine/kvrows"
@@ -14,7 +15,9 @@ func NewStore(st Store) kvrows.Store {
 	return localKV{st}
 }
 
-func (lkv localKV) ReadValue(mid uint64, key kvrows.Key) (uint64, []byte, error) {
+func (lkv localKV) ReadValue(ctx context.Context, mid uint64, key kvrows.Key) (uint64, []byte,
+	error) {
+
 	tx, err := lkv.st.Begin(false)
 	if err != nil {
 		return 0, nil, err
@@ -52,7 +55,7 @@ func (lkv localKV) ReadValue(mid uint64, key kvrows.Key) (uint64, []byte, error)
 	return k.Version, retval, nil
 }
 
-func (lkv localKV) ListValues(mid uint64) ([]kvrows.Key, [][]byte, error) {
+func (lkv localKV) ListValues(ctx context.Context, mid uint64) ([]kvrows.Key, [][]byte, error) {
 	tx, err := lkv.st.Begin(false)
 	if err != nil {
 		return nil, nil, err
@@ -94,7 +97,9 @@ func (lkv localKV) ListValues(mid uint64) ([]kvrows.Key, [][]byte, error) {
 	return keys, vals, nil
 }
 
-func (lkv localKV) WriteValue(mid uint64, key kvrows.Key, ver uint64, val []byte) error {
+func (lkv localKV) WriteValue(ctx context.Context, mid uint64, key kvrows.Key, ver uint64,
+	val []byte) error {
+
 	tx, err := lkv.st.Begin(true)
 	if err != nil {
 		return err
@@ -143,14 +148,26 @@ func (lkv localKV) WriteValue(mid uint64, key kvrows.Key, ver uint64, val []byte
 	return tx.Commit()
 }
 
-func (lkv localKV) ReadRows(txKey kvrows.TransactionKey, sid uint64, mid uint64, prefix []byte,
-	lastKey []byte, ver uint64) ([]kvrows.Key, [][]byte, error) {
+func (lkv localKV) ScanRelation(ctx context.Context, rel kvrows.Relation, prefix []byte,
+	next interface{}) ([]kvrows.Key, [][]byte, interface{}, error) {
 
-	return nil, nil, nil
+	return nil, nil, nil, nil
 }
 
-func (lkv localKV) WriteRows(txKey kvrows.TransactionKey, sid uint64, mid uint64, keys []kvrows.Key,
-	rows [][]byte) error {
+func (lkv localKV) DeleteRelation(ctx context.Context, rel kvrows.Relation,
+	keys []kvrows.Key) error {
+
+	return nil
+}
+
+func (lkv localKV) UpdateRelation(ctx context.Context, rel kvrows.Relation, keys []kvrows.Key,
+	vals []byte) error {
+
+	return nil
+}
+
+func (lkv localKV) InsertRelation(ctx context.Context, rel kvrows.Relation, keys []kvrows.Key,
+	vals []byte) error {
 
 	return nil
 }
