@@ -30,10 +30,19 @@ func testKey(t *testing.T, prevKey []byte, row []sql.Value, colKeys []engine.Col
 		Version: ver,
 		Type:    keyType,
 	}
+	ck := k.Copy()
+	if !testutil.DeepEqual(k, ck) {
+		t.Errorf("Copy() got %v want %v", ck, k)
+	}
+
 	key := k.Encode()
 	if bytes.Compare(prevKey, key) >= 0 {
 		t.Errorf("MakeKey(%v, %v) keys not ordered correctly; %v and %v",
 			row, colKeys, prevKey, key)
+	}
+
+	if kvrows.GetKeyType(key) != k.Type {
+		t.Errorf("GetKeyType(%v) got %v want %v", key, kvrows.GetKeyType(key), k.Type)
 	}
 
 	k, ok := kvrows.ParseKey(key)
@@ -1034,5 +1043,72 @@ func TestGobValues(t *testing.T) {
 		t.Errorf("ParseGobValue() failed")
 	} else if !testutil.DeepEqual(&result, &value) {
 		t.Errorf("ParseGobValue() got %v want %v", &result, &value)
+	}
+}
+
+func TestProposalValues(t *testing.T) {
+	txk := kvrows.TransactionKey{
+		MID:   1234,
+		Key:   []byte("abcdefghijk"),
+		TID:   5678,
+		Epoch: 9009,
+	}
+
+	val := []byte("xyzabc")
+	buf := kvrows.MakeProposalValue(txk, val)
+	rtxk, rval, ok := kvrows.ParseProposalValue(buf)
+	if !ok {
+		t.Error("ParseProposalValue failed")
+	} else {
+		if !txk.Equal(rtxk) {
+			t.Errorf("ParseProposalValue() got %v for tx key; want %v", rtxk, txk)
+		}
+		if !bytes.Equal(val, rval) {
+			t.Errorf("ParseProposalValue() got %v for value; want %v", rval, val)
+		}
+	}
+}
+
+func TestTransactionKeys(t *testing.T) {
+	cases := []struct {
+		txk1, txk2 kvrows.TransactionKey
+		fail       bool
+	}{
+		{
+			txk1: kvrows.TransactionKey{MID: 1234, Key: []byte("abcdef"), TID: 5678, Epoch: 9009},
+			txk2: kvrows.TransactionKey{MID: 1234, Key: []byte("abcdef"), TID: 5678, Epoch: 9009},
+		},
+		{
+			txk1: kvrows.TransactionKey{MID: 123, Key: []byte("abcdef"), TID: 5678, Epoch: 9009},
+			txk2: kvrows.TransactionKey{MID: 1234, Key: []byte("abcdef"), TID: 5678, Epoch: 9009},
+			fail: true,
+		},
+		{
+			txk1: kvrows.TransactionKey{MID: 1234, Key: []byte("abcdef"), TID: 567, Epoch: 9009},
+			txk2: kvrows.TransactionKey{MID: 1234, Key: []byte("abcdef"), TID: 5678, Epoch: 9009},
+			fail: true,
+		},
+		{
+			txk1: kvrows.TransactionKey{MID: 1234, Key: []byte("abcdef"), TID: 5678, Epoch: 9009},
+			txk2: kvrows.TransactionKey{MID: 1234, Key: []byte("abcdef"), TID: 5678, Epoch: 99},
+			fail: true,
+		},
+		{
+			txk1: kvrows.TransactionKey{MID: 1234, Key: []byte("ABCDEF"), TID: 5678, Epoch: 9009},
+			txk2: kvrows.TransactionKey{MID: 1234, Key: []byte("abcdef"), TID: 5678, Epoch: 9009},
+			fail: true,
+		},
+	}
+
+	for _, c := range cases {
+		if c.fail {
+			if c.txk1.Equal(c.txk2) {
+				t.Errorf("TransactionKey %v should not equal %v", c.txk1, c.txk2)
+			}
+		} else {
+			if !c.txk1.Equal(c.txk2) {
+				t.Errorf("TransactionKey %v should equal %v", c.txk1, c.txk2)
+			}
+		}
 	}
 }

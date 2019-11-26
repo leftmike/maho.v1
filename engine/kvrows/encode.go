@@ -336,14 +336,37 @@ func (txk TransactionKey) Equal(txk2 TransactionKey) bool {
 		bytes.Equal(txk.Key, txk2.Key)
 }
 
-func ParseProposalValue(buf []byte) (TransactionKey, []byte, error) {
-	// XXX
-	return TransactionKey{}, nil, nil
+func ParseProposalValue(buf []byte) (TransactionKey, []byte, bool) {
+	if len(buf) < 25 || buf[0] != ProposalValue {
+		return TransactionKey{}, nil, false
+	}
+	mid := decodeUint64(buf[1:9], false)
+	tid := decodeUint64(buf[9:17], false)
+	epoch := decodeUint64(buf[17:25], false)
+	buf = buf[25:]
+
+	buf, keylen, ok := DecodeVarint(buf)
+	if !ok || len(buf) <= int(keylen) {
+		return TransactionKey{}, nil, false
+	}
+
+	return TransactionKey{
+		MID:   mid,
+		Key:   buf[:keylen],
+		TID:   tid,
+		Epoch: epoch,
+	}, buf[keylen:], true
 }
 
-func EncodeProposalValue(txk TransactionKey, val []byte) []byte {
-	// XXX
-	return nil
+func MakeProposalValue(txk TransactionKey, val []byte) []byte {
+	pv := append(make([]byte, 0, len(txk.Key)+len(val)+26), ProposalValue)
+	pv = encodeUint64(pv, false, txk.MID)
+	pv = encodeUint64(pv, false, txk.TID)
+	pv = encodeUint64(pv, false, txk.Epoch)
+	pv = EncodeVarint(pv, uint64(len(txk.Key)))
+	pv = append(pv, txk.Key...)
+	pv = append(pv, val...)
+	return pv
 }
 
 func EncodeVarint(buf []byte, n uint64) []byte {
@@ -466,6 +489,10 @@ func IsRowValue(buf []byte) bool {
 
 func IsGobValue(buf []byte) bool {
 	return len(buf) > 0 && buf[0] == gobValue
+}
+
+func IsProposalValue(buf []byte) bool {
+	return len(buf) > 0 && buf[0] == ProposalValue
 }
 
 func ParseRowValue(buf []byte, dest []sql.Value) bool {

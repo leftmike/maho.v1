@@ -3,6 +3,7 @@ package localkv_test
 import (
 	"bytes"
 	"context"
+	"io"
 	"path/filepath"
 	"testing"
 
@@ -10,6 +11,7 @@ import (
 	"github.com/leftmike/maho/engine/bbolt"
 	"github.com/leftmike/maho/engine/kvrows"
 	"github.com/leftmike/maho/engine/localkv"
+	"github.com/leftmike/maho/sql"
 	"github.com/leftmike/maho/testutil"
 )
 
@@ -211,10 +213,237 @@ func testReadWriteList(t *testing.T, st kvrows.Store) {
 	})
 }
 
-func testRelation(t *testing.T, st kvrows.Store) {
+type keyValue struct {
+	key     kvrows.Key
+	val     []byte
+	visible bool
+}
+
+func initializeMap(t *testing.T, st localkv.Store, mid uint64, keyVals []keyValue) {
 	t.Helper()
 
-	// XXX
+	tx, err := st.Begin(true)
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer tx.Rollback()
+
+	m, err := tx.Map(mid)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	var prevKey []byte
+	for _, kv := range keyVals {
+		k := kv.key.Encode()
+		if bytes.Compare(prevKey, k) >= 0 {
+			t.Fatalf("initializeMap: keys out of order: %v %v", prevKey, k)
+		}
+
+		err = m.Set(k, kv.val)
+		if err != nil {
+			t.Fatal(err)
+		}
+		prevKey = k
+	}
+
+	err = tx.Commit()
+	if err != nil {
+		t.Fatal(err)
+	}
+}
+
+func checkScan(t *testing.T, keyVals []keyValue, idx int, keys []kvrows.Key, vals [][]byte) int {
+	if len(keys) != len(vals) {
+		t.Errorf("ScanRelation: got %d keys and %d values", len(keys), len(vals))
+	}
+
+	for jdx := range keys {
+		for {
+			if idx >= len(keyVals) {
+				t.Fatalf("ScanRelation: too many keys: %d", len(keys))
+			}
+			if keyVals[idx].visible {
+				break
+			}
+			idx += 1
+		}
+
+		if !testutil.DeepEqual(keys[jdx], keyVals[idx].key) {
+			t.Errorf("ScanRelation: got %v key; wanted %v", keys[jdx], keyVals[idx].key)
+		}
+		if keyVals[idx].key.Type == kvrows.ProposalKeyType {
+			_, buf, ok := kvrows.ParseProposalValue(keyVals[idx].val)
+			if !ok {
+				t.Fatalf("ScanRelation: expected proposal value with proposal key: %v; got %v",
+					keyVals[idx].key, keyVals[idx].val)
+			}
+			if !bytes.Equal(vals[jdx], buf) {
+				t.Errorf("ScanRelation: got %v value; wanted %v", vals[jdx], buf)
+			}
+		} else if !bytes.Equal(vals[jdx], keyVals[idx].val) {
+			t.Errorf("ScanRelation: got %v value; wanted %v", vals[jdx], keyVals[idx].val)
+		}
+		idx += 1
+	}
+
+	return idx
+}
+
+type relation struct {
+	txKey kvrows.TransactionKey
+	mid   uint64
+	sid   uint64
+}
+
+func (rel relation) TxKey() kvrows.TransactionKey {
+	return rel.txKey
+}
+
+func (rel relation) CurrentStatement() uint64 {
+	return rel.sid
+}
+
+func (rel relation) MapID() uint64 {
+	return rel.mid
+}
+
+func (_ relation) AbortedTransaction(txKey kvrows.TransactionKey) bool {
+	return true
+}
+
+func testScanRelation(t *testing.T, st localkv.Store) {
+	t.Helper()
+
+	ctx := context.Background()
+	lkv := localkv.NewStore(st)
+
+	txk := kvrows.TransactionKey{
+		MID:   1000,
+		Key:   []byte("cccc"),
+		TID:   99,
+		Epoch: 888,
+	}
+	keyVals := []keyValue{
+		{
+			key: kvrows.TransactionKey{
+				MID:   1000,
+				Key:   []byte("aaaa"),
+				TID:   11111,
+				Epoch: 1234,
+			}.EncodeKey(),
+			val: []byte("mid: 1000, key: aaaa, tid: 11111, epoch: 1234"),
+		},
+		{
+			key:     kvrows.Key{[]byte("bbbb"), 50, kvrows.DurableKeyType},
+			val:     kvrows.MakeRowValue([]sql.Value{sql.StringValue("bbbb@50")}),
+			visible: true,
+		},
+		{
+			key: kvrows.Key{[]byte("bbbb"), 49, kvrows.DurableKeyType},
+			val: kvrows.MakeRowValue([]sql.Value{sql.StringValue("bbbb@49")}),
+		},
+		{
+			key: kvrows.Key{[]byte("bbbb"), 48, kvrows.DurableKeyType},
+			val: kvrows.MakeTombstoneValue(),
+		},
+		{
+			key: kvrows.Key{[]byte("bbbb"), 47, kvrows.DurableKeyType},
+			val: kvrows.MakeRowValue([]sql.Value{sql.StringValue("bbbb@47")}),
+		},
+		{
+			key: txk.EncodeKey(),
+			val: []byte("mid: 1000, key: cccc, tid: 99, epoch: 888"),
+		},
+		{
+			key:     kvrows.Key{[]byte("dddd"), 100, kvrows.DurableKeyType},
+			val:     kvrows.MakeRowValue([]sql.Value{sql.StringValue("dddd@100")}),
+			visible: true,
+		},
+		{
+			key: kvrows.Key{[]byte("eeee"), 10, kvrows.DurableKeyType},
+			val: kvrows.MakeTombstoneValue(),
+		},
+		{
+			key: kvrows.Key{[]byte("eeee"), 9, kvrows.DurableKeyType},
+			val: kvrows.MakeRowValue([]sql.Value{sql.StringValue("eeee@9")}),
+		},
+		{
+			key: kvrows.Key{[]byte("eeee"), 8, kvrows.DurableKeyType},
+			val: kvrows.MakeRowValue([]sql.Value{sql.StringValue("eeee@8")}),
+		},
+		{
+			key:     kvrows.Key{[]byte("ffff"), 12, kvrows.ProposalKeyType},
+			val:     kvrows.MakeProposalValue(txk, []byte("proposal value ffff@12")),
+			visible: true,
+		},
+		{
+			key: kvrows.Key{[]byte("ffff"), 11, kvrows.ProposalKeyType},
+			val: kvrows.MakeProposalValue(txk, []byte("proposal value ffff@11")),
+		},
+		{
+			key: kvrows.Key{[]byte("ffff"), 10, kvrows.ProposalKeyType},
+			val: kvrows.MakeProposalValue(txk, kvrows.MakeTombstoneValue()),
+		},
+		{
+			key: kvrows.Key{[]byte("ffff"), 8, kvrows.DurableKeyType},
+			val: kvrows.MakeRowValue([]sql.Value{sql.StringValue("ffff@8")}),
+		},
+		{
+			key:     kvrows.Key{[]byte("gggg"), 858, kvrows.DurableKeyType},
+			val:     kvrows.MakeRowValue([]sql.Value{sql.StringValue("gggg@858")}),
+			visible: true,
+		},
+		{
+			key: kvrows.Key{[]byte("hhhh"), 120, kvrows.ProposalKeyType},
+			val: kvrows.MakeProposalValue(txk, kvrows.MakeTombstoneValue()),
+		},
+		{
+			key: kvrows.Key{[]byte("hhhh"), 119, kvrows.ProposalKeyType},
+			val: kvrows.MakeProposalValue(txk,
+				kvrows.MakeRowValue([]sql.Value{sql.StringValue("hhhh@119")})),
+		},
+		{
+			key: kvrows.Key{[]byte("hhhh"), 1234567, kvrows.DurableKeyType},
+			val: kvrows.MakeTombstoneValue(),
+		},
+		{
+			key: kvrows.Key{[]byte("hhhh"), 123456, kvrows.DurableKeyType},
+			val: kvrows.MakeRowValue([]sql.Value{sql.StringValue("hhhh@123456")}),
+		},
+		{
+			key: kvrows.Key{[]byte("iiii"), 9999999, kvrows.DurableKeyType},
+			val: kvrows.MakeRowValue([]sql.Value{sql.StringValue("iiii@9999999")}),
+		},
+		{
+			key:     kvrows.Key{[]byte("iiii"), 8, kvrows.DurableKeyType},
+			val:     kvrows.MakeRowValue([]sql.Value{sql.StringValue("iiii@8")}),
+			visible: true,
+		},
+	}
+
+	initializeMap(t, st, 1000, keyVals)
+
+	keys, vals, _, err := lkv.ScanRelation(ctx, relation{txKey: txk, mid: 1000, sid: 999999},
+		999999, nil, 1024, nil)
+	if err != io.EOF {
+		t.Errorf("ScanRelation failed with %s", err)
+	}
+	checkScan(t, keyVals, 0, keys, vals)
+
+	idx := 0
+	var next interface{}
+	for {
+		keys, vals, next, err = lkv.ScanRelation(ctx, relation{txKey: txk, mid: 1000, sid: 999999},
+			999999, nil, 1, next)
+		if err != nil && err != io.EOF {
+			t.Errorf("ScanRelation failed with %s", err)
+		}
+		idx = checkScan(t, keyVals, idx, keys, vals)
+		if err == io.EOF {
+			break
+		}
+	}
 }
 
 func TestBadger(t *testing.T) {
@@ -228,7 +457,7 @@ func TestBadger(t *testing.T) {
 		t.Fatal(err)
 	}
 	testReadWriteList(t, localkv.NewStore(st))
-	testRelation(t, localkv.NewStore(st))
+	testScanRelation(t, st)
 }
 
 func TestBBolt(t *testing.T) {
@@ -242,5 +471,5 @@ func TestBBolt(t *testing.T) {
 		t.Fatal(err)
 	}
 	testReadWriteList(t, localkv.NewStore(st))
-	testRelation(t, localkv.NewStore(st))
+	testScanRelation(t, st)
 }

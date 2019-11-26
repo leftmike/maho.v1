@@ -183,7 +183,9 @@ func (lkv localKV) ScanRelation(ctx context.Context, rel kvrows.Relation, maxVer
 	}
 
 	if num < 1 {
-		panic(fmt.Sprintf("ScanRelation: num must be > 0: %d", num))
+		num = 1
+	} else if num > 4096 {
+		num = 4096
 	}
 
 	var keys []kvrows.Key
@@ -196,12 +198,13 @@ func (lkv localKV) ScanRelation(ctx context.Context, rel kvrows.Relation, maxVer
 				err = w.Value(
 					func(val []byte) error {
 						if len(val) == 0 || val[0] != kvrows.ProposalValue {
-							return fmt.Errorf("localkv: unable to parse value for key %v", kbuf)
+							return fmt.Errorf("localkv: unable to parse value for key %v: %v",
+								kbuf, val)
 						}
-						// XXX: need to implement ParseProposalValue
-						txKey, pval, err := kvrows.ParseProposalValue(val)
-						if err != nil {
-							return err
+						txKey, pval, ok := kvrows.ParseProposalValue(val)
+						if !ok {
+							return fmt.Errorf("localkv: unable to parse value for key %v: %v",
+								kbuf, val)
 						}
 
 						if txKey.Equal(rel.TxKey()) {
@@ -217,6 +220,7 @@ func (lkv localKV) ScanRelation(ctx context.Context, rel kvrows.Relation, maxVer
 						} else if !rel.AbortedTransaction(txKey) {
 							// Can't ignore this proposal.
 
+							panic("localkv: can't ignore this proposal (not implemented)")
 							// XXX: return a proposal error
 						}
 						return nil
@@ -232,7 +236,7 @@ func (lkv localKV) ScanRelation(ctx context.Context, rel kvrows.Relation, maxVer
 						}
 						k = k.Copy()
 						keys = append(keys, k)
-						// XXX: parse the val here rather than just copying it to parse later
+						// XXX: parse the val here rather than just copying it to be parsed later
 						vals = append(vals, append(make([]byte, 0, len(val)), val...))
 						return nil
 					})
@@ -266,13 +270,13 @@ func (lkv localKV) ScanRelation(ctx context.Context, rel kvrows.Relation, maxVer
 				return nil, nil, nil, fmt.Errorf("localkv: unable to parse key %v", kbuf)
 			}
 			if !bytes.Equal(k.Key, nxt.Key) {
+				k = nxt
 				break
 			}
 		}
 	}
 
-	// XXX: return next
-	return keys, vals, nil, nil
+	return keys, vals, k.Key, nil
 }
 
 func (lkv localKV) DeleteRelation(ctx context.Context, rel kvrows.Relation,
