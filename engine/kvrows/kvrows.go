@@ -61,9 +61,10 @@ type KVRows struct {
 type TransactionState byte
 
 const (
-	ActiveTransaction    TransactionState = 0
-	CommittedTransaction TransactionState = 1
-	AbortedTransaction   TransactionState = 2
+	ActiveState    TransactionState = 0
+	CommittedState TransactionState = 1
+	AbortedState   TransactionState = 2
+	UnknownState   TransactionState = 3
 )
 
 type transactionMetadata struct {
@@ -372,15 +373,15 @@ func (kv *KVRows) Begin(sesid uint64) engine.Transaction {
 		},
 		sid:   1,
 		sesid: sesid,
-		state: ActiveTransaction,
+		state: ActiveState,
 	}
 }
 
 func (kv *KVRows) forRead(etx engine.Transaction) (*transaction, error) {
 	tx := etx.(*transaction)
-	if tx.state == CommittedTransaction {
+	if tx.state == CommittedState {
 		return nil, errTransactionCommitted
-	} else if tx.state == AbortedTransaction {
+	} else if tx.state == AbortedState {
 		return nil, errTransactionAborted
 	}
 	return tx, nil
@@ -390,9 +391,9 @@ func (kv *KVRows) forWrite(ctx context.Context, etx engine.Transaction, mid uint
 	sqlKey []byte) (*transaction, error) {
 
 	tx := etx.(*transaction)
-	if tx.state == CommittedTransaction {
+	if tx.state == CommittedState {
 		return nil, errTransactionCommitted
-	} else if tx.state == AbortedTransaction {
+	} else if tx.state == AbortedState {
 		return nil, errTransactionAborted
 	}
 	if tx.key.MID > 0 && tx.key.Key != nil {
@@ -402,12 +403,12 @@ func (kv *KVRows) forWrite(ctx context.Context, etx engine.Transaction, mid uint
 	tx.key.MID = mid
 	tx.key.Key = sqlKey
 	md := transactionMetadata{
-		State: ActiveTransaction,
+		State: ActiveState,
 		Epoch: tx.key.Epoch,
 	}
 	err := kv.writeGob(ctx, mid, tx.key.EncodeKey(), &md)
 	if err != nil {
-		tx.state = AbortedTransaction
+		tx.state = AbortedState
 		return nil, err
 	}
 	return tx, nil
@@ -416,9 +417,9 @@ func (kv *KVRows) forWrite(ctx context.Context, etx engine.Transaction, mid uint
 func (kv *KVRows) finalizeTransaction(ctx context.Context, tx *transaction,
 	ts TransactionState) error {
 
-	if tx.state == CommittedTransaction {
+	if tx.state == CommittedState {
 		return errTransactionCommitted
-	} else if tx.state == AbortedTransaction {
+	} else if tx.state == AbortedState {
 		return errTransactionAborted
 	}
 	if tx.key.MID == 0 || tx.key.Key == nil {
@@ -432,15 +433,15 @@ func (kv *KVRows) finalizeTransaction(ctx context.Context, tx *transaction,
 		return err
 	}
 
-	if md.State == AbortedTransaction {
-		tx.state = AbortedTransaction
-		if ts == AbortedTransaction {
+	if md.State == AbortedState {
+		tx.state = AbortedState
+		if ts == AbortedState {
 			// Someone else already aborted the transaction for us; since we are rolling back
 			// anyway, there is no error.
 			return nil
 		}
 		return errTransactionAborted
-	} else if md.State == CommittedTransaction {
+	} else if md.State == CommittedState {
 		// This should never happen: someone else committed the transaction for us.
 		return fmt.Errorf("kvrows: internal error: transaction already committed: %v", tx)
 	}
@@ -448,7 +449,7 @@ func (kv *KVRows) finalizeTransaction(ctx context.Context, tx *transaction,
 	md.State = ts
 	err = kv.writeGob(ctx, tx.key.MID, key, &md)
 	if err != nil {
-		tx.state = AbortedTransaction
+		tx.state = AbortedState
 		return err
 	}
 
@@ -493,11 +494,11 @@ func (kv *KVRows) ListTables(ctx context.Context, tx engine.Transaction,
 }
 
 func (tx *transaction) Commit(ctx context.Context) error {
-	return tx.kv.finalizeTransaction(ctx, tx, CommittedTransaction)
+	return tx.kv.finalizeTransaction(ctx, tx, CommittedState)
 }
 
 func (tx *transaction) Rollback() error {
-	return tx.kv.finalizeTransaction(context.Background(), tx, AbortedTransaction)
+	return tx.kv.finalizeTransaction(context.Background(), tx, AbortedState)
 }
 
 func (tx *transaction) NextStmt() {

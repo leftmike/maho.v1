@@ -151,7 +151,7 @@ func (lkv localKV) WriteValue(ctx context.Context, mid uint64, key kvrows.Key, v
 }
 
 func (lkv localKV) ScanRelation(ctx context.Context, rel kvrows.Relation, maxVer uint64,
-	prefix []byte, num int, next interface{}) ([]kvrows.Key, [][]byte, interface{}, error) {
+	prefix []byte, num int, seek []byte) ([]kvrows.Key, [][]byte, []byte, error) {
 
 	tx, err := lkv.st.Begin(false)
 	if err != nil {
@@ -169,10 +169,10 @@ func (lkv localKV) ScanRelation(ctx context.Context, rel kvrows.Relation, maxVer
 
 	var kbuf []byte
 	var ok bool
-	if next == nil {
+	if seek == nil {
 		kbuf, ok = w.Rewind()
 	} else {
-		kbuf, ok = w.Seek(next.([]byte))
+		kbuf, ok = w.Seek(seek)
 	}
 	if !ok {
 		return nil, nil, nil, io.EOF
@@ -195,37 +195,48 @@ func (lkv localKV) ScanRelation(ctx context.Context, rel kvrows.Relation, maxVer
 		for {
 			found := false
 			if k.Type == kvrows.ProposalKeyType {
+				blockingProposal := false
 				err = w.Value(
 					func(val []byte) error {
 						if len(val) == 0 || val[0] != kvrows.ProposalValue {
 							return fmt.Errorf("localkv: unable to parse value for key %v: %v",
 								kbuf, val)
 						}
-						txKey, pval, ok := kvrows.ParseProposalValue(val)
+						txk, pval, ok := kvrows.ParseProposalValue(val)
 						if !ok {
 							return fmt.Errorf("localkv: unable to parse value for key %v: %v",
 								kbuf, val)
 						}
 
-						if txKey.Equal(rel.TxKey()) {
+						if txk.Equal(rel.TxKey()) {
 							if k.Version < rel.CurrentStatement() {
-								if pval[0] != kvrows.TombstoneValue {
-									k = k.Copy()
-									keys = append(keys, k)
-									vals = append(vals,
-										append(make([]byte, 0, len(pval)), pval...))
-								}
 								found = true
 							}
-						} else if !rel.AbortedTransaction(txKey) {
-							// Can't ignore this proposal.
+						} else {
+							st := rel.GetTransactionState(txk)
+							if st == kvrows.CommittedState {
+								found = true
+							} else if st != kvrows.AbortedState {
+								// Can't ignore this proposal.
+								blockingProposal = true
+								return kvrows.ErrBlockingProposal(txk)
+							}
+						}
 
-							panic("localkv: can't ignore this proposal (not implemented)")
-							// XXX: return a proposal error
+						if found {
+							if pval[0] != kvrows.TombstoneValue {
+								k = k.Copy()
+								keys = append(keys, k)
+								vals = append(vals,
+									append(make([]byte, 0, len(pval)), pval...))
+							}
 						}
 						return nil
 					})
 				if err != nil {
+					if blockingProposal {
+						return keys, vals, k.Key, err
+					}
 					return nil, nil, nil, err
 				}
 			} else if k.Type == kvrows.DurableKeyType && k.Version <= maxVer {

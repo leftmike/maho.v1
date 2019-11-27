@@ -294,6 +294,7 @@ type relation struct {
 	txKey kvrows.TransactionKey
 	mid   uint64
 	sid   uint64
+	state kvrows.TransactionState
 }
 
 func (rel relation) TxKey() kvrows.TransactionKey {
@@ -308,8 +309,8 @@ func (rel relation) MapID() uint64 {
 	return rel.mid
 }
 
-func (_ relation) AbortedTransaction(txKey kvrows.TransactionKey) bool {
-	return true
+func (rel relation) GetTransactionState(txKey kvrows.TransactionKey) kvrows.TransactionState {
+	return rel.state
 }
 
 func testScanRelation(t *testing.T, st localkv.Store) {
@@ -424,18 +425,22 @@ func testScanRelation(t *testing.T, st localkv.Store) {
 
 	initializeMap(t, st, 1000, keyVals)
 
-	keys, vals, _, err := lkv.ScanRelation(ctx, relation{txKey: txk, mid: 1000, sid: 999999},
-		999999, nil, 1024, nil)
+	rel := relation{
+		txKey: txk,
+		mid:   1000,
+		sid:   999999,
+		state: kvrows.AbortedState,
+	}
+	keys, vals, _, err := lkv.ScanRelation(ctx, rel, 999999, nil, 1024, nil)
 	if err != io.EOF {
 		t.Errorf("ScanRelation failed with %s", err)
 	}
 	checkScan(t, keyVals, 0, keys, vals)
 
 	idx := 0
-	var next interface{}
+	var next []byte
 	for {
-		keys, vals, next, err = lkv.ScanRelation(ctx, relation{txKey: txk, mid: 1000, sid: 999999},
-			999999, nil, 1, next)
+		keys, vals, next, err = lkv.ScanRelation(ctx, rel, 999999, nil, 1, next)
 		if err != nil && err != io.EOF {
 			t.Errorf("ScanRelation failed with %s", err)
 		}
@@ -444,6 +449,87 @@ func testScanRelation(t *testing.T, st localkv.Store) {
 			break
 		}
 	}
+
+	txk2 := kvrows.TransactionKey{
+		MID:   99999,
+		Key:   []byte("abcdefghijklmn"),
+		TID:   12345678,
+		Epoch: 53,
+	}
+	keyVals2 := []keyValue{
+		{
+			key:     kvrows.Key{[]byte("bbbb"), 50, kvrows.DurableKeyType},
+			val:     kvrows.MakeRowValue([]sql.Value{sql.StringValue("bbbb@50")}),
+			visible: true,
+		},
+		{
+			key:     kvrows.Key{[]byte("cccc"), 12, kvrows.ProposalKeyType},
+			val:     kvrows.MakeProposalValue(txk2, []byte("proposal value cccc@12")),
+			visible: true,
+		},
+		{
+			key:     kvrows.Key{[]byte("dddd"), 50, kvrows.DurableKeyType},
+			val:     kvrows.MakeRowValue([]sql.Value{sql.StringValue("dddd@50")}),
+			visible: true,
+		},
+		{
+			key: kvrows.Key{[]byte("eeee"), 13, kvrows.ProposalKeyType},
+			val: kvrows.MakeProposalValue(txk2, kvrows.MakeTombstoneValue()),
+		},
+		{
+			key: kvrows.Key{[]byte("eeee"), 12, kvrows.ProposalKeyType},
+			val: kvrows.MakeProposalValue(txk2, []byte("proposal value eeee@12")),
+		},
+		{
+			key:     kvrows.Key{[]byte("ffff"), 50, kvrows.DurableKeyType},
+			val:     kvrows.MakeRowValue([]sql.Value{sql.StringValue("ffff@50")}),
+			visible: true,
+		},
+	}
+	initializeMap(t, st, 2000, keyVals2)
+
+	rel = relation{
+		txKey: txk,
+		mid:   2000,
+		sid:   999999,
+		state: kvrows.CommittedState,
+	}
+	keys, vals, _, err = lkv.ScanRelation(ctx, rel, 999999, nil, 1024, nil)
+	if err != io.EOF {
+		t.Errorf("ScanRelation failed with %s", err)
+	}
+	checkScan(t, keyVals2, 0, keys, vals)
+
+	rel = relation{
+		txKey: txk,
+		mid:   2000,
+		sid:   999999,
+		state: kvrows.ActiveState,
+	}
+	keys, vals, next, err = lkv.ScanRelation(ctx, rel, 999999, nil, 1024, nil)
+	bperr, ok := err.(kvrows.ErrBlockingProposal)
+	if !ok {
+		t.Errorf("ScanRelation: got %s; want blocking proposal error", err)
+	} else if !((kvrows.TransactionKey)(bperr)).Equal(txk2) {
+		t.Errorf("ScanRelation: got key %v; want %v", bperr, txk2)
+	}
+	if len(keys) != 1 {
+		t.Errorf("ScanRelation: got %d keys; want 1", len(keys))
+	}
+
+	idx = checkScan(t, keyVals2, 0, keys, vals)
+
+	rel = relation{
+		txKey: txk,
+		mid:   2000,
+		sid:   999999,
+		state: kvrows.CommittedState,
+	}
+	keys, vals, _, err = lkv.ScanRelation(ctx, rel, 999999, nil, 1024, next)
+	if err != io.EOF {
+		t.Errorf("ScanRelation failed with %s", err)
+	}
+	checkScan(t, keyVals2, idx, keys, vals)
 }
 
 func TestBadger(t *testing.T) {

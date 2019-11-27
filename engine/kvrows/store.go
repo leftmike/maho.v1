@@ -2,13 +2,20 @@ package kvrows
 
 import (
 	"context"
+	"fmt"
 )
 
 type Relation interface {
 	TxKey() TransactionKey
 	CurrentStatement() uint64
 	MapID() uint64
-	AbortedTransaction(txKey TransactionKey) bool
+	GetTransactionState(txKey TransactionKey) TransactionState
+}
+
+type ErrBlockingProposal TransactionKey
+
+func (err ErrBlockingProposal) Error() string {
+	return fmt.Sprintf("proposal blocked by transaction %v", err)
 }
 
 type Store interface {
@@ -24,7 +31,7 @@ type Store interface {
 	WriteValue(ctx context.Context, mid uint64, key Key, ver uint64, val []byte) error
 
 	ScanRelation(ctx context.Context, rel Relation, maxVer uint64, prefix []byte,
-		num int, next interface{}) ([]Key, [][]byte, interface{}, error)
+		num int, seek []byte) ([]Key, [][]byte, []byte, error)
 	DeleteRelation(ctx context.Context, rel Relation, keys []Key) error
 	UpdateRelation(ctx context.Context, rel Relation, keys []Key, vals []byte) error
 	InsertRelation(ctx context.Context, rel Relation, keys []Key, vals []byte) error
