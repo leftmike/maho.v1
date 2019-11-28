@@ -292,10 +292,63 @@ func (lkv localKV) ScanRelation(ctx context.Context, rel kvrows.Relation, maxVer
 	return keys, vals, k.Copy().Key, nil
 }
 
+func deleteRelation(rel kvrows.Relation, deleteKey kvrows.Key, m Mapper) error {
+	w := m.Walk(deleteKey.Key)
+	defer w.Close()
+
+	kbuf, ok := w.Seek(deleteKey.Key)
+	if !ok {
+		return fmt.Errorf("localkv: key %v not found", deleteKey)
+	}
+
+	// The key exists; check to see if it has a visible value.
+	k, ok := kvrows.ParseKey(kbuf)
+	if !ok {
+		return fmt.Errorf("localkv: unable to parse key %v", kbuf)
+	}
+
+	// Scan and find the greatest version of the key, if it has a visible value.
+	_, _, err := nextKey(rel, w, k, kvrows.MaximumVersion,
+		func(key kvrows.Key, val []byte) error {
+			if len(val) == 0 || val[0] == kvrows.TombstoneValue {
+				return fmt.Errorf("localkv: key %v not found", deleteKey)
+			}
+			if !key.Equal(deleteKey) {
+				return fmt.Errorf("localkv: key %v has conflicting write", deleteKey)
+			}
+			return nil
+		})
+	if err != nil {
+		return err
+	}
+
+	// The key has a visible value; go ahead and propose a tombstone.
+	return m.Set(kvrows.MakeProposalKey(deleteKey.Key, rel.CurrentStatement()).Encode(),
+		kvrows.MakeProposalValue(rel.TxKey(), kvrows.MakeTombstoneValue()))
+}
+
 func (lkv localKV) DeleteRelation(ctx context.Context, rel kvrows.Relation,
 	keys []kvrows.Key) error {
 
-	return nil
+	tx, err := lkv.st.Begin(true)
+	if err != nil {
+		return err
+	}
+	defer tx.Rollback()
+
+	m, err := tx.Map(rel.MapID())
+	if err != nil {
+		return err
+	}
+
+	for idx := range keys {
+		err := deleteRelation(rel, keys[idx], m)
+		if err != nil {
+			return err
+		}
+	}
+
+	return tx.Commit()
 }
 
 func (lkv localKV) UpdateRelation(ctx context.Context, rel kvrows.Relation, keys []kvrows.Key,
@@ -304,11 +357,11 @@ func (lkv localKV) UpdateRelation(ctx context.Context, rel kvrows.Relation, keys
 	return nil
 }
 
-func insertRelation(rel kvrows.Relation, key []byte, val []byte, m Mapper) error {
-	w := m.Walk(key)
+func insertRelation(rel kvrows.Relation, insertKey []byte, val []byte, m Mapper) error {
+	w := m.Walk(insertKey)
 	defer w.Close()
 
-	kbuf, ok := w.Seek(key)
+	kbuf, ok := w.Seek(insertKey)
 	if ok {
 		// The key exists; check to see if it has a visible value.
 		k, ok := kvrows.ParseKey(kbuf)
@@ -317,7 +370,7 @@ func insertRelation(rel kvrows.Relation, key []byte, val []byte, m Mapper) error
 		}
 
 		// Scan and find the greatest version of the key, if it has a visible value.
-		k, _, err := nextKey(rel, w, k, kvrows.MaximumVersion,
+		_, _, err := nextKey(rel, w, k, kvrows.MaximumVersion,
 			func(key kvrows.Key, val []byte) error {
 				if len(val) == 0 || val[0] == kvrows.TombstoneValue {
 					return nil
@@ -330,7 +383,7 @@ func insertRelation(rel kvrows.Relation, key []byte, val []byte, m Mapper) error
 	}
 
 	// No value is visible for the key; go ahead and propose a value.
-	return m.Set(kvrows.MakeProposalKey(key, rel.CurrentStatement()).Encode(),
+	return m.Set(kvrows.MakeProposalKey(insertKey, rel.CurrentStatement()).Encode(),
 		kvrows.MakeProposalValue(rel.TxKey(), val))
 }
 

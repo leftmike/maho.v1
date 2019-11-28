@@ -659,6 +659,170 @@ func testInsertRelation(t *testing.T, st kvrows.Store) {
 			kvrows.MakeRowValue([]sql.Value{sql.StringValue("cccc row")}),
 			kvrows.MakeRowValue([]sql.Value{sql.StringValue("dddd row")}),
 		})
+
+	rel.sid += 1
+	err = st.InsertRelation(ctx, rel,
+		[][]byte{
+			[]byte("eeee key"),
+			[]byte("eeee key"),
+		},
+		[][]byte{
+			kvrows.MakeRowValue([]sql.Value{sql.StringValue("eeee row #1")}),
+			kvrows.MakeRowValue([]sql.Value{sql.StringValue("eeee row #2")}),
+		})
+	if err == nil {
+		t.Errorf("InsertRelation did not fail")
+	}
+
+	rel.sid += 1
+	checkRelation(t, ctx, st, rel,
+		[][]byte{
+			[]byte("aaaa key"),
+			[]byte("bbbb key"),
+			[]byte("cccc key"),
+			[]byte("dddd key"),
+		},
+		[][]byte{
+			kvrows.MakeRowValue([]sql.Value{sql.StringValue("aaaa row")}),
+			kvrows.MakeRowValue([]sql.Value{sql.StringValue("bbbb row")}),
+			kvrows.MakeRowValue([]sql.Value{sql.StringValue("cccc row")}),
+			kvrows.MakeRowValue([]sql.Value{sql.StringValue("dddd row")}),
+		})
+}
+
+func testDeleteRelation(t *testing.T, st kvrows.Store) {
+	ctx := context.Background()
+
+	txk := kvrows.TransactionKey{
+		MID:   20000,
+		Key:   []byte("abcdefghijklmn"),
+		TID:   99,
+		Epoch: 888,
+	}
+
+	rel := relation{
+		txKey: txk,
+		mid:   20000,
+		sid:   10,
+		state: kvrows.AbortedState,
+	}
+
+	err := st.InsertRelation(ctx, rel,
+		[][]byte{
+			[]byte("aaaa key"),
+			[]byte("bbbb key"),
+			[]byte("cccc key"),
+			[]byte("dddd key"),
+		},
+		[][]byte{
+			kvrows.MakeRowValue([]sql.Value{sql.StringValue("aaaa row")}),
+			kvrows.MakeRowValue([]sql.Value{sql.StringValue("bbbb row")}),
+			kvrows.MakeRowValue([]sql.Value{sql.StringValue("cccc row")}),
+			kvrows.MakeRowValue([]sql.Value{sql.StringValue("dddd row")}),
+		})
+	if err != nil {
+		t.Errorf("InsertRelation: failed with %s", err)
+	}
+
+	rel.sid += 1
+	checkRelation(t, ctx, st, rel,
+		[][]byte{
+			[]byte("aaaa key"),
+			[]byte("bbbb key"),
+			[]byte("cccc key"),
+			[]byte("dddd key"),
+		},
+		[][]byte{
+			kvrows.MakeRowValue([]sql.Value{sql.StringValue("aaaa row")}),
+			kvrows.MakeRowValue([]sql.Value{sql.StringValue("bbbb row")}),
+			kvrows.MakeRowValue([]sql.Value{sql.StringValue("cccc row")}),
+			kvrows.MakeRowValue([]sql.Value{sql.StringValue("dddd row")}),
+		})
+
+	rel.sid += 1
+	err = st.DeleteRelation(ctx, rel,
+		[]kvrows.Key{
+			kvrows.Key{[]byte("bbbb key"), 10, kvrows.ProposalKeyType},
+		})
+	if err != nil {
+		t.Errorf("DeleteRelation failed with %s", err)
+	}
+
+	rel.sid += 1
+	checkRelation(t, ctx, st, rel,
+		[][]byte{
+			[]byte("aaaa key"),
+			[]byte("cccc key"),
+			[]byte("dddd key"),
+		},
+		[][]byte{
+			kvrows.MakeRowValue([]sql.Value{sql.StringValue("aaaa row")}),
+			kvrows.MakeRowValue([]sql.Value{sql.StringValue("cccc row")}),
+			kvrows.MakeRowValue([]sql.Value{sql.StringValue("dddd row")}),
+		})
+
+	rel.sid += 1
+	err = st.DeleteRelation(ctx, rel,
+		[]kvrows.Key{
+			kvrows.Key{[]byte("bbbb key"), 10, kvrows.ProposalKeyType},
+		})
+	if err == nil {
+		t.Errorf("DeleteRelation did not fail")
+	}
+
+	rel.sid += 1
+	err = st.InsertRelation(ctx, rel,
+		[][]byte{
+			[]byte("bbbb key"),
+			[]byte("eeee key"),
+		},
+		[][]byte{
+			kvrows.MakeRowValue([]sql.Value{sql.StringValue("bbbb row")}),
+			kvrows.MakeRowValue([]sql.Value{sql.StringValue("eeee row")}),
+		})
+	if err != nil {
+		t.Errorf("InsertRelation: failed with %s", err)
+	}
+
+	rel.sid += 1
+	checkRelation(t, ctx, st, rel,
+		[][]byte{
+			[]byte("aaaa key"),
+			[]byte("bbbb key"),
+			[]byte("cccc key"),
+			[]byte("dddd key"),
+			[]byte("eeee key"),
+		},
+		[][]byte{
+			kvrows.MakeRowValue([]sql.Value{sql.StringValue("aaaa row")}),
+			kvrows.MakeRowValue([]sql.Value{sql.StringValue("bbbb row")}),
+			kvrows.MakeRowValue([]sql.Value{sql.StringValue("cccc row")}),
+			kvrows.MakeRowValue([]sql.Value{sql.StringValue("dddd row")}),
+			kvrows.MakeRowValue([]sql.Value{sql.StringValue("eeee row")}),
+		})
+
+	rel.sid += 1
+	err = st.DeleteRelation(ctx, rel,
+		[]kvrows.Key{
+			kvrows.Key{[]byte("bbbb key"), 15, kvrows.ProposalKeyType},
+			kvrows.Key{[]byte("dddd key"), 10, kvrows.ProposalKeyType},
+		})
+	if err != nil {
+		t.Errorf("DeleteRelation failed with %s", err)
+	}
+
+	rel.sid += 1
+	checkRelation(t, ctx, st, rel,
+		[][]byte{
+			[]byte("aaaa key"),
+			[]byte("cccc key"),
+			[]byte("eeee key"),
+		},
+		[][]byte{
+			kvrows.MakeRowValue([]sql.Value{sql.StringValue("aaaa row")}),
+			kvrows.MakeRowValue([]sql.Value{sql.StringValue("cccc row")}),
+			kvrows.MakeRowValue([]sql.Value{sql.StringValue("eeee row")}),
+		})
 }
 
 func TestBadger(t *testing.T) {
@@ -674,6 +838,7 @@ func TestBadger(t *testing.T) {
 	testReadWriteList(t, localkv.NewStore(st))
 	testScanRelation(t, st)
 	testInsertRelation(t, localkv.NewStore(st))
+	testDeleteRelation(t, localkv.NewStore(st))
 }
 
 func TestBBolt(t *testing.T) {
@@ -689,4 +854,5 @@ func TestBBolt(t *testing.T) {
 	testReadWriteList(t, localkv.NewStore(st))
 	testScanRelation(t, st)
 	testInsertRelation(t, localkv.NewStore(st))
+	testDeleteRelation(t, localkv.NewStore(st))
 }

@@ -309,6 +309,10 @@ func (k Key) Copy() Key {
 	}
 }
 
+func (k Key) Equal(k2 Key) bool {
+	return k.Version == k2.Version && k.Type == k2.Type && bytes.Equal(k.Key, k2.Key)
+}
+
 func MakeProposalKey(key []byte, sid uint64) Key {
 	return Key{
 		Key:     key,
