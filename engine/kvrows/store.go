@@ -43,35 +43,34 @@ type Store interface {
 	// * If the scan was successful, but there are no more keys available, err will be io.EOF,
 	//   and next will be nil.
 	// * If the scan encountered a proposed write by a different transaction which is potentially
-	//   still active, err will be an instance of ErrBlockingProposals. The key of the proposed
+	//   still active, err will be an instance of ErrBlockingProposal. The key of the proposed
 	//   write will be returned as next. Note that zero or more valid keys and values, which
 	//   were scanned before the proposed write, will also be returned.
 	ScanRelation(ctx context.Context, rel Relation, maxVer uint64, prefix []byte, num int,
 		seek []byte) (keys []Key, vals [][]byte, next []byte, err error)
 
-	DeleteRelation(ctx context.Context, rel Relation, keys []Key) error
-	// XXX: fix so just the update needs to be sent
-	UpdateRelation(ctx context.Context, rel Relation, keys []Key, vals [][]byte) error
-	InsertRelation(ctx context.Context, rel Relation, keys [][]byte, vals [][]byte) error
+	// ModifyRelation will delete, if vals is nil, or update one or more keys for the relation
+	// specified by rel. The keys must all exist and have visible values. Each key must exactly
+	// match the latest visible version of the key. To do this, use the keys returned from
+	// ScanRelation.
+	//
+	// The operation is atomic: either all of the modifications will be proposed or none of them.
+	// A transaction key must already exist; it is passed as part of rel.
+	//
+	// If a modification encountered a proposed write by a different transaction which is
+	// potentially still active, err will be an instance of ErrBlockingProposal.
+	//
+	// XXX: updating a key doesn't require the entire value; it would potentially be more
+	// efficient to just pass the delta
+	ModifyRelation(ctx context.Context, rel Relation, keys []Key, vals [][]byte) error
 
-	/*
-		// WriteRows will update, delete, or insert one or more rows for the
-		// transaction specified by txKey.
-		//
-		// For update and delete, the keys, including version, must be the same as
-		// returned from ReadRows. For insert, the version must be zero.
-		//
-		// For insert, the keys must not be visible.
-		//
-		// For update, delete, and insert:
-		// * If making proposed writes for all keys was successful, error will be nil.
-		// * If one or more keys had existing proposed writes by other transactions,
-		//   error will be an instance of kvrows.ProposedWrites. The keys and the
-		//   transaction keys of all the existing proposed writes will be in the
-		//   instance.
-		// * If there is an existing conflicting value for a key, error will be an
-		//   instance of kvrows.ConflictingWrite. The key of the conflicting write will
-		//   be in the instance.
-		WriteRows(txKey TransactionKey, sid uint64, mid uint64, keys []Key, rows [][]byte) error
-	*/
+	// InsertRelation will insert new key(s) and value(s) into the relation specified by rel.
+	// None of the keys can have visible values.
+	//
+	// The operation is atomic: either all of the values will be proposed for the keys or none of
+	// them. A transaction key must already exist; it is passed as part of rel.
+	//
+	// If a insert encountered a proposed write by a different transaction which is
+	// potentially still active, err will be an instance of ErrBlockingProposal.
+	InsertRelation(ctx context.Context, rel Relation, keys [][]byte, vals [][]byte) error
 }

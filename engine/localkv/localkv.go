@@ -292,13 +292,13 @@ func (lkv localKV) ScanRelation(ctx context.Context, rel kvrows.Relation, maxVer
 	return keys, vals, k.Copy().Key, nil
 }
 
-func deleteRelation(rel kvrows.Relation, deleteKey kvrows.Key, m Mapper) error {
-	w := m.Walk(deleteKey.Key)
+func modifyRelation(rel kvrows.Relation, modifyKey kvrows.Key, val []byte, m Mapper) error {
+	w := m.Walk(modifyKey.Key)
 	defer w.Close()
 
-	kbuf, ok := w.Seek(deleteKey.Key)
+	kbuf, ok := w.Seek(modifyKey.Key)
 	if !ok {
-		return fmt.Errorf("localkv: key %v not found", deleteKey)
+		return fmt.Errorf("localkv: key %v not found", modifyKey)
 	}
 
 	// The key exists; check to see if it has a visible value.
@@ -311,10 +311,10 @@ func deleteRelation(rel kvrows.Relation, deleteKey kvrows.Key, m Mapper) error {
 	_, _, err := nextKey(rel, w, k, kvrows.MaximumVersion,
 		func(key kvrows.Key, val []byte) error {
 			if len(val) == 0 || val[0] == kvrows.TombstoneValue {
-				return fmt.Errorf("localkv: key %v not found", deleteKey)
+				return fmt.Errorf("localkv: key %v not found", modifyKey)
 			}
-			if !key.Equal(deleteKey) {
-				return fmt.Errorf("localkv: key %v has conflicting write", deleteKey)
+			if !key.Equal(modifyKey) {
+				return fmt.Errorf("localkv: key %v has conflicting write", modifyKey)
 			}
 			return nil
 		})
@@ -322,13 +322,13 @@ func deleteRelation(rel kvrows.Relation, deleteKey kvrows.Key, m Mapper) error {
 		return err
 	}
 
-	// The key has a visible value; go ahead and propose a tombstone.
-	return m.Set(kvrows.MakeProposalKey(deleteKey.Key, rel.CurrentStatement()).Encode(),
-		kvrows.MakeProposalValue(rel.TxKey(), kvrows.MakeTombstoneValue()))
+	// The key has a visible value; go ahead and propose an updated value.
+	return m.Set(kvrows.MakeProposalKey(modifyKey.Key, rel.CurrentStatement()).Encode(),
+		kvrows.MakeProposalValue(rel.TxKey(), val))
 }
 
-func (lkv localKV) DeleteRelation(ctx context.Context, rel kvrows.Relation,
-	keys []kvrows.Key) error {
+func (lkv localKV) ModifyRelation(ctx context.Context, rel kvrows.Relation, keys []kvrows.Key,
+	vals [][]byte) error {
 
 	tx, err := lkv.st.Begin(true)
 	if err != nil {
@@ -341,20 +341,22 @@ func (lkv localKV) DeleteRelation(ctx context.Context, rel kvrows.Relation,
 		return err
 	}
 
+	var val []byte
+	if vals == nil {
+		val = kvrows.MakeTombstoneValue()
+	}
+
 	for idx := range keys {
-		err := deleteRelation(rel, keys[idx], m)
+		if vals != nil {
+			val = vals[idx]
+		}
+		err := modifyRelation(rel, keys[idx], val, m)
 		if err != nil {
 			return err
 		}
 	}
 
 	return tx.Commit()
-}
-
-func (lkv localKV) UpdateRelation(ctx context.Context, rel kvrows.Relation, keys []kvrows.Key,
-	vals [][]byte) error {
-
-	return nil
 }
 
 func insertRelation(rel kvrows.Relation, insertKey []byte, val []byte, m Mapper) error {
