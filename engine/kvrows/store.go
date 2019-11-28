@@ -12,13 +12,13 @@ type Relation interface {
 	GetTransactionState(txKey TransactionKey) TransactionState
 }
 
-type ErrBlockingProposals struct {
-	TxKeys []TransactionKey
-	Keys   []Key
+type ErrBlockingProposal struct {
+	TxKey TransactionKey
+	Key   Key
 }
 
-func (err *ErrBlockingProposals) Error() string {
-	return fmt.Sprintf("kvrows: %d blocking proposals", len(err.TxKeys))
+func (err *ErrBlockingProposal) Error() string {
+	return fmt.Sprintf("kvrows: blocking proposal: %v by %v", err.Key, err.TxKey)
 }
 
 type Store interface {
@@ -50,8 +50,9 @@ type Store interface {
 		seek []byte) (keys []Key, vals [][]byte, next []byte, err error)
 
 	DeleteRelation(ctx context.Context, rel Relation, keys []Key) error
-	UpdateRelation(ctx context.Context, rel Relation, keys []Key, vals []byte) error
-	InsertRelation(ctx context.Context, rel Relation, keys []Key, vals []byte) error
+	// XXX: fix so just the update needs to be sent
+	UpdateRelation(ctx context.Context, rel Relation, keys []Key, vals [][]byte) error
+	InsertRelation(ctx context.Context, rel Relation, keys [][]byte, vals [][]byte) error
 
 	/*
 		// WriteRows will update, delete, or insert one or more rows for the

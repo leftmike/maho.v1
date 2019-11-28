@@ -526,10 +526,10 @@ func testScanRelation(t *testing.T, st localkv.Store) {
 		state: kvrows.ActiveState,
 	}
 	keys, vals, next, err = lkv.ScanRelation(ctx, rel, 999999, nil, 1024, nil)
-	bperr, ok := err.(*kvrows.ErrBlockingProposals)
+	bperr, ok := err.(*kvrows.ErrBlockingProposal)
 	if !ok {
 		t.Errorf("ScanRelation: got %s; want blocking proposals error", err)
-	} else if len(bperr.TxKeys) != 1 || !bperr.TxKeys[0].Equal(txk2) {
+	} else if !bperr.TxKey.Equal(txk2) {
 		t.Errorf("ScanRelation: got key %v; want %v", bperr, txk2)
 	}
 	if len(keys) != 1 {
@@ -556,6 +556,111 @@ func testScanRelation(t *testing.T, st localkv.Store) {
 	}
 }
 
+func checkRelation(t *testing.T, ctx context.Context, st kvrows.Store, rel kvrows.Relation,
+	wantKeys, wantVals [][]byte) {
+
+	keys, vals, _, err := st.ScanRelation(ctx, rel, kvrows.MaximumVersion, nil, 1024, nil)
+	if err != io.EOF {
+		t.Errorf("ScanRelation failed with %s", err)
+	}
+	if len(wantKeys) != len(keys) {
+		t.Errorf("ScanRelation: got %d keys; want %d", len(keys), len(wantKeys))
+	}
+	for i := range keys {
+		if !bytes.Equal(keys[i].Key, wantKeys[i]) {
+			t.Errorf("ScanRelation: got %v key at %d; want %v", keys[i].Key, i, wantKeys[i])
+		}
+	}
+	if !testutil.DeepEqual(vals, wantVals) {
+		t.Errorf("ScanRelation: got %v keys; want %v", vals, wantVals)
+	}
+}
+
+func testInsertRelation(t *testing.T, st kvrows.Store) {
+	ctx := context.Background()
+
+	txk := kvrows.TransactionKey{
+		MID:   10000,
+		Key:   []byte("abcdefghijklmn"),
+		TID:   99,
+		Epoch: 888,
+	}
+
+	rel := relation{
+		txKey: txk,
+		mid:   10000,
+		sid:   10,
+		state: kvrows.AbortedState,
+	}
+
+	err := st.InsertRelation(ctx, rel,
+		[][]byte{
+			[]byte("bbbb key"),
+			[]byte("cccc key"),
+		},
+		[][]byte{
+			kvrows.MakeRowValue([]sql.Value{sql.StringValue("bbbb row")}),
+			kvrows.MakeRowValue([]sql.Value{sql.StringValue("cccc row")}),
+		})
+	if err != nil {
+		t.Errorf("InsertRelation: failed with %s", err)
+	}
+
+	rel.sid += 1
+	checkRelation(t, ctx, st, rel,
+		[][]byte{
+			[]byte("bbbb key"),
+			[]byte("cccc key"),
+		},
+		[][]byte{
+			kvrows.MakeRowValue([]sql.Value{sql.StringValue("bbbb row")}),
+			kvrows.MakeRowValue([]sql.Value{sql.StringValue("cccc row")}),
+		})
+
+	rel.sid += 1
+	err = st.InsertRelation(ctx, rel,
+		[][]byte{
+			[]byte("bbbb key"),
+			[]byte("cccc key"),
+		},
+		[][]byte{
+			kvrows.MakeRowValue([]sql.Value{sql.StringValue("bbbb row")}),
+			kvrows.MakeRowValue([]sql.Value{sql.StringValue("cccc row")}),
+		})
+	if err == nil {
+		t.Errorf("InsertRelation: did not fail")
+	}
+
+	rel.sid += 1
+	err = st.InsertRelation(ctx, rel,
+		[][]byte{
+			[]byte("aaaa key"),
+			[]byte("dddd key"),
+		},
+		[][]byte{
+			kvrows.MakeRowValue([]sql.Value{sql.StringValue("aaaa row")}),
+			kvrows.MakeRowValue([]sql.Value{sql.StringValue("dddd row")}),
+		})
+	if err != nil {
+		t.Errorf("InsertRelation: failed with %s", err)
+	}
+
+	rel.sid += 1
+	checkRelation(t, ctx, st, rel,
+		[][]byte{
+			[]byte("aaaa key"),
+			[]byte("bbbb key"),
+			[]byte("cccc key"),
+			[]byte("dddd key"),
+		},
+		[][]byte{
+			kvrows.MakeRowValue([]sql.Value{sql.StringValue("aaaa row")}),
+			kvrows.MakeRowValue([]sql.Value{sql.StringValue("bbbb row")}),
+			kvrows.MakeRowValue([]sql.Value{sql.StringValue("cccc row")}),
+			kvrows.MakeRowValue([]sql.Value{sql.StringValue("dddd row")}),
+		})
+}
+
 func TestBadger(t *testing.T) {
 	err := testutil.CleanDir("testdata", []string{".gitignore"})
 	if err != nil {
@@ -568,6 +673,7 @@ func TestBadger(t *testing.T) {
 	}
 	testReadWriteList(t, localkv.NewStore(st))
 	testScanRelation(t, st)
+	testInsertRelation(t, localkv.NewStore(st))
 }
 
 func TestBBolt(t *testing.T) {
@@ -582,4 +688,5 @@ func TestBBolt(t *testing.T) {
 	}
 	testReadWriteList(t, localkv.NewStore(st))
 	testScanRelation(t, st)
+	testInsertRelation(t, localkv.NewStore(st))
 }

@@ -309,6 +309,14 @@ func (k Key) Copy() Key {
 	}
 }
 
+func MakeProposalKey(key []byte, sid uint64) Key {
+	return Key{
+		Key:     key,
+		Version: sid,
+		Type:    ProposalKeyType,
+	}
+}
+
 func ParseKey(key []byte) (Key, bool) {
 	if len(key) < 10 || key[len(key)-1] != key[len(key)-10] {
 		return Key{}, false
