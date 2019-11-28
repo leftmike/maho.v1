@@ -211,8 +211,8 @@ func nextKey(rel kvrows.Relation, w Walker, k kvrows.Key, maxVer uint64,
 	return k, false, io.EOF
 }
 
-func (lkv localKV) ScanRelation(ctx context.Context, rel kvrows.Relation, maxVer uint64,
-	prefix []byte, num int, seek []byte) ([]kvrows.Key, [][]byte, []byte, error) {
+func (lkv localKV) ScanRelation(ctx context.Context, rel kvrows.Relation, maxVer uint64, num int,
+	seek []byte) ([]kvrows.Key, [][]byte, []byte, error) {
 
 	tx, err := lkv.st.Begin(false)
 	if err != nil {
@@ -225,7 +225,7 @@ func (lkv localKV) ScanRelation(ctx context.Context, rel kvrows.Relation, maxVer
 		return nil, nil, nil, err
 	}
 
-	w := m.Walk(prefix)
+	w := m.Walk(nil)
 	defer w.Close()
 
 	var kbuf []byte

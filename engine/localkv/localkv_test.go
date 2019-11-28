@@ -439,7 +439,7 @@ func testScanRelation(t *testing.T, st localkv.Store) {
 		sid:   999999,
 		state: kvrows.AbortedState,
 	}
-	keys, vals, _, err := lkv.ScanRelation(ctx, rel, 999999, nil, 1024, nil)
+	keys, vals, _, err := lkv.ScanRelation(ctx, rel, 999999, 1024, nil)
 	if err != io.EOF {
 		t.Errorf("ScanRelation failed with %s", err)
 	}
@@ -452,7 +452,7 @@ func testScanRelation(t *testing.T, st localkv.Store) {
 	cnt := 0
 	var next []byte
 	for {
-		keys, vals, next, err = lkv.ScanRelation(ctx, rel, 999999, nil, 1, next)
+		keys, vals, next, err = lkv.ScanRelation(ctx, rel, 999999, 1, next)
 		if err != nil && err != io.EOF {
 			t.Errorf("ScanRelation failed with %s", err)
 		}
@@ -510,7 +510,7 @@ func testScanRelation(t *testing.T, st localkv.Store) {
 		sid:   999999,
 		state: kvrows.CommittedState,
 	}
-	keys, vals, _, err = lkv.ScanRelation(ctx, rel, 999999, nil, 1024, nil)
+	keys, vals, _, err = lkv.ScanRelation(ctx, rel, 999999, 1024, nil)
 	if err != io.EOF {
 		t.Errorf("ScanRelation failed with %s", err)
 	}
@@ -525,7 +525,7 @@ func testScanRelation(t *testing.T, st localkv.Store) {
 		sid:   999999,
 		state: kvrows.ActiveState,
 	}
-	keys, vals, next, err = lkv.ScanRelation(ctx, rel, 999999, nil, 1024, nil)
+	keys, vals, next, err = lkv.ScanRelation(ctx, rel, 999999, 1024, nil)
 	bperr, ok := err.(*kvrows.ErrBlockingProposal)
 	if !ok {
 		t.Errorf("ScanRelation: got %s; want blocking proposals error", err)
@@ -545,7 +545,7 @@ func testScanRelation(t *testing.T, st localkv.Store) {
 		sid:   999999,
 		state: kvrows.CommittedState,
 	}
-	keys, vals, _, err = lkv.ScanRelation(ctx, rel, 999999, nil, 1024, next)
+	keys, vals, _, err = lkv.ScanRelation(ctx, rel, 999999, 1024, next)
 	if err != io.EOF {
 		t.Errorf("ScanRelation failed with %s", err)
 	}
@@ -559,7 +559,7 @@ func testScanRelation(t *testing.T, st localkv.Store) {
 func checkRelation(t *testing.T, ctx context.Context, st kvrows.Store, rel kvrows.Relation,
 	wantKeys, wantVals [][]byte) {
 
-	keys, vals, _, err := st.ScanRelation(ctx, rel, kvrows.MaximumVersion, nil, 1024, nil)
+	keys, vals, _, err := st.ScanRelation(ctx, rel, kvrows.MaximumVersion, 1024, nil)
 	if err != io.EOF {
 		t.Errorf("ScanRelation failed with %s", err)
 	}
