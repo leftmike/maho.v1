@@ -12,10 +12,13 @@ type Relation interface {
 	GetTransactionState(txKey TransactionKey) TransactionState
 }
 
-type ErrBlockingProposal TransactionKey
+type ErrBlockingProposals struct {
+	TxKeys []TransactionKey
+	Keys   []Key
+}
 
-func (err ErrBlockingProposal) Error() string {
-	return fmt.Sprintf("proposal blocked by transaction %v", err)
+func (err *ErrBlockingProposals) Error() string {
+	return fmt.Sprintf("kvrows: %d blocking proposals", len(err.TxKeys))
 }
 
 type Store interface {
@@ -30,30 +33,27 @@ type Store interface {
 	// greater than key.Version.
 	WriteValue(ctx context.Context, mid uint64, key Key, ver uint64, val []byte) error
 
-	ScanRelation(ctx context.Context, rel Relation, maxVer uint64, prefix []byte,
-		num int, seek []byte) ([]Key, [][]byte, []byte, error)
+	// ScanRelation will return a list of keys and values starting from seek if specified. Use
+	// prefix to limit the results to only keys having that prefix. The maximum version of keys
+	// visible is specified by maxVer. Use num to limit the number of results returned. Which
+	// map to scan, as well as the active transaction, is passed as rel.
+	//
+	// * If the scan was successful, and there are potentially more keys available, err will
+	//   be nil. To continue scanning, use next as seek in the next call to ScanRelation.
+	// * If the scan was successful, but there are no more keys available, err will be io.EOF,
+	//   and next will be nil.
+	// * If the scan encountered a proposed write by a different transaction which is potentially
+	//   still active, err will be an instance of ErrBlockingProposals. The key of the proposed
+	//   write will be returned as next. Note that zero or more valid keys and values, which
+	//   were scanned before the proposed write, will also be returned.
+	ScanRelation(ctx context.Context, rel Relation, maxVer uint64, prefix []byte, num int,
+		seek []byte) (keys []Key, vals [][]byte, next []byte, err error)
+
 	DeleteRelation(ctx context.Context, rel Relation, keys []Key) error
 	UpdateRelation(ctx context.Context, rel Relation, keys []Key, vals []byte) error
 	InsertRelation(ctx context.Context, rel Relation, keys []Key, vals []byte) error
 
 	/*
-		// ReadRows will return a list of keys and values following lastKey. Use
-		// prefix to limit the result to only keys having that prefix. The maximum
-		// version of keys visible is specified by ver. To include proposed writes
-		// for a specific transaction, specify txKey.
-		//
-		// * If the scan was successful, and there are potential more keys available,
-		//   error will be nil.
-		// * If the scan was successful, but there are no more keys available, error
-		//   will be io.EOF.
-		// * If the scan encountered a proposed write by a different transaction,
-		//   error will be an instance of kvrows.ProposedWrites. The key and the
-		//   transaction key of the proposed write are in the instance. Note that
-		//   zero or more valid keys and values, which were scanned before the proposed
-		//    write, will also be returned.
-		ReadRows(txKey TransactionKey, sid uint64, mid uint64, prefix []byte, lastKey []byte,
-			maxVer uint64) ([]Key, [][]byte, error)
-
 		// WriteRows will update, delete, or insert one or more rows for the
 		// transaction specified by txKey.
 		//

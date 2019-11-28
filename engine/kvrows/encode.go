@@ -321,6 +321,15 @@ func ParseKey(key []byte) (Key, bool) {
 	}, true
 }
 
+func (txk TransactionKey) Copy() TransactionKey {
+	return TransactionKey{
+		MID:   txk.MID,
+		Key:   append(make([]byte, 0, len(txk.Key)), txk.Key...),
+		TID:   txk.TID,
+		Epoch: txk.Epoch,
+	}
+}
+
 func (txk TransactionKey) EncodeKey() Key {
 	key := append(make([]byte, 0, len(txk.Key)+16), txk.Key...)
 	key = encodeUint64(key, false, txk.TID)

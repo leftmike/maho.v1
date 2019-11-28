@@ -253,6 +253,16 @@ func initializeMap(t *testing.T, st localkv.Store, mid uint64, keyVals []keyValu
 	}
 }
 
+func countVisible(keyVals []keyValue) int {
+	cnt := 0
+	for _, kv := range keyVals {
+		if kv.visible {
+			cnt += 1
+		}
+	}
+	return cnt
+}
+
 func checkScan(t *testing.T, keyVals []keyValue, idx int, keys []kvrows.Key, vals [][]byte) int {
 	if len(keys) != len(vals) {
 		t.Errorf("ScanRelation: got %d keys and %d values", len(keys), len(vals))
@@ -314,8 +324,6 @@ func (rel relation) GetTransactionState(txKey kvrows.TransactionKey) kvrows.Tran
 }
 
 func testScanRelation(t *testing.T, st localkv.Store) {
-	t.Helper()
-
 	ctx := context.Background()
 	lkv := localkv.NewStore(st)
 
@@ -436,18 +444,26 @@ func testScanRelation(t *testing.T, st localkv.Store) {
 		t.Errorf("ScanRelation failed with %s", err)
 	}
 	checkScan(t, keyVals, 0, keys, vals)
+	if countVisible(keyVals) != len(keys) {
+		t.Errorf("ScanRelation: got %d key-values; want %d", len(keys), countVisible(keyVals))
+	}
 
 	idx := 0
+	cnt := 0
 	var next []byte
 	for {
 		keys, vals, next, err = lkv.ScanRelation(ctx, rel, 999999, nil, 1, next)
 		if err != nil && err != io.EOF {
 			t.Errorf("ScanRelation failed with %s", err)
 		}
+		cnt += len(keys)
 		idx = checkScan(t, keyVals, idx, keys, vals)
 		if err == io.EOF {
 			break
 		}
+	}
+	if countVisible(keyVals) != cnt {
+		t.Errorf("ScanRelation: got %d key-values; want %d", cnt, countVisible(keyVals))
 	}
 
 	txk2 := kvrows.TransactionKey{
@@ -499,6 +515,9 @@ func testScanRelation(t *testing.T, st localkv.Store) {
 		t.Errorf("ScanRelation failed with %s", err)
 	}
 	checkScan(t, keyVals2, 0, keys, vals)
+	if countVisible(keyVals2) != len(keys) {
+		t.Errorf("ScanRelation: got %d key-values; want %d", len(keys), countVisible(keyVals2))
+	}
 
 	rel = relation{
 		txKey: txk,
@@ -507,10 +526,10 @@ func testScanRelation(t *testing.T, st localkv.Store) {
 		state: kvrows.ActiveState,
 	}
 	keys, vals, next, err = lkv.ScanRelation(ctx, rel, 999999, nil, 1024, nil)
-	bperr, ok := err.(kvrows.ErrBlockingProposal)
+	bperr, ok := err.(*kvrows.ErrBlockingProposals)
 	if !ok {
-		t.Errorf("ScanRelation: got %s; want blocking proposal error", err)
-	} else if !((kvrows.TransactionKey)(bperr)).Equal(txk2) {
+		t.Errorf("ScanRelation: got %s; want blocking proposals error", err)
+	} else if len(bperr.TxKeys) != 1 || !bperr.TxKeys[0].Equal(txk2) {
 		t.Errorf("ScanRelation: got key %v; want %v", bperr, txk2)
 	}
 	if len(keys) != 1 {
@@ -518,6 +537,7 @@ func testScanRelation(t *testing.T, st localkv.Store) {
 	}
 
 	idx = checkScan(t, keyVals2, 0, keys, vals)
+	cnt = len(keys)
 
 	rel = relation{
 		txKey: txk,
@@ -530,6 +550,10 @@ func testScanRelation(t *testing.T, st localkv.Store) {
 		t.Errorf("ScanRelation failed with %s", err)
 	}
 	checkScan(t, keyVals2, idx, keys, vals)
+	cnt += len(keys)
+	if countVisible(keyVals2) != cnt {
+		t.Errorf("ScanRelation: got %d key-values; want %d", cnt, countVisible(keyVals2))
+	}
 }
 
 func TestBadger(t *testing.T) {
