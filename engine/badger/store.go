@@ -23,9 +23,10 @@ type badgerMapper struct {
 }
 
 type badgerWalker struct {
-	it     *badger.Iterator
-	tx     *badgerTx
-	prefix []byte
+	it         *badger.Iterator
+	tx         *badgerTx
+	prefix     []byte
+	seekPrefix []byte
 }
 
 func OpenStore(path string) (*badgerStore, error) {
@@ -83,9 +84,10 @@ func (bm *badgerMapper) Walk(prefix []byte) localkv.Walker {
 	opts := badger.DefaultIteratorOptions
 	opts.Prefix = bm.addPrefix(prefix)
 	return &badgerWalker{
-		it:     bm.tx.tx.NewIterator(opts),
-		tx:     bm.tx,
-		prefix: opts.Prefix,
+		it:         bm.tx.tx.NewIterator(opts),
+		tx:         bm.tx,
+		prefix:     opts.Prefix,
+		seekPrefix: bm.prefix,
 	}
 }
 
@@ -97,9 +99,7 @@ func (bw *badgerWalker) Close() {
 }
 
 func (bw *badgerWalker) currentKey() ([]byte, bool) {
-	if bw.prefix == nil && !bw.it.Valid() {
-		return nil, false
-	} else if bw.prefix != nil && !bw.it.ValidForPrefix(bw.prefix) {
+	if !bw.it.ValidForPrefix(bw.prefix) {
 		return nil, false
 	}
 	key := bw.it.Item().Key()
@@ -127,7 +127,7 @@ func (bw *badgerWalker) Rewind() ([]byte, bool) {
 }
 
 func (bw *badgerWalker) Seek(seek []byte) ([]byte, bool) {
-	bw.it.Seek(seek)
+	bw.it.Seek(append(bw.seekPrefix, seek...))
 	return bw.currentKey()
 }
 
