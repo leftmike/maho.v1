@@ -41,7 +41,8 @@ var (
 )
 
 type storeMetadata struct {
-	Epoch   uint64
+	Node    uint32
+	Epoch   uint32
 	Version uint64
 }
 
@@ -52,7 +53,8 @@ type databaseMetadata struct {
 type KVRows struct {
 	mutex     sync.RWMutex
 	st        Store
-	epoch     uint64
+	node      uint32
+	epoch     uint32
 	version   uint64
 	lastTID   uint64
 	databases map[sql.Identifier]databaseMetadata
@@ -69,7 +71,8 @@ const (
 
 type transactionMetadata struct {
 	State   TransactionState
-	Epoch   uint64
+	Node    uint32
+	Epoch   uint32
 	Version uint64
 }
 
@@ -114,6 +117,7 @@ func (kv *KVRows) loadMetadata(ctx context.Context) error {
 		return err
 	}
 
+	kv.node = md.Node
 	md.Epoch += 1
 	kv.epoch = md.Epoch
 	kv.version = md.Version
@@ -369,6 +373,7 @@ func (kv *KVRows) Begin(sesid uint64) engine.Transaction {
 		kv: kv,
 		key: TransactionKey{
 			TID:   tid,
+			Node:  kv.node,
 			Epoch: kv.epoch,
 		},
 		sid:   1,
@@ -404,6 +409,7 @@ func (kv *KVRows) forWrite(ctx context.Context, etx engine.Transaction, mid uint
 	tx.key.Key = sqlKey
 	md := transactionMetadata{
 		State: ActiveState,
+		Node:  tx.key.Node,
 		Epoch: tx.key.Epoch,
 	}
 	err := kv.writeGob(ctx, mid, tx.key.EncodeKey(), &md)

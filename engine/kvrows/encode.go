@@ -20,10 +20,14 @@ type Key struct {
 }
 
 type TransactionKey struct {
-	MID   uint64
-	Key   []byte
+	// MID and Key specify where the transaction record for this transaction is stored.
+	MID uint64
+	Key []byte
+
+	// Node, Epoch, and TID uniquely identify the transaction.
+	Node  uint32
+	Epoch uint32
 	TID   uint64
-	Epoch uint64
 }
 
 const (
@@ -337,15 +341,17 @@ func (txk TransactionKey) Copy() TransactionKey {
 	return TransactionKey{
 		MID:   txk.MID,
 		Key:   append(make([]byte, 0, len(txk.Key)), txk.Key...),
-		TID:   txk.TID,
+		Node:  txk.Node,
 		Epoch: txk.Epoch,
+		TID:   txk.TID,
 	}
 }
 
 func (txk TransactionKey) EncodeKey() Key {
 	key := append(make([]byte, 0, len(txk.Key)+16), txk.Key...)
+	key = encodeUint32(key, false, txk.Node)
+	key = encodeUint32(key, false, txk.Epoch)
 	key = encodeUint64(key, false, txk.TID)
-	key = encodeUint64(key, false, txk.Epoch)
 	return Key{
 		Key:  key,
 		Type: TransactionKeyType,
@@ -353,8 +359,8 @@ func (txk TransactionKey) EncodeKey() Key {
 }
 
 func (txk TransactionKey) Equal(txk2 TransactionKey) bool {
-	return txk.MID == txk2.MID && txk.TID == txk2.TID && txk.Epoch == txk2.Epoch &&
-		bytes.Equal(txk.Key, txk2.Key)
+	return txk.MID == txk2.MID && txk.Node == txk2.Node && txk.Epoch == txk2.Epoch &&
+		txk.TID == txk2.TID && bytes.Equal(txk.Key, txk2.Key)
 }
 
 func ParseProposalValue(buf []byte) (TransactionKey, []byte, bool) {
@@ -362,8 +368,9 @@ func ParseProposalValue(buf []byte) (TransactionKey, []byte, bool) {
 		return TransactionKey{}, nil, false
 	}
 	mid := decodeUint64(buf[1:9], false)
-	tid := decodeUint64(buf[9:17], false)
-	epoch := decodeUint64(buf[17:25], false)
+	node := decodeUint32(buf[9:13], false)
+	epoch := decodeUint32(buf[13:17], false)
+	tid := decodeUint64(buf[17:25], false)
 	buf = buf[25:]
 
 	buf, keylen, ok := DecodeVarint(buf)
@@ -374,16 +381,18 @@ func ParseProposalValue(buf []byte) (TransactionKey, []byte, bool) {
 	return TransactionKey{
 		MID:   mid,
 		Key:   buf[:keylen],
-		TID:   tid,
+		Node:  node,
 		Epoch: epoch,
+		TID:   tid,
 	}, buf[keylen:], true
 }
 
 func MakeProposalValue(txk TransactionKey, val []byte) []byte {
 	pv := append(make([]byte, 0, len(txk.Key)+len(val)+26), ProposalValue)
 	pv = encodeUint64(pv, false, txk.MID)
+	pv = encodeUint32(pv, false, txk.Node)
+	pv = encodeUint32(pv, false, txk.Epoch)
 	pv = encodeUint64(pv, false, txk.TID)
-	pv = encodeUint64(pv, false, txk.Epoch)
 	pv = EncodeVarint(pv, uint64(len(txk.Key)))
 	pv = append(pv, txk.Key...)
 	pv = append(pv, val...)
