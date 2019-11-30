@@ -14,7 +14,9 @@ type localKV struct {
 }
 
 func NewStore(st Store) kvrows.Store {
-	return localKV{st}
+	return localKV{
+		st: st,
+	}
 }
 
 func (lkv localKV) ReadValue(ctx context.Context, mid uint64, key kvrows.Key) (uint64, []byte,
@@ -150,8 +152,9 @@ func (lkv localKV) WriteValue(ctx context.Context, mid uint64, key kvrows.Key, v
 	return tx.Commit()
 }
 
-func nextKey(rel kvrows.Relation, w Walker, k kvrows.Key, maxVer uint64,
-	fkv func(key kvrows.Key, val []byte) error) (kvrows.Key, bool, error) {
+func (lkv localKV) nextKey(getState kvrows.GetState, txCtx kvrows.TxContext, w Walker,
+	k kvrows.Key, maxVer uint64, fkv func(key kvrows.Key, val []byte) error) (kvrows.Key, bool,
+	error) {
 
 	blockingProposal := false
 	for {
@@ -167,12 +170,12 @@ func nextKey(rel kvrows.Relation, w Walker, k kvrows.Key, maxVer uint64,
 						return fmt.Errorf("localkv: unable to parse value for key %v: %v", k, val)
 					}
 
-					if txk.Equal(rel.TxKey()) {
-						if k.Version < rel.CurrentStatement() {
+					if txk.Equal(txCtx.TxKey) {
+						if k.Version < txCtx.SID {
 							found = true
 						}
 					} else {
-						st := rel.GetTransactionState(txk)
+						st := getState(txk)
 						if st == kvrows.CommittedState {
 							found = true
 						} else if st != kvrows.AbortedState {
@@ -211,8 +214,9 @@ func nextKey(rel kvrows.Relation, w Walker, k kvrows.Key, maxVer uint64,
 	return k, false, io.EOF
 }
 
-func (lkv localKV) ScanRelation(ctx context.Context, rel kvrows.Relation, maxVer uint64, num int,
-	seek []byte) ([]kvrows.Key, [][]byte, []byte, error) {
+func (lkv localKV) ScanRelation(ctx context.Context, getState kvrows.GetState,
+	txCtx kvrows.TxContext, mid, maxVer uint64, num int, seek []byte) ([]kvrows.Key, [][]byte,
+	[]byte, error) {
 
 	tx, err := lkv.st.Begin(false)
 	if err != nil {
@@ -220,7 +224,7 @@ func (lkv localKV) ScanRelation(ctx context.Context, rel kvrows.Relation, maxVer
 	}
 	defer tx.Rollback()
 
-	m, err := tx.Map(rel.MapID())
+	m, err := tx.Map(mid)
 	if err != nil {
 		return nil, nil, nil, err
 	}
@@ -255,7 +259,7 @@ func (lkv localKV) ScanRelation(ctx context.Context, rel kvrows.Relation, maxVer
 		var blockingProposal bool
 
 		// Scan and find the greatest version of a key or a proposal key.
-		k, blockingProposal, err = nextKey(rel, w, k, maxVer,
+		k, blockingProposal, err = lkv.nextKey(getState, txCtx, w, k, maxVer,
 			func(key kvrows.Key, val []byte) error {
 				if len(val) == 0 || val[0] == kvrows.TombstoneValue {
 					return nil
@@ -292,7 +296,9 @@ func (lkv localKV) ScanRelation(ctx context.Context, rel kvrows.Relation, maxVer
 	return keys, vals, k.Copy().Key, nil
 }
 
-func modifyRelation(rel kvrows.Relation, modifyKey kvrows.Key, val []byte, m Mapper) error {
+func (lkv localKV) modifyRelation(getState kvrows.GetState, txCtx kvrows.TxContext,
+	modifyKey kvrows.Key, val []byte, m Mapper) error {
+
 	w := m.Walk(modifyKey.Key)
 	defer w.Close()
 
@@ -308,7 +314,7 @@ func modifyRelation(rel kvrows.Relation, modifyKey kvrows.Key, val []byte, m Map
 	}
 
 	// Scan and find the greatest version of the key, if it has a visible value.
-	_, _, err := nextKey(rel, w, k, kvrows.MaximumVersion,
+	_, _, err := lkv.nextKey(getState, txCtx, w, k, kvrows.MaximumVersion,
 		func(key kvrows.Key, val []byte) error {
 			if len(val) == 0 || val[0] == kvrows.TombstoneValue {
 				return fmt.Errorf("localkv: key %v not found", modifyKey)
@@ -323,12 +329,12 @@ func modifyRelation(rel kvrows.Relation, modifyKey kvrows.Key, val []byte, m Map
 	}
 
 	// The key has a visible value; go ahead and propose an updated value.
-	return m.Set(kvrows.MakeProposalKey(modifyKey.Key, rel.CurrentStatement()).Encode(),
-		kvrows.MakeProposalValue(rel.TxKey(), val))
+	return m.Set(kvrows.MakeProposalKey(modifyKey.Key, txCtx.SID).Encode(),
+		kvrows.MakeProposalValue(txCtx.TxKey, val))
 }
 
-func (lkv localKV) ModifyRelation(ctx context.Context, rel kvrows.Relation, keys []kvrows.Key,
-	vals [][]byte) error {
+func (lkv localKV) ModifyRelation(ctx context.Context, getState kvrows.GetState,
+	txCtx kvrows.TxContext, mid uint64, keys []kvrows.Key, vals [][]byte) error {
 
 	tx, err := lkv.st.Begin(true)
 	if err != nil {
@@ -336,7 +342,7 @@ func (lkv localKV) ModifyRelation(ctx context.Context, rel kvrows.Relation, keys
 	}
 	defer tx.Rollback()
 
-	m, err := tx.Map(rel.MapID())
+	m, err := tx.Map(mid)
 	if err != nil {
 		return err
 	}
@@ -350,7 +356,7 @@ func (lkv localKV) ModifyRelation(ctx context.Context, rel kvrows.Relation, keys
 		if vals != nil {
 			val = vals[idx]
 		}
-		err := modifyRelation(rel, keys[idx], val, m)
+		err := lkv.modifyRelation(getState, txCtx, keys[idx], val, m)
 		if err != nil {
 			return err
 		}
@@ -359,7 +365,9 @@ func (lkv localKV) ModifyRelation(ctx context.Context, rel kvrows.Relation, keys
 	return tx.Commit()
 }
 
-func insertRelation(rel kvrows.Relation, insertKey []byte, val []byte, m Mapper) error {
+func (lkv localKV) insertRelation(getState kvrows.GetState, txCtx kvrows.TxContext,
+	insertKey []byte, val []byte, m Mapper) error {
+
 	w := m.Walk(insertKey)
 	defer w.Close()
 
@@ -372,7 +380,7 @@ func insertRelation(rel kvrows.Relation, insertKey []byte, val []byte, m Mapper)
 		}
 
 		// Scan and find the greatest version of the key, if it has a visible value.
-		_, _, err := nextKey(rel, w, k, kvrows.MaximumVersion,
+		_, _, err := lkv.nextKey(getState, txCtx, w, k, kvrows.MaximumVersion,
 			func(key kvrows.Key, val []byte) error {
 				if len(val) == 0 || val[0] == kvrows.TombstoneValue {
 					return nil
@@ -385,12 +393,12 @@ func insertRelation(rel kvrows.Relation, insertKey []byte, val []byte, m Mapper)
 	}
 
 	// No value is visible for the key; go ahead and propose a value.
-	return m.Set(kvrows.MakeProposalKey(insertKey, rel.CurrentStatement()).Encode(),
-		kvrows.MakeProposalValue(rel.TxKey(), val))
+	return m.Set(kvrows.MakeProposalKey(insertKey, txCtx.SID).Encode(),
+		kvrows.MakeProposalValue(txCtx.TxKey, val))
 }
 
-func (lkv localKV) InsertRelation(ctx context.Context, rel kvrows.Relation, keys [][]byte,
-	vals [][]byte) error {
+func (lkv localKV) InsertRelation(ctx context.Context, getState kvrows.GetState,
+	txCtx kvrows.TxContext, mid uint64, keys [][]byte, vals [][]byte) error {
 
 	tx, err := lkv.st.Begin(true)
 	if err != nil {
@@ -398,17 +406,63 @@ func (lkv localKV) InsertRelation(ctx context.Context, rel kvrows.Relation, keys
 	}
 	defer tx.Rollback()
 
-	m, err := tx.Map(rel.MapID())
+	m, err := tx.Map(mid)
 	if err != nil {
 		return err
 	}
 
 	for idx := range keys {
-		err := insertRelation(rel, keys[idx], vals[idx], m)
+		err := lkv.insertRelation(getState, txCtx, keys[idx], vals[idx], m)
 		if err != nil {
 			return err
 		}
 	}
 
 	return tx.Commit()
+}
+
+func (lkv localKV) FinalizeProposals(ctx context.Context, txKey kvrows.TransactionKey,
+	state kvrows.TransactionState, proposals []kvrows.Proposal) error {
+
+	// XXX
+	return nil
+}
+
+func (lkv localKV) CleanRelation(ctx context.Context, getState kvrows.GetState, mid uint64,
+	start []byte, max int) ([]byte, error) {
+
+	tx, err := lkv.st.Begin(true)
+	if err != nil {
+		return nil, err
+	}
+	defer tx.Rollback()
+
+	m, err := tx.Map(mid)
+	if err != nil {
+		return nil, err
+	}
+
+	w := m.Walk(nil)
+	defer w.Close()
+
+	var kbuf []byte
+	var ok bool
+	if start == nil {
+		kbuf, ok = w.Rewind()
+	} else {
+		kbuf, ok = w.Seek(start)
+	}
+	if !ok {
+		return nil, nil
+	}
+	k, ok := kvrows.ParseKey(kbuf)
+	if !ok {
+		// XXX: delete the key, with a log message
+		return nil, fmt.Errorf("localkv: unable to parse key %v", kbuf)
+	}
+
+	_ = k
+
+	// XXX
+	return nil, nil
 }
