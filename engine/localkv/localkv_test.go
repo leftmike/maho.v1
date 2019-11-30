@@ -537,7 +537,7 @@ func testScanRelation(t *testing.T, st localkv.Store) {
 	}
 }
 
-func checkRelation(t *testing.T, ctx context.Context, st kvrows.Store, getState kvrows.GetState,
+func checkRelation(t *testing.T, ctx context.Context, st kvrows.Store, getState kvrows.GetTxState,
 	txCtx kvrows.TxContext, mid uint64, wantKeys, wantVals [][]byte) {
 
 	keys, vals, _, err := st.ScanRelation(ctx, getState, txCtx, mid, kvrows.MaximumVersion, 1024,

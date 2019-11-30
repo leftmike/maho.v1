@@ -15,7 +15,7 @@ type TxContext struct {
 	SID   uint64
 }
 
-type GetState func(txKey TransactionKey) TransactionState
+type GetTxState func(txKey TransactionKey) TransactionState
 
 type ErrBlockingProposal struct {
 	TxKey TransactionKey
@@ -50,7 +50,7 @@ type Store interface {
 	//   still active, err will be an instance of ErrBlockingProposal. The key of the proposed
 	//   write will be returned as next. Note that zero or more valid keys and values, which
 	//   were scanned before the proposed write, will also be returned.
-	ScanRelation(ctx context.Context, getState GetState, txCtx TxContext, mid, maxVer uint64,
+	ScanRelation(ctx context.Context, getState GetTxState, txCtx TxContext, mid, maxVer uint64,
 		num int, seek []byte) (keys []Key, vals [][]byte, next []byte, err error)
 
 	// ModifyRelation will delete, if vals is nil, or update one or more keys for the map
@@ -66,8 +66,8 @@ type Store interface {
 	//
 	// XXX: updating a key doesn't require the entire value; it would potentially be more
 	// efficient to just pass the delta
-	ModifyRelation(ctx context.Context, getState GetState, txCtx TxContext, mid uint64, keys []Key,
-		vals [][]byte) error
+	ModifyRelation(ctx context.Context, getState GetTxState, txCtx TxContext, mid uint64,
+		keys []Key, vals [][]byte) error
 
 	// InsertRelation will insert new key(s) and value(s) into the map specified by mid.
 	// None of the keys can have visible values.
@@ -77,7 +77,7 @@ type Store interface {
 	//
 	// If a insert encountered a proposed write by a different transaction which is
 	// potentially still active, err will be an instance of ErrBlockingProposal.
-	InsertRelation(ctx context.Context, getState GetState, txCtx TxContext, mid uint64,
+	InsertRelation(ctx context.Context, getState GetTxState, txCtx TxContext, mid uint64,
 		keys [][]byte, vals [][]byte) error
 
 	// FinalizeProposals
@@ -85,6 +85,6 @@ type Store interface {
 		proposals []Proposal) error
 
 	// CleanRelation
-	CleanRelation(ctx context.Context, getState GetState, mid uint64, start []byte,
+	CleanRelation(ctx context.Context, getState GetTxState, mid uint64, start []byte,
 		max int) ([]byte, error)
 }

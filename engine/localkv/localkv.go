@@ -152,7 +152,7 @@ func (lkv localKV) WriteValue(ctx context.Context, mid uint64, key kvrows.Key, v
 	return tx.Commit()
 }
 
-func (lkv localKV) nextKey(getState kvrows.GetState, txCtx kvrows.TxContext, w Walker,
+func (lkv localKV) nextKey(getState kvrows.GetTxState, txCtx kvrows.TxContext, w Walker,
 	k kvrows.Key, maxVer uint64, fkv func(key kvrows.Key, val []byte) error) (kvrows.Key, bool,
 	error) {
 
@@ -214,7 +214,7 @@ func (lkv localKV) nextKey(getState kvrows.GetState, txCtx kvrows.TxContext, w W
 	return k, false, io.EOF
 }
 
-func (lkv localKV) ScanRelation(ctx context.Context, getState kvrows.GetState,
+func (lkv localKV) ScanRelation(ctx context.Context, getState kvrows.GetTxState,
 	txCtx kvrows.TxContext, mid, maxVer uint64, num int, seek []byte) ([]kvrows.Key, [][]byte,
 	[]byte, error) {
 
@@ -296,7 +296,7 @@ func (lkv localKV) ScanRelation(ctx context.Context, getState kvrows.GetState,
 	return keys, vals, k.Copy().Key, nil
 }
 
-func (lkv localKV) modifyRelation(getState kvrows.GetState, txCtx kvrows.TxContext,
+func (lkv localKV) modifyRelation(getState kvrows.GetTxState, txCtx kvrows.TxContext,
 	modifyKey kvrows.Key, val []byte, m Mapper) error {
 
 	w := m.Walk(modifyKey.Key)
@@ -333,7 +333,7 @@ func (lkv localKV) modifyRelation(getState kvrows.GetState, txCtx kvrows.TxConte
 		kvrows.MakeProposalValue(txCtx.TxKey, val))
 }
 
-func (lkv localKV) ModifyRelation(ctx context.Context, getState kvrows.GetState,
+func (lkv localKV) ModifyRelation(ctx context.Context, getState kvrows.GetTxState,
 	txCtx kvrows.TxContext, mid uint64, keys []kvrows.Key, vals [][]byte) error {
 
 	tx, err := lkv.st.Begin(true)
@@ -365,7 +365,7 @@ func (lkv localKV) ModifyRelation(ctx context.Context, getState kvrows.GetState,
 	return tx.Commit()
 }
 
-func (lkv localKV) insertRelation(getState kvrows.GetState, txCtx kvrows.TxContext,
+func (lkv localKV) insertRelation(getState kvrows.GetTxState, txCtx kvrows.TxContext,
 	insertKey []byte, val []byte, m Mapper) error {
 
 	w := m.Walk(insertKey)
@@ -397,7 +397,7 @@ func (lkv localKV) insertRelation(getState kvrows.GetState, txCtx kvrows.TxConte
 		kvrows.MakeProposalValue(txCtx.TxKey, val))
 }
 
-func (lkv localKV) InsertRelation(ctx context.Context, getState kvrows.GetState,
+func (lkv localKV) InsertRelation(ctx context.Context, getState kvrows.GetTxState,
 	txCtx kvrows.TxContext, mid uint64, keys [][]byte, vals [][]byte) error {
 
 	tx, err := lkv.st.Begin(true)
@@ -428,7 +428,7 @@ func (lkv localKV) FinalizeProposals(ctx context.Context, txKey kvrows.Transacti
 	return nil
 }
 
-func (lkv localKV) CleanRelation(ctx context.Context, getState kvrows.GetState, mid uint64,
+func (lkv localKV) CleanRelation(ctx context.Context, getState kvrows.GetTxState, mid uint64,
 	start []byte, max int) ([]byte, error) {
 
 	tx, err := lkv.st.Begin(true)
