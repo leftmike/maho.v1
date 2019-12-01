@@ -36,7 +36,7 @@ var (
 	ErrKeyNotFound          = errors.New("kvrows: key not found")
 	ErrValueVersionMismatch = errors.New("kvrows: value version mismatch")
 
-	metadataKey      = Key{Key: []byte("metadata"), Type: MetadataKeyType}
+	metadataKey      = Key{Key: []byte("metadata")} // XXX: should be a SQL key
 	databasesPrimary = []engine.ColumnKey{engine.MakeColumnKey(0, false)}
 	schemasPrimary   = []engine.ColumnKey{
 		engine.MakeColumnKey(0, false),
@@ -60,13 +60,13 @@ type databaseMetadata struct {
 }
 
 type KVRows struct {
-	mutex     sync.RWMutex
-	st        Store
-	node      uint32
-	epoch     uint32
-	version   uint64
-	lastTID   uint64
-	databases map[sql.Identifier]databaseMetadata
+	mutex       sync.RWMutex
+	st          Store
+	node        uint32
+	epoch       uint32
+	version     uint64
+	lastLocalID uint64
+	databases   map[sql.Identifier]databaseMetadata
 }
 
 type TransactionState byte
@@ -87,7 +87,7 @@ type transactionMetadata struct {
 
 type transaction struct {
 	kv    *KVRows
-	key   TransactionKey
+	tid   TransactionID
 	sid   uint64
 	sesid uint64
 	state TransactionState
@@ -197,8 +197,7 @@ func makeDatabaseKey(dbname sql.Identifier) []byte {
 
 func (kv *KVRows) updateDatabase(ctx context.Context, dbname sql.Identifier, active bool) error {
 	key := Key{
-		Key:  makeDatabaseKey(dbname),
-		Type: MetadataKeyType,
+		Key: makeDatabaseKey(dbname),
 	}
 	var md databaseMetadata
 	key, err := kv.readGob(ctx, databasesMID, key, &md)
@@ -316,7 +315,7 @@ func (kv *KVRows) LookupTable(ctx context.Context, etx engine.Transaction,
 	}
 
 	/*
-		keys, vals, err := kv.st.ReadRows(tx.key, tx.sid, tablesMID, makeTableKey(tn), nil,
+		keys, vals, err := kv.st.ReadRows(tx.tid, tx.sid, tablesMID, makeTableKey(tn), nil,
 			MaximumVersion)
 		if err != nil {
 			return nil, err
@@ -376,14 +375,14 @@ func (_ *KVRows) DropIndex(ctx context.Context, tx engine.Transaction, idxname s
 }
 
 func (kv *KVRows) Begin(sesid uint64) engine.Transaction {
-	tid := atomic.AddUint64(&kv.lastTID, 1)
+	lid := atomic.AddUint64(&kv.lastLocalID, 1)
 
 	return &transaction{
 		kv: kv,
-		key: TransactionKey{
-			TID:   tid,
-			Node:  kv.node,
-			Epoch: kv.epoch,
+		tid: TransactionID{
+			Node:    kv.node,
+			Epoch:   kv.epoch,
+			LocalID: lid,
 		},
 		sid:   1,
 		sesid: sesid,
@@ -410,18 +409,20 @@ func (kv *KVRows) forWrite(ctx context.Context, etx engine.Transaction, mid uint
 	} else if tx.state == AbortedState {
 		return nil, errTransactionAborted
 	}
-	if tx.key.MID > 0 && tx.key.Key != nil {
+	if tx.tid.LocalID > 0 {
 		return tx, nil
 	}
 
-	tx.key.MID = mid
-	tx.key.Key = sqlKey
+	// tx.tid. = ...
+	//tx.key.MID = mid
+	//tx.key.Key = sqlKey
 	md := transactionMetadata{
 		State: ActiveState,
-		Node:  tx.key.Node,
-		Epoch: tx.key.Epoch,
+		Node:  tx.tid.Node,
+		Epoch: tx.tid.Epoch,
 	}
-	err := kv.writeGob(ctx, mid, tx.key.EncodeKey(), &md)
+	err := kv.writeGob(ctx, mid, Key{}, &md) // XXX: broken
+	//err := kv.writeGob(ctx, mid, tx.key.EncodeKey(), &md)
 	if err != nil {
 		tx.state = AbortedState
 		return nil, err
@@ -437,13 +438,14 @@ func (kv *KVRows) finalizeTransaction(ctx context.Context, tx *transaction,
 	} else if tx.state == AbortedState {
 		return errTransactionAborted
 	}
-	if tx.key.MID == 0 || tx.key.Key == nil {
+	if tx.tid.Node == 0 {
 		tx.state = ts
 		return nil
 	}
 
 	var md transactionMetadata
-	key, err := kv.readGob(ctx, tx.key.MID, tx.key.EncodeKey(), &md)
+	key, err := kv.readGob(ctx, 0, Key{}, &md) // XXX: broken
+	//key, err := kv.readGob(ctx, tx.key.MID, tx.key.EncodeKey(), &md)
 	if err != nil {
 		return err
 	}
@@ -462,7 +464,8 @@ func (kv *KVRows) finalizeTransaction(ctx context.Context, tx *transaction,
 	}
 
 	md.State = ts
-	err = kv.writeGob(ctx, tx.key.MID, key, &md)
+	err = kv.writeGob(ctx, 0, key, &md) // XXX: broken
+	//err = kv.writeGob(ctx, tx.key.MID, key, &md)
 	if err != nil {
 		tx.state = AbortedState
 		return err

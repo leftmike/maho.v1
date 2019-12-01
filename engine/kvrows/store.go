@@ -5,20 +5,15 @@ import (
 	"fmt"
 )
 
-type TxContext struct {
-	TxKey TransactionKey
-	SID   uint64
-}
-
-type GetTxState func(txKey TransactionKey) (TransactionState, uint64)
+type GetTxState func(tid TransactionID) (TransactionState, uint64)
 
 type ErrBlockingProposal struct {
-	TxKey TransactionKey
-	Key   Key
+	TID TransactionID
+	Key Key
 }
 
 func (err *ErrBlockingProposal) Error() string {
-	return fmt.Sprintf("kvrows: blocking proposal: %v by %v", err.Key, err.TxKey)
+	return fmt.Sprintf("kvrows: blocking proposal: %v by %v", err.Key, err.TID)
 }
 
 type Store interface {
@@ -45,8 +40,9 @@ type Store interface {
 	//   still active, err will be an instance of ErrBlockingProposal. The key of the proposed
 	//   write will be returned as next. Note that zero or more valid keys and values, which
 	//   were scanned before the proposed write, will also be returned.
-	ScanRelation(ctx context.Context, getState GetTxState, txCtx TxContext, mid, maxVer uint64,
-		num int, seek []byte) (keys []Key, vals [][]byte, next []byte, err error)
+	ScanRelation(ctx context.Context, getState GetTxState, tid TransactionID,
+		sid, mid, maxVer uint64, num int, seek []byte) (keys []Key, vals [][]byte, next []byte,
+		err error)
 
 	// ModifyRelation will delete, if vals is nil, or update one or more keys for the map
 	// specified by mid. The keys must all exist and have visible values. Each key must exactly
@@ -61,7 +57,7 @@ type Store interface {
 	//
 	// XXX: updating a key doesn't require the entire value; it would potentially be more
 	// efficient to just pass the delta
-	ModifyRelation(ctx context.Context, getState GetTxState, txCtx TxContext, mid uint64,
+	ModifyRelation(ctx context.Context, getState GetTxState, tid TransactionID, sid, mid uint64,
 		keys []Key, vals [][]byte) error
 
 	// InsertRelation will insert new key(s) and value(s) into the map specified by mid.
@@ -72,7 +68,7 @@ type Store interface {
 	//
 	// If a insert encountered a proposed write by a different transaction which is
 	// potentially still active, err will be an instance of ErrBlockingProposal.
-	InsertRelation(ctx context.Context, getState GetTxState, txCtx TxContext, mid uint64,
+	InsertRelation(ctx context.Context, getState GetTxState, tid TransactionID, sid, mid uint64,
 		keys [][]byte, vals [][]byte) error
 
 	// CleanKey

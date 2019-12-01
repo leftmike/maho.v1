@@ -1,10 +1,8 @@
 package localkv
 
 import (
-	"bytes"
 	"context"
 	"fmt"
-	"io"
 
 	"github.com/leftmike/maho/engine/kvrows"
 )
@@ -141,7 +139,6 @@ func (lkv localKV) WriteValue(ctx context.Context, mid uint64, key kvrows.Key, v
 	k := kvrows.Key{
 		Key:     key.Key,
 		Version: ver,
-		Type:    key.Type,
 	}
 	err = m.Set(k.Encode(), val)
 	if err != nil {
@@ -152,6 +149,29 @@ func (lkv localKV) WriteValue(ctx context.Context, mid uint64, key kvrows.Key, v
 	return tx.Commit()
 }
 
+func (lkv localKV) ScanRelation(ctx context.Context, getState kvrows.GetTxState,
+	tid kvrows.TransactionID, sid, mid, maxVer uint64, num int, seek []byte) (keys []kvrows.Key,
+	vals [][]byte, next []byte, err error) {
+
+	// XXX
+	return nil, nil, nil, nil
+}
+
+func (lkv localKV) ModifyRelation(ctx context.Context, getState kvrows.GetTxState,
+	tid kvrows.TransactionID, sid, mid uint64, keys []kvrows.Key, vals [][]byte) error {
+
+	// XXX
+	return nil
+}
+
+func (lkv localKV) InsertRelation(ctx context.Context, getState kvrows.GetTxState,
+	tid kvrows.TransactionID, sid, mid uint64, keys [][]byte, vals [][]byte) error {
+
+	// XXX
+	return nil
+}
+
+/*
 func (lkv localKV) nextKey(getState kvrows.GetTxState, txCtx kvrows.TxContext, w Walker,
 	k kvrows.Key, maxVer uint64, fkv func(key kvrows.Key, val []byte) error) (kvrows.Key, bool,
 	error) {
@@ -422,50 +442,13 @@ func (lkv localKV) InsertRelation(ctx context.Context, getState kvrows.GetTxStat
 
 	return tx.Commit()
 }
+*/
 
 func (lkv localKV) CleanKey(ctx context.Context, getState kvrows.GetTxState, mid uint64,
 	key []byte) error {
 
-	tx, err := lkv.st.Begin(true)
-	if err != nil {
-		return err
-	}
-	defer tx.Rollback()
-
-	m, err := tx.Map(mid)
-	if err != nil {
-		return err
-	}
-
-	w := m.Walk(key)
-	defer w.Close()
-
-	kbuf, ok := w.Seek(key)
-	if !ok {
-		return nil
-	}
-	k, ok := kvrows.ParseKey(kbuf)
-	if !ok {
-		return fmt.Errorf("localkv: unable to parse key %v", kbuf)
-	}
-
-	for {
-		if k.Type == kvrows.ProposalKeyType {
-
-		}
-
-		kbuf, ok := w.Next()
-		if !ok {
-			break
-		}
-		k, ok = kvrows.ParseKey(kbuf)
-		if !ok {
-			return fmt.Errorf("localkv: unable to parse key %v", kbuf)
-		}
-	}
-
-	// XXX: only commit if there were changes made
-	return tx.Commit()
+	// XXX
+	return nil
 }
 
 func (lkv localKV) CleanRelation(ctx context.Context, getState kvrows.GetTxState, mid uint64,

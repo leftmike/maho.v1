@@ -20,7 +20,7 @@ type testCase struct {
 }
 
 func testKey(t *testing.T, prevKey []byte, row []sql.Value, colKeys []engine.ColumnKey,
-	ver uint64, keyType kvrows.KeyType) []byte {
+	ver uint64) []byte {
 
 	t.Helper()
 
@@ -28,7 +28,6 @@ func testKey(t *testing.T, prevKey []byte, row []sql.Value, colKeys []engine.Col
 	k := kvrows.Key{
 		Key:     sqlKey,
 		Version: ver,
-		Type:    keyType,
 	}
 	ck := k.Copy()
 	if !testutil.DeepEqual(k, ck) {
@@ -41,19 +40,12 @@ func testKey(t *testing.T, prevKey []byte, row []sql.Value, colKeys []engine.Col
 			row, colKeys, prevKey, key)
 	}
 
-	if kvrows.GetKeyType(key) != k.Type {
-		t.Errorf("GetKeyType(%v) got %v want %v", key, kvrows.GetKeyType(key), k.Type)
-	}
-
 	k, ok := kvrows.ParseKey(key)
 	if !ok {
 		t.Errorf("ParseKey(%v) failed", key)
 	} else {
 		if k.Version != ver {
 			t.Errorf("ParseKey(%v) got %d for version; want %d", key, k.Version, ver)
-		}
-		if k.Type != keyType {
-			t.Errorf("ParseKey(%v) got %d for type; want %d", key, k.Type, keyType)
 		}
 		if bytes.Compare(sqlKey, k.Key) != 0 {
 			t.Errorf("ParseKey(%v) got %v for sql key; want %v", key, k.Key, sqlKey)
@@ -96,22 +88,11 @@ func testMakeKey(t *testing.T, cases []testCase) {
 		prevKey = key
 
 		ver := uint64(rand.Intn(99999)) + 99
-		prevKey = testKey(t, prevKey, c.row, c.colKeys, ver, kvrows.ProposalKeyType)
-		prevKey = testKey(t, prevKey, c.row, c.colKeys, ver-1, kvrows.ProposalKeyType)
-		prevKey = testKey(t, prevKey, c.row, c.colKeys, 1, kvrows.ProposalKeyType)
-		prevKey = testKey(t, prevKey, c.row, c.colKeys, 0, kvrows.ProposalKeyType)
-
-		ver = uint64(rand.Intn(99999)) + 99
-		prevKey = testKey(t, prevKey, c.row, c.colKeys, ver, kvrows.DurableKeyType)
-		prevKey = testKey(t, prevKey, c.row, c.colKeys, ver-1, kvrows.DurableKeyType)
-		prevKey = testKey(t, prevKey, c.row, c.colKeys, 1, kvrows.DurableKeyType)
-		prevKey = testKey(t, prevKey, c.row, c.colKeys, 0, kvrows.DurableKeyType)
-
-		ver = uint64(rand.Intn(99999)) + 99
-		prevKey = testKey(t, prevKey, c.row, c.colKeys, ver, kvrows.TransactionKeyType)
-		prevKey = testKey(t, prevKey, c.row, c.colKeys, ver-1, kvrows.TransactionKeyType)
-		prevKey = testKey(t, prevKey, c.row, c.colKeys, 1, kvrows.TransactionKeyType)
-		prevKey = testKey(t, prevKey, c.row, c.colKeys, 0, kvrows.TransactionKeyType)
+		prevKey = testKey(t, prevKey, c.row, c.colKeys, kvrows.ProposalVersion)
+		prevKey = testKey(t, prevKey, c.row, c.colKeys, ver)
+		prevKey = testKey(t, prevKey, c.row, c.colKeys, ver-1)
+		prevKey = testKey(t, prevKey, c.row, c.colKeys, 1)
+		prevKey = testKey(t, prevKey, c.row, c.colKeys, 0)
 	}
 }
 
@@ -1047,68 +1028,37 @@ func TestGobValues(t *testing.T) {
 }
 
 func TestProposalValues(t *testing.T) {
-	txk := kvrows.TransactionKey{
-		MID:   1234,
-		Key:   []byte("abcdefghijk"),
-		TID:   5678,
-		Epoch: 9009,
+
+	tid := kvrows.TransactionID{
+		Node:    333,
+		Epoch:   4444,
+		LocalID: 55555,
+	}
+	proposals := []kvrows.Proposal{
+		{
+			SID:   1234,
+			Value: []byte("sid: 1234"),
+		},
+		{
+			SID:   2345,
+			Value: []byte("sid: 2345"),
+		},
+		{
+			SID:   3456,
+			Value: []byte("sid: 3456"),
+		},
 	}
 
-	val := []byte("xyzabc")
-	buf := kvrows.MakeProposalValue(txk, val)
-	rtxk, rval, ok := kvrows.ParseProposalValue(buf)
+	buf := kvrows.MakeProposalValue(tid, proposals)
+	retTID, retProposals, ok := kvrows.ParseProposalValue(buf)
 	if !ok {
 		t.Error("ParseProposalValue failed")
 	} else {
-		if !txk.Equal(rtxk) {
-			t.Errorf("ParseProposalValue() got %v for tx key; want %v", rtxk, txk)
+		if retTID != tid {
+			t.Errorf("ParseProposalValue() got %v for tid; want %v", retTID, tid)
 		}
-		if !bytes.Equal(val, rval) {
-			t.Errorf("ParseProposalValue() got %v for value; want %v", rval, val)
-		}
-	}
-}
-
-func TestTransactionKeys(t *testing.T) {
-	cases := []struct {
-		txk1, txk2 kvrows.TransactionKey
-		fail       bool
-	}{
-		{
-			txk1: kvrows.TransactionKey{MID: 1234, Key: []byte("abcdef"), TID: 5678, Epoch: 9009},
-			txk2: kvrows.TransactionKey{MID: 1234, Key: []byte("abcdef"), TID: 5678, Epoch: 9009},
-		},
-		{
-			txk1: kvrows.TransactionKey{MID: 123, Key: []byte("abcdef"), TID: 5678, Epoch: 9009},
-			txk2: kvrows.TransactionKey{MID: 1234, Key: []byte("abcdef"), TID: 5678, Epoch: 9009},
-			fail: true,
-		},
-		{
-			txk1: kvrows.TransactionKey{MID: 1234, Key: []byte("abcdef"), TID: 567, Epoch: 9009},
-			txk2: kvrows.TransactionKey{MID: 1234, Key: []byte("abcdef"), TID: 5678, Epoch: 9009},
-			fail: true,
-		},
-		{
-			txk1: kvrows.TransactionKey{MID: 1234, Key: []byte("abcdef"), TID: 5678, Epoch: 9009},
-			txk2: kvrows.TransactionKey{MID: 1234, Key: []byte("abcdef"), TID: 5678, Epoch: 99},
-			fail: true,
-		},
-		{
-			txk1: kvrows.TransactionKey{MID: 1234, Key: []byte("ABCDEF"), TID: 5678, Epoch: 9009},
-			txk2: kvrows.TransactionKey{MID: 1234, Key: []byte("abcdef"), TID: 5678, Epoch: 9009},
-			fail: true,
-		},
-	}
-
-	for _, c := range cases {
-		if c.fail {
-			if c.txk1.Equal(c.txk2) {
-				t.Errorf("TransactionKey %v should not equal %v", c.txk1, c.txk2)
-			}
-		} else {
-			if !c.txk1.Equal(c.txk2) {
-				t.Errorf("TransactionKey %v should equal %v", c.txk1, c.txk2)
-			}
+		if !testutil.DeepEqual(proposals, retProposals) {
+			t.Errorf("ParseProposalValue() got %v for proposals; want %v", retProposals, proposals)
 		}
 	}
 }

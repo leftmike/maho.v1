@@ -63,7 +63,7 @@ func (btx *badgerTx) Rollback() error {
 }
 
 func (bm *badgerMapper) addPrefix(key []byte) []byte {
-	return append(bm.prefix, key...)
+	return append(bm.prefix, key...) // XXX: need to copy bm.prefix
 }
 
 func (bm *badgerMapper) Get(key []byte, vf func(val []byte) error) error {
@@ -127,7 +127,7 @@ func (bw *badgerWalker) Rewind() ([]byte, bool) {
 }
 
 func (bw *badgerWalker) Seek(seek []byte) ([]byte, bool) {
-	bw.it.Seek(append(bw.seekPrefix, seek...))
+	bw.it.Seek(append(bw.seekPrefix, seek...)) // XXX: need to copy bw.seekPrefix
 	return bw.currentKey()
 }
 

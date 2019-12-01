@@ -11,32 +11,21 @@ import (
 	"github.com/leftmike/maho/sql"
 )
 
-type KeyType byte
-
 type Key struct {
 	Key     []byte
 	Version uint64
-	Type    KeyType
 }
 
-type TransactionKey struct {
-	// MID and Key specify where the transaction record for this transaction is stored.
-	MID uint64
-	Key []byte
-
-	// Node, Epoch, and TID uniquely identify the transaction.
-	Node  uint32
-	Epoch uint32
-	TID   uint64
+type TransactionID struct {
+	// Node, Epoch, and LocalID uniquely identify the transaction.
+	Node    uint32
+	Epoch   uint32
+	LocalID uint64
 }
 
 const (
-	MaximumVersion uint64 = math.MaxUint64
-
-	ProposalKeyType    KeyType = 1
-	DurableKeyType     KeyType = 2
-	TransactionKeyType KeyType = 3
-	MetadataKeyType    KeyType = 4
+	MaximumVersion  uint64 = math.MaxUint64
+	ProposalVersion uint64 = MaximumVersion
 
 	nullKeyTag        = 130
 	boolKeyTag        = 131
@@ -291,112 +280,33 @@ func ParseSQLKey(key []byte, colKeys []engine.ColumnKey, dest []sql.Value) bool 
 	return true
 }
 
-func GetKeyType(buf []byte) KeyType {
-	return KeyType(buf[len(buf)-1])
-}
-
 func (k Key) Encode() []byte {
-	key := append(make([]byte, 0, len(k.Key)+10), k.Key...)
-	key = append(key, byte(k.Type))
+	key := append(make([]byte, 0, len(k.Key)+8), k.Key...)
 	// Encode the version _descending_ so that the most recent version will be encountered
 	// first in a key scan.
-	key = encodeUint64(key, true, k.Version)
-	key = append(key, byte(k.Type))
-	return key
+	return encodeUint64(key, true, k.Version)
 }
 
-func (k Key) Copy() Key {
+func (k Key) Copy() Key { // XXX: is this still needed?
 	return Key{
 		Key:     append(make([]byte, 0, len(k.Key)), k.Key...),
 		Version: k.Version,
-		Type:    k.Type,
 	}
 }
 
-func (k Key) Equal(k2 Key) bool {
-	return k.Version == k2.Version && k.Type == k2.Type && bytes.Equal(k.Key, k2.Key)
-}
-
-func MakeProposalKey(key []byte, sid uint64) Key {
-	return Key{
-		Key:     key,
-		Version: sid,
-		Type:    ProposalKeyType,
-	}
+func (k Key) Equal(k2 Key) bool { // XXX: is this still needed?
+	return k.Version == k2.Version && bytes.Equal(k.Key, k2.Key)
 }
 
 func ParseKey(key []byte) (Key, bool) {
-	if len(key) < 10 || key[len(key)-1] != key[len(key)-10] {
+	if len(key) < 8 {
 		return Key{}, false
 	}
 
 	return Key{
-		Key:     key[:len(key)-10],
-		Version: decodeUint64(key[len(key)-9:len(key)-1], true),
-		Type:    KeyType(key[len(key)-1]),
+		Key:     key[:len(key)-8],
+		Version: decodeUint64(key[len(key)-8:], true),
 	}, true
-}
-
-func (txk TransactionKey) Copy() TransactionKey {
-	return TransactionKey{
-		MID:   txk.MID,
-		Key:   append(make([]byte, 0, len(txk.Key)), txk.Key...),
-		Node:  txk.Node,
-		Epoch: txk.Epoch,
-		TID:   txk.TID,
-	}
-}
-
-func (txk TransactionKey) EncodeKey() Key {
-	key := append(make([]byte, 0, len(txk.Key)+16), txk.Key...)
-	key = encodeUint32(key, false, txk.Node)
-	key = encodeUint32(key, false, txk.Epoch)
-	key = encodeUint64(key, false, txk.TID)
-	return Key{
-		Key:  key,
-		Type: TransactionKeyType,
-	}
-}
-
-func (txk TransactionKey) Equal(txk2 TransactionKey) bool {
-	return txk.MID == txk2.MID && txk.Node == txk2.Node && txk.Epoch == txk2.Epoch &&
-		txk.TID == txk2.TID && bytes.Equal(txk.Key, txk2.Key)
-}
-
-func ParseProposalValue(buf []byte) (TransactionKey, []byte, bool) {
-	if len(buf) < 25 || buf[0] != ProposalValue {
-		return TransactionKey{}, nil, false
-	}
-	mid := decodeUint64(buf[1:9], false)
-	node := decodeUint32(buf[9:13], false)
-	epoch := decodeUint32(buf[13:17], false)
-	tid := decodeUint64(buf[17:25], false)
-	buf = buf[25:]
-
-	buf, keylen, ok := DecodeVarint(buf)
-	if !ok || len(buf) <= int(keylen) {
-		return TransactionKey{}, nil, false
-	}
-
-	return TransactionKey{
-		MID:   mid,
-		Key:   buf[:keylen],
-		Node:  node,
-		Epoch: epoch,
-		TID:   tid,
-	}, buf[keylen:], true
-}
-
-func MakeProposalValue(txk TransactionKey, val []byte) []byte {
-	pv := append(make([]byte, 0, len(txk.Key)+len(val)+26), ProposalValue)
-	pv = encodeUint64(pv, false, txk.MID)
-	pv = encodeUint32(pv, false, txk.Node)
-	pv = encodeUint32(pv, false, txk.Epoch)
-	pv = encodeUint64(pv, false, txk.TID)
-	pv = EncodeVarint(pv, uint64(len(txk.Key)))
-	pv = append(pv, txk.Key...)
-	pv = append(pv, val...)
-	return pv
 }
 
 func EncodeVarint(buf []byte, n uint64) []byte {
@@ -507,6 +417,38 @@ func MakeGobValue(value interface{}) ([]byte, error) {
 		return nil, err
 	}
 	return buf.Bytes(), nil
+}
+
+type Proposal struct {
+	SID   uint64
+	Value []byte
+}
+
+func MakeProposalValue(tid TransactionID, proposals []Proposal) []byte {
+	var buf bytes.Buffer
+	buf.WriteByte(ProposalValue)
+	enc := gob.NewEncoder(&buf)
+	if enc.Encode(&tid) != nil {
+		return nil
+	}
+	if enc.Encode(proposals) != nil {
+		return nil
+	}
+	return buf.Bytes()
+}
+
+func ParseProposalValue(buf []byte) (TransactionID, []Proposal, bool) {
+	if len(buf) == 0 || buf[0] != ProposalValue {
+		return TransactionID{}, nil, false
+	}
+
+	var tid TransactionID
+	var proposals []Proposal
+	dec := gob.NewDecoder(bytes.NewBuffer(buf[1:]))
+	if dec.Decode(&tid) != nil || dec.Decode(&proposals) != nil {
+		return TransactionID{}, nil, false
+	}
+	return tid, proposals, true
 }
 
 func IsTombstoneValue(buf []byte) bool {
