@@ -84,10 +84,10 @@ type transaction struct {
 	state TransactionState
 }
 
-func (kv *KVRows) readGob(ctx context.Context, mid uint64, key Key, value interface{}) (Key,
-	error) {
+func (kv *KVRows) readGob(ctx context.Context, mid uint64, layer byte, key Key,
+	value interface{}) (Key, error) {
 
-	ver, val, err := kv.st.ReadValue(ctx, mid, key)
+	ver, val, err := kv.st.ReadValue(ctx, mid, layer, key)
 	if err == ErrKeyNotFound {
 		key.Version = 0
 		return key, err
@@ -100,19 +100,21 @@ func (kv *KVRows) readGob(ctx context.Context, mid uint64, key Key, value interf
 	return key, dec.Decode(value)
 }
 
-func (kv *KVRows) writeGob(ctx context.Context, mid uint64, key Key, value interface{}) error {
+func (kv *KVRows) writeGob(ctx context.Context, mid uint64, layer byte, key Key,
+	value interface{}) error {
+
 	var buf bytes.Buffer
 	enc := gob.NewEncoder(&buf)
 	err := enc.Encode(value)
 	if err != nil {
 		return err
 	}
-	return kv.st.WriteValue(ctx, mid, key, key.Version+1, buf.Bytes())
+	return kv.st.WriteValue(ctx, mid, layer, key, key.Version+1, buf.Bytes())
 }
 
 func (kv *KVRows) loadMetadata(ctx context.Context) error {
 	var md storeMetadata
-	key, err := kv.readGob(ctx, configMID, metadataKey, &md)
+	key, err := kv.readGob(ctx, configMID, MetadataLayer, metadataKey, &md)
 	if err != nil && err != ErrKeyNotFound {
 		return err
 	}
@@ -121,11 +123,11 @@ func (kv *KVRows) loadMetadata(ctx context.Context) error {
 	md.Epoch += 1
 	kv.epoch = md.Epoch
 	kv.version = md.Version
-	return kv.writeGob(ctx, configMID, key, &md)
+	return kv.writeGob(ctx, configMID, MetadataLayer, key, &md)
 }
 
 func (kv *KVRows) loadDatabases(ctx context.Context) error {
-	keys, vals, err := kv.st.ListValues(ctx, databasesMID)
+	keys, vals, err := kv.st.ListValues(ctx, databasesMID, MetadataLayer)
 	if err != nil {
 		return err
 	}
@@ -192,13 +194,13 @@ func (kv *KVRows) updateDatabase(ctx context.Context, dbname sql.Identifier, act
 		Type: MetadataKeyType,
 	}
 	var md databaseMetadata
-	key, err := kv.readGob(ctx, databasesMID, key, &md)
+	key, err := kv.readGob(ctx, databasesMID, MetadataLayer, key, &md)
 	if err != nil && err != ErrKeyNotFound {
 		return err
 	}
 
 	md.Active = active
-	err = kv.writeGob(ctx, databasesMID, key, &md)
+	err = kv.writeGob(ctx, databasesMID, MetadataLayer, key, &md)
 	if err != nil {
 		return err
 	}
@@ -412,7 +414,7 @@ func (kv *KVRows) forWrite(ctx context.Context, etx engine.Transaction, mid uint
 		Node:  tx.key.Node,
 		Epoch: tx.key.Epoch,
 	}
-	err := kv.writeGob(ctx, mid, tx.key.EncodeKey(), &md)
+	err := kv.writeGob(ctx, mid, TransactionLayer, tx.key.EncodeKey(), &md)
 	if err != nil {
 		tx.state = AbortedState
 		return nil, err
@@ -434,7 +436,7 @@ func (kv *KVRows) finalizeTransaction(ctx context.Context, tx *transaction,
 	}
 
 	var md transactionMetadata
-	key, err := kv.readGob(ctx, tx.key.MID, tx.key.EncodeKey(), &md)
+	key, err := kv.readGob(ctx, tx.key.MID, TransactionLayer, tx.key.EncodeKey(), &md)
 	if err != nil {
 		return err
 	}
@@ -453,7 +455,7 @@ func (kv *KVRows) finalizeTransaction(ctx context.Context, tx *transaction,
 	}
 
 	md.State = ts
-	err = kv.writeGob(ctx, tx.key.MID, key, &md)
+	err = kv.writeGob(ctx, tx.key.MID, TransactionLayer, key, &md)
 	if err != nil {
 		tx.state = AbortedState
 		return err

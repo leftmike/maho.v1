@@ -66,6 +66,10 @@ func EncodeUint64(u uint64) []byte {
 	return encodeUint64(make([]byte, 0, 8), false, u)
 }
 
+func EncodeUint64Layer(u uint64, layer byte) []byte {
+	return append(encodeUint64(make([]byte, 0, 9), false, u), layer)
+}
+
 func encodeUint64(buf []byte, reverse bool, u uint64) []byte {
 	if reverse {
 		u = ^u

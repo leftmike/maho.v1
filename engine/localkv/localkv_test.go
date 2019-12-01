@@ -31,13 +31,13 @@ type cmd struct {
 	fail bool
 }
 
-func runCmds(t *testing.T, st kvrows.Store, mid uint64, cmds []cmd) {
+func runCmds(t *testing.T, st kvrows.Store, mid uint64, layer byte, cmds []cmd) {
 	ctx := context.Background()
 
 	for i, cmd := range cmds {
 		switch cmd.cmd {
 		case cmdReadValue:
-			ver, val, err := st.ReadValue(ctx, mid, cmd.key)
+			ver, val, err := st.ReadValue(ctx, mid, layer, cmd.key)
 			if err != nil {
 				if !cmd.fail {
 					t.Errorf("ReadValue(%d, %v) failed with %s", i, cmd.key, err)
@@ -57,7 +57,7 @@ func runCmds(t *testing.T, st kvrows.Store, mid uint64, cmds []cmd) {
 				}
 			}
 		case cmdListValues:
-			keys, vals, err := st.ListValues(ctx, mid)
+			keys, vals, err := st.ListValues(ctx, mid, layer)
 			if err != nil {
 				if !cmd.fail {
 					t.Errorf("ListValues(%d) failed with %s", i, err)
@@ -75,7 +75,7 @@ func runCmds(t *testing.T, st kvrows.Store, mid uint64, cmds []cmd) {
 				}
 			}
 		case cmdWriteValue:
-			err := st.WriteValue(ctx, mid, cmd.key, cmd.ver, cmd.val)
+			err := st.WriteValue(ctx, mid, layer, cmd.key, cmd.ver, cmd.val)
 			if err != nil {
 				if !cmd.fail {
 					t.Errorf("WriteValue(%d, %v) failed with %s", i, cmd.key, err)
@@ -92,7 +92,7 @@ func runCmds(t *testing.T, st kvrows.Store, mid uint64, cmds []cmd) {
 func testReadWriteList(t *testing.T, st kvrows.Store) {
 	t.Helper()
 
-	runCmds(t, st, 1, []cmd{
+	runCmds(t, st, 1, 99, []cmd{
 		{
 			cmd:  cmdReadValue,
 			key:  kvrows.Key{Key: []byte("abcd"), Type: kvrows.TransactionKeyType},

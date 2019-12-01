@@ -49,7 +49,7 @@ func (bs *badgerStore) Begin(writable bool) (localkv.Tx, error) {
 func (btx *badgerTx) Map(mid uint64, layer byte) (localkv.Mapper, error) {
 	return &badgerMapper{
 		tx:     btx,
-		prefix: append(kvrows.EncodeUint64(mid), layer),
+		prefix: kvrows.EncodeUint64Layer(mid, layer),
 	}, nil
 }
 
