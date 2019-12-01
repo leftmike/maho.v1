@@ -3,7 +3,7 @@ package bbolt
 import (
 	"bytes"
 	"errors"
-	"strconv"
+	"fmt"
 
 	"go.etcd.io/bbolt"
 
@@ -57,8 +57,8 @@ func (bs *bboltStore) Begin(writable bool) (localkv.Tx, error) {
 	}, nil
 }
 
-func (btx *bboltTx) Map(mid uint64) (localkv.Mapper, error) {
-	key := []byte(strconv.FormatUint(mid, 10))
+func (btx *bboltTx) Map(mid uint64, layer byte) (localkv.Mapper, error) {
+	key := []byte(fmt.Sprintf("%d.%d", mid, layer))
 	bkt := btx.tx.Bucket(key)
 	if bkt == nil && btx.writable {
 		var err error

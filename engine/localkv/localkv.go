@@ -28,7 +28,7 @@ func (lkv localKV) ReadValue(ctx context.Context, mid uint64, key kvrows.Key) (u
 	}
 	defer tx.Rollback()
 
-	m, err := tx.Map(mid)
+	m, err := tx.Map(mid, 0) // XXX
 	if err != nil {
 		return 0, nil, err
 	}
@@ -66,7 +66,7 @@ func (lkv localKV) ListValues(ctx context.Context, mid uint64) ([]kvrows.Key, []
 	}
 	defer tx.Rollback()
 
-	m, err := tx.Map(mid)
+	m, err := tx.Map(mid, 0) // XXX
 	if err != nil {
 		return nil, nil, err
 	}
@@ -110,7 +110,7 @@ func (lkv localKV) WriteValue(ctx context.Context, mid uint64, key kvrows.Key, v
 	}
 	defer tx.Rollback()
 
-	m, err := tx.Map(mid)
+	m, err := tx.Map(mid, 0) // XXX
 	if err != nil {
 		return err
 	}
@@ -224,7 +224,7 @@ func (lkv localKV) ScanRelation(ctx context.Context, getState kvrows.GetTxState,
 	}
 	defer tx.Rollback()
 
-	m, err := tx.Map(mid)
+	m, err := tx.Map(mid, 0) // XXX
 	if err != nil {
 		return nil, nil, nil, err
 	}
@@ -342,7 +342,7 @@ func (lkv localKV) ModifyRelation(ctx context.Context, getState kvrows.GetTxStat
 	}
 	defer tx.Rollback()
 
-	m, err := tx.Map(mid)
+	m, err := tx.Map(mid, 0) // XXX
 	if err != nil {
 		return err
 	}
@@ -406,7 +406,7 @@ func (lkv localKV) InsertRelation(ctx context.Context, getState kvrows.GetTxStat
 	}
 	defer tx.Rollback()
 
-	m, err := tx.Map(mid)
+	m, err := tx.Map(mid, 0) // XXX
 	if err != nil {
 		return err
 	}
@@ -437,7 +437,7 @@ func (lkv localKV) CleanRelation(ctx context.Context, getState kvrows.GetTxState
 	}
 	defer tx.Rollback()
 
-	m, err := tx.Map(mid)
+	m, err := tx.Map(mid, 0) // XXX
 	if err != nil {
 		return nil, err
 	}

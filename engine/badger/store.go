@@ -46,10 +46,10 @@ func (bs *badgerStore) Begin(writable bool) (localkv.Tx, error) {
 	}, nil
 }
 
-func (btx *badgerTx) Map(mid uint64) (localkv.Mapper, error) {
+func (btx *badgerTx) Map(mid uint64, layer byte) (localkv.Mapper, error) {
 	return &badgerMapper{
 		tx:     btx,
-		prefix: kvrows.EncodeUint64(mid),
+		prefix: append(kvrows.EncodeUint64(mid), layer),
 	}, nil
 }
 
@@ -63,7 +63,7 @@ func (btx *badgerTx) Rollback() error {
 }
 
 func (bm *badgerMapper) addPrefix(key []byte) []byte {
-	return append(bm.prefix, key...)
+	return append(append(make([]byte, 0, len(bm.prefix)+len(key)), bm.prefix...), key...)
 }
 
 func (bm *badgerMapper) Get(key []byte, vf func(val []byte) error) error {
@@ -103,10 +103,10 @@ func (bw *badgerWalker) currentKey() ([]byte, bool) {
 		return nil, false
 	}
 	key := bw.it.Item().Key()
-	if len(key) < 8 {
+	if len(key) < 9 {
 		return nil, false
 	}
-	return key[8:], true
+	return key[9:], true
 }
 
 func (bw *badgerWalker) Delete() error {
@@ -127,7 +127,8 @@ func (bw *badgerWalker) Rewind() ([]byte, bool) {
 }
 
 func (bw *badgerWalker) Seek(seek []byte) ([]byte, bool) {
-	bw.it.Seek(append(bw.seekPrefix, seek...))
+	bw.it.Seek(append(append(make([]byte, 0, len(bw.seekPrefix)+len(seek)), bw.seekPrefix...),
+		seek...))
 	return bw.currentKey()
 }
 

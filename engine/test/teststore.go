@@ -15,10 +15,10 @@ type row struct {
 	value uint64
 }
 
-func insertRows(t *testing.T, tx localkv.Tx, mid uint64, rows []row) {
+func insertRows(t *testing.T, tx localkv.Tx, mid uint64, layer byte, rows []row) {
 	t.Helper()
 
-	m, err := tx.Map(mid)
+	m, err := tx.Map(mid, layer)
 	if err != nil {
 		t.Errorf("Map(%d) failed with %s", mid, err)
 		return
@@ -33,10 +33,10 @@ func insertRows(t *testing.T, tx localkv.Tx, mid uint64, rows []row) {
 	}
 }
 
-func deleteRows(t *testing.T, tx localkv.Tx, mid uint64, rows map[string]struct{}) {
+func deleteRows(t *testing.T, tx localkv.Tx, mid uint64, layer byte, rows map[string]struct{}) {
 	t.Helper()
 
-	m, err := tx.Map(mid)
+	m, err := tx.Map(mid, layer)
 	if err != nil {
 		t.Errorf("Map(%d) failed with %s", mid, err)
 		return
@@ -57,10 +57,10 @@ func deleteRows(t *testing.T, tx localkv.Tx, mid uint64, rows map[string]struct{
 	}
 }
 
-func updateRows(t *testing.T, tx localkv.Tx, mid uint64, rows map[string]uint64) {
+func updateRows(t *testing.T, tx localkv.Tx, mid uint64, layer byte, rows map[string]uint64) {
 	t.Helper()
 
-	m, err := tx.Map(mid)
+	m, err := tx.Map(mid, layer)
 	if err != nil {
 		t.Errorf("Map(%d) failed with %s", mid, err)
 		return
@@ -81,10 +81,10 @@ func updateRows(t *testing.T, tx localkv.Tx, mid uint64, rows map[string]uint64)
 	}
 }
 
-func selectRows(t *testing.T, tx localkv.Tx, mid uint64, seek string, rows []row) {
+func selectRows(t *testing.T, tx localkv.Tx, mid uint64, layer byte, seek string, rows []row) {
 	t.Helper()
 
-	m, err := tx.Map(mid)
+	m, err := tx.Map(mid, layer)
 	if err != nil {
 		t.Errorf("Map(%d) failed with %s", mid, err)
 		return
@@ -101,6 +101,9 @@ func selectRows(t *testing.T, tx localkv.Tx, mid uint64, seek string, rows []row
 		key, ok = w.Seek([]byte(seek))
 	}
 	for i := 0; ok; i += 1 {
+		if i >= len(rows) {
+			t.Fatalf("Walk(%d) too many rows", i)
+		}
 		if string(key) != rows[i].key {
 			t.Errorf("Walk(%d) got key %s want key %s", i, string(key), rows[i].key)
 		}
@@ -122,10 +125,8 @@ func selectRows(t *testing.T, tx localkv.Tx, mid uint64, seek string, rows []row
 	}
 }
 
-func testGetSet(t *testing.T, tx localkv.Tx, mid uint64) {
-	t.Helper()
-
-	m, err := tx.Map(mid)
+func testGetSet(t *testing.T, tx localkv.Tx, mid uint64, layer byte) {
+	m, err := tx.Map(mid, layer)
 	if err != nil {
 		t.Errorf("Map(%d) failed with %s", mid, err)
 		return
@@ -199,7 +200,7 @@ func withRollback(t *testing.T, st localkv.Store, writable bool,
 	}
 }
 
-func RunLocalKVTest(t *testing.T, st localkv.Store) {
+func runLocalKVTest(t *testing.T, st localkv.Store, mid uint64, layer byte) {
 	withCommit(t, st, func(t *testing.T, tx localkv.Tx) {})
 	withRollback(t, st, true, func(t *testing.T, tx localkv.Tx) {})
 	withRollback(t, st, false, func(t *testing.T, tx localkv.Tx) {})
@@ -221,21 +222,21 @@ func RunLocalKVTest(t *testing.T, st localkv.Store) {
 	}
 	withCommit(t, st,
 		func(t *testing.T, tx localkv.Tx) {
-			insertRows(t, tx, 1024, rows1)
-			selectRows(t, tx, 1024, "", rows1)
+			insertRows(t, tx, mid, layer, rows1)
+			selectRows(t, tx, mid, layer, "", rows1)
 		})
 	withRollback(t, st, true,
 		func(t *testing.T, tx localkv.Tx) {
-			insertRows(t, tx, 1024, rows2)
-			selectRows(t, tx, 1024, "", rows2)
+			insertRows(t, tx, mid, layer, rows2)
+			selectRows(t, tx, mid, layer, "", rows2)
 		})
 	withCommit(t, st,
 		func(t *testing.T, tx localkv.Tx) {
-			selectRows(t, tx, 1024, "", rows1)
+			selectRows(t, tx, mid, layer, "", rows1)
 		})
 	withRollback(t, st, false,
 		func(t *testing.T, tx localkv.Tx) {
-			selectRows(t, tx, 1024, "", rows1)
+			selectRows(t, tx, mid, layer, "", rows1)
 		})
 
 	rows3 := []row{
@@ -251,22 +252,22 @@ func RunLocalKVTest(t *testing.T, st localkv.Store) {
 	}
 	withRollback(t, st, true,
 		func(t *testing.T, tx localkv.Tx) {
-			selectRows(t, tx, 1024, "", rows1)
-			updateRows(t, tx, 1024, update1)
-			selectRows(t, tx, 1024, "", rows3)
+			selectRows(t, tx, mid, layer, "", rows1)
+			updateRows(t, tx, mid, layer, update1)
+			selectRows(t, tx, mid, layer, "", rows3)
 		})
 	withCommit(t, st,
 		func(t *testing.T, tx localkv.Tx) {
-			selectRows(t, tx, 1024, "", rows1)
-			updateRows(t, tx, 1024, update1)
+			selectRows(t, tx, mid, layer, "", rows1)
+			updateRows(t, tx, mid, layer, update1)
 		})
 	withCommit(t, st,
 		func(t *testing.T, tx localkv.Tx) {
-			selectRows(t, tx, 1024, "", rows3)
+			selectRows(t, tx, mid, layer, "", rows3)
 		})
 	withRollback(t, st, false,
 		func(t *testing.T, tx localkv.Tx) {
-			selectRows(t, tx, 1024, "", rows3)
+			selectRows(t, tx, mid, layer, "", rows3)
 		})
 
 	rows4 := []row{
@@ -280,37 +281,37 @@ func RunLocalKVTest(t *testing.T, st localkv.Store) {
 	}
 	withRollback(t, st, true,
 		func(t *testing.T, tx localkv.Tx) {
-			selectRows(t, tx, 1024, "", rows3)
-			deleteRows(t, tx, 1024, delete1)
-			selectRows(t, tx, 1024, "", rows4)
+			selectRows(t, tx, mid, layer, "", rows3)
+			deleteRows(t, tx, mid, layer, delete1)
+			selectRows(t, tx, mid, layer, "", rows4)
 		})
 	withCommit(t, st,
 		func(t *testing.T, tx localkv.Tx) {
-			selectRows(t, tx, 1024, "", rows3)
-			deleteRows(t, tx, 1024, delete1)
+			selectRows(t, tx, mid, layer, "", rows3)
+			deleteRows(t, tx, mid, layer, delete1)
 		})
 	withCommit(t, st,
 		func(t *testing.T, tx localkv.Tx) {
-			selectRows(t, tx, 1024, "", rows4)
+			selectRows(t, tx, mid, layer, "", rows4)
 		})
 	withRollback(t, st, false,
 		func(t *testing.T, tx localkv.Tx) {
-			selectRows(t, tx, 1024, "", rows4)
+			selectRows(t, tx, mid, layer, "", rows4)
 		})
 
 	withCommit(t, st,
 		func(t *testing.T, tx localkv.Tx) {
-			insertRows(t, tx, 9999, rows1)
+			insertRows(t, tx, mid+10, layer, rows1)
 		})
 	withCommit(t, st,
 		func(t *testing.T, tx localkv.Tx) {
-			selectRows(t, tx, 9999, "", rows1)
-			selectRows(t, tx, 1024, "", rows4)
+			selectRows(t, tx, mid+10, layer, "", rows1)
+			selectRows(t, tx, mid, layer, "", rows4)
 		})
 	withRollback(t, st, false,
 		func(t *testing.T, tx localkv.Tx) {
-			selectRows(t, tx, 9999, "", rows1)
-			selectRows(t, tx, 1024, "", rows4)
+			selectRows(t, tx, mid+10, layer, "", rows1)
+			selectRows(t, tx, mid, layer, "", rows4)
 		})
 
 	rows5 := []row{
@@ -326,34 +327,41 @@ func RunLocalKVTest(t *testing.T, st localkv.Store) {
 	}
 	withCommit(t, st,
 		func(t *testing.T, tx localkv.Tx) {
-			insertRows(t, tx, 1, rows5)
+			insertRows(t, tx, mid+20, layer, rows5)
 		})
 	withCommit(t, st,
 		func(t *testing.T, tx localkv.Tx) {
-			selectRows(t, tx, 1, "", rows5)
-			selectRows(t, tx, 1, "ABC", rows5)
-			selectRows(t, tx, 1, "a", rows5)
-			selectRows(t, tx, 1, "ab", rows5[1:])
-			selectRows(t, tx, 1, "bcd", rows5[3:])
-			selectRows(t, tx, 1, "z", nil)
+			selectRows(t, tx, mid+20, layer, "", rows5)
+			selectRows(t, tx, mid+20, layer, "ABC", rows5)
+			selectRows(t, tx, mid+20, layer, "a", rows5)
+			selectRows(t, tx, mid+20, layer, "ab", rows5[1:])
+			selectRows(t, tx, mid+20, layer, "bcd", rows5[3:])
+			selectRows(t, tx, mid+20, layer, "z", nil)
 		})
 	withRollback(t, st, false,
 		func(t *testing.T, tx localkv.Tx) {
-			selectRows(t, tx, 1, "", rows5)
-			selectRows(t, tx, 1, "ABC", rows5)
-			selectRows(t, tx, 1, "a", rows5)
-			selectRows(t, tx, 1, "ab", rows5[1:])
-			selectRows(t, tx, 1, "bcd", rows5[3:])
-			selectRows(t, tx, 1, "z", nil)
+			selectRows(t, tx, mid+20, layer, "", rows5)
+			selectRows(t, tx, mid+20, layer, "ABC", rows5)
+			selectRows(t, tx, mid+20, layer, "a", rows5)
+			selectRows(t, tx, mid+20, layer, "ab", rows5[1:])
+			selectRows(t, tx, mid+20, layer, "bcd", rows5[3:])
+			selectRows(t, tx, mid+20, layer, "z", nil)
 		})
 
 	withCommit(t, st,
 		func(t *testing.T, tx localkv.Tx) {
-			testGetSet(t, tx, 123)
+			testGetSet(t, tx, mid+30, layer)
 		})
 
 	withRollback(t, st, true,
 		func(t *testing.T, tx localkv.Tx) {
-			testGetSet(t, tx, 234)
+			testGetSet(t, tx, mid+40, layer)
 		})
+}
+
+func RunLocalKVTest(t *testing.T, st localkv.Store) {
+	runLocalKVTest(t, st, 1000, 0)
+	runLocalKVTest(t, st, 1000, 1)
+	runLocalKVTest(t, st, 2000, 1)
+	runLocalKVTest(t, st, 2000, 123)
 }
