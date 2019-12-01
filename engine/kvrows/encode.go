@@ -12,7 +12,7 @@ import (
 )
 
 type Key struct {
-	Key     []byte
+	SQLKey  []byte
 	Version uint64
 }
 
@@ -281,7 +281,7 @@ func ParseSQLKey(key []byte, colKeys []engine.ColumnKey, dest []sql.Value) bool 
 }
 
 func (k Key) Encode() []byte {
-	key := append(make([]byte, 0, len(k.Key)+8), k.Key...)
+	key := append(make([]byte, 0, len(k.SQLKey)+8), k.SQLKey...)
 	// Encode the version _descending_ so that the most recent version will be encountered
 	// first in a key scan.
 	return encodeUint64(key, true, k.Version)
@@ -289,13 +289,13 @@ func (k Key) Encode() []byte {
 
 func (k Key) Copy() Key { // XXX: is this still needed?
 	return Key{
-		Key:     append(make([]byte, 0, len(k.Key)), k.Key...),
+		SQLKey:  append(make([]byte, 0, len(k.SQLKey)), k.SQLKey...),
 		Version: k.Version,
 	}
 }
 
 func (k Key) Equal(k2 Key) bool { // XXX: is this still needed?
-	return k.Version == k2.Version && bytes.Equal(k.Key, k2.Key)
+	return k.Version == k2.Version && bytes.Equal(k.SQLKey, k2.SQLKey)
 }
 
 func ParseKey(key []byte) (Key, bool) {
@@ -304,7 +304,7 @@ func ParseKey(key []byte) (Key, bool) {
 	}
 
 	return Key{
-		Key:     key[:len(key)-8],
+		SQLKey:  key[:len(key)-8],
 		Version: decodeUint64(key[len(key)-8:], true),
 	}, true
 }

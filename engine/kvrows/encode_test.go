@@ -26,7 +26,7 @@ func testKey(t *testing.T, prevKey []byte, row []sql.Value, colKeys []engine.Col
 
 	sqlKey := kvrows.MakeSQLKey(row, colKeys)
 	k := kvrows.Key{
-		Key:     sqlKey,
+		SQLKey:  sqlKey,
 		Version: ver,
 	}
 	ck := k.Copy()
@@ -47,8 +47,8 @@ func testKey(t *testing.T, prevKey []byte, row []sql.Value, colKeys []engine.Col
 		if k.Version != ver {
 			t.Errorf("ParseKey(%v) got %d for version; want %d", key, k.Version, ver)
 		}
-		if bytes.Compare(sqlKey, k.Key) != 0 {
-			t.Errorf("ParseKey(%v) got %v for sql key; want %v", key, k.Key, sqlKey)
+		if bytes.Compare(sqlKey, k.SQLKey) != 0 {
+			t.Errorf("ParseKey(%v) got %v for sql key; want %v", key, k.SQLKey, sqlKey)
 		}
 	}
 

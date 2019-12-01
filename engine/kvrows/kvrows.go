@@ -36,7 +36,7 @@ var (
 	ErrKeyNotFound          = errors.New("kvrows: key not found")
 	ErrValueVersionMismatch = errors.New("kvrows: value version mismatch")
 
-	metadataKey      = Key{Key: []byte("metadata")} // XXX: should be a SQL key
+	metadataKey      = Key{SQLKey: []byte("metadata")} // XXX: should be a SQL key
 	databasesPrimary = []engine.ColumnKey{engine.MakeColumnKey(0, false)}
 	schemasPrimary   = []engine.ColumnKey{
 		engine.MakeColumnKey(0, false),
@@ -141,9 +141,9 @@ func (kv *KVRows) loadDatabases(ctx context.Context) error {
 
 	for idx := range keys {
 		sqlKey := []sql.Value{nil}
-		ok := ParseSQLKey(keys[idx].Key, databasesPrimary, sqlKey)
+		ok := ParseSQLKey(keys[idx].SQLKey, databasesPrimary, sqlKey)
 		if !ok {
-			return fmt.Errorf("kvrows: databases: corrupt primary key: %v", keys[idx].Key)
+			return fmt.Errorf("kvrows: databases: corrupt primary key: %v", keys[idx].SQLKey)
 		}
 		s, ok := sqlKey[0].(sql.StringValue)
 		if !ok {
@@ -197,7 +197,7 @@ func makeDatabaseKey(dbname sql.Identifier) []byte {
 
 func (kv *KVRows) updateDatabase(ctx context.Context, dbname sql.Identifier, active bool) error {
 	key := Key{
-		Key: makeDatabaseKey(dbname),
+		SQLKey: makeDatabaseKey(dbname),
 	}
 	var md databaseMetadata
 	key, err := kv.readGob(ctx, databasesMID, key, &md)
@@ -415,7 +415,7 @@ func (kv *KVRows) forWrite(ctx context.Context, etx engine.Transaction, mid uint
 
 	// tx.tid. = ...
 	//tx.key.MID = mid
-	//tx.key.Key = sqlKey
+	//tx.key.SQLKey = sqlKey
 	md := transactionMetadata{
 		State: ActiveState,
 		Node:  tx.tid.Node,
