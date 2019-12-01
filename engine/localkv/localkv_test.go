@@ -300,16 +300,16 @@ func checkScan(t *testing.T, keyVals []keyValue, idx int, keys []kvrows.Key, val
 	return idx
 }
 
-func getAbortedState(txKey kvrows.TransactionKey) kvrows.TransactionState {
-	return kvrows.AbortedState
+func getAbortedState(txKey kvrows.TransactionKey) (kvrows.TransactionState, uint64) {
+	return kvrows.AbortedState, 0
 }
 
-func getCommittedState(txKey kvrows.TransactionKey) kvrows.TransactionState {
-	return kvrows.CommittedState
+func getCommittedState(txKey kvrows.TransactionKey) (kvrows.TransactionState, uint64) {
+	return kvrows.CommittedState, 100000
 }
 
-func getActiveState(txKey kvrows.TransactionKey) kvrows.TransactionState {
-	return kvrows.ActiveState
+func getActiveState(txKey kvrows.TransactionKey) (kvrows.TransactionState, uint64) {
+	return kvrows.ActiveState, 0
 }
 
 func testScanRelation(t *testing.T, st localkv.Store) {

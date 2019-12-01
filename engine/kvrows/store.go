@@ -5,17 +5,12 @@ import (
 	"fmt"
 )
 
-type Proposal struct {
-	MID uint64
-	Key Key
-}
-
 type TxContext struct {
 	TxKey TransactionKey
 	SID   uint64
 }
 
-type GetTxState func(txKey TransactionKey) TransactionState
+type GetTxState func(txKey TransactionKey) (TransactionState, uint64)
 
 type ErrBlockingProposal struct {
 	TxKey TransactionKey
@@ -80,9 +75,8 @@ type Store interface {
 	InsertRelation(ctx context.Context, getState GetTxState, txCtx TxContext, mid uint64,
 		keys [][]byte, vals [][]byte) error
 
-	// FinalizeProposals
-	FinalizeProposals(ctx context.Context, txKey TransactionKey, state TransactionState,
-		proposals []Proposal) error
+	// CleanKey
+	CleanKey(ctx context.Context, getState GetTxState, mid uint64, key []byte) error
 
 	// CleanRelation
 	CleanRelation(ctx context.Context, getState GetTxState, mid uint64, start []byte,

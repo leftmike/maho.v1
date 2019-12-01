@@ -175,9 +175,11 @@ func (lkv localKV) nextKey(getState kvrows.GetTxState, txCtx kvrows.TxContext, w
 							found = true
 						}
 					} else {
-						st := getState(txk)
+						st, ver := getState(txk)
 						if st == kvrows.CommittedState {
-							found = true
+							if ver <= maxVer {
+								found = true
+							}
 						} else if st != kvrows.AbortedState {
 							blockingProposal = true
 							return &kvrows.ErrBlockingProposal{
@@ -421,47 +423,53 @@ func (lkv localKV) InsertRelation(ctx context.Context, getState kvrows.GetTxStat
 	return tx.Commit()
 }
 
-func (lkv localKV) FinalizeProposals(ctx context.Context, txKey kvrows.TransactionKey,
-	state kvrows.TransactionState, proposals []kvrows.Proposal) error {
-
-	// XXX
-	return nil
-}
-
-func (lkv localKV) CleanRelation(ctx context.Context, getState kvrows.GetTxState, mid uint64,
-	start []byte, max int) ([]byte, error) {
+func (lkv localKV) CleanKey(ctx context.Context, getState kvrows.GetTxState, mid uint64,
+	key []byte) error {
 
 	tx, err := lkv.st.Begin(true)
 	if err != nil {
-		return nil, err
+		return err
 	}
 	defer tx.Rollback()
 
 	m, err := tx.Map(mid)
 	if err != nil {
-		return nil, err
+		return err
 	}
 
-	w := m.Walk(nil)
+	w := m.Walk(key)
 	defer w.Close()
 
-	var kbuf []byte
-	var ok bool
-	if start == nil {
-		kbuf, ok = w.Rewind()
-	} else {
-		kbuf, ok = w.Seek(start)
-	}
+	kbuf, ok := w.Seek(key)
 	if !ok {
-		return nil, nil
+		return nil
 	}
 	k, ok := kvrows.ParseKey(kbuf)
 	if !ok {
-		// XXX: delete the key, with a log message
-		return nil, fmt.Errorf("localkv: unable to parse key %v", kbuf)
+		return fmt.Errorf("localkv: unable to parse key %v", kbuf)
 	}
 
-	_ = k
+	for {
+		if k.Type == kvrows.ProposalKeyType {
+
+		}
+
+		kbuf, ok := w.Next()
+		if !ok {
+			break
+		}
+		k, ok = kvrows.ParseKey(kbuf)
+		if !ok {
+			return fmt.Errorf("localkv: unable to parse key %v", kbuf)
+		}
+	}
+
+	// XXX: only commit if there were changes made
+	return tx.Commit()
+}
+
+func (lkv localKV) CleanRelation(ctx context.Context, getState kvrows.GetTxState, mid uint64,
+	start []byte, max int) ([]byte, error) {
 
 	// XXX
 	return nil, nil
