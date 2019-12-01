@@ -5,13 +5,6 @@ import (
 	"fmt"
 )
 
-const (
-	MetadataLayer    = 0
-	DurableLayer     = 1
-	ProposalLayer    = 2
-	TransactionLayer = 3
-)
-
 type Proposal struct {
 	MID uint64
 	Key Key
@@ -34,16 +27,16 @@ func (err *ErrBlockingProposal) Error() string {
 }
 
 type Store interface {
-	// ReadValue will return the most recent version and value of key on layer in mid.
-	ReadValue(ctx context.Context, mid uint64, layer byte, key Key) (uint64, []byte, error)
+	// ReadValue will return the most recent version and value of key in mid.
+	ReadValue(ctx context.Context, mid uint64, key Key) (uint64, []byte, error)
 
-	// ListValues will return all of the keys and values on layer in mid.
-	ListValues(ctx context.Context, mid uint64, layer byte) ([]Key, [][]byte, error)
+	// ListValues will return all of the keys and values in mid.
+	ListValues(ctx context.Context, mid uint64) ([]Key, [][]byte, error)
 
-	// WriteValue will atomically check that the most recent version of key on layer in mid is
+	// WriteValue will atomically check that the most recent version of key in mid is
 	// key.Version; if it is, the value will be updated to val and the version to ver, which
 	// must be greater than key.Version.
-	WriteValue(ctx context.Context, mid uint64, layer byte, key Key, ver uint64, val []byte) error
+	WriteValue(ctx context.Context, mid uint64, key Key, ver uint64, val []byte) error
 
 	// ScanRelation will return a list of keys and values starting from seek, if specified. The
 	// maximum version of keys visible is specified by maxVer. Use num to limit the number of

@@ -19,8 +19,8 @@ func NewStore(st Store) kvrows.Store {
 	}
 }
 
-func (lkv localKV) ReadValue(ctx context.Context, mid uint64, layer byte, key kvrows.Key) (uint64,
-	[]byte, error) {
+func (lkv localKV) ReadValue(ctx context.Context, mid uint64, key kvrows.Key) (uint64, []byte,
+	error) {
 
 	tx, err := lkv.st.Begin(false)
 	if err != nil {
@@ -28,7 +28,7 @@ func (lkv localKV) ReadValue(ctx context.Context, mid uint64, layer byte, key kv
 	}
 	defer tx.Rollback()
 
-	m, err := tx.Map(mid, layer)
+	m, err := tx.Map(mid, 0) // XXX
 	if err != nil {
 		return 0, nil, err
 	}
@@ -59,16 +59,14 @@ func (lkv localKV) ReadValue(ctx context.Context, mid uint64, layer byte, key kv
 	return k.Version, retval, nil
 }
 
-func (lkv localKV) ListValues(ctx context.Context, mid uint64, layer byte) ([]kvrows.Key,
-	[][]byte, error) {
-
+func (lkv localKV) ListValues(ctx context.Context, mid uint64) ([]kvrows.Key, [][]byte, error) {
 	tx, err := lkv.st.Begin(false)
 	if err != nil {
 		return nil, nil, err
 	}
 	defer tx.Rollback()
 
-	m, err := tx.Map(mid, layer)
+	m, err := tx.Map(mid, 0) // XXX
 	if err != nil {
 		return nil, nil, err
 	}
@@ -103,8 +101,8 @@ func (lkv localKV) ListValues(ctx context.Context, mid uint64, layer byte) ([]kv
 	return keys, vals, nil
 }
 
-func (lkv localKV) WriteValue(ctx context.Context, mid uint64, layer byte, key kvrows.Key,
-	ver uint64, val []byte) error {
+func (lkv localKV) WriteValue(ctx context.Context, mid uint64, key kvrows.Key, ver uint64,
+	val []byte) error {
 
 	tx, err := lkv.st.Begin(true)
 	if err != nil {
@@ -112,7 +110,7 @@ func (lkv localKV) WriteValue(ctx context.Context, mid uint64, layer byte, key k
 	}
 	defer tx.Rollback()
 
-	m, err := tx.Map(mid, layer)
+	m, err := tx.Map(mid, 0) // XXX
 	if err != nil {
 		return err
 	}
