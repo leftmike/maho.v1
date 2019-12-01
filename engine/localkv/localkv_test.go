@@ -228,7 +228,7 @@ func initializeMap(t *testing.T, st localkv.Store, mid uint64, keyVals []keyValu
 	}
 	defer tx.Rollback()
 
-	m, err := tx.Map(mid, 0) // XXX
+	m, err := tx.Map(mid)
 	if err != nil {
 		t.Fatal(err)
 	}

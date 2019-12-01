@@ -5,7 +5,7 @@ type Store interface {
 }
 
 type Tx interface {
-	Map(mid uint64, layer byte) (Mapper, error)
+	Map(mid uint64) (Mapper, error)
 	Commit() error
 	Rollback() error
 }
