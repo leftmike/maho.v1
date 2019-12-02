@@ -429,90 +429,82 @@ func testScanRelation(t *testing.T, st localkv.Store) {
 	if countVisible(keyVals) != cnt {
 		t.Errorf("ScanRelation: got %d key-values; want %d", cnt, countVisible(keyVals))
 	}
-	/*
-		txk2 := kvrows.TransactionKey{
-			MID:   99999,
-			Key:   []byte("abcdefghijklmn"),
-			TID:   12345678,
-			Epoch: 53,
-		}
-		keyVals2 := []keyValue{
-			{
-				key:     kvrows.Key{[]byte("bbbb"), 50, kvrows.DurableKeyType},
-				val:     kvrows.MakeRowValue([]sql.Value{sql.StringValue("bbbb@50")}),
-				visible: true,
-			},
-			{
-				key:     kvrows.Key{[]byte("cccc"), 12, kvrows.ProposalKeyType},
-				val:     kvrows.MakeProposalValue(txk2, []byte("proposal value cccc@12")),
-				visible: true,
-			},
-			{
-				key:     kvrows.Key{[]byte("dddd"), 50, kvrows.DurableKeyType},
-				val:     kvrows.MakeRowValue([]sql.Value{sql.StringValue("dddd@50")}),
-				visible: true,
-			},
-			{
-				key: kvrows.Key{[]byte("eeee"), 13, kvrows.ProposalKeyType},
-				val: kvrows.MakeProposalValue(txk2, kvrows.MakeTombstoneValue()),
-			},
-			{
-				key: kvrows.Key{[]byte("eeee"), 12, kvrows.ProposalKeyType},
-				val: kvrows.MakeProposalValue(txk2, []byte("proposal value eeee@12")),
-			},
-			{
-				key:     kvrows.Key{[]byte("ffff"), 50, kvrows.DurableKeyType},
-				val:     kvrows.MakeRowValue([]sql.Value{sql.StringValue("ffff@50")}),
-				visible: true,
-			},
-		}
-		initializeMap(t, st, 2000, keyVals2)
 
-		txCtx = kvrows.TxContext{
-			TxKey: txk,
-			SID:   999999,
-		}
-		keys, vals, _, err = lkv.ScanRelation(ctx, getCommittedState, txCtx, 2000, 999999, 1024, nil)
-		if err != io.EOF {
-			t.Errorf("ScanRelation failed with %s", err)
-		}
-		checkScan(t, keyVals2, 0, keys, vals)
-		if countVisible(keyVals2) != len(keys) {
-			t.Errorf("ScanRelation: got %d key-values; want %d", len(keys), countVisible(keyVals2))
-		}
+	tid2 := kvrows.TransactionID{
+		Node:    10,
+		Epoch:   53,
+		LocalID: 12345678,
+	}
+	keyVals2 := []keyValue{
+		{
+			key:     kvrows.Key{[]byte("bbbb"), 50},
+			val:     kvrows.MakeRowValue([]sql.Value{sql.StringValue("bbbb@50")}),
+			visible: true,
+		},
+		{
+			key: kvrows.Key{[]byte("cccc"), kvrows.ProposalVersion},
+			val: kvrows.MakeProposalValue(tid2,
+				[]kvrows.Proposal{
+					{SID: 12, Value: []byte("proposal value cccc@12")},
+				}),
+			scanVal: []byte("proposal value cccc@12"),
+			visible: true,
+		},
+		{
+			key:     kvrows.Key{[]byte("dddd"), 50},
+			val:     kvrows.MakeRowValue([]sql.Value{sql.StringValue("dddd@50")}),
+			visible: true,
+		},
+		{
+			key: kvrows.Key{[]byte("eeee"), kvrows.ProposalVersion},
+			val: kvrows.MakeProposalValue(tid2,
+				[]kvrows.Proposal{
+					{12, []byte("proposal value eeee@12")},
+					{13, kvrows.MakeTombstoneValue()},
+				}),
+		},
+		{
+			key:     kvrows.Key{[]byte("ffff"), 50},
+			val:     kvrows.MakeRowValue([]sql.Value{sql.StringValue("ffff@50")}),
+			visible: true,
+		},
+	}
+	initializeMap(t, st, 2000, keyVals2)
 
-		txCtx = kvrows.TxContext{
-			TxKey: txk,
-			SID:   999999,
-		}
-		keys, vals, next, err = lkv.ScanRelation(ctx, getActiveState, txCtx, 2000, 999999, 1024, nil)
-		bperr, ok := err.(*kvrows.ErrBlockingProposal)
-		if !ok {
-			t.Errorf("ScanRelation: got %s; want blocking proposals error", err)
-		} else if !bperr.TxKey.Equal(txk2) {
-			t.Errorf("ScanRelation: got key %v; want %v", bperr, txk2)
-		}
-		if len(keys) != 1 {
-			t.Errorf("ScanRelation: got %d keys; want 1", len(keys))
-		}
+	keys, vals, _, err = lkv.ScanRelation(ctx, getCommittedState, tid, 999999, 2000, 999999, 1024,
+		nil)
+	if err != io.EOF {
+		t.Errorf("ScanRelation failed with %s", err)
+	}
+	checkScan(t, keyVals2, 0, keys, vals)
+	if countVisible(keyVals2) != len(keys) {
+		t.Errorf("ScanRelation: got %d key-values; want %d", len(keys), countVisible(keyVals2))
+	}
 
-		idx = checkScan(t, keyVals2, 0, keys, vals)
-		cnt = len(keys)
+	keys, vals, next, err = lkv.ScanRelation(ctx, getActiveState, tid, 999999, 2000, 999999, 1024, nil)
+	bperr, ok := err.(*kvrows.ErrBlockingProposal)
+	if !ok {
+		t.Errorf("ScanRelation: got %s; want blocking proposals error", err)
+	} else if bperr.TID != tid2 {
+		t.Errorf("ScanRelation: got key %v; want %v", bperr, tid2)
+	}
+	if len(keys) != 1 {
+		t.Errorf("ScanRelation: got %d keys; want 1", len(keys))
+	}
 
-		txCtx = kvrows.TxContext{
-			TxKey: txk,
-			SID:   999999,
-		}
-		keys, vals, _, err = lkv.ScanRelation(ctx, getCommittedState, txCtx, 2000, 999999, 1024, next)
-		if err != io.EOF {
-			t.Errorf("ScanRelation failed with %s", err)
-		}
-		checkScan(t, keyVals2, idx, keys, vals)
-		cnt += len(keys)
-		if countVisible(keyVals2) != cnt {
-			t.Errorf("ScanRelation: got %d key-values; want %d", cnt, countVisible(keyVals2))
-		}
-	*/
+	idx = checkScan(t, keyVals2, 0, keys, vals)
+	cnt = len(keys)
+
+	keys, vals, _, err = lkv.ScanRelation(ctx, getCommittedState, tid, 999999, 2000, 999999, 1024,
+		next)
+	if err != io.EOF {
+		t.Errorf("ScanRelation failed with %s", err)
+	}
+	checkScan(t, keyVals2, idx, keys, vals)
+	cnt += len(keys)
+	if countVisible(keyVals2) != cnt {
+		t.Errorf("ScanRelation: got %d key-values; want %d", cnt, countVisible(keyVals2))
+	}
 }
 
 /* XXX

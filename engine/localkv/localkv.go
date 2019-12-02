@@ -252,7 +252,7 @@ func (lkv localKV) ScanRelation(ctx context.Context, getState kvrows.GetTxState,
 					})
 				if err != nil {
 					if blockingProposal {
-						return keys, vals, k.Copy().SQLKey, nil
+						return keys, vals, k.Copy().SQLKey, err
 					}
 					return nil, nil, nil, err
 				}
