@@ -50,7 +50,7 @@ type Store interface {
 	// ScanRelation.
 	//
 	// The operation is atomic: either all of the modifications will be proposed or none of them.
-	// A transaction key must already exist; it is passed as part of txCtx.
+	// A transaction key must already exist; it is passed as tid.
 	//
 	// If a modification encountered a proposed write by a different transaction which is
 	// potentially still active, err will be an instance of ErrBlockingProposal.
@@ -64,9 +64,9 @@ type Store interface {
 	// None of the keys can have visible values.
 	//
 	// The operation is atomic: either all of the values will be proposed for the keys or none of
-	// them. A transaction key must already exist; it is passed as part of txCtx.
+	// them. A transaction key must already exist; it is passed as tid.
 	//
-	// If a insert encountered a proposed write by a different transaction which is
+	// If an insert encountered a proposed write by a different transaction which is
 	// potentially still active, err will be an instance of ErrBlockingProposal.
 	InsertRelation(ctx context.Context, getState GetTxState, tid TransactionID, sid, mid uint64,
 		keys [][]byte, vals [][]byte) error

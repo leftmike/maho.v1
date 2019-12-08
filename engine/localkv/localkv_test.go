@@ -130,6 +130,13 @@ func testReadWriteList(t *testing.T, st kvrows.Store) {
 			fail: true,
 		},
 		{
+			cmd:  cmdWriteValue,
+			key:  kvrows.Key{SQLKey: []byte("xxxyyyzzz"), Version: 10},
+			ver:  11,
+			val:  []byte("0987654321"),
+			fail: true,
+		},
+		{
 			cmd: cmdWriteValue,
 			key: kvrows.Key{SQLKey: []byte("abcd0"), Version: 1},
 			ver: 2,
@@ -402,7 +409,8 @@ func testScanRelation(t *testing.T, st localkv.Store) {
 
 	initializeMap(t, st, 1000, keyVals)
 
-	keys, vals, _, err := lkv.ScanRelation(ctx, getAbortedState, tid, 200, 1000, 999999, 1024, nil)
+	keys, vals, _, err := lkv.ScanRelation(ctx, getAbortedState, tid, 200, 1000, 999999, 88888,
+		nil)
 	if err != io.EOF {
 		t.Errorf("ScanRelation failed with %s", err)
 	}
@@ -713,23 +721,17 @@ func testInsertRelation(t *testing.T, st kvrows.Store) {
 	}
 }
 
-/* XXX
 func testModifyRelation(t *testing.T, st kvrows.Store) {
 	ctx := context.Background()
 
-	txk := kvrows.TransactionKey{
-		MID:   20000,
-		Key:   []byte("abcdefghijklmn"),
-		TID:   99,
-		Epoch: 888,
+	tid := kvrows.TransactionID{
+		Node:    20,
+		Epoch:   888,
+		LocalID: 99,
 	}
 
-	txCtx := kvrows.TxContext{
-		TxKey: txk,
-		SID:   10,
-	}
-
-	err := st.InsertRelation(ctx, getAbortedState, txCtx, 20000,
+	sid := uint64(10)
+	err := st.InsertRelation(ctx, getAbortedState, tid, sid, 20000,
 		[][]byte{
 			[]byte("aaaa key"),
 			[]byte("bbbb key"),
@@ -746,8 +748,8 @@ func testModifyRelation(t *testing.T, st kvrows.Store) {
 		t.Errorf("InsertRelation: failed with %s", err)
 	}
 
-	txCtx.SID += 1
-	checkRelation(t, ctx, st, getAbortedState, txCtx, 20000,
+	sid += 1
+	checkRelation(t, ctx, st, getAbortedState, tid, sid, 20000,
 		[][]byte{
 			[]byte("aaaa key"),
 			[]byte("bbbb key"),
@@ -761,17 +763,17 @@ func testModifyRelation(t *testing.T, st kvrows.Store) {
 			kvrows.MakeRowValue([]sql.Value{sql.StringValue("dddd row")}),
 		})
 
-	txCtx.SID += 1
-	err = st.ModifyRelation(ctx, getAbortedState, txCtx, 20000,
+	sid += 1
+	err = st.ModifyRelation(ctx, getAbortedState, tid, sid, 20000,
 		[]kvrows.Key{
-			kvrows.Key{[]byte("bbbb key"), 10, kvrows.ProposalKeyType},
+			kvrows.Key{[]byte("bbbb key"), kvrows.ProposalVersion},
 		}, nil)
 	if err != nil {
 		t.Errorf("ModifyRelation failed with %s", err)
 	}
 
-	txCtx.SID += 1
-	checkRelation(t, ctx, st, getAbortedState, txCtx, 20000,
+	sid += 1
+	checkRelation(t, ctx, st, getAbortedState, tid, sid, 20000,
 		[][]byte{
 			[]byte("aaaa key"),
 			[]byte("cccc key"),
@@ -783,17 +785,26 @@ func testModifyRelation(t *testing.T, st kvrows.Store) {
 			kvrows.MakeRowValue([]sql.Value{sql.StringValue("dddd row")}),
 		})
 
-	txCtx.SID += 1
-	err = st.ModifyRelation(ctx, getAbortedState, txCtx, 20000,
+	sid += 1
+	err = st.ModifyRelation(ctx, getAbortedState, tid, sid, 20000,
 		[]kvrows.Key{
-			kvrows.Key{[]byte("bbbb key"), 10, kvrows.ProposalKeyType},
+			kvrows.Key{[]byte("bbbb key"), kvrows.ProposalVersion},
 		}, nil)
 	if err == nil {
 		t.Errorf("ModifyRelation did not fail")
 	}
 
-	txCtx.SID += 1
-	err = st.InsertRelation(ctx, getAbortedState, txCtx, 20000,
+	sid += 1
+	err = st.ModifyRelation(ctx, getAbortedState, tid, sid, 20000,
+		[]kvrows.Key{
+			kvrows.Key{[]byte("xxxxyyyyzzzz key"), kvrows.ProposalVersion},
+		}, nil)
+	if err == nil {
+		t.Errorf("ModifyRelation did not fail")
+	}
+
+	sid += 1
+	err = st.InsertRelation(ctx, getAbortedState, tid, sid, 20000,
 		[][]byte{
 			[]byte("bbbb key"),
 			[]byte("eeee key"),
@@ -808,8 +819,8 @@ func testModifyRelation(t *testing.T, st kvrows.Store) {
 		t.Errorf("InsertRelation: failed with %s", err)
 	}
 
-	txCtx.SID += 1
-	checkRelation(t, ctx, st, getAbortedState, txCtx, 20000,
+	sid += 1
+	checkRelation(t, ctx, st, getAbortedState, tid, sid, 20000,
 		[][]byte{
 			[]byte("aaaa key"),
 			[]byte("bbbb key"),
@@ -827,18 +838,26 @@ func testModifyRelation(t *testing.T, st kvrows.Store) {
 			kvrows.MakeRowValue([]sql.Value{sql.StringValue("ffff row")}),
 		})
 
-	txCtx.SID += 1
-	err = st.ModifyRelation(ctx, getAbortedState, txCtx, 20000,
+	sid += 1
+	err = st.ModifyRelation(ctx, getAbortedState, tid, sid, 20000,
 		[]kvrows.Key{
-			kvrows.Key{[]byte("bbbb key"), 15, kvrows.ProposalKeyType},
-			kvrows.Key{[]byte("dddd key"), 10, kvrows.ProposalKeyType},
+			kvrows.Key{[]byte("bbbb key"), kvrows.ProposalVersion},
+			kvrows.Key{[]byte("dddd key"), kvrows.ProposalVersion},
 		}, nil)
 	if err != nil {
 		t.Errorf("ModifyRelation failed with %s", err)
 	}
 
-	txCtx.SID += 1
-	checkRelation(t, ctx, st, getAbortedState, txCtx, 20000,
+	err = st.ModifyRelation(ctx, getAbortedState, tid, sid, 20000,
+		[]kvrows.Key{
+			kvrows.Key{[]byte("bbbb key"), kvrows.ProposalVersion},
+		}, nil)
+	if err == nil {
+		t.Errorf("ModifyRelation did not fail")
+	}
+
+	sid += 1
+	checkRelation(t, ctx, st, getAbortedState, tid, sid, 20000,
 		[][]byte{
 			[]byte("aaaa key"),
 			[]byte("cccc key"),
@@ -852,11 +871,11 @@ func testModifyRelation(t *testing.T, st kvrows.Store) {
 			kvrows.MakeRowValue([]sql.Value{sql.StringValue("ffff row")}),
 		})
 
-	txCtx.SID += 1
-	err = st.ModifyRelation(ctx, getAbortedState, txCtx, 20000,
+	sid += 1
+	err = st.ModifyRelation(ctx, getAbortedState, tid, sid, 20000,
 		[]kvrows.Key{
-			kvrows.Key{[]byte("ffff key"), 15, kvrows.ProposalKeyType},
-			kvrows.Key{[]byte("aaaa key"), 10, kvrows.ProposalKeyType},
+			kvrows.Key{[]byte("ffff key"), kvrows.ProposalVersion},
+			kvrows.Key{[]byte("aaaa key"), kvrows.ProposalVersion},
 		},
 		[][]byte{
 			kvrows.MakeRowValue([]sql.Value{sql.StringValue("ffff row #2")}),
@@ -866,8 +885,8 @@ func testModifyRelation(t *testing.T, st kvrows.Store) {
 		t.Errorf("ModifyRelation failed with %s", err)
 	}
 
-	txCtx.SID += 1
-	checkRelation(t, ctx, st, getAbortedState, txCtx, 20000,
+	sid += 1
+	checkRelation(t, ctx, st, getAbortedState, tid, sid, 20000,
 		[][]byte{
 			[]byte("aaaa key"),
 			[]byte("cccc key"),
@@ -881,12 +900,12 @@ func testModifyRelation(t *testing.T, st kvrows.Store) {
 			kvrows.MakeRowValue([]sql.Value{sql.StringValue("ffff row #2")}),
 		})
 
-	txCtx.SID += 1
-	err = st.ModifyRelation(ctx, getAbortedState, txCtx, 20000,
+	sid += 1
+	err = st.ModifyRelation(ctx, getAbortedState, tid, sid, 20000,
 		[]kvrows.Key{
-			kvrows.Key{[]byte("cccc key"), 10, kvrows.ProposalKeyType},
-			kvrows.Key{[]byte("ffff key"), 19, kvrows.ProposalKeyType},
-			kvrows.Key{[]byte("aaaa key"), 19, kvrows.ProposalKeyType},
+			kvrows.Key{[]byte("cccc key"), kvrows.ProposalVersion},
+			kvrows.Key{[]byte("ffff key"), kvrows.ProposalVersion},
+			kvrows.Key{[]byte("aaaa key"), kvrows.ProposalVersion},
 		},
 		[][]byte{
 			kvrows.MakeRowValue([]sql.Value{sql.StringValue("cccc row #2")}),
@@ -897,8 +916,8 @@ func testModifyRelation(t *testing.T, st kvrows.Store) {
 		t.Errorf("ModifyRelation failed with %s", err)
 	}
 
-	txCtx.SID += 1
-	checkRelation(t, ctx, st, getAbortedState, txCtx, 20000,
+	sid += 1
+	checkRelation(t, ctx, st, getAbortedState, tid, sid, 20000,
 		[][]byte{
 			[]byte("aaaa key"),
 			[]byte("cccc key"),
@@ -912,7 +931,6 @@ func testModifyRelation(t *testing.T, st kvrows.Store) {
 			kvrows.MakeRowValue([]sql.Value{sql.StringValue("ffff row #3")}),
 		})
 }
-*/
 
 func TestBadger(t *testing.T) {
 	err := testutil.CleanDir("testdata", []string{".gitignore"})
@@ -927,7 +945,7 @@ func TestBadger(t *testing.T) {
 	testReadWriteList(t, localkv.NewStore(st))
 	testScanRelation(t, st)
 	testInsertRelation(t, localkv.NewStore(st))
-	// XXX: testModifyRelation(t, localkv.NewStore(st))
+	testModifyRelation(t, localkv.NewStore(st))
 }
 
 func TestBBolt(t *testing.T) {
@@ -943,5 +961,5 @@ func TestBBolt(t *testing.T) {
 	testReadWriteList(t, localkv.NewStore(st))
 	testScanRelation(t, st)
 	testInsertRelation(t, localkv.NewStore(st))
-	// XXX: testModifyRelation(t, localkv.NewStore(st))
+	testModifyRelation(t, localkv.NewStore(st))
 }
