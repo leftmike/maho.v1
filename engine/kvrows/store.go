@@ -75,6 +75,5 @@ type Store interface {
 	CleanKeys(ctx context.Context, getState GetTxState, mid uint64, key [][]byte) error
 
 	// CleanRelation
-	CleanRelation(ctx context.Context, getState GetTxState, mid uint64, start []byte,
-		num int) ([]byte, error)
+	CleanRelation(ctx context.Context, getState GetTxState, mid uint64) error
 }
