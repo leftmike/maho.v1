@@ -71,10 +71,10 @@ type Store interface {
 	InsertRelation(ctx context.Context, getState GetTxState, tid TransactionID, sid, mid uint64,
 		keys [][]byte, vals [][]byte) error
 
-	// CleanKey
-	CleanKey(ctx context.Context, getState GetTxState, mid uint64, key []byte) error
+	// CleanKeys
+	CleanKeys(ctx context.Context, getState GetTxState, mid uint64, key [][]byte) error
 
 	// CleanRelation
 	CleanRelation(ctx context.Context, getState GetTxState, mid uint64, start []byte,
-		max int) ([]byte, error)
+		num int) ([]byte, error)
 }
