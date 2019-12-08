@@ -23,6 +23,11 @@ type TransactionID struct {
 	LocalID uint64
 }
 
+type Proposal struct {
+	SID   uint64
+	Value []byte
+}
+
 const (
 	MaximumVersion  uint64 = math.MaxUint64
 	ProposalVersion uint64 = MaximumVersion
@@ -417,11 +422,6 @@ func MakeGobValue(value interface{}) ([]byte, error) {
 		return nil, err
 	}
 	return buf.Bytes(), nil
-}
-
-type Proposal struct {
-	SID   uint64
-	Value []byte
 }
 
 func MakeProposalValue(tid TransactionID, proposals []Proposal) []byte {

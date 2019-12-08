@@ -308,11 +308,136 @@ func (lkv localKV) ModifyRelation(ctx context.Context, getState kvrows.GetTxStat
 	return errors.New("not implemented")
 }
 
+func insertValue(tid kvrows.TransactionID, sid uint64, insertKey, val []byte,
+	proposals []kvrows.Proposal, m Mapper) error {
+
+	return m.Set(kvrows.Key{insertKey, kvrows.ProposalVersion}.Encode(),
+		kvrows.MakeProposalValue(tid, append(proposals, kvrows.Proposal{sid, val})))
+}
+
+func insertRelation(getState kvrows.GetTxState, tid kvrows.TransactionID, sid uint64,
+	insertKey []byte, val []byte, m Mapper) error {
+
+	w := m.Walk(insertKey)
+	defer w.Close()
+
+	kbuf, ok := w.Seek(insertKey)
+	if !ok {
+		// No value for the key; go ahead and propose a value.
+		return insertValue(tid, sid, insertKey, val, nil, m)
+	}
+
+	k, ok := kvrows.ParseKey(kbuf)
+	if !ok {
+		return fmt.Errorf("localkv: unable to parse key %v", kbuf)
+	}
+
+	if k.Version == kvrows.ProposalVersion {
+		found := false
+		err := w.Value(
+			func(val []byte) error {
+				if len(val) == 0 || val[0] != kvrows.ProposalValue {
+					return fmt.Errorf("localkv: unable to parse value for key %v: %v", k,
+						val)
+				}
+				proTID, proposals, ok := kvrows.ParseProposalValue(val)
+				if !ok {
+					return fmt.Errorf("localkv: unable to parse value for key %v: %v", k,
+						val)
+				}
+
+				if proTID == tid {
+					found = true
+					proVal := proposals[len(proposals)-1].Value
+					if len(proVal) == 0 || proVal[0] != kvrows.TombstoneValue ||
+						proposals[len(proposals)-1].SID == sid {
+
+						return fmt.Errorf("localkv: existing value for key %v", insertKey)
+					} else {
+						// No visible value for the key; go ahead and propose a value.
+						return insertValue(tid, sid, insertKey, val, proposals, m)
+					}
+				} else {
+					st, ver := getState(proTID)
+					if st == kvrows.CommittedState {
+						found = true
+						proVal := proposals[len(proposals)-1].Value
+						if len(proVal) == 0 || proVal[0] != kvrows.TombstoneValue {
+							return fmt.Errorf("localkv: existing value for key %v", insertKey)
+						} else {
+							// No visible value for the key; go ahead and propose a value, but
+							// first, make the previous, committed, proposal durable.
+
+							panic("committed proposal; value is a tombstone") // XXX
+							err := m.Set(kvrows.Key{insertKey, ver}.Encode(), proVal)
+							if err != nil {
+								return err
+							}
+							return insertValue(tid, sid, insertKey, val, proposals, m)
+						}
+					} else if st != kvrows.AbortedState {
+						return &kvrows.ErrBlockingProposal{
+							TID: proTID,
+							Key: k.Copy(),
+						}
+					}
+				}
+
+				return nil
+			})
+		if err != nil || found {
+			return err
+		}
+
+		kbuf, ok := w.Next()
+		if !ok {
+			// No visible value for the key; go ahead and propose a value.
+			return insertValue(tid, sid, insertKey, val, nil, m)
+		}
+		k, ok = kvrows.ParseKey(kbuf)
+		if !ok {
+			return fmt.Errorf("localkv: unable to parse key %v", kbuf)
+		}
+	}
+
+	err := w.Value(
+		func(val []byte) error {
+			if len(val) == 0 || val[0] == kvrows.TombstoneValue {
+				return nil
+			}
+
+			return fmt.Errorf("localkv: existing value for key %v", insertKey)
+		})
+	if err != nil {
+		return err
+	}
+
+	// No visible value for the key; go ahead and propose a value.
+	return insertValue(tid, sid, insertKey, val, nil, m)
+}
+
 func (lkv localKV) InsertRelation(ctx context.Context, getState kvrows.GetTxState,
 	tid kvrows.TransactionID, sid, mid uint64, keys [][]byte, vals [][]byte) error {
 
-	// XXX
-	return errors.New("not implemented")
+	tx, err := lkv.st.Begin(true)
+	if err != nil {
+		return err
+	}
+	defer tx.Rollback()
+
+	m, err := tx.Map(mid)
+	if err != nil {
+		return err
+	}
+
+	for idx := range keys {
+		err := insertRelation(getState, tid, sid, keys[idx], vals[idx], m)
+		if err != nil {
+			return err
+		}
+	}
+
+	return tx.Commit()
 }
 
 /*
