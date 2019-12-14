@@ -12,7 +12,7 @@ To Do:
   at engine/localkv/localkv_test.go
 
 - keep track of databases per engine as a simple config file that gets read and written by maho
---  depends on the engine: yes for bbolt, no for badger
+  depends on the engine: yes for bbolt, no for badger
 
 - add test for not seeing modified rows within a single SQL statement
 
