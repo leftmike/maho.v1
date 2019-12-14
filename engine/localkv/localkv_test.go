@@ -1029,7 +1029,7 @@ func testModifyRelation(t *testing.T, st kvrows.Store) {
 			kvrows.MakeRowValue([]sql.Value{sql.StringValue("ffff row #3")}),
 		})
 
-	err = st.CleanRelation(ctx, ver.getCommittedState, 20000)
+	err = st.CleanRelation(ctx, ver.getCommittedState, 20000, false)
 	if err != nil {
 		t.Errorf("CleanRelation failed with %s", err)
 	}
@@ -1121,7 +1121,7 @@ func testRelation(t *testing.T, st kvrows.Store) {
 			kvrows.MakeRowValue([]sql.Value{sql.StringValue("dddd row")}),
 		})
 
-	err = st.CleanRelation(ctx, getAbortedState, 30000)
+	err = st.CleanRelation(ctx, getAbortedState, 30000, false)
 	if err != nil {
 		t.Errorf("CleanRelation failed with %s", err)
 	}
@@ -1147,7 +1147,7 @@ func testRelation(t *testing.T, st kvrows.Store) {
 	}
 
 	ver := version(20)
-	err = st.CleanRelation(ctx, ver.getCommittedState, 30000)
+	err = st.CleanRelation(ctx, ver.getCommittedState, 30000, false)
 	if err != nil {
 		t.Errorf("CleanRelation failed with %s", err)
 	}
@@ -1234,7 +1234,7 @@ func testRelation(t *testing.T, st kvrows.Store) {
 		t.Errorf("InsertRelation: failed with %s", err)
 	}
 
-	err = st.CleanRelation(ctx, ver.getCommittedState, 30000)
+	err = st.CleanRelation(ctx, ver.getCommittedState, 30000, false)
 	if err != nil {
 		t.Errorf("CleanRelation failed with %s", err)
 	}
@@ -1279,7 +1279,7 @@ func testRelation(t *testing.T, st kvrows.Store) {
 		t.Errorf("ModifyRelation failed with %s", err)
 	}
 
-	err = st.CleanRelation(ctx, ver.getCommittedState, 30000)
+	err = st.CleanRelation(ctx, ver.getCommittedState, 30000, false)
 	if err != nil {
 		t.Errorf("CleanRelation failed with %s", err)
 	}

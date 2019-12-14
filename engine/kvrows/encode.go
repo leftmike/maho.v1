@@ -292,15 +292,11 @@ func (k Key) Encode() []byte {
 	return encodeUint64(key, true, k.Version)
 }
 
-func (k Key) Copy() Key { // XXX: is this still needed?
+func (k Key) Copy() Key {
 	return Key{
 		SQLKey:  append(make([]byte, 0, len(k.SQLKey)), k.SQLKey...),
 		Version: k.Version,
 	}
-}
-
-func (k Key) Equal(k2 Key) bool { // XXX: is this still needed?
-	return k.Version == k2.Version && bytes.Equal(k.SQLKey, k2.SQLKey)
 }
 
 func ParseKey(key []byte) (Key, bool) {

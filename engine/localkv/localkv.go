@@ -559,10 +559,13 @@ func (lkv localKV) InsertRelation(ctx context.Context, getState kvrows.GetTxStat
 	return tx.Commit()
 }
 
-func cleanKey(getState kvrows.GetTxState, kbuf []byte, m Mapper, w Walker) error {
+func cleanKey(getState kvrows.GetTxState, kbuf []byte, bad bool, m Mapper, w Walker) error {
 	k, ok := kvrows.ParseKey(kbuf)
 	if !ok {
-		// XXX: delete the key and log an error
+		if bad {
+			// XXX: log cleaning up the bad key
+			return w.Delete()
+		}
 		return fmt.Errorf("localkv: unable to parse key %v", kbuf)
 	}
 
@@ -573,13 +576,19 @@ func cleanKey(getState kvrows.GetTxState, kbuf []byte, m Mapper, w Walker) error
 	return w.Value(
 		func(val []byte) error {
 			if len(val) == 0 || val[0] != kvrows.ProposalValue {
-				// XXX: delete the key and log an error
+				if bad {
+					// XXX: log cleaning up the bad proposal
+					return w.Delete()
+				}
 				return fmt.Errorf("localkv: unable to parse value for key %v: %v", k,
 					val)
 			}
 			tid, proposals, ok := kvrows.ParseProposalValue(val)
 			if !ok {
-				// XXX: delete the key and log an error
+				if bad {
+					// XXX: log cleaning up the bad proposal
+					return w.Delete()
+				}
 				return fmt.Errorf("localkv: unable to parse value for key %v: %v", k,
 					val)
 			}
@@ -622,7 +631,7 @@ func (lkv localKV) CleanKeys(ctx context.Context, getState kvrows.GetTxState, mi
 			return nil
 		}
 
-		err := cleanKey(getState, kbuf, m, w)
+		err := cleanKey(getState, kbuf, false, m, w)
 		if err != nil {
 			return err
 		}
@@ -632,7 +641,7 @@ func (lkv localKV) CleanKeys(ctx context.Context, getState kvrows.GetTxState, mi
 	return tx.Commit()
 }
 
-func cleanRelation(getState kvrows.GetTxState, m Mapper) error {
+func cleanRelation(getState kvrows.GetTxState, bad bool, m Mapper) error {
 	w := m.Walk(nil)
 	defer w.Close()
 
@@ -642,7 +651,7 @@ func cleanRelation(getState kvrows.GetTxState, m Mapper) error {
 	}
 
 	for {
-		err := cleanKey(getState, kbuf, m, w)
+		err := cleanKey(getState, kbuf, bad, m, w)
 		if err != nil {
 			return err
 		}
@@ -655,7 +664,7 @@ func cleanRelation(getState kvrows.GetTxState, m Mapper) error {
 }
 
 func (lkv localKV) CleanRelation(ctx context.Context, getState kvrows.GetTxState,
-	mid uint64) error {
+	mid uint64, bad bool) error {
 
 	tx, err := lkv.st.Begin(true)
 	if err != nil {
@@ -668,7 +677,7 @@ func (lkv localKV) CleanRelation(ctx context.Context, getState kvrows.GetTxState
 		return err
 	}
 
-	err = cleanRelation(getState, m)
+	err = cleanRelation(getState, bad, m)
 	if err != nil {
 		return err
 	}

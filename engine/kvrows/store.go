@@ -56,7 +56,7 @@ type Store interface {
 	// potentially still active, err will be an instance of ErrBlockingProposal.
 	//
 	// XXX: updating a key doesn't require the entire value; it would potentially be more
-	// efficient to just pass the delta
+	// efficient to just pass the delta.
 	ModifyRelation(ctx context.Context, getState GetTxState, tid TransactionID, sid, mid uint64,
 		keys []Key, vals [][]byte) error
 
@@ -71,9 +71,13 @@ type Store interface {
 	InsertRelation(ctx context.Context, getState GetTxState, tid TransactionID, sid, mid uint64,
 		keys [][]byte, vals [][]byte) error
 
-	// CleanKeys
-	CleanKeys(ctx context.Context, getState GetTxState, mid uint64, key [][]byte) error
+	// CleanKeys makes proposals by committed transactions durable and deletes proposals by
+	// aborted transactions; it only does this for the keys specified.
+	CleanKeys(ctx context.Context, getState GetTxState, mid uint64, keys [][]byte) error
 
-	// CleanRelation
-	CleanRelation(ctx context.Context, getState GetTxState, mid uint64) error
+	// CleanRelation checks all of the keys in a relation; all proposals by committed
+	// transactions are made durable and all proposals by aborted transactions are deleted.
+	// Bad keys and proposals cause an error unless bad is true, in which case they are
+	// deleted.
+	CleanRelation(ctx context.Context, getState GetTxState, mid uint64, bad bool) error
 }

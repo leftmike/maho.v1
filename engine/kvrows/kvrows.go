@@ -1,14 +1,5 @@
 package kvrows
 
-/*
-- store all proposals for a single key in one key
-- remove key type
--- all keys are encoded as <sql-key> <version>
--- <version> = MaximumVersion means it is a proposal
-- don't mix logical layout (mid + <sql-key>) and physical layout
-- transaction state and table metadata should be in seperate tables
-*/
-
 import (
 	"bytes"
 	"context"
