@@ -576,7 +576,7 @@ func checkMap(t *testing.T, ctx context.Context, st kvrows.Store, getState kvrow
 	}
 }
 
-func testInsertRelation(t *testing.T, st kvrows.Store) {
+func testInsertMap(t *testing.T, st kvrows.Store) {
 	ctx := context.Background()
 
 	tid := kvrows.TransactionID{
@@ -586,17 +586,15 @@ func testInsertRelation(t *testing.T, st kvrows.Store) {
 	}
 
 	sid := uint64(10)
-	err := st.InsertRelation(ctx, getAbortedState, tid, sid, 10000,
-		[][]byte{
-			[]byte("bbbb key"),
-			[]byte("cccc key"),
-		},
-		[][]byte{
-			kvrows.MakeRowValue([]sql.Value{sql.StringValue("bbbb row")}),
-			kvrows.MakeRowValue([]sql.Value{sql.StringValue("cccc row")}),
-		})
+	err := st.InsertMap(ctx, getAbortedState, tid, sid, 10000,
+		[]byte("bbbb key"), kvrows.MakeRowValue([]sql.Value{sql.StringValue("bbbb row")}))
 	if err != nil {
-		t.Errorf("InsertRelation: failed with %s", err)
+		t.Errorf("InsertMap: failed with %s", err)
+	}
+	err = st.InsertMap(ctx, getAbortedState, tid, sid, 10000,
+		[]byte("cccc key"), kvrows.MakeRowValue([]sql.Value{sql.StringValue("cccc row")}))
+	if err != nil {
+		t.Errorf("InsertMap: failed with %s", err)
 	}
 
 	sid += 1
@@ -611,31 +609,27 @@ func testInsertRelation(t *testing.T, st kvrows.Store) {
 		})
 
 	sid += 1
-	err = st.InsertRelation(ctx, getAbortedState, tid, sid, 10000,
-		[][]byte{
-			[]byte("bbbb key"),
-			[]byte("cccc key"),
-		},
-		[][]byte{
-			kvrows.MakeRowValue([]sql.Value{sql.StringValue("bbbb row")}),
-			kvrows.MakeRowValue([]sql.Value{sql.StringValue("cccc row")}),
-		})
+	err = st.InsertMap(ctx, getAbortedState, tid, sid, 10000,
+		[]byte("bbbb key"), kvrows.MakeRowValue([]sql.Value{sql.StringValue("bbbb row")}))
 	if err == nil {
-		t.Errorf("InsertRelation: did not fail")
+		t.Errorf("InsertMap: did not fail")
+	}
+	err = st.InsertMap(ctx, getAbortedState, tid, sid, 10000,
+		[]byte("cccc key"), kvrows.MakeRowValue([]sql.Value{sql.StringValue("cccc row")}))
+	if err == nil {
+		t.Errorf("InsertMap: did not fail")
 	}
 
 	sid += 1
-	err = st.InsertRelation(ctx, getAbortedState, tid, sid, 10000,
-		[][]byte{
-			[]byte("aaaa key"),
-			[]byte("dddd key"),
-		},
-		[][]byte{
-			kvrows.MakeRowValue([]sql.Value{sql.StringValue("aaaa row")}),
-			kvrows.MakeRowValue([]sql.Value{sql.StringValue("dddd row")}),
-		})
+	err = st.InsertMap(ctx, getAbortedState, tid, sid, 10000,
+		[]byte("aaaa key"), kvrows.MakeRowValue([]sql.Value{sql.StringValue("aaaa row")}))
 	if err != nil {
-		t.Errorf("InsertRelation: failed with %s", err)
+		t.Errorf("InsertMap: failed with %s", err)
+	}
+	err = st.InsertMap(ctx, getAbortedState, tid, sid, 10000,
+		[]byte("dddd key"), kvrows.MakeRowValue([]sql.Value{sql.StringValue("dddd row")}))
+	if err != nil {
+		t.Errorf("InsertMap: failed with %s", err)
 	}
 
 	sid += 1
@@ -654,17 +648,10 @@ func testInsertRelation(t *testing.T, st kvrows.Store) {
 		})
 
 	sid += 1
-	err = st.InsertRelation(ctx, getAbortedState, tid, sid, 10000,
-		[][]byte{
-			[]byte("eeee key"),
-			[]byte("eeee key"),
-		},
-		[][]byte{
-			kvrows.MakeRowValue([]sql.Value{sql.StringValue("eeee row #1")}),
-			kvrows.MakeRowValue([]sql.Value{sql.StringValue("eeee row #2")}),
-		})
+	err = st.InsertMap(ctx, getAbortedState, tid, sid, 10000,
+		[]byte("dddd key"), kvrows.MakeRowValue([]sql.Value{sql.StringValue("dddd row #1")}))
 	if err == nil {
-		t.Errorf("InsertRelation did not fail")
+		t.Errorf("InsertMap did not fail")
 	}
 
 	sid += 1
@@ -689,27 +676,17 @@ func testInsertRelation(t *testing.T, st kvrows.Store) {
 	}
 
 	sid2 := uint64(100)
-	err = st.InsertRelation(ctx, getAbortedState, tid2, sid2, 10000,
-		[][]byte{
-			[]byte("eeee key"),
-		},
-		[][]byte{
-			kvrows.MakeRowValue([]sql.Value{sql.StringValue("eeee row@2")}),
-		})
+	err = st.InsertMap(ctx, getAbortedState, tid2, sid2, 10000,
+		[]byte("eeee key"), kvrows.MakeRowValue([]sql.Value{sql.StringValue("eeee row@2")}))
 	if err != nil {
-		t.Errorf("InsertRelation: failed with %s", err)
+		t.Errorf("InsertMap: failed with %s", err)
 	}
 
 	sid += 1
-	err = st.InsertRelation(ctx, getAbortedState, tid, sid, 10000,
-		[][]byte{
-			[]byte("eeee key"),
-		},
-		[][]byte{
-			kvrows.MakeRowValue([]sql.Value{sql.StringValue("eeee row@1")}),
-		})
+	err = st.InsertMap(ctx, getAbortedState, tid, sid, 10000,
+		[]byte("eeee key"), kvrows.MakeRowValue([]sql.Value{sql.StringValue("eeee row@1")}))
 	if err != nil {
-		t.Errorf("InsertRelation: failed with %s", err)
+		t.Errorf("InsertMap: failed with %s", err)
 	}
 
 	sid += 1
@@ -730,33 +707,23 @@ func testInsertRelation(t *testing.T, st kvrows.Store) {
 		})
 
 	sid2 += 1
-	err = st.InsertRelation(ctx, getCommittedState, tid2, sid2, 10000,
-		[][]byte{
-			[]byte("eeee key"),
-		},
-		[][]byte{
-			kvrows.MakeRowValue([]sql.Value{sql.StringValue("eeee row@2")}),
-		})
+	err = st.InsertMap(ctx, getCommittedState, tid2, sid2, 10000,
+		[]byte("eeee key"), kvrows.MakeRowValue([]sql.Value{sql.StringValue("eeee row@2")}))
 	if err == nil {
-		t.Errorf("InsertRelation did not fail")
+		t.Errorf("InsertMap did not fail")
 	}
 
 	sid2 += 1
-	err = st.InsertRelation(ctx, getActiveState, tid2, sid2, 10000,
-		[][]byte{
-			[]byte("eeee key"),
-		},
-		[][]byte{
-			kvrows.MakeRowValue([]sql.Value{sql.StringValue("eeee row@2")}),
-		})
+	err = st.InsertMap(ctx, getActiveState, tid2, sid2, 10000,
+		[]byte("eeee key"), kvrows.MakeRowValue([]sql.Value{sql.StringValue("eeee row@2")}))
 	if err == nil {
-		t.Errorf("InsertRelation did not fail")
+		t.Errorf("InsertMap did not fail")
 	}
 	bperr, ok := err.(*kvrows.ErrBlockingProposal)
 	if !ok {
-		t.Errorf("InsertRelation: got %s; want blocking proposals error", err)
+		t.Errorf("InsertMap: got %s; want blocking proposals error", err)
 	} else if bperr.TID != tid {
-		t.Errorf("InsertRelation: got key %v; want %v", bperr, tid)
+		t.Errorf("InsertMap: got key %v; want %v", bperr, tid)
 	}
 
 	sid += 1
@@ -841,21 +808,25 @@ func testModifyRelation(t *testing.T, st kvrows.Store) {
 
 	ver := version(100)
 	sid := uint64(10)
-	err := st.InsertRelation(ctx, getAbortedState, tid, sid, 20000,
-		[][]byte{
-			[]byte("aaaa key"),
-			[]byte("bbbb key"),
-			[]byte("cccc key"),
-			[]byte("dddd key"),
-		},
-		[][]byte{
-			kvrows.MakeRowValue([]sql.Value{sql.StringValue("aaaa row")}),
-			kvrows.MakeRowValue([]sql.Value{sql.StringValue("bbbb row")}),
-			kvrows.MakeRowValue([]sql.Value{sql.StringValue("cccc row")}),
-			kvrows.MakeRowValue([]sql.Value{sql.StringValue("dddd row")}),
-		})
+	err := st.InsertMap(ctx, getAbortedState, tid, sid, 20000,
+		[]byte("aaaa key"), kvrows.MakeRowValue([]sql.Value{sql.StringValue("aaaa row")}))
 	if err != nil {
-		t.Errorf("InsertRelation: failed with %s", err)
+		t.Errorf("InsertMap: failed with %s", err)
+	}
+	err = st.InsertMap(ctx, getAbortedState, tid, sid, 20000,
+		[]byte("bbbb key"), kvrows.MakeRowValue([]sql.Value{sql.StringValue("bbbb row")}))
+	if err != nil {
+		t.Errorf("InsertMap: failed with %s", err)
+	}
+	err = st.InsertMap(ctx, getAbortedState, tid, sid, 20000,
+		[]byte("cccc key"), kvrows.MakeRowValue([]sql.Value{sql.StringValue("cccc row")}))
+	if err != nil {
+		t.Errorf("InsertMap: failed with %s", err)
+	}
+	err = st.InsertMap(ctx, getAbortedState, tid, sid, 20000,
+		[]byte("dddd key"), kvrows.MakeRowValue([]sql.Value{sql.StringValue("dddd row")}))
+	if err != nil {
+		t.Errorf("InsertMap: failed with %s", err)
 	}
 
 	sid += 1
@@ -905,19 +876,20 @@ func testModifyRelation(t *testing.T, st kvrows.Store) {
 	}
 
 	sid += 1
-	err = st.InsertRelation(ctx, getAbortedState, tid, sid, 20000,
-		[][]byte{
-			[]byte("bbbb key"),
-			[]byte("eeee key"),
-			[]byte("ffff key"),
-		},
-		[][]byte{
-			kvrows.MakeRowValue([]sql.Value{sql.StringValue("bbbb row")}),
-			kvrows.MakeRowValue([]sql.Value{sql.StringValue("eeee row")}),
-			kvrows.MakeRowValue([]sql.Value{sql.StringValue("ffff row")}),
-		})
+	err = st.InsertMap(ctx, getAbortedState, tid, sid, 20000,
+		[]byte("bbbb key"), kvrows.MakeRowValue([]sql.Value{sql.StringValue("bbbb row")}))
 	if err != nil {
-		t.Errorf("InsertRelation: failed with %s", err)
+		t.Errorf("InsertMap: failed with %s", err)
+	}
+	err = st.InsertMap(ctx, getAbortedState, tid, sid, 20000,
+		[]byte("eeee key"), kvrows.MakeRowValue([]sql.Value{sql.StringValue("eeee row")}))
+	if err != nil {
+		t.Errorf("InsertMap: failed with %s", err)
+	}
+	err = st.InsertMap(ctx, getAbortedState, tid, sid, 20000,
+		[]byte("ffff key"), kvrows.MakeRowValue([]sql.Value{sql.StringValue("ffff row")}))
+	if err != nil {
+		t.Errorf("InsertMap: failed with %s", err)
 	}
 
 	sid += 1
@@ -1095,15 +1067,10 @@ func testModifyRelation(t *testing.T, st kvrows.Store) {
 	}
 
 	sid += 1
-	err = st.InsertRelation(ctx, getAbortedState, tid, sid, 20000,
-		[][]byte{
-			[]byte("cccc key"),
-		},
-		[][]byte{
-			kvrows.MakeRowValue([]sql.Value{sql.StringValue("cccc row fail")}),
-		})
+	err = st.InsertMap(ctx, getAbortedState, tid, sid, 20000,
+		[]byte("cccc key"), kvrows.MakeRowValue([]sql.Value{sql.StringValue("cccc row fail")}))
 	if err == nil {
-		t.Errorf("InsertRelation did not fail")
+		t.Errorf("InsertMap did not fail")
 	}
 }
 
@@ -1122,21 +1089,25 @@ func testRelation(t *testing.T, st kvrows.Store) {
 	}
 
 	sid := uint64(10)
-	err := st.InsertRelation(ctx, getAbortedState, tid, sid, 30000,
-		[][]byte{
-			[]byte("aaaa key"),
-			[]byte("bbbb key"),
-			[]byte("cccc key"),
-			[]byte("dddd key"),
-		},
-		[][]byte{
-			kvrows.MakeRowValue([]sql.Value{sql.StringValue("aaaa row")}),
-			kvrows.MakeRowValue([]sql.Value{sql.StringValue("bbbb row")}),
-			kvrows.MakeRowValue([]sql.Value{sql.StringValue("cccc row")}),
-			kvrows.MakeRowValue([]sql.Value{sql.StringValue("dddd row")}),
-		})
+	err := st.InsertMap(ctx, getAbortedState, tid, sid, 30000,
+		[]byte("aaaa key"), kvrows.MakeRowValue([]sql.Value{sql.StringValue("aaaa row")}))
 	if err != nil {
-		t.Errorf("InsertRelation: failed with %s", err)
+		t.Errorf("InsertMap: failed with %s", err)
+	}
+	err = st.InsertMap(ctx, getAbortedState, tid, sid, 30000,
+		[]byte("bbbb key"), kvrows.MakeRowValue([]sql.Value{sql.StringValue("bbbb row")}))
+	if err != nil {
+		t.Errorf("InsertMap: failed with %s", err)
+	}
+	err = st.InsertMap(ctx, getAbortedState, tid, sid, 30000,
+		[]byte("cccc key"), kvrows.MakeRowValue([]sql.Value{sql.StringValue("cccc row")}))
+	if err != nil {
+		t.Errorf("InsertMap: failed with %s", err)
+	}
+	err = st.InsertMap(ctx, getAbortedState, tid, sid, 30000,
+		[]byte("dddd key"), kvrows.MakeRowValue([]sql.Value{sql.StringValue("dddd row")}))
+	if err != nil {
+		t.Errorf("InsertMap: failed with %s", err)
 	}
 
 	sid += 1
@@ -1162,21 +1133,25 @@ func testRelation(t *testing.T, st kvrows.Store) {
 	checkMap(t, ctx, st, getAbortedState, tid, sid, 30000, nil, nil)
 
 	sid += 1
-	err = st.InsertRelation(ctx, getAbortedState, tid, sid, 30000,
-		[][]byte{
-			[]byte("aaaa key"),
-			[]byte("bbbb key"),
-			[]byte("cccc key"),
-			[]byte("dddd key"),
-		},
-		[][]byte{
-			kvrows.MakeRowValue([]sql.Value{sql.StringValue("aaaa row")}),
-			kvrows.MakeRowValue([]sql.Value{sql.StringValue("bbbb row")}),
-			kvrows.MakeRowValue([]sql.Value{sql.StringValue("cccc row")}),
-			kvrows.MakeRowValue([]sql.Value{sql.StringValue("dddd row")}),
-		})
+	err = st.InsertMap(ctx, getAbortedState, tid, sid, 30000,
+		[]byte("aaaa key"), kvrows.MakeRowValue([]sql.Value{sql.StringValue("aaaa row")}))
 	if err != nil {
-		t.Errorf("InsertRelation: failed with %s", err)
+		t.Errorf("InsertMap: failed with %s", err)
+	}
+	err = st.InsertMap(ctx, getAbortedState, tid, sid, 30000,
+		[]byte("bbbb key"), kvrows.MakeRowValue([]sql.Value{sql.StringValue("bbbb row")}))
+	if err != nil {
+		t.Errorf("InsertMap: failed with %s", err)
+	}
+	err = st.InsertMap(ctx, getAbortedState, tid, sid, 30000,
+		[]byte("cccc key"), kvrows.MakeRowValue([]sql.Value{sql.StringValue("cccc row")}))
+	if err != nil {
+		t.Errorf("InsertMap: failed with %s", err)
+	}
+	err = st.InsertMap(ctx, getAbortedState, tid, sid, 30000,
+		[]byte("dddd key"), kvrows.MakeRowValue([]sql.Value{sql.StringValue("dddd row")}))
+	if err != nil {
+		t.Errorf("InsertMap: failed with %s", err)
 	}
 
 	ver := version(20)
@@ -1254,17 +1229,15 @@ func testRelation(t *testing.T, st kvrows.Store) {
 
 	ver += 1
 	sid += 1
-	err = st.InsertRelation(ctx, ver.getCommittedState, tid, sid, 30000,
-		[][]byte{
-			[]byte("cccc key"),
-			[]byte("dddd key"),
-		},
-		[][]byte{
-			kvrows.MakeRowValue([]sql.Value{sql.StringValue("cccc row@2")}),
-			kvrows.MakeRowValue([]sql.Value{sql.StringValue("dddd row@2")}),
-		})
+	err = st.InsertMap(ctx, ver.getCommittedState, tid, sid, 30000,
+		[]byte("cccc key"), kvrows.MakeRowValue([]sql.Value{sql.StringValue("cccc row@2")}))
 	if err != nil {
-		t.Errorf("InsertRelation: failed with %s", err)
+		t.Errorf("InsertMap: failed with %s", err)
+	}
+	err = st.InsertMap(ctx, ver.getCommittedState, tid, sid, 30000,
+		[]byte("dddd key"), kvrows.MakeRowValue([]sql.Value{sql.StringValue("dddd row@2")}))
+	if err != nil {
+		t.Errorf("InsertMap: failed with %s", err)
 	}
 
 	err = st.CleanRelation(ctx, ver.getCommittedState, 30000, false)
@@ -1288,15 +1261,10 @@ func testRelation(t *testing.T, st kvrows.Store) {
 		})
 
 	sid += 1
-	err = st.InsertRelation(ctx, getAbortedState, tid, sid, 30000,
-		[][]byte{
-			[]byte("eeee key"),
-		},
-		[][]byte{
-			kvrows.MakeRowValue([]sql.Value{sql.StringValue("eeee row")}),
-		})
+	err = st.InsertMap(ctx, getAbortedState, tid, sid, 30000,
+		[]byte("eeee key"), kvrows.MakeRowValue([]sql.Value{sql.StringValue("eeee row")}))
 	if err != nil {
-		t.Errorf("InsertRelation: failed with %s", err)
+		t.Errorf("InsertMap: failed with %s", err)
 	}
 
 	ver += 1
@@ -1383,7 +1351,7 @@ func TestBadger(t *testing.T) {
 	}
 	testReadWriteList(t, localkv.NewStore(st))
 	testScanMap(t, st)
-	testInsertRelation(t, localkv.NewStore(st))
+	testInsertMap(t, localkv.NewStore(st))
 	testModifyRelation(t, localkv.NewStore(st))
 	testRelation(t, localkv.NewStore(st))
 }
@@ -1400,7 +1368,7 @@ func TestBBolt(t *testing.T) {
 	}
 	testReadWriteList(t, localkv.NewStore(st))
 	testScanMap(t, st)
-	testInsertRelation(t, localkv.NewStore(st))
+	testInsertMap(t, localkv.NewStore(st))
 	testModifyRelation(t, localkv.NewStore(st))
 	testRelation(t, localkv.NewStore(st))
 }

@@ -290,8 +290,8 @@ func (kv *KVRows) CreateSchema(ctx context.Context, etx engine.Transaction,
 		sql.StringValue(sn.Schema.String()),
 		sql.Int64Value(0),
 	}
-	return kv.st.InsertRelation(ctx, kv.getState, tx.tid, tx.sid, schemasMID,
-		[][]byte{makeSchemaKey(sn)}, [][]byte{MakeRowValue(row)})
+	return kv.st.InsertMap(ctx, kv.getState, tx.tid, tx.sid, schemasMID, makeSchemaKey(sn),
+		MakeRowValue(row))
 }
 
 func (kv *KVRows) lookupSchemaKey(ctx context.Context, tx *transaction, sn sql.SchemaName) (Key,

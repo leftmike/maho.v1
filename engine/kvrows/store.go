@@ -48,17 +48,6 @@ type Store interface {
 	ModifyRelation(ctx context.Context, getState GetTxState, tid TransactionID, sid, mid uint64,
 		keys []Key, vals [][]byte) error
 
-	// InsertRelation will insert new key(s) and value(s) into the map specified by mid.
-	// None of the keys can have visible values.
-	//
-	// The operation is atomic: either all of the values will be proposed for the keys or none of
-	// them. A transaction key must already exist; it is passed as tid.
-	//
-	// If an insert encountered a proposed write by a different transaction which is
-	// potentially still active, err will be an instance of ErrBlockingProposal.
-	InsertRelation(ctx context.Context, getState GetTxState, tid TransactionID, sid, mid uint64,
-		keys [][]byte, vals [][]byte) error
-
 	// CleanKeys makes proposals by committed transactions durable and deletes proposals by
 	// aborted transactions; it only does this for the keys specified.
 	CleanKeys(ctx context.Context, getState GetTxState, mid uint64, keys [][]byte) error
