@@ -5,7 +5,6 @@ import (
 	"context"
 	"errors"
 	"fmt"
-	"io"
 
 	"github.com/leftmike/maho/engine/kvrows"
 )
@@ -150,155 +149,6 @@ func (lkv localKV) WriteValue(ctx context.Context, mid uint64, key kvrows.Key, v
 
 	w.Close()
 	return tx.Commit()
-}
-
-func appendKeysVals(keys []kvrows.Key, vals [][]byte, k kvrows.Key, val []byte) ([]kvrows.Key,
-	[][]byte) {
-
-	if len(val) > 0 && val[0] != kvrows.TombstoneValue {
-		// XXX: parse the val here rather than just copying it to be parsed later
-		return append(keys, k.Copy()),
-			append(vals, append(make([]byte, 0, len(val)), val...))
-	}
-	return keys, vals
-}
-
-func (lkv localKV) ScanRelation(ctx context.Context, getState kvrows.GetTxState,
-	tid kvrows.TransactionID, sid, mid, maxVer uint64, num int, seek []byte) ([]kvrows.Key,
-	[][]byte, []byte, error) {
-
-	tx, err := lkv.st.Begin(false)
-	if err != nil {
-		return nil, nil, nil, err
-	}
-	defer tx.Rollback()
-
-	m, err := tx.Map(mid)
-	if err != nil {
-		return nil, nil, nil, err
-	}
-
-	w := m.Walk(nil)
-	defer w.Close()
-
-	var kbuf []byte
-	var ok bool
-	if seek == nil {
-		kbuf, ok = w.Rewind()
-	} else {
-		kbuf, ok = w.Seek(seek)
-	}
-	if !ok {
-		return nil, nil, nil, io.EOF
-	}
-	k, ok := kvrows.ParseKey(kbuf)
-	if !ok {
-		return nil, nil, nil, fmt.Errorf("localkv: unable to parse key %v", kbuf)
-	}
-
-	if num < 1 {
-		num = 1
-	} else if num > 4096 {
-		num = 4096
-	}
-
-	var keys []kvrows.Key
-	var vals [][]byte
-	for len(keys) < num {
-		for {
-			if k.Version == kvrows.ProposalVersion {
-				found := false
-				blockingProposal := false
-				err := w.Value(
-					func(val []byte) error {
-						if len(val) == 0 || val[0] != kvrows.ProposalValue {
-							return fmt.Errorf("localkv: unable to parse value for key %v: %v", k,
-								val)
-						}
-						proTID, proposals, ok := kvrows.ParseProposalValue(val)
-						if !ok {
-							return fmt.Errorf("localkv: unable to parse value for key %v: %v", k,
-								val)
-						}
-
-						if proTID == tid {
-							for pdx := len(proposals) - 1; pdx >= 0; pdx -= 1 {
-								if proposals[pdx].SID < sid {
-									keys, vals = appendKeysVals(keys, vals, k,
-										proposals[pdx].Value)
-									found = true
-									break
-								}
-							}
-						} else {
-							st, ver := getState(proTID)
-							if st == kvrows.CommittedState {
-								if ver <= maxVer {
-									keys, vals = appendKeysVals(keys, vals, k,
-										proposals[len(proposals)-1].Value)
-									found = true
-								}
-							} else if st != kvrows.AbortedState {
-								blockingProposal = true
-								return &kvrows.ErrBlockingProposal{
-									TID: proTID,
-									Key: k.Copy(),
-								}
-							}
-
-						}
-
-						return nil
-					})
-				if err != nil {
-					if blockingProposal {
-						return keys, vals, k.Copy().SQLKey, err
-					}
-					return nil, nil, nil, err
-				}
-				if found {
-					break
-				}
-			} else if k.Version <= maxVer {
-				err := w.Value(
-					func(val []byte) error {
-						keys, vals = appendKeysVals(keys, vals, k, val)
-						return nil
-					})
-				if err != nil {
-					return nil, nil, nil, err
-				}
-				break
-			}
-
-			kbuf, ok := w.Next()
-			if !ok {
-				return keys, vals, nil, io.EOF
-			}
-			k, ok = kvrows.ParseKey(kbuf)
-			if !ok {
-				return nil, nil, nil, fmt.Errorf("localkv: unable to parse key %v", kbuf)
-			}
-		}
-
-		// Skip along to the next key.
-		for {
-			kbuf, ok = w.Next()
-			if !ok {
-				return keys, vals, nil, io.EOF
-			}
-			nxt, ok := kvrows.ParseKey(kbuf)
-			if !ok {
-				return nil, nil, nil, fmt.Errorf("localkv: unable to parse key %v", kbuf)
-			}
-			if !bytes.Equal(k.SQLKey, nxt.SQLKey) {
-				k = nxt
-				break
-			}
-		}
-	}
-
-	return keys, vals, k.Copy().SQLKey, nil
 }
 
 func modifyRelation(getState kvrows.GetTxState, tid kvrows.TransactionID, sid uint64,
@@ -564,7 +414,134 @@ func (lkv localKV) ScanMap(ctx context.Context, getState kvrows.GetTxState,
 	tid kvrows.TransactionID, sid, mid uint64, prefix, seek []byte,
 	scanKeyValue kvrows.ScanKeyValue) (next []byte, err error) {
 
-	return nil, errors.New("not implemented")
+	tx, err := lkv.st.Begin(false)
+	if err != nil {
+		return nil, err
+	}
+	defer tx.Rollback()
+
+	m, err := tx.Map(mid)
+	if err != nil {
+		return nil, err
+	}
+
+	w := m.Walk(prefix)
+	defer w.Close()
+
+	var kbuf []byte
+	var ok bool
+	if seek == nil {
+		kbuf, ok = w.Rewind()
+	} else {
+		kbuf, ok = w.Seek(seek)
+	}
+	if !ok {
+		return nil, nil
+	}
+	k, ok := kvrows.ParseKey(kbuf) // XXX: change ParseKey to return []byte, ver, ok
+	if !ok {
+		return nil, fmt.Errorf("localkv: unable to parse key %v", kbuf)
+	}
+
+	var done bool
+	for !done {
+		for {
+			if k.Version == kvrows.ProposalVersion {
+				found := false
+				err := w.Value(
+					func(val []byte) error {
+						if len(val) == 0 || val[0] != kvrows.ProposalValue {
+							return fmt.Errorf("localkv: unable to parse value for key %v: %v", k,
+								val)
+						}
+						proTID, proposals, ok := kvrows.ParseProposalValue(val)
+						if !ok {
+							return fmt.Errorf("localkv: unable to parse value for key %v: %v", k,
+								val)
+						}
+
+						if proTID == tid {
+							for pdx := len(proposals) - 1; pdx >= 0; pdx -= 1 {
+								if proposals[pdx].SID < sid {
+									found = true
+									proVal := proposals[pdx].Value
+									if len(proVal) > 0 && proVal[0] != kvrows.TombstoneValue {
+										done, err = scanKeyValue(k.SQLKey,
+											kvrows.ProposalVersion, proVal)
+										return err
+									}
+									break
+								}
+							}
+						} else {
+							st, ver := getState(proTID)
+							if st == kvrows.CommittedState {
+								found = true
+								proVal := proposals[len(proposals)-1].Value
+								if len(proVal) > 0 && proVal[0] != kvrows.TombstoneValue {
+									done, err = scanKeyValue(k.SQLKey, ver, proVal)
+									return err
+								}
+							} else if st != kvrows.AbortedState {
+								return &kvrows.ErrBlockingProposal{
+									TID: proTID,
+									Key: k.Copy(),
+								}
+							}
+						}
+
+						return nil
+					})
+				if err != nil {
+					return k.Copy().SQLKey, err
+				}
+				if found {
+					break
+				}
+			} else {
+				err := w.Value(
+					func(val []byte) error {
+						if len(val) > 0 && val[0] != kvrows.TombstoneValue {
+							var err error
+							done, err = scanKeyValue(k.SQLKey, k.Version, val)
+							return err
+						}
+						return nil
+					})
+				if err != nil {
+					return nil, err
+				}
+				break
+			}
+
+			kbuf, ok := w.Next()
+			if !ok {
+				return nil, nil
+			}
+			k, ok = kvrows.ParseKey(kbuf)
+			if !ok {
+				return nil, fmt.Errorf("localkv: unable to parse key %v", kbuf)
+			}
+		}
+
+		// Skip along to the next key.
+		for {
+			kbuf, ok = w.Next()
+			if !ok {
+				return nil, nil
+			}
+			nxt, ok := kvrows.ParseKey(kbuf)
+			if !ok {
+				return nil, fmt.Errorf("localkv: unable to parse key %v", kbuf)
+			}
+			if !bytes.Equal(k.SQLKey, nxt.SQLKey) {
+				k = nxt
+				break
+			}
+		}
+	}
+
+	return k.Copy().SQLKey, nil
 }
 
 func (lkv localKV) ModifyMap(ctx context.Context, getState kvrows.GetTxState,

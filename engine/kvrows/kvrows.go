@@ -6,8 +6,6 @@ import (
 	"encoding/gob"
 	"errors"
 	"fmt"
-	"io"
-	"math"
 	"sync"
 	"sync/atomic"
 
@@ -299,23 +297,26 @@ func (kv *KVRows) CreateSchema(ctx context.Context, etx engine.Transaction,
 func (kv *KVRows) lookupSchemaKey(ctx context.Context, tx *transaction, sn sql.SchemaName) (Key,
 	int64, error) {
 
-	sqlKey := makeSchemaKey(sn)
-	keys, vals, _, err := kv.st.ScanRelation(ctx, kv.getState, tx.tid, tx.sid, schemasMID,
-		MaximumVersion, 1, sqlKey)
-	if err != nil {
-		return Key{}, 0, err
-	} else if len(keys) == 0 || !bytes.Equal(sqlKey, keys[0].SQLKey) {
-		return Key{}, 0, io.EOF
-	}
-	row := []sql.Value{nil, nil, nil}
-	if !ParseRowValue(vals[0], row) {
-		return Key{}, 0, fmt.Errorf("kvrows: at key %v unable to parse row: %v", keys[0], vals[0])
-	}
-	i64, ok := row[2].(sql.Int64Value)
-	if !ok {
-		return Key{}, 0, fmt.Errorf("kvrows: schemas table: expected an int, got %s", row[2])
-	}
-	return keys[0], int64(i64), nil
+	/*
+		sqlKey := makeSchemaKey(sn)
+		keys, vals, _, err := kv.st.ScanRelation(ctx, kv.getState, tx.tid, tx.sid, schemasMID,
+			MaximumVersion, 1, sqlKey)
+		if err != nil {
+			return Key{}, 0, err
+		} else if len(keys) == 0 || !bytes.Equal(sqlKey, keys[0].SQLKey) {
+			return Key{}, 0, io.EOF
+		}
+		row := []sql.Value{nil, nil, nil}
+		if !ParseRowValue(vals[0], row) {
+			return Key{}, 0, fmt.Errorf("kvrows: at key %v unable to parse row: %v", keys[0], vals[0])
+		}
+		i64, ok := row[2].(sql.Int64Value)
+		if !ok {
+			return Key{}, 0, fmt.Errorf("kvrows: schemas table: expected an int, got %s", row[2])
+		}
+		return keys[0], int64(i64), nil
+	*/
+	return Key{}, 0, notImplemented
 }
 
 func (kv *KVRows) DropSchema(ctx context.Context, etx engine.Transaction, sn sql.SchemaName,
@@ -532,32 +533,35 @@ func (kv *KVRows) ListSchemas(ctx context.Context, etx engine.Transaction,
 		return nil, err
 	}
 
-	keys, vals, _, err := kv.st.ScanRelation(ctx, kv.getState, tx.tid, tx.sid, schemasMID,
-		MaximumVersion, math.MaxInt32, nil)
-	if err != io.EOF && err != nil {
-		return nil, err
-	}
-
+	/*
+		keys, vals, _, err := kv.st.ScanRelation(ctx, kv.getState, tx.tid, tx.sid, schemasMID,
+			MaximumVersion, math.MaxInt32, nil)
+		if err != io.EOF && err != nil {
+			return nil, err
+		}
+	*/
+	_ = tx
 	scnames := []sql.Identifier{sql.PUBLIC} // XXX: sql.PUBLIC
-	for idx, val := range vals {
-		row := []sql.Value{nil, nil, nil}
-		if !ParseRowValue(val, row) {
-			return nil, fmt.Errorf("kvrows: at key %v unable to parse row: %v", keys[idx], val)
+	/*
+		for idx, val := range vals {
+			row := []sql.Value{nil, nil, nil}
+			if !ParseRowValue(val, row) {
+				return nil, fmt.Errorf("kvrows: at key %v unable to parse row: %v", keys[idx], val)
+			}
+			s, ok := row[0].(sql.StringValue)
+			if !ok {
+				return nil, fmt.Errorf("kvrows: schemas table: expected a string, got %s", row[0])
+			}
+			if string(s) != dbname.String() {
+				continue
+			}
+			s, ok = row[1].(sql.StringValue)
+			if !ok {
+				return nil, fmt.Errorf("kvrows: schemas table: expected a string, got %s", row[1])
+			}
+			scnames = append(scnames, sql.QuotedID(string(s)))
 		}
-		s, ok := row[0].(sql.StringValue)
-		if !ok {
-			return nil, fmt.Errorf("kvrows: schemas table: expected a string, got %s", row[0])
-		}
-		if string(s) != dbname.String() {
-			continue
-		}
-		s, ok = row[1].(sql.StringValue)
-		if !ok {
-			return nil, fmt.Errorf("kvrows: schemas table: expected a string, got %s", row[1])
-		}
-		scnames = append(scnames, sql.QuotedID(string(s)))
-	}
-
+	*/
 	return scnames, nil
 }
 

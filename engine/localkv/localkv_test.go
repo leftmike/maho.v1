@@ -3,7 +3,6 @@ package localkv_test
 import (
 	"bytes"
 	"context"
-	"io"
 	"path/filepath"
 	"testing"
 
@@ -271,15 +270,15 @@ func countVisible(keyVals []keyValue) int {
 	return cnt
 }
 
-func checkScan(t *testing.T, keyVals []keyValue, idx int, keys []kvrows.Key, vals [][]byte) int {
-	if len(keys) != len(vals) {
-		t.Errorf("ScanRelation: got %d keys and %d values", len(keys), len(vals))
+func checkScanMap(t *testing.T, keyVals []keyValue, idx int, kv *keyValues) int {
+	if len(kv.keys) != len(kv.vals) {
+		t.Errorf("ScanMap: got %d keys and %d values", len(kv.keys), len(kv.vals))
 	}
 
-	for jdx := range keys {
+	for jdx := range kv.keys {
 		for {
 			if idx >= len(keyVals) {
-				t.Fatalf("ScanRelation: too many keys: %d", len(keys))
+				t.Fatalf("ScanMap: too many keys: %d", len(kv.keys))
 			}
 			if keyVals[idx].visible {
 				break
@@ -287,15 +286,25 @@ func checkScan(t *testing.T, keyVals []keyValue, idx int, keys []kvrows.Key, val
 			idx += 1
 		}
 
-		if !testutil.DeepEqual(keys[jdx], keyVals[idx].key) {
-			t.Errorf("ScanRelation: got %v key; wanted %v", keys[jdx], keyVals[idx].key)
-		}
 		if keyVals[idx].key.Version == kvrows.ProposalVersion {
-			if !bytes.Equal(vals[jdx], keyVals[idx].scanVal) {
-				t.Errorf("ScanRelation: got %v value; wanted %v", vals[jdx], keyVals[idx].scanVal)
+			// XXX: fix this
+			if (kv.keys[jdx].Version != committedVersion &&
+				kv.keys[jdx].Version != kvrows.ProposalVersion) ||
+				!testutil.DeepEqual(kv.keys[jdx].SQLKey, keyVals[idx].key.SQLKey) {
+
+				t.Errorf("ScanMap: got %v key; wanted %v", kv.keys[jdx], keyVals[idx].key)
 			}
-		} else if !bytes.Equal(vals[jdx], keyVals[idx].val) {
-			t.Errorf("ScanRelation: got %v value; wanted %v", vals[jdx], keyVals[idx].val)
+			if !bytes.Equal(kv.vals[jdx], keyVals[idx].scanVal) {
+				t.Errorf("ScanMap: got %v value; wanted %v", kv.vals[jdx],
+					keyVals[idx].scanVal)
+			}
+		} else {
+			if !testutil.DeepEqual(kv.keys[jdx], keyVals[idx].key) {
+				t.Errorf("ScanMap: got %v key; wanted %v", kv.keys[jdx], keyVals[idx].key)
+			}
+			if !bytes.Equal(kv.vals[jdx], keyVals[idx].val) {
+				t.Errorf("ScanMap: got %v value; wanted %v", kv.vals[jdx], keyVals[idx].val)
+			}
 		}
 		idx += 1
 	}
@@ -309,19 +318,35 @@ func getAbortedState(tid kvrows.TransactionID) (kvrows.TransactionState, uint64)
 
 type version uint64
 
+const (
+	committedVersion = 100000
+)
+
 func (ver version) getCommittedState(tid kvrows.TransactionID) (kvrows.TransactionState, uint64) {
 	return kvrows.CommittedState, uint64(ver)
 }
 
 func getCommittedState(tid kvrows.TransactionID) (kvrows.TransactionState, uint64) {
-	return kvrows.CommittedState, 100000
+	return kvrows.CommittedState, committedVersion
 }
 
 func getActiveState(tid kvrows.TransactionID) (kvrows.TransactionState, uint64) {
 	return kvrows.ActiveState, 0
 }
 
-func testScanRelation(t *testing.T, st localkv.Store) {
+type keyValues struct {
+	keys []kvrows.Key
+	vals [][]byte
+	num  int
+}
+
+func (kv *keyValues) scanKeyValue(key []byte, ver uint64, val []byte) (bool, error) {
+	kv.keys = append(kv.keys, kvrows.Key{append(make([]byte, 0, len(key)), key...), ver})
+	kv.vals = append(kv.vals, append(make([]byte, 0, len(val)), val...))
+	return len(kv.keys) >= kv.num, nil
+}
+
+func testScanMap(t *testing.T, st localkv.Store) {
 	ctx := context.Background()
 	lkv := localkv.NewStore(st)
 
@@ -403,10 +428,6 @@ func testScanRelation(t *testing.T, st localkv.Store) {
 			val: kvrows.MakeRowValue([]sql.Value{sql.StringValue("hhhh@123456")}),
 		},
 		{
-			key: kvrows.Key{[]byte("iiii"), 9999999},
-			val: kvrows.MakeRowValue([]sql.Value{sql.StringValue("iiii@9999999")}),
-		},
-		{
 			key:     kvrows.Key{[]byte("iiii"), 8},
 			val:     kvrows.MakeRowValue([]sql.Value{sql.StringValue("iiii@8")}),
 			visible: true,
@@ -415,33 +436,35 @@ func testScanRelation(t *testing.T, st localkv.Store) {
 
 	initializeMap(t, st, 1000, keyVals)
 
-	keys, vals, _, err := lkv.ScanRelation(ctx, getAbortedState, tid, 200, 1000, 999999, 88888,
-		nil)
-	if err != io.EOF {
-		t.Errorf("ScanRelation failed with %s", err)
+	kv := &keyValues{num: 1024}
+	next, err := lkv.ScanMap(ctx, getAbortedState, tid, 200, 1000, nil, nil, kv.scanKeyValue)
+	if err != nil {
+		t.Errorf("ScanMap failed with %s", err)
 	}
-	checkScan(t, keyVals, 0, keys, vals)
-	if countVisible(keyVals) != len(keys) {
-		t.Errorf("ScanRelation: got %d key-values; want %d", len(keys), countVisible(keyVals))
+	if next != nil {
+		t.Errorf("ScanMap did not reach EOF")
+	}
+	checkScanMap(t, keyVals, 0, kv)
+	if countVisible(keyVals) != len(kv.keys) {
+		t.Errorf("ScanMap: got %d key-values; want %d", len(kv.keys), countVisible(keyVals))
 	}
 
 	idx := 0
 	cnt := 0
-	var next []byte
 	for {
-		keys, vals, next, err = lkv.ScanRelation(ctx, getAbortedState, tid, 200, 1000, 999999,
-			1, next)
-		if err != nil && err != io.EOF {
-			t.Errorf("ScanRelation failed with %s", err)
+		kv = &keyValues{num: 1}
+		next, err = lkv.ScanMap(ctx, getAbortedState, tid, 200, 1000, nil, next, kv.scanKeyValue)
+		if err != nil {
+			t.Errorf("ScanMap failed with %s", err)
 		}
-		cnt += len(keys)
-		idx = checkScan(t, keyVals, idx, keys, vals)
-		if err == io.EOF {
+		cnt += len(kv.keys)
+		idx = checkScanMap(t, keyVals, idx, kv)
+		if next == nil {
 			break
 		}
 	}
 	if countVisible(keyVals) != cnt {
-		t.Errorf("ScanRelation: got %d key-values; want %d", cnt, countVisible(keyVals))
+		t.Errorf("ScanMap: got %d key-values; want %d", cnt, countVisible(keyVals))
 	}
 
 	tid2 := kvrows.TransactionID{
@@ -485,61 +508,71 @@ func testScanRelation(t *testing.T, st localkv.Store) {
 	}
 	initializeMap(t, st, 2000, keyVals2)
 
-	keys, vals, _, err = lkv.ScanRelation(ctx, getCommittedState, tid, 999999, 2000, 999999,
-		1024, nil)
-	if err != io.EOF {
-		t.Errorf("ScanRelation failed with %s", err)
+	kv = &keyValues{num: 1024}
+	next, err = lkv.ScanMap(ctx, getCommittedState, tid, 999999, 2000, nil, nil, kv.scanKeyValue)
+	if err != nil {
+		t.Errorf("ScanMap failed with %s", err)
 	}
-	checkScan(t, keyVals2, 0, keys, vals)
-	if countVisible(keyVals2) != len(keys) {
-		t.Errorf("ScanRelation: got %d key-values; want %d", len(keys), countVisible(keyVals2))
+	if next != nil {
+		t.Errorf("ScanMap did not reach EOF")
+	}
+	checkScanMap(t, keyVals2, 0, kv)
+	if countVisible(keyVals2) != len(kv.keys) {
+		t.Errorf("ScanMap: got %d key-values; want %d", len(kv.keys), countVisible(keyVals2))
 	}
 
-	keys, vals, next, err = lkv.ScanRelation(ctx, getActiveState, tid, 999999, 2000, 999999, 1024,
-		nil)
+	kv = &keyValues{num: 1024}
+	next, err = lkv.ScanMap(ctx, getActiveState, tid, 999999, 2000, nil, nil, kv.scanKeyValue)
+
 	bperr, ok := err.(*kvrows.ErrBlockingProposal)
 	if !ok {
-		t.Errorf("ScanRelation: got %s; want blocking proposals error", err)
+		t.Errorf("ScanMap: got %s; want blocking proposals error", err)
 	} else if bperr.TID != tid2 {
-		t.Errorf("ScanRelation: got key %v; want %v", bperr, tid2)
+		t.Errorf("ScanMap: got key %v; want %v", bperr, tid2)
 	}
-	if len(keys) != 1 {
-		t.Errorf("ScanRelation: got %d keys; want 1", len(keys))
+	if len(kv.keys) != 1 {
+		t.Errorf("ScanMap: got %d keys; want 1", len(kv.keys))
 	}
 
-	idx = checkScan(t, keyVals2, 0, keys, vals)
-	cnt = len(keys)
+	idx = checkScanMap(t, keyVals2, 0, kv)
 
-	keys, vals, _, err = lkv.ScanRelation(ctx, getCommittedState, tid, 999999, 2000, 999999, 1024,
-		next)
-	if err != io.EOF {
-		t.Errorf("ScanRelation failed with %s", err)
+	cnt = len(kv.keys)
+	kv = &keyValues{num: 1024}
+	next, err = lkv.ScanMap(ctx, getCommittedState, tid, 999999, 2000, nil, next, kv.scanKeyValue)
+	if err != nil {
+		t.Errorf("ScanMap failed with %s", err)
 	}
-	checkScan(t, keyVals2, idx, keys, vals)
-	cnt += len(keys)
+	if next != nil {
+		t.Errorf("ScanMap did not reach EOF")
+	}
+	checkScanMap(t, keyVals2, idx, kv)
+	cnt += len(kv.keys)
 	if countVisible(keyVals2) != cnt {
-		t.Errorf("ScanRelation: got %d key-values; want %d", cnt, countVisible(keyVals2))
+		t.Errorf("ScanMap: got %d key-values; want %d", cnt, countVisible(keyVals2))
 	}
 }
 
-func checkRelation(t *testing.T, ctx context.Context, st kvrows.Store, getState kvrows.GetTxState,
+func checkMap(t *testing.T, ctx context.Context, st kvrows.Store, getState kvrows.GetTxState,
 	tid kvrows.TransactionID, sid, mid uint64, wantKeys, wantVals [][]byte) {
 
-	keys, vals, _, err := st.ScanRelation(ctx, getState, tid, sid, mid, kvrows.MaximumVersion,
-		1024, nil)
-	if err != io.EOF {
-		t.Errorf("ScanRelation failed with %s", err)
+	kv := &keyValues{num: 1024}
+	next, err := st.ScanMap(ctx, getState, tid, sid, mid, nil, nil, kv.scanKeyValue)
+	if err != nil {
+		t.Errorf("ScanMap failed with %s", err)
 	}
-	if len(wantKeys) != len(keys) {
-		t.Errorf("ScanRelation: got %d keys; want %d", len(keys), len(wantKeys))
+	if next != nil {
+		t.Errorf("ScanMap did not reach EOF")
 	}
-	for i := range keys {
-		if !bytes.Equal(keys[i].SQLKey, wantKeys[i]) {
-			t.Errorf("ScanRelation: got %v key at %d; want %v", keys[i].SQLKey, i, wantKeys[i])
+	if len(wantKeys) != len(kv.keys) {
+		t.Errorf("ScanMap: got %d keys; want %d", len(kv.keys), len(wantKeys))
+	}
+	for i := range kv.keys {
+		if !bytes.Equal(kv.keys[i].SQLKey, wantKeys[i]) {
+			t.Errorf("ScanMap: got %v key at %d; want %v", kv.keys[i].SQLKey, i, wantKeys[i])
 		}
 	}
-	if !testutil.DeepEqual(vals, wantVals) {
-		t.Errorf("ScanRelation: got %v keys; want %v", vals, wantVals)
+	if !testutil.DeepEqual(kv.vals, wantVals) {
+		t.Errorf("ScanMap: got %v keys; want %v", kv.vals, wantVals)
 	}
 }
 
@@ -567,7 +600,7 @@ func testInsertRelation(t *testing.T, st kvrows.Store) {
 	}
 
 	sid += 1
-	checkRelation(t, ctx, st, getAbortedState, tid, sid, 10000,
+	checkMap(t, ctx, st, getAbortedState, tid, sid, 10000,
 		[][]byte{
 			[]byte("bbbb key"),
 			[]byte("cccc key"),
@@ -606,7 +639,7 @@ func testInsertRelation(t *testing.T, st kvrows.Store) {
 	}
 
 	sid += 1
-	checkRelation(t, ctx, st, getAbortedState, tid, sid, 10000,
+	checkMap(t, ctx, st, getAbortedState, tid, sid, 10000,
 		[][]byte{
 			[]byte("aaaa key"),
 			[]byte("bbbb key"),
@@ -635,7 +668,7 @@ func testInsertRelation(t *testing.T, st kvrows.Store) {
 	}
 
 	sid += 1
-	checkRelation(t, ctx, st, getAbortedState, tid, sid, 10000,
+	checkMap(t, ctx, st, getAbortedState, tid, sid, 10000,
 		[][]byte{
 			[]byte("aaaa key"),
 			[]byte("bbbb key"),
@@ -680,7 +713,7 @@ func testInsertRelation(t *testing.T, st kvrows.Store) {
 	}
 
 	sid += 1
-	checkRelation(t, ctx, st, getAbortedState, tid, sid, 10000,
+	checkMap(t, ctx, st, getAbortedState, tid, sid, 10000,
 		[][]byte{
 			[]byte("aaaa key"),
 			[]byte("bbbb key"),
@@ -727,7 +760,7 @@ func testInsertRelation(t *testing.T, st kvrows.Store) {
 	}
 
 	sid += 1
-	checkRelation(t, ctx, st, getAbortedState, tid, sid, 10000,
+	checkMap(t, ctx, st, getAbortedState, tid, sid, 10000,
 		[][]byte{
 			[]byte("aaaa key"),
 			[]byte("bbbb key"),
@@ -752,7 +785,7 @@ func testInsertRelation(t *testing.T, st kvrows.Store) {
 		t.Errorf("CleanKeys failed %s", err)
 	}
 
-	checkRelation(t, ctx, st, getAbortedState, tid, sid, 10000,
+	checkMap(t, ctx, st, getAbortedState, tid, sid, 10000,
 		[][]byte{
 			[]byte("aaaa key"),
 			[]byte("bbbb key"),
@@ -779,7 +812,7 @@ func testInsertRelation(t *testing.T, st kvrows.Store) {
 		t.Errorf("CleanKeys failed %s", err)
 	}
 
-	checkRelation(t, ctx, st, getAbortedState, tid, sid, 10000,
+	checkMap(t, ctx, st, getAbortedState, tid, sid, 10000,
 		[][]byte{
 			[]byte("aaaa key"),
 			[]byte("bbbb key"),
@@ -826,7 +859,7 @@ func testModifyRelation(t *testing.T, st kvrows.Store) {
 	}
 
 	sid += 1
-	checkRelation(t, ctx, st, getAbortedState, tid, sid, 20000,
+	checkMap(t, ctx, st, getAbortedState, tid, sid, 20000,
 		[][]byte{
 			[]byte("aaaa key"),
 			[]byte("bbbb key"),
@@ -850,7 +883,7 @@ func testModifyRelation(t *testing.T, st kvrows.Store) {
 	}
 
 	sid += 1
-	checkRelation(t, ctx, st, getAbortedState, tid, sid, 20000,
+	checkMap(t, ctx, st, getAbortedState, tid, sid, 20000,
 		[][]byte{
 			[]byte("aaaa key"),
 			[]byte("cccc key"),
@@ -888,7 +921,7 @@ func testModifyRelation(t *testing.T, st kvrows.Store) {
 	}
 
 	sid += 1
-	checkRelation(t, ctx, st, getAbortedState, tid, sid, 20000,
+	checkMap(t, ctx, st, getAbortedState, tid, sid, 20000,
 		[][]byte{
 			[]byte("aaaa key"),
 			[]byte("bbbb key"),
@@ -925,7 +958,7 @@ func testModifyRelation(t *testing.T, st kvrows.Store) {
 	}
 
 	sid += 1
-	checkRelation(t, ctx, st, getAbortedState, tid, sid, 20000,
+	checkMap(t, ctx, st, getAbortedState, tid, sid, 20000,
 		[][]byte{
 			[]byte("aaaa key"),
 			[]byte("cccc key"),
@@ -954,7 +987,7 @@ func testModifyRelation(t *testing.T, st kvrows.Store) {
 	}
 
 	sid += 1
-	checkRelation(t, ctx, st, getAbortedState, tid, sid, 20000,
+	checkMap(t, ctx, st, getAbortedState, tid, sid, 20000,
 		[][]byte{
 			[]byte("aaaa key"),
 			[]byte("cccc key"),
@@ -1015,7 +1048,7 @@ func testModifyRelation(t *testing.T, st kvrows.Store) {
 	}
 
 	sid += 1
-	checkRelation(t, ctx, st, getAbortedState, tid, sid, 20000,
+	checkMap(t, ctx, st, getAbortedState, tid, sid, 20000,
 		[][]byte{
 			[]byte("aaaa key"),
 			[]byte("cccc key"),
@@ -1035,7 +1068,7 @@ func testModifyRelation(t *testing.T, st kvrows.Store) {
 	}
 
 	ver += 1
-	checkRelation(t, ctx, st, ver.getCommittedState, tid, sid, 20000,
+	checkMap(t, ctx, st, ver.getCommittedState, tid, sid, 20000,
 		[][]byte{
 			[]byte("aaaa key"),
 			[]byte("cccc key"),
@@ -1107,7 +1140,7 @@ func testRelation(t *testing.T, st kvrows.Store) {
 	}
 
 	sid += 1
-	checkRelation(t, ctx, st, getAbortedState, tid, sid, 30000,
+	checkMap(t, ctx, st, getAbortedState, tid, sid, 30000,
 		[][]byte{
 			[]byte("aaaa key"),
 			[]byte("bbbb key"),
@@ -1126,7 +1159,7 @@ func testRelation(t *testing.T, st kvrows.Store) {
 		t.Errorf("CleanRelation failed with %s", err)
 	}
 
-	checkRelation(t, ctx, st, getAbortedState, tid, sid, 30000, nil, nil)
+	checkMap(t, ctx, st, getAbortedState, tid, sid, 30000, nil, nil)
 
 	sid += 1
 	err = st.InsertRelation(ctx, getAbortedState, tid, sid, 30000,
@@ -1153,7 +1186,7 @@ func testRelation(t *testing.T, st kvrows.Store) {
 	}
 
 	sid += 1
-	checkRelation(t, ctx, st, getAbortedState, tid2, sid, 30000,
+	checkMap(t, ctx, st, getAbortedState, tid2, sid, 30000,
 		[][]byte{
 			[]byte("aaaa key"),
 			[]byte("bbbb key"),
@@ -1197,7 +1230,7 @@ func testRelation(t *testing.T, st kvrows.Store) {
 	}
 
 	sid += 1
-	checkRelation(t, ctx, st, getAbortedState, tid2, sid, 30000,
+	checkMap(t, ctx, st, getAbortedState, tid2, sid, 30000,
 		[][]byte{
 			[]byte("aaaa key"),
 			[]byte("bbbb key"),
@@ -1240,7 +1273,7 @@ func testRelation(t *testing.T, st kvrows.Store) {
 	}
 
 	sid += 1
-	checkRelation(t, ctx, st, getAbortedState, tid2, sid, 30000,
+	checkMap(t, ctx, st, getAbortedState, tid2, sid, 30000,
 		[][]byte{
 			[]byte("aaaa key"),
 			[]byte("bbbb key"),
@@ -1285,7 +1318,7 @@ func testRelation(t *testing.T, st kvrows.Store) {
 	}
 
 	sid += 1
-	checkRelation(t, ctx, st, getActiveState, tid, sid, 30000,
+	checkMap(t, ctx, st, getActiveState, tid, sid, 30000,
 		[][]byte{
 			[]byte("aaaa key"),
 			[]byte("bbbb key"),
@@ -1349,7 +1382,7 @@ func TestBadger(t *testing.T) {
 		t.Fatal(err)
 	}
 	testReadWriteList(t, localkv.NewStore(st))
-	testScanRelation(t, st)
+	testScanMap(t, st)
 	testInsertRelation(t, localkv.NewStore(st))
 	testModifyRelation(t, localkv.NewStore(st))
 	testRelation(t, localkv.NewStore(st))
@@ -1366,7 +1399,7 @@ func TestBBolt(t *testing.T) {
 		t.Fatal(err)
 	}
 	testReadWriteList(t, localkv.NewStore(st))
-	testScanRelation(t, st)
+	testScanMap(t, st)
 	testInsertRelation(t, localkv.NewStore(st))
 	testModifyRelation(t, localkv.NewStore(st))
 	testRelation(t, localkv.NewStore(st))

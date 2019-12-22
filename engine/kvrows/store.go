@@ -32,22 +32,6 @@ type Store interface {
 	// must be greater than key.Version.
 	WriteValue(ctx context.Context, mid uint64, key Key, ver uint64, val []byte) error
 
-	// ScanRelation will return a list of keys and values starting from seek, if specified. The
-	// maximum version of keys visible is specified by maxVer. Use num to limit the number of
-	// results returned. The map to scan is specified as mid.
-	//
-	// * If the scan was successful, and there are potentially more keys available, err will
-	//   be nil. To continue scanning, use next as seek in the next call to ScanRelation.
-	// * If the scan was successful, but there are no more keys available, err will be io.EOF,
-	//   and next will be nil.
-	// * If the scan encountered a proposed write by a different transaction which is potentially
-	//   still active, err will be an instance of ErrBlockingProposal. The key of the proposed
-	//   write will be returned as next. Note that zero or more valid keys and values, which
-	//   were scanned before the proposed write, will also be returned.
-	ScanRelation(ctx context.Context, getState GetTxState, tid TransactionID,
-		sid, mid, maxVer uint64, num int, seek []byte) (keys []Key, vals [][]byte, next []byte,
-		err error)
-
 	// ModifyRelation will delete, if vals is nil, or update one or more keys for the map
 	// specified by mid. The keys must all exist and have visible values. Each key must exactly
 	// match the latest visible version of the key. To do this, use the keys returned from
