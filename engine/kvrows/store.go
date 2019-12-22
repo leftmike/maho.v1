@@ -7,6 +7,10 @@ import (
 
 type GetTxState func(tid TransactionID) (TransactionState, uint64)
 
+type ScanKeyValue func(key []byte, ver uint64, val []byte) (bool, error)
+
+type ModifyKeyValue func(key []byte, ver uint64, val []byte) ([]byte, error)
+
 type ErrBlockingProposal struct {
 	TID TransactionID
 	Key Key
@@ -80,4 +84,13 @@ type Store interface {
 	// Bad keys and proposals cause an error unless bad is true, in which case they are
 	// deleted.
 	CleanRelation(ctx context.Context, getState GetTxState, mid uint64, bad bool) error
+
+	ScanMap(ctx context.Context, getState GetTxState, tid TransactionID, sid, mid uint64,
+		prefix, seek []byte, scanKeyValue ScanKeyValue) (next []byte, err error)
+	ModifyMap(ctx context.Context, getState GetTxState, tid TransactionID, sid, mid uint64,
+		key []byte, ver uint64, modifyKeyValue ModifyKeyValue) error
+	DeleteMap(ctx context.Context, getState GetTxState, tid TransactionID, sid, mid uint64,
+		key []byte, ver uint64) error
+	InsertMap(ctx context.Context, getState GetTxState, tid TransactionID, sid, mid uint64,
+		key, val []byte) error
 }

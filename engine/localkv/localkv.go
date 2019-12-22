@@ -3,6 +3,7 @@ package localkv
 import (
 	"bytes"
 	"context"
+	"errors"
 	"fmt"
 	"io"
 
@@ -272,7 +273,7 @@ func (lkv localKV) ScanRelation(ctx context.Context, getState kvrows.GetTxState,
 
 			kbuf, ok := w.Next()
 			if !ok {
-				break
+				return keys, vals, nil, io.EOF
 			}
 			k, ok = kvrows.ParseKey(kbuf)
 			if !ok {
@@ -557,6 +558,32 @@ func (lkv localKV) InsertRelation(ctx context.Context, getState kvrows.GetTxStat
 	}
 
 	return tx.Commit()
+}
+
+func (lkv localKV) ScanMap(ctx context.Context, getState kvrows.GetTxState,
+	tid kvrows.TransactionID, sid, mid uint64, prefix, seek []byte,
+	scanKeyValue kvrows.ScanKeyValue) (next []byte, err error) {
+
+	return nil, errors.New("not implemented")
+}
+
+func (lkv localKV) ModifyMap(ctx context.Context, getState kvrows.GetTxState,
+	tid kvrows.TransactionID, sid, mid uint64, key []byte, ver uint64,
+	modifyKeyValue kvrows.ModifyKeyValue) error {
+
+	return errors.New("not implemented")
+}
+
+func (lkv localKV) DeleteMap(ctx context.Context, getState kvrows.GetTxState,
+	tid kvrows.TransactionID, sid, mid uint64, key []byte, ver uint64) error {
+
+	return errors.New("not implemented")
+}
+
+func (lkv localKV) InsertMap(ctx context.Context, getState kvrows.GetTxState,
+	tid kvrows.TransactionID, sid, mid uint64, key, val []byte) error {
+
+	return errors.New("not implemented")
 }
 
 func cleanKey(getState kvrows.GetTxState, kbuf []byte, bad bool, m Mapper, w Walker) error {

@@ -409,13 +409,17 @@ func RunTableTest(t *testing.T, e engine.Engine) {
 		[]engCmd{
 			{cmd: cmdBegin},
 			{cmd: cmdLookupSchema, name: sql.ID("sc-a"), fail: true},
+			{cmd: cmdNextStmt},
 			{cmd: cmdCreateSchema, name: sql.ID("sc-a")},
+			{cmd: cmdNextStmt},
 			{cmd: cmdLookupSchema, name: sql.ID("sc-a")},
 			{cmd: cmdCommit},
 
 			{cmd: cmdBegin},
 			{cmd: cmdLookupTable, name: sql.ID("tbl-a"), fail: true},
+			{cmd: cmdNextStmt},
 			{cmd: cmdCreateTable, name: sql.ID("tbl-a")},
+			{cmd: cmdNextStmt},
 			{cmd: cmdLookupTable, name: sql.ID("tbl-a")},
 			{cmd: cmdCommit},
 		})
