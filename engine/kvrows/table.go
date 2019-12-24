@@ -36,12 +36,10 @@ func (tbl *table) ColumnTypes(ctx context.Context) []sql.ColumnType {
 	return tbl.colTypes
 }
 
-// XXX: add to engine.Table interface
 func (tbl *table) PrimaryKey(ctx context.Context) []engine.ColumnKey {
 	return tbl.primary
 }
 
-// XXX: add to engine.Table interface
 func (tbl *table) Scan(ctx context.Context, key []sql.Value, numKeyCols int) (engine.Rows, error) {
 	var prefix []byte
 	if numKeyCols > 0 {

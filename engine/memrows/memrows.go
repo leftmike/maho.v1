@@ -759,6 +759,14 @@ func (mt *table) ColumnTypes(ctx context.Context) []sql.ColumnType {
 	return mt.table.getColumnTypes(mt.tctx)
 }
 
+func (mt *table) PrimaryKey(ctx context.Context) []engine.ColumnKey {
+	return nil
+}
+
+func (mt *table) Scan(ctx context.Context, key []sql.Value, numKeyCols int) (engine.Rows, error) {
+	return mt.Rows(ctx)
+}
+
 func (mt *table) Rows(ctx context.Context) (engine.Rows, error) {
 	return &rows{table: mt}, nil
 }

@@ -227,6 +227,16 @@ func (vt *virtualTable) ColumnTypes(ctx context.Context) []sql.ColumnType {
 	return vt.colTypes
 }
 
+func (vt *virtualTable) PrimaryKey(ctx context.Context) []engine.ColumnKey {
+	return nil
+}
+
+func (vt *virtualTable) Scan(ctx context.Context, key []sql.Value, numKeyCols int) (engine.Rows,
+	error) {
+
+	return vt.Rows(ctx)
+}
+
 func (vt *virtualTable) Rows(ctx context.Context) (engine.Rows, error) {
 	return &virtualRows{tn: vt.tn, columns: vt.cols, rows: vt.values}, nil
 }

@@ -418,6 +418,14 @@ func (bt *table) ColumnTypes(ctx context.Context) []sql.ColumnType {
 	return bt.columnTypes
 }
 
+func (bt *table) PrimaryKey(ctx context.Context) []engine.ColumnKey {
+	return nil
+}
+
+func (bt *table) Scan(ctx context.Context, key []sql.Value, numKeyCols int) (engine.Rows, error) {
+	return bt.Rows(ctx)
+}
+
 func (bt *table) Rows(ctx context.Context) (engine.Rows, error) {
 	bt.be.mutex.RLock()
 	defer bt.be.mutex.RUnlock()
