@@ -792,7 +792,7 @@ func testInsertMap(t *testing.T, st kvrows.Store) {
 		})
 }
 
-func testModifyRelation(t *testing.T, st kvrows.Store) {
+func testModifyMap(t *testing.T, st kvrows.Store) {
 	ctx := context.Background()
 
 	tid := kvrows.TransactionID{
@@ -845,12 +845,10 @@ func testModifyRelation(t *testing.T, st kvrows.Store) {
 		})
 
 	sid += 1
-	err = st.ModifyRelation(ctx, getAbortedState, tid, sid, 20000,
-		[]kvrows.Key{
-			kvrows.Key{[]byte("bbbb key"), kvrows.ProposalVersion},
-		}, nil)
+	err = st.DeleteMap(ctx, getAbortedState, tid, sid, 20000,
+		[]byte("bbbb key"), kvrows.ProposalVersion)
 	if err != nil {
-		t.Errorf("ModifyRelation failed with %s", err)
+		t.Errorf("DeleteMap failed with %s", err)
 	}
 
 	sid += 1
@@ -867,12 +865,10 @@ func testModifyRelation(t *testing.T, st kvrows.Store) {
 		})
 
 	sid += 1
-	err = st.ModifyRelation(ctx, getAbortedState, tid, sid, 20000,
-		[]kvrows.Key{
-			kvrows.Key{[]byte("xxxxyyyyzzzz key"), kvrows.ProposalVersion},
-		}, nil)
+	err = st.DeleteMap(ctx, getAbortedState, tid, sid, 20000,
+		[]byte("xxxxyyyyzzzz key"), kvrows.ProposalVersion)
 	if err == nil {
-		t.Errorf("ModifyRelation did not fail")
+		t.Errorf("DeleteMap did not fail")
 	}
 
 	sid += 1
@@ -912,21 +908,21 @@ func testModifyRelation(t *testing.T, st kvrows.Store) {
 		})
 
 	sid += 1
-	err = st.ModifyRelation(ctx, getAbortedState, tid, sid, 20000,
-		[]kvrows.Key{
-			kvrows.Key{[]byte("bbbb key"), kvrows.ProposalVersion},
-			kvrows.Key{[]byte("dddd key"), kvrows.ProposalVersion},
-		}, nil)
+	err = st.DeleteMap(ctx, getAbortedState, tid, sid, 20000,
+		[]byte("bbbb key"), kvrows.ProposalVersion)
 	if err != nil {
-		t.Errorf("ModifyRelation failed with %s", err)
+		t.Errorf("DeleteMap failed with %s", err)
+	}
+	err = st.DeleteMap(ctx, getAbortedState, tid, sid, 20000,
+		[]byte("dddd key"), kvrows.ProposalVersion)
+	if err != nil {
+		t.Errorf("DeleteMap failed with %s", err)
 	}
 
-	err = st.ModifyRelation(ctx, getAbortedState, tid, sid, 20000,
-		[]kvrows.Key{
-			kvrows.Key{[]byte("bbbb key"), kvrows.ProposalVersion},
-		}, nil)
+	err = st.DeleteMap(ctx, getAbortedState, tid, sid, 20000,
+		[]byte("bbbb key"), kvrows.ProposalVersion)
 	if err == nil {
-		t.Errorf("ModifyRelation did not fail")
+		t.Errorf("DeleteMap did not fail")
 	}
 
 	sid += 1
@@ -945,17 +941,21 @@ func testModifyRelation(t *testing.T, st kvrows.Store) {
 		})
 
 	sid += 1
-	err = st.ModifyRelation(ctx, getAbortedState, tid, sid, 20000,
-		[]kvrows.Key{
-			kvrows.Key{[]byte("ffff key"), kvrows.ProposalVersion},
-			kvrows.Key{[]byte("aaaa key"), kvrows.ProposalVersion},
-		},
-		[][]byte{
-			kvrows.MakeRowValue([]sql.Value{sql.StringValue("ffff row #2")}),
-			kvrows.MakeRowValue([]sql.Value{sql.StringValue("aaaa row #2")}),
+	err = st.ModifyMap(ctx, getAbortedState, tid, sid, 20000,
+		[]byte("ffff key"), kvrows.ProposalVersion,
+		func(key []byte, ver uint64, val []byte) ([]byte, error) {
+			return kvrows.MakeRowValue([]sql.Value{sql.StringValue("ffff row #2")}), nil
 		})
 	if err != nil {
-		t.Errorf("ModifyRelation failed with %s", err)
+		t.Errorf("ModifyMap failed with %s", err)
+	}
+	err = st.ModifyMap(ctx, getAbortedState, tid, sid, 20000,
+		[]byte("aaaa key"), kvrows.ProposalVersion,
+		func(key []byte, ver uint64, val []byte) ([]byte, error) {
+			return kvrows.MakeRowValue([]sql.Value{sql.StringValue("aaaa row #2")}), nil
+		})
+	if err != nil {
+		t.Errorf("ModifyMap failed with %s", err)
 	}
 
 	sid += 1
@@ -974,49 +974,55 @@ func testModifyRelation(t *testing.T, st kvrows.Store) {
 		})
 
 	sid += 1
-	err = st.ModifyRelation(ctx, getAbortedState, tid, sid, 20000,
-		[]kvrows.Key{
-			kvrows.Key{[]byte("cccc key"), kvrows.ProposalVersion},
-			kvrows.Key{[]byte("ffff key"), kvrows.ProposalVersion},
-			kvrows.Key{[]byte("aaaa key"), kvrows.ProposalVersion},
-		},
-		[][]byte{
-			kvrows.MakeRowValue([]sql.Value{sql.StringValue("cccc row #2")}),
-			kvrows.MakeRowValue([]sql.Value{sql.StringValue("ffff row #3")}),
-			kvrows.MakeRowValue([]sql.Value{sql.StringValue("aaaa row #3")}),
+	err = st.ModifyMap(ctx, getAbortedState, tid, sid, 20000,
+		[]byte("cccc key"), kvrows.ProposalVersion,
+		func(key []byte, ver uint64, val []byte) ([]byte, error) {
+			return kvrows.MakeRowValue([]sql.Value{sql.StringValue("cccc row #2")}), nil
 		})
 	if err != nil {
-		t.Errorf("ModifyRelation failed with %s", err)
+		t.Errorf("ModifyMap failed with %s", err)
+	}
+	err = st.ModifyMap(ctx, getAbortedState, tid, sid, 20000,
+		[]byte("ffff key"), kvrows.ProposalVersion,
+		func(key []byte, ver uint64, val []byte) ([]byte, error) {
+			return kvrows.MakeRowValue([]sql.Value{sql.StringValue("ffff row #3")}), nil
+		})
+	if err != nil {
+		t.Errorf("ModifyMap failed with %s", err)
+	}
+	err = st.ModifyMap(ctx, getAbortedState, tid, sid, 20000,
+		[]byte("aaaa key"), kvrows.ProposalVersion,
+		func(key []byte, ver uint64, val []byte) ([]byte, error) {
+			return kvrows.MakeRowValue([]sql.Value{sql.StringValue("aaaa row #3")}), nil
+		})
+	if err != nil {
+		t.Errorf("ModifyMap failed with %s", err)
 	}
 
 	sid += 1
-	err = st.ModifyRelation(ctx, getActiveState, tid2, sid, 20000,
-		[]kvrows.Key{
-			kvrows.Key{[]byte("cccc key"), 123},
-		},
-		[][]byte{
-			kvrows.MakeRowValue([]sql.Value{sql.StringValue("cccc row blocking")}),
+	err = st.ModifyMap(ctx, getActiveState, tid2, sid, 20000,
+		[]byte("cccc key"), 123,
+		func(key []byte, ver uint64, val []byte) ([]byte, error) {
+			return kvrows.MakeRowValue([]sql.Value{sql.StringValue("cccc row blocking")}), nil
 		})
 	if err == nil {
-		t.Errorf("ModifyRelation did not fail")
+		t.Errorf("ModifyMap did not fail")
 	}
 	bperr, ok := err.(*kvrows.ErrBlockingProposal)
 	if !ok {
-		t.Errorf("ModifyRelation: got %s; want blocking proposals error", err)
+		t.Errorf("ModifyMap: got %s; want blocking proposals error", err)
 	} else if bperr.TID != tid {
-		t.Errorf("ModifyRelation: got key %v; want %v", bperr, tid)
+		t.Errorf("ModifyMap: got key %v; want %v", bperr, tid)
 	}
 
 	sid += 1
-	err = st.ModifyRelation(ctx, getAbortedState, tid2, sid, 20000,
-		[]kvrows.Key{
-			kvrows.Key{[]byte("cccc key"), kvrows.ProposalVersion},
-		},
-		[][]byte{
-			kvrows.MakeRowValue([]sql.Value{sql.StringValue("cccc row blocking")}),
+	err = st.ModifyMap(ctx, getAbortedState, tid2, sid, 20000,
+		[]byte("cccc key"), kvrows.ProposalVersion,
+		func(key []byte, ver uint64, val []byte) ([]byte, error) {
+			return kvrows.MakeRowValue([]sql.Value{sql.StringValue("cccc row blocking")}), nil
 		})
 	if err == nil {
-		t.Errorf("ModifyRelation did not fail")
+		t.Errorf("ModifyMap did not fail")
 	}
 
 	sid += 1
@@ -1055,15 +1061,13 @@ func testModifyRelation(t *testing.T, st kvrows.Store) {
 		})
 
 	sid += 1
-	err = st.ModifyRelation(ctx, ver.getCommittedState, tid2, sid, 20000,
-		[]kvrows.Key{
-			kvrows.Key{[]byte("cccc key"), 100},
-		},
-		[][]byte{
-			kvrows.MakeRowValue([]sql.Value{sql.StringValue("cccc row proposal")}),
+	err = st.ModifyMap(ctx, ver.getCommittedState, tid2, sid, 20000,
+		[]byte("cccc key"), 100,
+		func(key []byte, ver uint64, val []byte) ([]byte, error) {
+			return kvrows.MakeRowValue([]sql.Value{sql.StringValue("cccc row proposal")}), nil
 		})
 	if err != nil {
-		t.Errorf("ModifyRelation failed with %s", err)
+		t.Errorf("ModifyMap failed with %s", err)
 	}
 
 	sid += 1
@@ -1074,7 +1078,7 @@ func testModifyRelation(t *testing.T, st kvrows.Store) {
 	}
 }
 
-func testRelation(t *testing.T, st kvrows.Store) {
+func testMap(t *testing.T, st kvrows.Store) {
 	ctx := context.Background()
 
 	tid := kvrows.TransactionID{
@@ -1176,23 +1180,15 @@ func testRelation(t *testing.T, st kvrows.Store) {
 		})
 
 	sid += 1
-	err = st.ModifyRelation(ctx, getAbortedState, tid, sid, 30000,
-		[]kvrows.Key{
-			kvrows.Key{[]byte("dddd key"), 0},
-		},
-		nil)
+	err = st.DeleteMap(ctx, getAbortedState, tid, sid, 30000, []byte("dddd key"), 0)
 	if err == nil {
-		t.Errorf("ModifyRelation did not fail")
+		t.Errorf("DeleteMap did not fail")
 	}
 
 	sid += 1
-	err = st.ModifyRelation(ctx, getAbortedState, tid, sid, 30000,
-		[]kvrows.Key{
-			kvrows.Key{[]byte("dddd key"), 20},
-		},
-		nil)
+	err = st.DeleteMap(ctx, getAbortedState, tid, sid, 30000, []byte("dddd key"), 20)
 	if err != nil {
-		t.Errorf("ModifyRelation failed with %s", err)
+		t.Errorf("DeleteMap failed with %s", err)
 	}
 
 	ver += 1
@@ -1218,13 +1214,9 @@ func testRelation(t *testing.T, st kvrows.Store) {
 		})
 
 	sid += 1
-	err = st.ModifyRelation(ctx, getAbortedState, tid2, sid, 30000,
-		[]kvrows.Key{
-			kvrows.Key{[]byte("cccc key"), 20},
-		},
-		nil)
+	err = st.DeleteMap(ctx, getAbortedState, tid2, sid, 30000, []byte("cccc key"), 20)
 	if err != nil {
-		t.Errorf("ModifyRelation failed with %s", err)
+		t.Errorf("DeleteMap failed with %s", err)
 	}
 
 	ver += 1
@@ -1269,15 +1261,13 @@ func testRelation(t *testing.T, st kvrows.Store) {
 
 	ver += 1
 	sid += 1
-	err = st.ModifyRelation(ctx, ver.getCommittedState, tid2, sid, 30000,
-		[]kvrows.Key{
-			kvrows.Key{[]byte("eeee key"), uint64(ver)},
-		},
-		[][]byte{
-			kvrows.MakeRowValue([]sql.Value{sql.StringValue("eeee row@2")}),
+	err = st.ModifyMap(ctx, ver.getCommittedState, tid2, sid, 30000,
+		[]byte("eeee key"), uint64(ver),
+		func(key []byte, ver uint64, val []byte) ([]byte, error) {
+			return kvrows.MakeRowValue([]sql.Value{sql.StringValue("eeee row@2")}), nil
 		})
 	if err != nil {
-		t.Errorf("ModifyRelation failed with %s", err)
+		t.Errorf("ModifyMap failed with %s", err)
 	}
 
 	err = st.CleanRelation(ctx, ver.getCommittedState, 30000, false)
@@ -1303,39 +1293,33 @@ func testRelation(t *testing.T, st kvrows.Store) {
 		})
 
 	sid += 1
-	err = st.ModifyRelation(ctx, getAbortedState, tid2, sid, 30000,
-		[]kvrows.Key{
-			kvrows.Key{[]byte("eeee key"), uint64(ver)},
-		},
-		[][]byte{
-			kvrows.MakeRowValue([]sql.Value{sql.StringValue("eeee row@3")}),
+	err = st.ModifyMap(ctx, getAbortedState, tid2, sid, 30000,
+		[]byte("eeee key"), uint64(ver),
+		func(key []byte, ver uint64, val []byte) ([]byte, error) {
+			return kvrows.MakeRowValue([]sql.Value{sql.StringValue("eeee row@3")}), nil
 		})
 	if err != nil {
-		t.Errorf("ModifyRelation failed with %s", err)
+		t.Errorf("ModifyMap failed with %s", err)
 	}
 
 	sid += 1
-	err = st.ModifyRelation(ctx, getAbortedState, tid, sid, 30000,
-		[]kvrows.Key{
-			kvrows.Key{[]byte("eeee key"), uint64(ver)},
-		},
-		[][]byte{
-			kvrows.MakeRowValue([]sql.Value{sql.StringValue("eeee row@4")}),
+	err = st.ModifyMap(ctx, getAbortedState, tid, sid, 30000,
+		[]byte("eeee key"), uint64(ver),
+		func(key []byte, ver uint64, val []byte) ([]byte, error) {
+			return kvrows.MakeRowValue([]sql.Value{sql.StringValue("eeee row@4")}), nil
 		})
 	if err != nil {
-		t.Errorf("ModifyRelation failed with %s", err)
+		t.Errorf("ModifyMap failed with %s", err)
 	}
 
 	sid += 1
-	err = st.ModifyRelation(ctx, ver.getCommittedState, tid2, sid, 30000,
-		[]kvrows.Key{
-			kvrows.Key{[]byte("eeee key"), uint64(ver - 1)},
-		},
-		[][]byte{
-			kvrows.MakeRowValue([]sql.Value{sql.StringValue("eeee row@5")}),
+	err = st.ModifyMap(ctx, ver.getCommittedState, tid2, sid, 30000,
+		[]byte("eeee key"), uint64(ver-1),
+		func(key []byte, ver uint64, val []byte) ([]byte, error) {
+			return kvrows.MakeRowValue([]sql.Value{sql.StringValue("eeee row@5")}), nil
 		})
 	if err == nil {
-		t.Errorf("ModifyRelation did not fail")
+		t.Errorf("ModifyMap did not fail")
 	}
 }
 
@@ -1352,8 +1336,8 @@ func TestBadger(t *testing.T) {
 	testReadWriteList(t, localkv.NewStore(st))
 	testScanMap(t, st)
 	testInsertMap(t, localkv.NewStore(st))
-	testModifyRelation(t, localkv.NewStore(st))
-	testRelation(t, localkv.NewStore(st))
+	testModifyMap(t, localkv.NewStore(st))
+	testMap(t, localkv.NewStore(st))
 }
 
 func TestBBolt(t *testing.T) {
@@ -1369,6 +1353,6 @@ func TestBBolt(t *testing.T) {
 	testReadWriteList(t, localkv.NewStore(st))
 	testScanMap(t, st)
 	testInsertMap(t, localkv.NewStore(st))
-	testModifyRelation(t, localkv.NewStore(st))
-	testRelation(t, localkv.NewStore(st))
+	testModifyMap(t, localkv.NewStore(st))
+	testMap(t, localkv.NewStore(st))
 }
