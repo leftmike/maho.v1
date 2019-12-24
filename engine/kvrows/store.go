@@ -36,11 +36,11 @@ type Store interface {
 	// aborted transactions; it only does this for the keys specified.
 	CleanKeys(ctx context.Context, getState GetTxState, mid uint64, keys [][]byte) error
 
-	// CleanRelation checks all of the keys in a relation; all proposals by committed
+	// CleanMap checks all of the keys in a map; all proposals by committed
 	// transactions are made durable and all proposals by aborted transactions are deleted.
 	// Bad keys and proposals cause an error unless bad is true, in which case they are
 	// deleted.
-	CleanRelation(ctx context.Context, getState GetTxState, mid uint64, bad bool) error
+	CleanMap(ctx context.Context, getState GetTxState, mid uint64, bad bool) error
 
 	ScanMap(ctx context.Context, getState GetTxState, tid TransactionID, sid, mid uint64,
 		prefix, seek []byte, scanKeyValue ScanKeyValue) (next []byte, err error)

@@ -1040,9 +1040,9 @@ func testModifyMap(t *testing.T, st kvrows.Store) {
 			kvrows.MakeRowValue([]sql.Value{sql.StringValue("ffff row #3")}),
 		})
 
-	err = st.CleanRelation(ctx, ver.getCommittedState, 20000, false)
+	err = st.CleanMap(ctx, ver.getCommittedState, 20000, false)
 	if err != nil {
-		t.Errorf("CleanRelation failed with %s", err)
+		t.Errorf("CleanMap failed with %s", err)
 	}
 
 	ver += 1
@@ -1129,9 +1129,9 @@ func testMap(t *testing.T, st kvrows.Store) {
 			kvrows.MakeRowValue([]sql.Value{sql.StringValue("dddd row")}),
 		})
 
-	err = st.CleanRelation(ctx, getAbortedState, 30000, false)
+	err = st.CleanMap(ctx, getAbortedState, 30000, false)
 	if err != nil {
-		t.Errorf("CleanRelation failed with %s", err)
+		t.Errorf("CleanMap failed with %s", err)
 	}
 
 	checkMap(t, ctx, st, getAbortedState, tid, sid, 30000, nil, nil)
@@ -1159,9 +1159,9 @@ func testMap(t *testing.T, st kvrows.Store) {
 	}
 
 	ver := version(20)
-	err = st.CleanRelation(ctx, ver.getCommittedState, 30000, false)
+	err = st.CleanMap(ctx, ver.getCommittedState, 30000, false)
 	if err != nil {
-		t.Errorf("CleanRelation failed with %s", err)
+		t.Errorf("CleanMap failed with %s", err)
 	}
 
 	sid += 1
@@ -1232,9 +1232,9 @@ func testMap(t *testing.T, st kvrows.Store) {
 		t.Errorf("InsertMap: failed with %s", err)
 	}
 
-	err = st.CleanRelation(ctx, ver.getCommittedState, 30000, false)
+	err = st.CleanMap(ctx, ver.getCommittedState, 30000, false)
 	if err != nil {
-		t.Errorf("CleanRelation failed with %s", err)
+		t.Errorf("CleanMap failed with %s", err)
 	}
 
 	sid += 1
@@ -1270,9 +1270,9 @@ func testMap(t *testing.T, st kvrows.Store) {
 		t.Errorf("ModifyMap failed with %s", err)
 	}
 
-	err = st.CleanRelation(ctx, ver.getCommittedState, 30000, false)
+	err = st.CleanMap(ctx, ver.getCommittedState, 30000, false)
 	if err != nil {
-		t.Errorf("CleanRelation failed with %s", err)
+		t.Errorf("CleanMap failed with %s", err)
 	}
 
 	sid += 1

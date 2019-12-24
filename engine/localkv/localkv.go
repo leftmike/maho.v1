@@ -654,7 +654,7 @@ func (lkv localKV) CleanKeys(ctx context.Context, getState kvrows.GetTxState, mi
 	return tx.Commit()
 }
 
-func cleanRelation(getState kvrows.GetTxState, bad bool, m Mapper) error {
+func cleanMap(getState kvrows.GetTxState, bad bool, m Mapper) error {
 	w := m.Walk(nil)
 	defer w.Close()
 
@@ -676,7 +676,7 @@ func cleanRelation(getState kvrows.GetTxState, bad bool, m Mapper) error {
 	return nil
 }
 
-func (lkv localKV) CleanRelation(ctx context.Context, getState kvrows.GetTxState,
+func (lkv localKV) CleanMap(ctx context.Context, getState kvrows.GetTxState,
 	mid uint64, bad bool) error {
 
 	tx, err := lkv.st.Begin(true)
@@ -690,7 +690,7 @@ func (lkv localKV) CleanRelation(ctx context.Context, getState kvrows.GetTxState
 		return err
 	}
 
-	err = cleanRelation(getState, bad, m)
+	err = cleanMap(getState, bad, m)
 	if err != nil {
 		return err
 	}
