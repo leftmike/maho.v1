@@ -2,6 +2,7 @@ package typedtbl_test
 
 import (
 	"context"
+	"io"
 	"testing"
 
 	"github.com/leftmike/maho/engine"
@@ -12,12 +13,12 @@ import (
 )
 
 type testRow struct {
-	str        string
-	i64        int64
-	bytes      []byte
-	null_str   *string
-	null_f64   *float64
-	null_bytes []byte
+	Str       string
+	I64       int64
+	Bytes     []byte
+	NullStr   *string
+	NullF64   *float64
+	NullBytes []byte
 }
 
 func testPanic(test func(), noPanic func()) {
@@ -43,12 +44,12 @@ func TestTypedTable(t *testing.T) {
 	tn := sql.TableName{dn, sn.Schema, sql.ID("table")}
 
 	columns := []sql.Identifier{
-		sql.QuotedID("Str"),
+		sql.QuotedID("str"),
 		sql.ID("i64"),
 		sql.QuotedID("BYTES"),
-		sql.QuotedID("NULL_Str"),
-		sql.ID("null_f64"),
-		sql.ID("null_bytes"),
+		sql.QuotedID("NULLStr"),
+		sql.ID("nullf64"),
+		sql.ID("nullbytes"),
 	}
 	columnTypes := []sql.ColumnType{
 		sql.StringColType,
@@ -107,42 +108,44 @@ func TestTypedTable(t *testing.T) {
 	//	t.Errorf("PrimaryKey(): got %v want %v", pkey, primaryKey)
 	//}
 
-	tr := testRow{
-		str:        "string #1",
-		i64:        1,
-		bytes:      []byte{1, 1},
-		null_str:   nil,
-		null_f64:   nil,
-		null_bytes: nil,
+	tr := []testRow{
+		{
+			Str:       "string #1",
+			I64:       1,
+			Bytes:     []byte{1, 1},
+			NullStr:   nil,
+			NullF64:   nil,
+			NullBytes: nil,
+		},
+		{
+			Str:       "string #2",
+			I64:       2,
+			Bytes:     []byte{2, 2},
+			NullStr:   typedtbl.NullString("null string #1"),
+			NullF64:   typedtbl.NullFloat64(1.1),
+			NullBytes: []byte{1, 1},
+		},
 	}
-	err = ttbl.Insert(ctx, &tr)
+	err = ttbl.Insert(ctx, &tr[0])
 	if err != nil {
 		t.Errorf("Insert(%v) failed with %s", tr, err)
 	}
 
-	tr2 := testRow{
-		str:        "string #2",
-		i64:        2,
-		bytes:      []byte{2, 2},
-		null_str:   typedtbl.NullString("null string #1"),
-		null_f64:   typedtbl.NullFloat64(1.1),
-		null_bytes: []byte{1, 1},
-	}
-	err = ttbl.Insert(ctx, tr2)
+	err = ttbl.Insert(ctx, tr[1])
 	if err != nil {
-		t.Errorf("Insert(%v) failed with %s", tr, err)
+		t.Errorf("Insert(%v) failed with %s", tr[1], err)
 	}
 
 	testPanic(
 		func() {
-			tr3 := struct {
-				i64   int64
-				bytes []byte
+			tr := struct {
+				I64   int64
+				Bytes []byte
 			}{
-				i64:   3,
-				bytes: []byte{3, 3},
+				I64:   3,
+				Bytes: []byte{3, 3},
 			}
-			ttbl.Insert(ctx, tr3)
+			ttbl.Insert(ctx, tr)
 		},
 		func() {
 			t.Errorf("Insert(%v) did not panic", tr)
@@ -150,16 +153,35 @@ func TestTypedTable(t *testing.T) {
 
 	testPanic(
 		func() {
-			tr4 := struct {
-				str string
-				i64 int64
+			tr := struct {
+				Str string
+				I64 int64
 			}{
-				str: "string #4",
-				i64: 4,
+				Str: "string #4",
+				I64: 4,
 			}
-			ttbl.Insert(ctx, tr4)
+			ttbl.Insert(ctx, tr)
 		},
 		func() {
 			t.Errorf("Insert(%v) did not panic", tr)
 		})
+
+	r, err := ttbl.Rows(ctx)
+	if err != nil {
+		t.Errorf("Rows() failed with %s", err)
+	}
+
+	var dest testRow
+	for rdx := 0; ; rdx += 1 {
+		err = r.Next(ctx, &dest)
+		if err == io.EOF {
+			break
+		}
+		if err != nil {
+			t.Errorf("Next() failed with %s", err)
+		}
+		if !testutil.DeepEqual(dest, tr[rdx]) {
+			t.Errorf("Next(%d): got %v want %v", rdx, dest, tr[rdx])
+		}
+	}
 }

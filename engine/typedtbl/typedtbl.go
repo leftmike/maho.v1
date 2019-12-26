@@ -27,6 +27,7 @@ type table struct {
 }
 
 type rows struct {
+	tbl  *table
 	rows engine.Rows
 }
 
@@ -58,7 +59,10 @@ func (tbl *table) Rows(ctx context.Context) (*rows, error) {
 	if err != nil {
 		return nil, err
 	}
-	return &rows{rows: r}, nil
+	return &rows{
+		rows: r,
+		tbl:  tbl,
+	}, nil
 }
 
 func (tbl *table) makeColumnField(cn string, ct sql.ColumnType,
@@ -216,7 +220,86 @@ func (r *rows) Close() error {
 }
 
 func (r *rows) Next(ctx context.Context, destObj interface{}) error {
-	return errors.New("not implemented") // XXX
+	tbl := r.tbl
+
+	rowType := reflect.TypeOf(destObj)
+	rowVal := reflect.ValueOf(destObj)
+	if rowType.Kind() != reflect.Ptr || rowType.Elem().Kind() != reflect.Struct {
+		panic(fmt.Sprintf("typed table: destObj must be a pointer to a struct; got %v", destObj))
+	}
+	rowType = rowType.Elem()
+	rowVal = rowVal.Elem()
+
+	if rowType != tbl.rowType {
+		tbl.colFields = tbl.makeColumnFields(ctx, rowType)
+		tbl.rowType = rowType
+	}
+
+	dest := make([]sql.Value, len(tbl.colFields))
+	err := r.rows.Next(ctx, dest)
+	if err != nil {
+		return err
+	}
+
+	for cdx, cf := range tbl.colFields {
+		if cf.skip {
+			continue
+		}
+
+		v := rowVal.Field(cf.index)
+		if dest[cdx] == nil {
+			continue
+		}
+
+		switch cf.dataType {
+		case sql.BooleanType:
+			bv, ok := dest[cdx].(sql.BoolValue)
+			if ok {
+				b := bool(bv)
+				if cf.pointer {
+					v.Set(reflect.ValueOf(&b))
+				} else {
+					v.SetBool(b)
+				}
+			}
+		case sql.StringType:
+			sv, ok := dest[cdx].(sql.StringValue)
+			if ok {
+				s := string(sv)
+				if cf.pointer {
+					v.Set(reflect.ValueOf(&s))
+				} else {
+					v.SetString(s)
+				}
+			}
+		case sql.BytesType:
+			b, ok := dest[cdx].(sql.BytesValue)
+			if ok {
+				v.SetBytes([]byte(b))
+			}
+		case sql.FloatType:
+			fv, ok := dest[cdx].(sql.Float64Value)
+			if ok {
+				f := float64(fv)
+				if cf.pointer {
+					v.Set(reflect.ValueOf(&f))
+				} else {
+					v.SetFloat(f)
+				}
+			}
+		case sql.IntegerType:
+			iv, ok := dest[cdx].(sql.Int64Value)
+			if ok {
+				i := int64(iv)
+				if cf.pointer {
+					v.Set(reflect.ValueOf(&i))
+				} else {
+					v.SetInt(i)
+				}
+			}
+		}
+	}
+	return nil
 }
 
 func (r *rows) Delete(ctx context.Context) error {
