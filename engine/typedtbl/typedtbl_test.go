@@ -144,9 +144,11 @@ func TestTypedTable(t *testing.T) {
 		t.Errorf("Insert(%v) failed with %s", tr, err)
 	}
 
-	err = ttbl.Insert(ctx, tr[1])
-	if err != nil {
-		t.Errorf("Insert(%v) failed with %s", tr[1], err)
+	for rdx := 1; rdx < len(tr); rdx += 1 {
+		err = ttbl.Insert(ctx, tr[rdx])
+		if err != nil {
+			t.Errorf("Insert(%v) failed with %s", tr[rdx], err)
+		}
 	}
 
 	testPanic(
@@ -183,7 +185,6 @@ func TestTypedTable(t *testing.T) {
 	if err != nil {
 		t.Errorf("Rows() failed with %s", err)
 	}
-
 	var dest testRow
 	for rdx := 0; ; rdx += 1 {
 		err = r.Next(ctx, &dest)
@@ -197,4 +198,45 @@ func TestTypedTable(t *testing.T) {
 			t.Errorf("Next(%d): got %v want %v", rdx, dest, tr[rdx])
 		}
 	}
+	err = r.Close()
+	if err != nil {
+		t.Errorf("Close() failed with %s", err)
+	}
+
+	r, err = ttbl.Rows(ctx)
+	if err != nil {
+		t.Errorf("Rows() failed with %s", err)
+	}
+	for {
+		err = r.Next(ctx, &dest)
+		if err == io.EOF {
+			break
+		}
+		if err != nil {
+			t.Errorf("Next() failed with %s", err)
+		}
+		var s string
+		if dest.NullStr == nil {
+			s = "<nil>"
+		} else {
+			s = *dest.NullStr
+		}
+		err = r.Update(ctx, struct {
+			Str       string
+			NullF64   *float64
+			NullBytes []byte
+		}{
+			Str:       s,
+			NullF64:   typedtbl.NullFloat64(float64(dest.I64) * 12.34),
+			NullBytes: append(dest.NullBytes, dest.NullBytes...),
+		})
+		if err != nil {
+			t.Errorf("Update() failed with %s", err)
+		}
+	}
+	err = r.Close()
+	if err != nil {
+		t.Errorf("Close() failed with %s", err)
+	}
+
 }
