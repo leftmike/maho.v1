@@ -248,6 +248,7 @@ func (r *rows) Next(ctx context.Context, destObj interface{}) error {
 
 		v := rowVal.Field(cf.index)
 		if dest[cdx] == nil {
+			v.Set(reflect.Zero(v.Type()))
 			continue
 		}
 

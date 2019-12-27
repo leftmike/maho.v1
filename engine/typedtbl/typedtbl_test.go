@@ -125,6 +125,19 @@ func TestTypedTable(t *testing.T) {
 			NullF64:   typedtbl.NullFloat64(1.1),
 			NullBytes: []byte{1, 1},
 		},
+		{
+			Str:   "string #3",
+			I64:   3,
+			Bytes: []byte{3, 3, 3},
+		},
+		{
+			Str:       "string #4",
+			I64:       4,
+			Bytes:     []byte{4, 4, 4, 4},
+			NullStr:   typedtbl.NullString(""),
+			NullF64:   typedtbl.NullFloat64(0.0),
+			NullBytes: []byte{},
+		},
 	}
 	err = ttbl.Insert(ctx, &tr[0])
 	if err != nil {
