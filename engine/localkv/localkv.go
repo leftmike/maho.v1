@@ -151,7 +151,7 @@ func (lkv localKV) WriteValue(ctx context.Context, mid uint64, key kvrows.Key, v
 }
 
 func (lkv localKV) ScanMap(ctx context.Context, getState kvrows.GetTxState,
-	tid kvrows.TransactionID, sid, mid uint64, prefix, seek []byte,
+	tid kvrows.TransactionID, sid, mid uint64, seek []byte,
 	scanKeyValue kvrows.ScanKeyValue) (next []byte, err error) {
 
 	tx, err := lkv.st.Begin(false)
@@ -165,7 +165,7 @@ func (lkv localKV) ScanMap(ctx context.Context, getState kvrows.GetTxState,
 		return nil, err
 	}
 
-	w := m.Walk(prefix)
+	w := m.Walk(nil)
 	defer w.Close()
 
 	var kbuf []byte

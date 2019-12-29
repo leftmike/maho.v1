@@ -231,9 +231,7 @@ func (vt *virtualTable) PrimaryKey(ctx context.Context) []engine.ColumnKey {
 	return nil
 }
 
-func (vt *virtualTable) Scan(ctx context.Context, key []sql.Value, numKeyCols int) (engine.Rows,
-	error) {
-
+func (vt *virtualTable) Seek(ctx context.Context, row []sql.Value) (engine.Rows, error) {
 	return vt.Rows(ctx)
 }
 

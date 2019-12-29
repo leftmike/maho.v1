@@ -422,7 +422,7 @@ func (bt *table) PrimaryKey(ctx context.Context) []engine.ColumnKey {
 	return nil
 }
 
-func (bt *table) Scan(ctx context.Context, key []sql.Value, numKeyCols int) (engine.Rows, error) {
+func (bt *table) Seek(ctx context.Context, row []sql.Value) (engine.Rows, error) {
 	return bt.Rows(ctx)
 }
 

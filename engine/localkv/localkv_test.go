@@ -437,7 +437,7 @@ func testScanMap(t *testing.T, st localkv.Store) {
 	initializeMap(t, st, 1000, keyVals)
 
 	kv := &keyValues{num: 1024}
-	next, err := lkv.ScanMap(ctx, getAbortedState, tid, 200, 1000, nil, nil, kv.scanKeyValue)
+	next, err := lkv.ScanMap(ctx, getAbortedState, tid, 200, 1000, nil, kv.scanKeyValue)
 	if err != nil {
 		t.Errorf("ScanMap failed with %s", err)
 	}
@@ -453,7 +453,7 @@ func testScanMap(t *testing.T, st localkv.Store) {
 	cnt := 0
 	for {
 		kv = &keyValues{num: 1}
-		next, err = lkv.ScanMap(ctx, getAbortedState, tid, 200, 1000, nil, next, kv.scanKeyValue)
+		next, err = lkv.ScanMap(ctx, getAbortedState, tid, 200, 1000, next, kv.scanKeyValue)
 		if err != nil {
 			t.Errorf("ScanMap failed with %s", err)
 		}
@@ -509,7 +509,7 @@ func testScanMap(t *testing.T, st localkv.Store) {
 	initializeMap(t, st, 2000, keyVals2)
 
 	kv = &keyValues{num: 1024}
-	next, err = lkv.ScanMap(ctx, getCommittedState, tid, 999999, 2000, nil, nil, kv.scanKeyValue)
+	next, err = lkv.ScanMap(ctx, getCommittedState, tid, 999999, 2000, nil, kv.scanKeyValue)
 	if err != nil {
 		t.Errorf("ScanMap failed with %s", err)
 	}
@@ -522,7 +522,7 @@ func testScanMap(t *testing.T, st localkv.Store) {
 	}
 
 	kv = &keyValues{num: 1024}
-	next, err = lkv.ScanMap(ctx, getActiveState, tid, 999999, 2000, nil, nil, kv.scanKeyValue)
+	next, err = lkv.ScanMap(ctx, getActiveState, tid, 999999, 2000, nil, kv.scanKeyValue)
 
 	bperr, ok := err.(*kvrows.ErrBlockingProposal)
 	if !ok {
@@ -538,7 +538,7 @@ func testScanMap(t *testing.T, st localkv.Store) {
 
 	cnt = len(kv.keys)
 	kv = &keyValues{num: 1024}
-	next, err = lkv.ScanMap(ctx, getCommittedState, tid, 999999, 2000, nil, next, kv.scanKeyValue)
+	next, err = lkv.ScanMap(ctx, getCommittedState, tid, 999999, 2000, next, kv.scanKeyValue)
 	if err != nil {
 		t.Errorf("ScanMap failed with %s", err)
 	}
@@ -556,7 +556,7 @@ func checkMap(t *testing.T, ctx context.Context, st kvrows.Store, getState kvrow
 	tid kvrows.TransactionID, sid, mid uint64, wantKeys, wantVals [][]byte) {
 
 	kv := &keyValues{num: 1024}
-	next, err := st.ScanMap(ctx, getState, tid, sid, mid, nil, nil, kv.scanKeyValue)
+	next, err := st.ScanMap(ctx, getState, tid, sid, mid, nil, kv.scanKeyValue)
 	if err != nil {
 		t.Errorf("ScanMap failed with %s", err)
 	}

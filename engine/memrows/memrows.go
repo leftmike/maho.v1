@@ -763,7 +763,7 @@ func (mt *table) PrimaryKey(ctx context.Context) []engine.ColumnKey {
 	return nil
 }
 
-func (mt *table) Scan(ctx context.Context, key []sql.Value, numKeyCols int) (engine.Rows, error) {
+func (mt *table) Seek(ctx context.Context, row []sql.Value) (engine.Rows, error) {
 	return mt.Rows(ctx)
 }
 

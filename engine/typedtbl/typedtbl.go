@@ -51,8 +51,8 @@ func (tbl *Table) PrimaryKey(ctx context.Context) []engine.ColumnKey {
 	return tbl.tbl.PrimaryKey(ctx)
 }
 
-func (tbl *Table) Scan(ctx context.Context, key []sql.Value, numKeyCols int) (*rows, error) {
-	r, err := tbl.tbl.Scan(ctx, key, numKeyCols)
+func (tbl *Table) Seek(ctx context.Context, row []sql.Value) (*rows, error) {
+	r, err := tbl.tbl.Seek(ctx, row)
 	if err != nil {
 		return nil, err
 	}

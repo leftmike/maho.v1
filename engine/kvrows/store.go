@@ -43,7 +43,7 @@ type Store interface {
 	CleanMap(ctx context.Context, getState GetTxState, mid uint64, bad bool) error
 
 	ScanMap(ctx context.Context, getState GetTxState, tid TransactionID, sid, mid uint64,
-		prefix, seek []byte, scanKeyValue ScanKeyValue) (next []byte, err error)
+		seek []byte, scanKeyValue ScanKeyValue) (next []byte, err error)
 	ModifyMap(ctx context.Context, getState GetTxState, tid TransactionID, sid, mid uint64,
 		key []byte, ver uint64, modifyKeyValue ModifyKeyValue) error
 	DeleteMap(ctx context.Context, getState GetTxState, tid TransactionID, sid, mid uint64,

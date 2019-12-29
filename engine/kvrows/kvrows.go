@@ -1,8 +1,6 @@
 package kvrows
 
 /*
-- change Walk to not take a prefix
-- change Scan to take a row and _not_ a number of columns
 - use 0x00 <key> to be for metadata about a table; localkv needs to skip those keys on scans
 */
 
@@ -368,8 +366,8 @@ func (kv *KVRows) DropSchema(ctx context.Context, etx engine.Transaction, sn sql
 	}
 
 	ttbl := kv.makeSchemasTable(tx)
-	rows, err := ttbl.Scan(ctx,
-		[]sql.Value{sql.StringValue(sn.Database.String()), sql.StringValue(sn.Schema.String())}, 2)
+	rows, err := ttbl.Seek(ctx,
+		[]sql.Value{sql.StringValue(sn.Database.String()), sql.StringValue(sn.Schema.String())})
 	if err != nil {
 		return err
 	}
@@ -402,8 +400,8 @@ func (kv *KVRows) updateSchema(ctx context.Context, tx *transaction, sn sql.Sche
 	delta int64) error {
 
 	ttbl := kv.makeSchemasTable(tx)
-	rows, err := ttbl.Scan(ctx,
-		[]sql.Value{sql.StringValue(sn.Database.String()), sql.StringValue(sn.Schema.String())}, 2)
+	rows, err := ttbl.Seek(ctx,
+		[]sql.Value{sql.StringValue(sn.Database.String()), sql.StringValue(sn.Schema.String())})
 	if err != nil {
 		return err
 	}
@@ -453,12 +451,12 @@ func (kv *KVRows) lookupTable(ctx context.Context, tx *transaction, tn sql.Table
 	bool, error) {
 
 	ttbl := kv.makeTablesTable(tx)
-	rows, err := ttbl.Scan(ctx,
+	rows, err := ttbl.Seek(ctx,
 		[]sql.Value{
 			sql.StringValue(tn.Database.String()),
 			sql.StringValue(tn.Schema.String()),
 			sql.StringValue(tn.Table.String()),
-		}, 3)
+		})
 	if err != nil {
 		return 0, false, err
 	}

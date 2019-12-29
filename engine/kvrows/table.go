@@ -21,7 +21,6 @@ type table struct {
 type rows struct {
 	tbl    *table
 	next   []byte
-	prefix []byte
 	idx    int
 	rows   [][]sql.Value
 	vers   []uint64
@@ -40,23 +39,19 @@ func (tbl *table) PrimaryKey(ctx context.Context) []engine.ColumnKey {
 	return tbl.primary
 }
 
-func (tbl *table) Scan(ctx context.Context, keyRow []sql.Value, numKeyCols int) (engine.Rows,
-	error) {
-
-	var prefix []byte
-	if numKeyCols > 0 {
-		// XXX: encoded key is not a prefix; it has the wrong number of columns
-		prefix = MakeSQLKey(keyRow, tbl.primary[:numKeyCols])
+func (tbl *table) Seek(ctx context.Context, row []sql.Value) (engine.Rows, error) {
+	var next []byte
+	if row != nil {
+		next = MakeSQLKey(row, tbl.primary)
 	}
 	return &rows{
-		tbl:    tbl,
-		next:   nil,
-		prefix: prefix,
+		tbl:  tbl,
+		next: next,
 	}, nil
 }
 
 func (tbl *table) Rows(ctx context.Context) (engine.Rows, error) {
-	return tbl.Scan(ctx, nil, 0)
+	return tbl.Seek(ctx, nil)
 }
 
 func (tbl *table) Insert(ctx context.Context, row []sql.Value) error {
@@ -97,8 +92,8 @@ func (r *rows) Next(ctx context.Context, dest []sql.Value) error {
 
 		kv := r.tbl.kv
 		tx := r.tbl.tx
-		next, err := r.tbl.kv.st.ScanMap(ctx, kv.getState, tx.tid, tx.sid, r.tbl.mid, r.prefix,
-			r.next, r.scanKeyValue)
+		next, err := r.tbl.kv.st.ScanMap(ctx, kv.getState, tx.tid, tx.sid, r.tbl.mid, r.next,
+			r.scanKeyValue)
 		if err != nil {
 			return err
 		}

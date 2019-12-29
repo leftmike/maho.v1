@@ -80,7 +80,7 @@ type Table interface {
 	Columns(ctx context.Context) []sql.Identifier
 	ColumnTypes(ctx context.Context) []sql.ColumnType
 	PrimaryKey(ctx context.Context) []ColumnKey
-	Scan(ctx context.Context, key []sql.Value, numKeyCols int) (Rows, error)
+	Seek(ctx context.Context, row []sql.Value) (Rows, error)
 	Rows(ctx context.Context) (Rows, error)
 	Insert(ctx context.Context, row []sql.Value) error
 }
