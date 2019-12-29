@@ -6,10 +6,12 @@ import (
 	"encoding/gob"
 	"errors"
 	"fmt"
+	"io"
 	"sync"
 	"sync/atomic"
 
 	"github.com/leftmike/maho/engine"
+	"github.com/leftmike/maho/engine/typedtbl"
 	"github.com/leftmike/maho/sql"
 )
 
@@ -37,10 +39,13 @@ var (
 	}
 
 	databasesPrimary = []engine.ColumnKey{engine.MakeColumnKey(0, false)}
+
+	schemasTableName = sql.TableName{sql.ID("system"), sql.ID("private"), sql.ID("schemas")}
 	schemasPrimary   = []engine.ColumnKey{
 		engine.MakeColumnKey(0, false),
 		engine.MakeColumnKey(1, false),
 	}
+
 	tablesPrimary = []engine.ColumnKey{
 		engine.MakeColumnKey(0, false),
 		engine.MakeColumnKey(1, false),
@@ -264,13 +269,22 @@ func (kv *KVRows) DropDatabase(dbname sql.Identifier, ifExists bool, options eng
 	return kv.updateDatabase(context.Background(), dbname, false)
 }
 
-func makeSchemaKey(sn sql.SchemaName) []byte {
-	return MakeSQLKey(
-		[]sql.Value{
-			sql.StringValue(sn.Database.String()),
-			sql.StringValue(sn.Schema.String()),
-		},
-		schemasPrimary)
+type schemaRow struct {
+	Database string
+	Schema   string
+	Tables   int64
+}
+
+func (kv *KVRows) makeSchemasTable(tx *transaction) *typedtbl.Table {
+	return typedtbl.MakeTable(schemasTableName,
+		&table{
+			kv:       kv,
+			tx:       tx,
+			mid:      schemasMID,
+			cols:     []sql.Identifier{sql.ID("database"), sql.ID("schema"), sql.ID("tables")},
+			colTypes: []sql.ColumnType{sql.IdColType, sql.IdColType, sql.Int64ColType},
+			primary:  schemasPrimary,
+		})
 }
 
 func (kv *KVRows) CreateSchema(ctx context.Context, etx engine.Transaction,
@@ -285,38 +299,13 @@ func (kv *KVRows) CreateSchema(ctx context.Context, etx engine.Transaction,
 		return nil
 	}
 
-	row := []sql.Value{
-		sql.StringValue(sn.Database.String()),
-		sql.StringValue(sn.Schema.String()),
-		sql.Int64Value(0),
-	}
-	return kv.st.InsertMap(ctx, kv.getState, tx.tid, tx.sid, schemasMID, makeSchemaKey(sn),
-		MakeRowValue(row))
-}
-
-func (kv *KVRows) lookupSchemaKey(ctx context.Context, tx *transaction, sn sql.SchemaName) (Key,
-	int64, error) {
-
-	/*
-		sqlKey := makeSchemaKey(sn)
-		keys, vals, _, err := kv.st.ScanRelation(ctx, kv.getState, tx.tid, tx.sid, schemasMID,
-			MaximumVersion, 1, sqlKey)
-		if err != nil {
-			return Key{}, 0, err
-		} else if len(keys) == 0 || !bytes.Equal(sqlKey, keys[0].SQLKey) {
-			return Key{}, 0, io.EOF
-		}
-		row := []sql.Value{nil, nil, nil}
-		if !ParseRowValue(vals[0], row) {
-			return Key{}, 0, fmt.Errorf("kvrows: at key %v unable to parse row: %v", keys[0], vals[0])
-		}
-		i64, ok := row[2].(sql.Int64Value)
-		if !ok {
-			return Key{}, 0, fmt.Errorf("kvrows: schemas table: expected an int, got %s", row[2])
-		}
-		return keys[0], int64(i64), nil
-	*/
-	return Key{}, 0, notImplemented
+	ttbl := kv.makeSchemasTable(tx)
+	return ttbl.Insert(ctx,
+		schemaRow{
+			Database: sn.Database.String(),
+			Schema:   sn.Schema.String(),
+			Tables:   0,
+		})
 }
 
 func (kv *KVRows) DropSchema(ctx context.Context, etx engine.Transaction, sn sql.SchemaName,
@@ -326,7 +315,32 @@ func (kv *KVRows) DropSchema(ctx context.Context, etx engine.Transaction, sn sql
 		return fmt.Errorf("kvrows: schema %s may not be dropped", sn)
 	}
 
-	return notImplemented
+	tx, err := kv.forWrite(ctx, etx)
+	if err != nil {
+		return nil
+	}
+
+	ttbl := kv.makeSchemasTable(tx)
+	rows, err := ttbl.Scan(ctx,
+		[]sql.Value{sql.StringValue(sn.Database.String()), sql.StringValue(sn.Schema.String())}, 2)
+	if err != nil {
+		return err
+	}
+	defer rows.Close()
+
+	var sr schemaRow
+	err = rows.Next(ctx, &sr)
+	if err != nil {
+		return err
+	}
+	// XXX: err == io.EOF
+	if sr.Database != sn.Database.String() || sr.Schema != sn.Schema.String() {
+		return fmt.Errorf("kvrows: schema %s not found", sn)
+	}
+	if sr.Tables > 0 {
+		return fmt.Errorf("kvrows: schema %s is not empty", sn)
+	}
+	return rows.Delete(ctx)
 }
 
 func makeTableKey(tn sql.TableName) []byte {
@@ -533,35 +547,29 @@ func (kv *KVRows) ListSchemas(ctx context.Context, etx engine.Transaction,
 		return nil, err
 	}
 
-	/*
-		keys, vals, _, err := kv.st.ScanRelation(ctx, kv.getState, tx.tid, tx.sid, schemasMID,
-			MaximumVersion, math.MaxInt32, nil)
-		if err != io.EOF && err != nil {
+	ttbl := kv.makeSchemasTable(tx)
+	// XXX: Scan doesn't work
+	//rows, err := ttbl.Scan(ctx, []sql.Value{sql.StringValue(dbname.String())}, 1)
+	rows, err := ttbl.Rows(ctx)
+	if err != nil {
+		return nil, err
+	}
+
+	scnames := []sql.Identifier{sql.PUBLIC} // XXX: sql.PUBLIC
+	for {
+		var sr schemaRow
+		err = rows.Next(ctx, &sr)
+		if err == io.EOF {
+			break
+		} else if err != nil {
 			return nil, err
 		}
-	*/
-	_ = tx
-	scnames := []sql.Identifier{sql.PUBLIC} // XXX: sql.PUBLIC
-	/*
-		for idx, val := range vals {
-			row := []sql.Value{nil, nil, nil}
-			if !ParseRowValue(val, row) {
-				return nil, fmt.Errorf("kvrows: at key %v unable to parse row: %v", keys[idx], val)
-			}
-			s, ok := row[0].(sql.StringValue)
-			if !ok {
-				return nil, fmt.Errorf("kvrows: schemas table: expected a string, got %s", row[0])
-			}
-			if string(s) != dbname.String() {
-				continue
-			}
-			s, ok = row[1].(sql.StringValue)
-			if !ok {
-				return nil, fmt.Errorf("kvrows: schemas table: expected a string, got %s", row[1])
-			}
-			scnames = append(scnames, sql.QuotedID(string(s)))
+		// XXX: should be unnecessary once Scan is fixed
+		if sr.Database != dbname.String() {
+			continue
 		}
-	*/
+		scnames = append(scnames, sql.ID(sr.Schema))
+	}
 	return scnames, nil
 }
 

@@ -40,14 +40,17 @@ func (tbl *table) PrimaryKey(ctx context.Context) []engine.ColumnKey {
 	return tbl.primary
 }
 
-func (tbl *table) Scan(ctx context.Context, key []sql.Value, numKeyCols int) (engine.Rows, error) {
+func (tbl *table) Scan(ctx context.Context, keyRow []sql.Value, numKeyCols int) (engine.Rows,
+	error) {
+
 	var prefix []byte
 	if numKeyCols > 0 {
-		prefix = MakeSQLKey(key, tbl.primary[0:numKeyCols])
+		// XXX: encoded key is not a prefix; it has the wrong number of columns
+		prefix = MakeSQLKey(keyRow, tbl.primary[:numKeyCols])
 	}
 	return &rows{
 		tbl:    tbl,
-		next:   prefix,
+		next:   nil,
 		prefix: prefix,
 	}, nil
 }
@@ -101,6 +104,9 @@ func (r *rows) Next(ctx context.Context, dest []sql.Value) error {
 		}
 		if next == nil {
 			r.noMore = true
+		}
+		if len(r.rows) == 0 {
+			return io.EOF
 		}
 
 		r.idx = 0
