@@ -2,7 +2,6 @@ package typedtbl
 
 import (
 	"context"
-	"errors"
 	"fmt"
 	"reflect"
 	"strings"
@@ -19,7 +18,7 @@ type columnField struct {
 	pointer  bool
 }
 
-type table struct {
+type Table struct {
 	tbl          engine.Table
 	tn           sql.TableName
 	rowType      reflect.Type
@@ -29,34 +28,41 @@ type table struct {
 }
 
 type rows struct {
-	tbl  *table
+	tbl  *Table
 	rows engine.Rows
 }
 
-func MakeTable(tn sql.TableName, tbl engine.Table) *table {
-	return &table{
+func MakeTable(tn sql.TableName, tbl engine.Table) *Table {
+	return &Table{
 		tbl: tbl,
 		tn:  tn,
 	}
 }
 
-func (tbl *table) Columns(ctx context.Context) []sql.Identifier {
+func (tbl *Table) Columns(ctx context.Context) []sql.Identifier {
 	return tbl.tbl.Columns(ctx)
 }
 
-func (tbl *table) ColumnTypes(ctx context.Context) []sql.ColumnType {
+func (tbl *Table) ColumnTypes(ctx context.Context) []sql.ColumnType {
 	return tbl.tbl.ColumnTypes(ctx)
 }
 
-func (tbl *table) PrimaryKey(ctx context.Context) []engine.ColumnKey {
+func (tbl *Table) PrimaryKey(ctx context.Context) []engine.ColumnKey {
 	return tbl.tbl.PrimaryKey(ctx)
 }
 
-func (tbl *table) Scan(ctx context.Context, key interface{}, numKeyCols int) (*rows, error) {
-	return nil, errors.New("not implemented") // XXX
+func (tbl *Table) Scan(ctx context.Context, key []sql.Value, numKeyCols int) (*rows, error) {
+	r, err := tbl.tbl.Scan(ctx, key, numKeyCols)
+	if err != nil {
+		return nil, err
+	}
+	return &rows{
+		rows: r,
+		tbl:  tbl,
+	}, nil
 }
 
-func (tbl *table) Rows(ctx context.Context) (*rows, error) {
+func (tbl *Table) Rows(ctx context.Context) (*rows, error) {
 	r, err := tbl.tbl.Rows(ctx)
 	if err != nil {
 		return nil, err
@@ -67,7 +73,7 @@ func (tbl *table) Rows(ctx context.Context) (*rows, error) {
 	}, nil
 }
 
-func (tbl *table) makeColumnField(cn string, ct sql.ColumnType, idx int,
+func (tbl *Table) makeColumnField(cn string, ct sql.ColumnType, idx int,
 	sf reflect.StructField) columnField {
 
 	ptr := !ct.NotNull
@@ -136,7 +142,7 @@ func (tbl *table) makeColumnField(cn string, ct sql.ColumnType, idx int,
 	}
 }
 
-func (tbl *table) makeRowFields(ctx context.Context, rowType reflect.Type) []columnField {
+func (tbl *Table) makeRowFields(ctx context.Context, rowType reflect.Type) []columnField {
 	var rowFields []columnField
 
 	fields := map[string]reflect.StructField{}
@@ -164,7 +170,7 @@ func (tbl *table) makeRowFields(ctx context.Context, rowType reflect.Type) []col
 	return rowFields
 }
 
-func (tbl *table) Insert(ctx context.Context, rowObj interface{}) error {
+func (tbl *Table) Insert(ctx context.Context, rowObj interface{}) error {
 	rowType := reflect.TypeOf(rowObj)
 	rowVal := reflect.ValueOf(rowObj)
 	if rowType.Kind() == reflect.Ptr {
@@ -309,7 +315,7 @@ func (r *rows) Delete(ctx context.Context) error {
 	return r.rows.Delete(ctx)
 }
 
-func (tbl *table) makeUpdateFields(ctx context.Context, updateType reflect.Type) []columnField {
+func (tbl *Table) makeUpdateFields(ctx context.Context, updateType reflect.Type) []columnField {
 	var updateFields []columnField
 
 	type column struct {
