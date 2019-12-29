@@ -1,5 +1,11 @@
 package kvrows
 
+/*
+- change Walk to not take a prefix
+- change Scan to take a row and _not_ a number of columns
+- use 0x00 <key> to be for metadata about a table; localkv needs to skip those keys on scans
+*/
+
 import (
 	"bytes"
 	"context"
@@ -46,11 +52,13 @@ var (
 		engine.MakeColumnKey(1, false),
 	}
 
-	tablesPrimary = []engine.ColumnKey{
+	tablesTableName = sql.TableName{sql.ID("system"), sql.ID("private"), sql.ID("table")}
+	tablesPrimary   = []engine.ColumnKey{
 		engine.MakeColumnKey(0, false),
 		engine.MakeColumnKey(1, false),
 		engine.MakeColumnKey(2, false),
 	}
+
 	transactionsPrimary = []engine.ColumnKey{
 		engine.MakeColumnKey(0, false),
 		engine.MakeColumnKey(1, false),
@@ -234,11 +242,7 @@ func (kv *KVRows) updateDatabase(ctx context.Context, dbname sql.Identifier, act
 	return nil
 }
 
-func (kv *KVRows) CreateDatabase(dbname sql.Identifier, options engine.Options) error {
-	if len(options) != 0 {
-		return fmt.Errorf("kvrows: unexpected option to create database: %s", dbname)
-	}
-
+func (kv *KVRows) createDatabase(ctx context.Context, dbname sql.Identifier) error {
 	kv.mutex.Lock()
 	defer kv.mutex.Unlock()
 
@@ -247,12 +251,63 @@ func (kv *KVRows) CreateDatabase(dbname sql.Identifier, options engine.Options) 
 		return fmt.Errorf("kvrows: database %s already exists", dbname)
 	}
 
-	return kv.updateDatabase(context.Background(), dbname, true)
+	return kv.updateDatabase(ctx, dbname, true)
+}
+
+func (kv *KVRows) setupDatabase(ctx context.Context, dbname sql.Identifier) error {
+	etx := kv.Begin(0)
+	err := kv.CreateSchema(ctx, etx, sql.SchemaName{dbname, sql.PUBLIC})
+	if err != nil {
+		etx.Rollback()
+		return err
+	}
+	return etx.Commit(ctx)
+}
+
+func (kv *KVRows) CreateDatabase(dbname sql.Identifier, options engine.Options) error {
+	if len(options) != 0 {
+		return fmt.Errorf("kvrows: unexpected option to create database: %s", dbname)
+	}
+
+	ctx := context.Background()
+	err := kv.createDatabase(ctx, dbname)
+	if err != nil {
+		return err
+	}
+	err = kv.setupDatabase(ctx, dbname)
+	if err != nil {
+		kv.updateDatabase(ctx, dbname, false)
+		return err
+	}
+	return nil
+}
+
+func (kv *KVRows) cleanupDatabase(ctx context.Context, dbname sql.Identifier) error {
+	etx := kv.Begin(0)
+	scnames, err := kv.ListSchemas(ctx, etx, dbname)
+	if err != nil {
+		etx.Rollback()
+		return err
+	}
+	for _, scname := range scnames {
+		err = kv.DropSchema(ctx, etx, sql.SchemaName{dbname, scname}, true)
+		if err != nil {
+			etx.Rollback()
+			return err
+		}
+	}
+	return etx.Commit(ctx)
 }
 
 func (kv *KVRows) DropDatabase(dbname sql.Identifier, ifExists bool, options engine.Options) error {
 	if len(options) != 0 {
 		return fmt.Errorf("kvrows: unexpected option to drop database: %s", dbname)
+	}
+
+	ctx := context.Background()
+	err := kv.cleanupDatabase(ctx, dbname)
+	if err != nil {
+		return err
 	}
 
 	kv.mutex.Lock()
@@ -266,7 +321,7 @@ func (kv *KVRows) DropDatabase(dbname sql.Identifier, ifExists bool, options eng
 		return fmt.Errorf("kvrows: database %s does not exist", dbname)
 	}
 
-	return kv.updateDatabase(context.Background(), dbname, false)
+	return kv.updateDatabase(ctx, dbname, false)
 }
 
 type schemaRow struct {
@@ -290,10 +345,6 @@ func (kv *KVRows) makeSchemasTable(tx *transaction) *typedtbl.Table {
 func (kv *KVRows) CreateSchema(ctx context.Context, etx engine.Transaction,
 	sn sql.SchemaName) error {
 
-	if sn.Schema == sql.PUBLIC {
-		return fmt.Errorf("kvrows: schema %s already exists", sn)
-	}
-
 	tx, err := kv.forWrite(ctx, etx)
 	if err != nil {
 		return nil
@@ -311,10 +362,6 @@ func (kv *KVRows) CreateSchema(ctx context.Context, etx engine.Transaction,
 func (kv *KVRows) DropSchema(ctx context.Context, etx engine.Transaction, sn sql.SchemaName,
 	ifExists bool) error {
 
-	if sn.Schema == sql.PUBLIC {
-		return fmt.Errorf("kvrows: schema %s may not be dropped", sn)
-	}
-
 	tx, err := kv.forWrite(ctx, etx)
 	if err != nil {
 		return nil
@@ -330,11 +377,19 @@ func (kv *KVRows) DropSchema(ctx context.Context, etx engine.Transaction, sn sql
 
 	var sr schemaRow
 	err = rows.Next(ctx, &sr)
-	if err != nil {
+	if err == io.EOF {
+		if ifExists {
+			return nil
+		}
+		return fmt.Errorf("kvrows: schema %s not found", sn)
+	} else if err != nil {
 		return err
 	}
-	// XXX: err == io.EOF
+
 	if sr.Database != sn.Database.String() || sr.Schema != sn.Schema.String() {
+		if ifExists {
+			return nil
+		}
 		return fmt.Errorf("kvrows: schema %s not found", sn)
 	}
 	if sr.Tables > 0 {
@@ -343,14 +398,87 @@ func (kv *KVRows) DropSchema(ctx context.Context, etx engine.Transaction, sn sql
 	return rows.Delete(ctx)
 }
 
-func makeTableKey(tn sql.TableName) []byte {
-	return MakeSQLKey(
+func (kv *KVRows) updateSchema(ctx context.Context, tx *transaction, sn sql.SchemaName,
+	delta int64) error {
+
+	ttbl := kv.makeSchemasTable(tx)
+	rows, err := ttbl.Scan(ctx,
+		[]sql.Value{sql.StringValue(sn.Database.String()), sql.StringValue(sn.Schema.String())}, 2)
+	if err != nil {
+		return err
+	}
+	defer rows.Close()
+
+	var sr schemaRow
+	err = rows.Next(ctx, &sr)
+	if err == io.EOF {
+		fmt.Println("io.EOF")
+		return fmt.Errorf("kvrows: schema %s not found", sn)
+	} else if err != nil {
+		return err
+	}
+
+	if sr.Database != sn.Database.String() || sr.Schema != sn.Schema.String() {
+		fmt.Printf("%s %v\n", sn, sr)
+		return fmt.Errorf("kvrows: schema %s not found", sn)
+	}
+	return rows.Update(ctx,
+		struct {
+			Tables int64
+		}{sr.Tables + delta})
+}
+
+type tableRow struct {
+	Database string
+	Schema   string
+	Table    string
+	MID      int64
+}
+
+func (kv *KVRows) makeTablesTable(tx *transaction) *typedtbl.Table {
+	return typedtbl.MakeTable(tablesTableName,
+		&table{
+			kv:  kv,
+			tx:  tx,
+			mid: tablesMID,
+			cols: []sql.Identifier{sql.ID("database"), sql.ID("schema"), sql.ID("table"),
+				sql.ID("mid")},
+			colTypes: []sql.ColumnType{sql.IdColType, sql.IdColType, sql.IdColType,
+				sql.Int64ColType},
+			primary: tablesPrimary,
+		})
+}
+
+func (kv *KVRows) lookupTable(ctx context.Context, tx *transaction, tn sql.TableName) (uint64,
+	bool, error) {
+
+	ttbl := kv.makeTablesTable(tx)
+	rows, err := ttbl.Scan(ctx,
 		[]sql.Value{
 			sql.StringValue(tn.Database.String()),
 			sql.StringValue(tn.Schema.String()),
 			sql.StringValue(tn.Table.String()),
-		},
-		tablesPrimary)
+		}, 3)
+	if err != nil {
+		return 0, false, err
+	}
+	defer rows.Close()
+
+	var tr tableRow
+	err = rows.Next(ctx, &tr)
+	if err == io.EOF {
+		return 0, false, nil
+	} else if err != nil {
+		return 0, false, err
+	}
+
+	if tr.Database != tn.Database.String() || tr.Schema != tn.Schema.String() ||
+		tr.Table != tn.Table.String() {
+
+		return 0, false, nil
+	}
+
+	return uint64(tr.MID), true, nil
 }
 
 func (kv *KVRows) LookupTable(ctx context.Context, etx engine.Transaction,
@@ -360,17 +488,22 @@ func (kv *KVRows) LookupTable(ctx context.Context, etx engine.Transaction,
 	if err != nil {
 		return nil, err
 	}
-	_ = tx
-	/*
-		keys, vals, err := kv.st.ReadRows(tx.tid, tx.sid, tablesMID, makeTableKey(tn), nil,
-			MaximumVersion)
-		if err != nil {
-			return nil, err
-		}
-		_ = keys
-		_ = vals
-	*/
-	return nil, notImplemented
+
+	mid, ok, err := kv.lookupTable(ctx, tx, tn)
+	if err != nil {
+		return nil, err
+	} else if !ok {
+		return nil, fmt.Errorf("kvrows: table %s not found", tn)
+	}
+
+	return &table{
+		kv:  kv,
+		tx:  tx,
+		mid: mid,
+		// XXX: col:
+		// XXX: colTypes:
+		// XXX: primary:
+	}, nil
 }
 
 func (kv *KVRows) CreateTable(ctx context.Context, etx engine.Transaction, tn sql.TableName,
@@ -381,9 +514,13 @@ func (kv *KVRows) CreateTable(ctx context.Context, etx engine.Transaction, tn sq
 	if err != nil {
 		return err
 	}
-	_ = tx
-	//sqlKey := makeTableKey(tn)
-	// XXX: WriteRows
+
+	err = kv.updateSchema(ctx, tx, tn.SchemaName(), 1)
+	if err != nil {
+		return err
+	}
+
+	//ttbl := kv.makeTablesTable(tx)
 
 	return notImplemented
 }
@@ -548,14 +685,12 @@ func (kv *KVRows) ListSchemas(ctx context.Context, etx engine.Transaction,
 	}
 
 	ttbl := kv.makeSchemasTable(tx)
-	// XXX: Scan doesn't work
-	//rows, err := ttbl.Scan(ctx, []sql.Value{sql.StringValue(dbname.String())}, 1)
 	rows, err := ttbl.Rows(ctx)
 	if err != nil {
 		return nil, err
 	}
 
-	scnames := []sql.Identifier{sql.PUBLIC} // XXX: sql.PUBLIC
+	var scnames []sql.Identifier
 	for {
 		var sr schemaRow
 		err = rows.Next(ctx, &sr)
@@ -564,7 +699,6 @@ func (kv *KVRows) ListSchemas(ctx context.Context, etx engine.Transaction,
 		} else if err != nil {
 			return nil, err
 		}
-		// XXX: should be unnecessary once Scan is fixed
 		if sr.Database != dbname.String() {
 			continue
 		}
