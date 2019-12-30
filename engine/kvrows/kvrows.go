@@ -1,9 +1,5 @@
 package kvrows
 
-/*
-- get rid of kvrows.Key
-*/
-
 import (
 	"bytes"
 	"context"

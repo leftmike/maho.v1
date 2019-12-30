@@ -11,11 +11,6 @@ import (
 	"github.com/leftmike/maho/sql"
 )
 
-type Key struct {
-	SQLKey  []byte
-	Version uint64
-}
-
 type TransactionID struct {
 	// Node, Epoch, and LocalID uniquely identify the transaction.
 	Node    uint32
@@ -285,18 +280,15 @@ func ParseSQLKey(key []byte, colKeys []engine.ColumnKey, dest []sql.Value) bool 
 	return true
 }
 
-func (k Key) Encode() []byte {
-	key := append(make([]byte, 0, len(k.SQLKey)+8), k.SQLKey...)
+func MakeKeyVersion(key []byte, ver uint64) []byte {
+	k := append(make([]byte, 0, len(key)+8), key...)
 	// Encode the version _descending_ so that the most recent version will be encountered
 	// first in a key scan.
-	return encodeUint64(key, true, k.Version)
+	return encodeUint64(k, true, ver)
 }
 
-func (k Key) Copy() Key {
-	return Key{
-		SQLKey:  append(make([]byte, 0, len(k.SQLKey)), k.SQLKey...),
-		Version: k.Version,
-	}
+func CopyKey(key []byte) []byte {
+	return append(make([]byte, 0, len(key)), key...)
 }
 
 func ParseKey(key []byte) ([]byte, uint64, bool) {

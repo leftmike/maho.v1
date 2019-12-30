@@ -24,35 +24,31 @@ func testKey(t *testing.T, prevKey []byte, row []sql.Value, colKeys []engine.Col
 
 	t.Helper()
 
-	sqlKey := kvrows.MakeSQLKey(row, colKeys)
-	k := kvrows.Key{
-		SQLKey:  sqlKey,
-		Version: ver,
-	}
-	ck := k.Copy()
-	if !testutil.DeepEqual(k, ck) {
-		t.Errorf("Copy() got %v want %v", ck, k)
+	key := kvrows.MakeSQLKey(row, colKeys)
+	ck := kvrows.CopyKey(key)
+	if !bytes.Equal(key, ck) {
+		t.Errorf("CopyKey() got %v want %v", ck, key)
 	}
 
-	key := k.Encode()
-	if bytes.Compare(prevKey, key) >= 0 {
-		t.Errorf("MakeKey(%v, %v) keys not ordered correctly; %v and %v",
-			row, colKeys, prevKey, key)
+	kbuf := kvrows.MakeKeyVersion(key, ver)
+	if bytes.Compare(prevKey, kbuf) >= 0 {
+		t.Errorf("MakeKeyVersion(%v, %v) keys not ordered correctly; %v and %v",
+			row, colKeys, prevKey, kbuf)
 	}
 
-	kval, retVer, ok := kvrows.ParseKey(key)
+	k, kv, ok := kvrows.ParseKey(kbuf)
 	if !ok {
-		t.Errorf("ParseKey(%v) failed", key)
+		t.Errorf("ParseKey(%v) failed", kbuf)
 	} else {
-		if retVer != ver {
-			t.Errorf("ParseKey(%v) got %d for version; want %d", key, retVer, ver)
+		if kv != ver {
+			t.Errorf("ParseKey(%v) got %d for version; want %d", kbuf, kv, ver)
 		}
-		if bytes.Compare(sqlKey, kval) != 0 {
-			t.Errorf("ParseKey(%v) got %v for sql key; want %v", key, kval, sqlKey)
+		if bytes.Compare(key, k) != 0 {
+			t.Errorf("ParseKey() got %v for key; want %v", k, key)
 		}
 	}
 
-	return key
+	return kbuf
 }
 
 func checkPrefixes(t *testing.T, prefixes [][]byte, i int, key []byte) {

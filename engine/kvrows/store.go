@@ -15,7 +15,7 @@ type ModifyKeyValue func(key []byte, ver uint64, val []byte) ([]byte, error)
 
 type ErrBlockingProposal struct {
 	TID TransactionID
-	Key Key
+	Key []byte
 }
 
 func (err *ErrBlockingProposal) Error() string {

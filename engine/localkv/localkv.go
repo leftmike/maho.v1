@@ -140,11 +140,7 @@ func (lkv localKV) WriteValue(ctx context.Context, mid uint64, key []byte, ver u
 		}
 	}
 
-	k := kvrows.Key{
-		SQLKey:  key,
-		Version: ver + 1,
-	}
-	err = m.Set(k.Encode(), val)
+	err = m.Set(kvrows.MakeKeyVersion(key, ver+1), val)
 	if err != nil {
 		return err
 	}
@@ -239,7 +235,7 @@ func (lkv localKV) ScanMap(ctx context.Context, getState kvrows.GetTxState,
 							} else if st != kvrows.AbortedState {
 								return &kvrows.ErrBlockingProposal{
 									TID: proTID,
-									Key: kvrows.Key{SQLKey: k}, // XXX: fix; also need to copy k
+									Key: kvrows.CopyKey(k),
 								}
 							}
 						}
@@ -247,7 +243,7 @@ func (lkv localKV) ScanMap(ctx context.Context, getState kvrows.GetTxState,
 						return nil
 					})
 				if err != nil {
-					return k, err // XXX: need to copy k
+					return kvrows.CopyKey(k), err
 				}
 				if found {
 					break
@@ -296,13 +292,13 @@ func (lkv localKV) ScanMap(ctx context.Context, getState kvrows.GetTxState,
 		}
 	}
 
-	return k, nil // XXX: need to copy k
+	return kvrows.CopyKey(k), nil
 }
 
 func appendProposal(tid kvrows.TransactionID, sid uint64, insertKey, val []byte,
 	proposals []kvrows.Proposal, m Mapper) error {
 
-	return m.Set(kvrows.Key{insertKey, kvrows.ProposalVersion}.Encode(),
+	return m.Set(kvrows.MakeKeyVersion(insertKey, kvrows.ProposalVersion),
 		kvrows.MakeProposalValue(tid, append(proposals, kvrows.Proposal{sid, val})))
 }
 
@@ -360,7 +356,7 @@ func modifyMap(getState kvrows.GetTxState, tid kvrows.TransactionID, sid uint64,
 						// first, make the previous, committed, proposal durable.
 
 						v := proposals[len(proposals)-1].Value
-						err := m.Set(kvrows.Key{key, curVer}.Encode(), v)
+						err := m.Set(kvrows.MakeKeyVersion(key, curVer), v)
 						if err != nil {
 							return err
 						}
@@ -374,7 +370,7 @@ func modifyMap(getState kvrows.GetTxState, tid kvrows.TransactionID, sid uint64,
 					} else if st != kvrows.AbortedState {
 						return &kvrows.ErrBlockingProposal{
 							TID: proTID,
-							Key: kvrows.Key{SQLKey: k}, // XXX: fix; and need to copy k
+							Key: kvrows.CopyKey(k),
 						}
 					}
 				}
@@ -516,7 +512,7 @@ func insertMap(getState kvrows.GetTxState, tid kvrows.TransactionID, sid uint64,
 							// No visible value for the key; go ahead and propose a value, but
 							// first, make the previous, committed, proposal durable.
 
-							err := m.Set(kvrows.Key{insertKey, ver}.Encode(), v)
+							err := m.Set(kvrows.MakeKeyVersion(insertKey, ver), v)
 							if err != nil {
 								return err
 							}
@@ -525,7 +521,7 @@ func insertMap(getState kvrows.GetTxState, tid kvrows.TransactionID, sid uint64,
 					} else if st != kvrows.AbortedState {
 						return &kvrows.ErrBlockingProposal{
 							TID: proTID,
-							Key: kvrows.Key{SQLKey: k}, // XXX: fix; and need to copy k
+							Key: kvrows.CopyKey(k),
 						}
 					}
 				}
@@ -627,7 +623,7 @@ func cleanKey(getState kvrows.GetTxState, kbuf []byte, bad bool, m Mapper, w Wal
 					return err
 				}
 				v := proposals[len(proposals)-1].Value
-				return m.Set(kvrows.Key{k, ver}.Encode(), v)
+				return m.Set(kvrows.MakeKeyVersion(k, ver), v)
 			} else if st == kvrows.AbortedState {
 				return w.Delete()
 			}

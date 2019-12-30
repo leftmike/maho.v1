@@ -281,7 +281,8 @@ func testReadWriteList(t *testing.T, st kvrows.Store) {
 }
 
 type keyValue struct {
-	key     kvrows.Key
+	key     []byte
+	ver     uint64
 	val     []byte
 	scanVal []byte // If the key is a proposal.
 	visible bool
@@ -303,7 +304,7 @@ func initializeMap(t *testing.T, st localkv.Store, mid uint64, keyVals []keyValu
 
 	var prevKey []byte
 	for _, kv := range keyVals {
-		k := kv.key.Encode()
+		k := kvrows.MakeKeyVersion(kv.key, kv.ver)
 		if bytes.Compare(prevKey, k) >= 0 {
 			t.Fatalf("initializeMap: keys out of order: %v %v", prevKey, k)
 		}
@@ -347,11 +348,11 @@ func checkScanMap(t *testing.T, keyVals []keyValue, idx int, kv *keyValues) int 
 			idx += 1
 		}
 
-		if keyVals[idx].key.Version == kvrows.ProposalVersion {
+		if keyVals[idx].ver == kvrows.ProposalVersion {
 			// XXX: fix this
-			if (kv.keys[jdx].Version != committedVersion &&
-				kv.keys[jdx].Version != kvrows.ProposalVersion) ||
-				!testutil.DeepEqual(kv.keys[jdx].SQLKey, keyVals[idx].key.SQLKey) {
+			if (kv.vers[jdx] != committedVersion &&
+				kv.vers[jdx] != kvrows.ProposalVersion) ||
+				!testutil.DeepEqual(kv.keys[jdx], keyVals[idx].key) {
 
 				t.Errorf("ScanMap: got %v key; wanted %v", kv.keys[jdx], keyVals[idx].key)
 			}
@@ -396,13 +397,15 @@ func getActiveState(tid kvrows.TransactionID) (kvrows.TransactionState, uint64) 
 }
 
 type keyValues struct {
-	keys []kvrows.Key
+	keys [][]byte
+	vers []uint64
 	vals [][]byte
 	num  int
 }
 
 func (kv *keyValues) scanKeyValue(key []byte, ver uint64, val []byte) (bool, error) {
-	kv.keys = append(kv.keys, kvrows.Key{append(make([]byte, 0, len(key)), key...), ver})
+	kv.keys = append(kv.keys, append(make([]byte, 0, len(key)), key...))
+	kv.vers = append(kv.vers, ver)
 	kv.vals = append(kv.vals, append(make([]byte, 0, len(val)), val...))
 	return len(kv.keys) >= kv.num, nil
 }
@@ -418,41 +421,50 @@ func testScanMap(t *testing.T, st localkv.Store) {
 	}
 	keyVals := []keyValue{
 		{
-			key:     kvrows.Key{[]byte("bbbb"), 50},
+			key:     []byte("bbbb"),
+			ver:     50,
 			val:     kvrows.MakeRowValue([]sql.Value{sql.StringValue("bbbb@50")}),
 			visible: true,
 		},
 		{
-			key: kvrows.Key{[]byte("bbbb"), 49},
+			key: []byte("bbbb"),
+			ver: 49,
 			val: kvrows.MakeRowValue([]sql.Value{sql.StringValue("bbbb@49")}),
 		},
 		{
-			key: kvrows.Key{[]byte("bbbb"), 48},
+			key: []byte("bbbb"),
+			ver: 48,
 			val: kvrows.MakeTombstoneValue(),
 		},
 		{
-			key: kvrows.Key{[]byte("bbbb"), 47},
+			key: []byte("bbbb"),
+			ver: 47,
 			val: kvrows.MakeRowValue([]sql.Value{sql.StringValue("bbbb@47")}),
 		},
 		{
-			key:     kvrows.Key{[]byte("dddd"), 100},
+			key:     []byte("dddd"),
+			ver:     100,
 			val:     kvrows.MakeRowValue([]sql.Value{sql.StringValue("dddd@100")}),
 			visible: true,
 		},
 		{
-			key: kvrows.Key{[]byte("eeee"), 10},
+			key: []byte("eeee"),
+			ver: 10,
 			val: kvrows.MakeTombstoneValue(),
 		},
 		{
-			key: kvrows.Key{[]byte("eeee"), 9},
+			key: []byte("eeee"),
+			ver: 9,
 			val: kvrows.MakeRowValue([]sql.Value{sql.StringValue("eeee@9")}),
 		},
 		{
-			key: kvrows.Key{[]byte("eeee"), 8},
+			key: []byte("eeee"),
+			ver: 8,
 			val: kvrows.MakeRowValue([]sql.Value{sql.StringValue("eeee@8")}),
 		},
 		{
-			key:     kvrows.Key{[]byte("ffff"), kvrows.ProposalVersion},
+			key:     []byte("ffff"),
+			ver:     kvrows.ProposalVersion,
 			visible: true,
 			val: kvrows.MakeProposalValue(tid,
 				[]kvrows.Proposal{
@@ -463,17 +475,20 @@ func testScanMap(t *testing.T, st localkv.Store) {
 			scanVal: []byte("proposal value ffff@12"),
 		},
 		{
-			key: kvrows.Key{[]byte("ffff"), 8},
+			key: []byte("ffff"),
+			ver: 8,
 			val: kvrows.MakeRowValue([]sql.Value{sql.StringValue("ffff@8")}),
 		},
 		{
-			key:     kvrows.Key{[]byte("gggg"), 858},
+			key:     []byte("gggg"),
+			ver:     858,
 			val:     kvrows.MakeRowValue([]sql.Value{sql.StringValue("gggg@858")}),
 			visible: true,
 		},
 
 		{
-			key: kvrows.Key{[]byte("hhhh"), kvrows.ProposalVersion},
+			key: []byte("hhhh"),
+			ver: kvrows.ProposalVersion,
 			val: kvrows.MakeProposalValue(tid,
 				[]kvrows.Proposal{
 					{119, kvrows.MakeRowValue([]sql.Value{sql.StringValue("hhhh@119")})},
@@ -481,15 +496,18 @@ func testScanMap(t *testing.T, st localkv.Store) {
 				}),
 		},
 		{
-			key: kvrows.Key{[]byte("hhhh"), 1234567},
+			key: []byte("hhhh"),
+			ver: 1234567,
 			val: kvrows.MakeTombstoneValue(),
 		},
 		{
-			key: kvrows.Key{[]byte("hhhh"), 123456},
+			key: []byte("hhhh"),
+			ver: 123456,
 			val: kvrows.MakeRowValue([]sql.Value{sql.StringValue("hhhh@123456")}),
 		},
 		{
-			key:     kvrows.Key{[]byte("iiii"), 8},
+			key:     []byte("iiii"),
+			ver:     8,
 			val:     kvrows.MakeRowValue([]sql.Value{sql.StringValue("iiii@8")}),
 			visible: true,
 		},
@@ -535,12 +553,14 @@ func testScanMap(t *testing.T, st localkv.Store) {
 	}
 	keyVals2 := []keyValue{
 		{
-			key:     kvrows.Key{[]byte("bbbb"), 50},
+			key:     []byte("bbbb"),
+			ver:     50,
 			val:     kvrows.MakeRowValue([]sql.Value{sql.StringValue("bbbb@50")}),
 			visible: true,
 		},
 		{
-			key: kvrows.Key{[]byte("cccc"), kvrows.ProposalVersion},
+			key: []byte("cccc"),
+			ver: kvrows.ProposalVersion,
 			val: kvrows.MakeProposalValue(tid2,
 				[]kvrows.Proposal{
 					{SID: 12, Value: []byte("proposal value cccc@12")},
@@ -549,12 +569,14 @@ func testScanMap(t *testing.T, st localkv.Store) {
 			visible: true,
 		},
 		{
-			key:     kvrows.Key{[]byte("dddd"), 50},
+			key:     []byte("dddd"),
+			ver:     50,
 			val:     kvrows.MakeRowValue([]sql.Value{sql.StringValue("dddd@50")}),
 			visible: true,
 		},
 		{
-			key: kvrows.Key{[]byte("eeee"), kvrows.ProposalVersion},
+			key: []byte("eeee"),
+			ver: kvrows.ProposalVersion,
 			val: kvrows.MakeProposalValue(tid2,
 				[]kvrows.Proposal{
 					{12, []byte("proposal value eeee@12")},
@@ -562,7 +584,8 @@ func testScanMap(t *testing.T, st localkv.Store) {
 				}),
 		},
 		{
-			key:     kvrows.Key{[]byte("ffff"), 50},
+			key:     []byte("ffff"),
+			ver:     50,
 			val:     kvrows.MakeRowValue([]sql.Value{sql.StringValue("ffff@50")}),
 			visible: true,
 		},
@@ -628,8 +651,8 @@ func checkMap(t *testing.T, ctx context.Context, st kvrows.Store, getState kvrow
 		t.Errorf("ScanMap: got %d keys; want %d", len(kv.keys), len(wantKeys))
 	}
 	for i := range kv.keys {
-		if !bytes.Equal(kv.keys[i].SQLKey, wantKeys[i]) {
-			t.Errorf("ScanMap: got %v key at %d; want %v", kv.keys[i].SQLKey, i, wantKeys[i])
+		if !bytes.Equal(kv.keys[i], wantKeys[i]) {
+			t.Errorf("ScanMap: got %v key at %d; want %v", kv.keys[i], i, wantKeys[i])
 		}
 	}
 	if !testutil.DeepEqual(kv.vals, wantVals) {
