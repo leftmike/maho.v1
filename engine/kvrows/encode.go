@@ -299,15 +299,12 @@ func (k Key) Copy() Key {
 	}
 }
 
-func ParseKey(key []byte) (Key, bool) {
+func ParseKey(key []byte) ([]byte, uint64, bool) {
 	if len(key) < 8 {
-		return Key{}, false
+		return nil, 0, false
 	}
 
-	return Key{
-		SQLKey:  key[:len(key)-8],
-		Version: decodeUint64(key[len(key)-8:], true),
-	}, true
+	return key[:len(key)-8], decodeUint64(key[len(key)-8:], true), true
 }
 
 func EncodeVarint(buf []byte, n uint64) []byte {

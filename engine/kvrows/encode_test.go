@@ -40,15 +40,15 @@ func testKey(t *testing.T, prevKey []byte, row []sql.Value, colKeys []engine.Col
 			row, colKeys, prevKey, key)
 	}
 
-	k, ok := kvrows.ParseKey(key)
+	kval, retVer, ok := kvrows.ParseKey(key)
 	if !ok {
 		t.Errorf("ParseKey(%v) failed", key)
 	} else {
-		if k.Version != ver {
-			t.Errorf("ParseKey(%v) got %d for version; want %d", key, k.Version, ver)
+		if retVer != ver {
+			t.Errorf("ParseKey(%v) got %d for version; want %d", key, retVer, ver)
 		}
-		if bytes.Compare(sqlKey, k.SQLKey) != 0 {
-			t.Errorf("ParseKey(%v) got %v for sql key; want %v", key, k.SQLKey, sqlKey)
+		if bytes.Compare(sqlKey, kval) != 0 {
+			t.Errorf("ParseKey(%v) got %v for sql key; want %v", key, kval, sqlKey)
 		}
 	}
 

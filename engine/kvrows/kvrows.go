@@ -1,7 +1,6 @@
 package kvrows
 
 /*
-- change ParseKey to return []byte, ver, ok
 - get rid of kvrows.Key
 */
 
