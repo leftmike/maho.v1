@@ -18,9 +18,7 @@ func NewStore(st Store) kvrows.Store {
 	}
 }
 
-func (lkv localKV) ReadValue(ctx context.Context, mid uint64, key kvrows.Key) (uint64, []byte,
-	error) {
-
+func (lkv localKV) ReadValue(ctx context.Context, mid uint64, key []byte) (uint64, []byte, error) {
 	tx, err := lkv.st.Begin(false)
 	if err != nil {
 		return 0, nil, err
@@ -32,7 +30,7 @@ func (lkv localKV) ReadValue(ctx context.Context, mid uint64, key kvrows.Key) (u
 		return 0, nil, err
 	}
 
-	w := m.Walk(key.SQLKey)
+	w := m.Walk(key)
 	defer w.Close()
 
 	kbuf, ok := w.Rewind()
@@ -58,16 +56,18 @@ func (lkv localKV) ReadValue(ctx context.Context, mid uint64, key kvrows.Key) (u
 	return k.Version, retval, nil
 }
 
-func (lkv localKV) ListValues(ctx context.Context, mid uint64) ([]kvrows.Key, [][]byte, error) {
+func (lkv localKV) ListValues(ctx context.Context, mid uint64,
+	listKeyValue kvrows.ListKeyValue) error {
+
 	tx, err := lkv.st.Begin(false)
 	if err != nil {
-		return nil, nil, err
+		return err
 	}
 	defer tx.Rollback()
 
 	m, err := tx.Map(mid)
 	if err != nil {
-		return nil, nil, err
+		return err
 	}
 
 	w := m.Walk(nil)
@@ -75,32 +75,34 @@ func (lkv localKV) ListValues(ctx context.Context, mid uint64) ([]kvrows.Key, []
 
 	kbuf, ok := w.Rewind()
 
-	var keys []kvrows.Key
-	var vals [][]byte
 	for ok {
 		var k kvrows.Key
 		k, ok = kvrows.ParseKey(kbuf)
 		if !ok {
-			return nil, nil, fmt.Errorf("localkv: unable to parse key %v", kbuf)
+			return fmt.Errorf("localkv: unable to parse key %v", kbuf)
 		}
-		keys = append(keys, k)
 
+		var done bool
 		err = w.Value(
 			func(val []byte) error {
-				vals = append(vals, append(make([]byte, 0, len(val)), val...))
-				return nil
+				var err error
+				done, err = listKeyValue(k.SQLKey, k.Version, val)
+				return err
 			})
 		if err != nil {
-			return nil, nil, err
+			return err
+		}
+		if done {
+			break
 		}
 
 		kbuf, ok = w.Next()
 	}
 
-	return keys, vals, nil
+	return nil
 }
 
-func (lkv localKV) WriteValue(ctx context.Context, mid uint64, key kvrows.Key, ver uint64,
+func (lkv localKV) WriteValue(ctx context.Context, mid uint64, key []byte, ver uint64,
 	val []byte) error {
 
 	tx, err := lkv.st.Begin(true)
@@ -114,12 +116,12 @@ func (lkv localKV) WriteValue(ctx context.Context, mid uint64, key kvrows.Key, v
 		return err
 	}
 
-	w := m.Walk(key.SQLKey)
+	w := m.Walk(key)
 	defer w.Close()
 
 	buf, ok := w.Rewind()
 	if !ok {
-		if key.Version > 0 {
+		if ver > 0 {
 			return kvrows.ErrKeyNotFound
 		}
 	} else {
@@ -127,7 +129,7 @@ func (lkv localKV) WriteValue(ctx context.Context, mid uint64, key kvrows.Key, v
 		if !ok {
 			return fmt.Errorf("localkv: unable to parse key %v", buf)
 		}
-		if k.Version != key.Version || ver <= k.Version {
+		if k.Version != ver {
 			return kvrows.ErrValueVersionMismatch
 		}
 
@@ -138,8 +140,8 @@ func (lkv localKV) WriteValue(ctx context.Context, mid uint64, key kvrows.Key, v
 	}
 
 	k := kvrows.Key{
-		SQLKey:  key.SQLKey,
-		Version: ver,
+		SQLKey:  key,
+		Version: ver + 1,
 	}
 	err = m.Set(k.Encode(), val)
 	if err != nil {
@@ -172,13 +174,25 @@ func (lkv localKV) ScanMap(ctx context.Context, getState kvrows.GetTxState,
 	var ok bool
 	if seek == nil {
 		kbuf, ok = w.Rewind()
+		if !ok {
+			return nil, nil
+		}
+
+		// Skip over the metadata keys at the beginning of the map.
+		for kbuf[0] == 0 {
+			kbuf, ok = w.Next()
+			if !ok {
+				return nil, nil
+			}
+		}
 	} else {
 		kbuf, ok = w.Seek(seek)
+		if !ok {
+			return nil, nil
+		}
 	}
-	if !ok {
-		return nil, nil
-	}
-	k, ok := kvrows.ParseKey(kbuf) // XXX: change ParseKey to return []byte, ver, ok
+
+	k, ok := kvrows.ParseKey(kbuf)
 	if !ok {
 		return nil, fmt.Errorf("localkv: unable to parse key %v", kbuf)
 	}
@@ -327,7 +341,6 @@ func modifyMap(getState kvrows.GetTxState, tid kvrows.TransactionID, sid uint64,
 					}
 
 					// Go ahead and propose a modification to the key.
-
 					found = true
 					newVal, err := modifyKeyValue(key, ver, proposals[len(proposals)-1].Value)
 					if err != nil {
@@ -664,6 +677,11 @@ func cleanMap(getState kvrows.GetTxState, bad bool, m Mapper) error {
 	}
 
 	for {
+		if kbuf[0] == 0 {
+			// Metadata keys don't need to be cleaned.
+			continue
+		}
+
 		err := cleanKey(getState, kbuf, bad, m, w)
 		if err != nil {
 			return err

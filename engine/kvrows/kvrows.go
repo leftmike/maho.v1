@@ -1,7 +1,8 @@
 package kvrows
 
 /*
-- use 0x00 <key> to be for metadata about a table; localkv needs to skip those keys on scans
+- change ParseKey to return []byte, ver, ok
+- get rid of kvrows.Key
 */
 
 import (
@@ -38,9 +39,7 @@ var (
 	ErrValueVersionMismatch = errors.New("kvrows: value version mismatch")
 
 	metadataPrimary = []engine.ColumnKey{engine.MakeColumnKey(0, false)}
-	metadataKey     = Key{
-		SQLKey: MakeSQLKey([]sql.Value{sql.StringValue("metadata")}, metadataPrimary),
-	}
+	metadataKey     = MakeSQLKey([]sql.Value{sql.StringValue("metadata")}, metadataPrimary)
 
 	databasesPrimary = []engine.ColumnKey{engine.MakeColumnKey(0, false)}
 
@@ -109,35 +108,33 @@ type transaction struct {
 	hasWritten bool
 }
 
-func (kv *KVRows) readGob(ctx context.Context, mid uint64, key Key, value interface{}) (Key,
+func (kv *KVRows) readGob(ctx context.Context, mid uint64, key []byte, value interface{}) (uint64,
 	error) {
 
 	ver, val, err := kv.st.ReadValue(ctx, mid, key)
-	if err == ErrKeyNotFound {
-		key.Version = 0
-		return key, err
-	} else if err != nil {
-		return Key{}, err
+	if err != nil {
+		return 0, err
 	}
-	key.Version = ver
 
 	dec := gob.NewDecoder(bytes.NewBuffer(val))
-	return key, dec.Decode(value)
+	return ver, dec.Decode(value)
 }
 
-func (kv *KVRows) writeGob(ctx context.Context, mid uint64, key Key, value interface{}) error {
+func (kv *KVRows) writeGob(ctx context.Context, mid uint64, key []byte, ver uint64,
+	value interface{}) error {
+
 	var buf bytes.Buffer
 	enc := gob.NewEncoder(&buf)
 	err := enc.Encode(value)
 	if err != nil {
 		return err
 	}
-	return kv.st.WriteValue(ctx, mid, key, key.Version+1, buf.Bytes())
+	return kv.st.WriteValue(ctx, mid, key, ver, buf.Bytes())
 }
 
 func (kv *KVRows) loadMetadata(ctx context.Context) error {
 	var md storeMetadata
-	key, err := kv.readGob(ctx, configMID, metadataKey, &md)
+	ver, err := kv.readGob(ctx, configMID, metadataKey, &md)
 	if err != nil && err != ErrKeyNotFound {
 		return err
 	}
@@ -146,37 +143,32 @@ func (kv *KVRows) loadMetadata(ctx context.Context) error {
 	md.Epoch += 1
 	kv.epoch = md.Epoch
 	kv.version = md.Version
-	return kv.writeGob(ctx, configMID, key, &md)
+	return kv.writeGob(ctx, configMID, metadataKey, ver, &md)
 }
 
 func (kv *KVRows) loadDatabases(ctx context.Context) error {
-	keys, vals, err := kv.st.ListValues(ctx, databasesMID)
-	if err != nil {
-		return err
-	}
+	return kv.st.ListValues(ctx, databasesMID,
+		func(key []byte, ver uint64, val []byte) (bool, error) {
+			sqlKey := []sql.Value{nil}
+			ok := ParseSQLKey(key, databasesPrimary, sqlKey)
+			if !ok {
+				return false, fmt.Errorf("kvrows: databases: corrupt primary key: %v", key)
+			}
+			s, ok := sqlKey[0].(sql.StringValue)
+			if !ok {
+				return false, fmt.Errorf("kvrows: databases: expected string key: %s", sqlKey[0])
+			}
 
-	for idx := range keys {
-		sqlKey := []sql.Value{nil}
-		ok := ParseSQLKey(keys[idx].SQLKey, databasesPrimary, sqlKey)
-		if !ok {
-			return fmt.Errorf("kvrows: databases: corrupt primary key: %v", keys[idx].SQLKey)
-		}
-		s, ok := sqlKey[0].(sql.StringValue)
-		if !ok {
-			return fmt.Errorf("kvrows: databases: expected string key: %s", sqlKey[0])
-		}
+			var md databaseMetadata
+			dec := gob.NewDecoder(bytes.NewBuffer(val))
+			err := dec.Decode(&md)
+			if err != nil {
+				return false, err
+			}
 
-		var md databaseMetadata
-		dec := gob.NewDecoder(bytes.NewBuffer(vals[idx]))
-		err = dec.Decode(&md)
-		if err != nil {
-			return err
-		}
-
-		kv.databases[sql.ID(string(s))] = md
-	}
-
-	return nil
+			kv.databases[sql.ID(string(s))] = md
+			return false, nil
+		})
 }
 
 func (kv *KVRows) loadTransactions(ctx context.Context) error {
@@ -222,17 +214,15 @@ func makeDatabaseKey(dbname sql.Identifier) []byte {
 }
 
 func (kv *KVRows) updateDatabase(ctx context.Context, dbname sql.Identifier, active bool) error {
-	key := Key{
-		SQLKey: makeDatabaseKey(dbname),
-	}
+	key := makeDatabaseKey(dbname)
 	var md databaseMetadata
-	key, err := kv.readGob(ctx, databasesMID, key, &md)
+	ver, err := kv.readGob(ctx, databasesMID, key, &md)
 	if err != nil && err != ErrKeyNotFound {
 		return err
 	}
 
 	md.Active = active
-	err = kv.writeGob(ctx, databasesMID, key, &md)
+	err = kv.writeGob(ctx, databasesMID, key, ver, &md)
 	if err != nil {
 		return err
 	}
@@ -582,11 +572,9 @@ func (kv *KVRows) forRead(etx engine.Transaction) (*transaction, error) {
 	return tx, nil
 }
 
-func (tx *transaction) makeKey() Key {
-	return Key{
-		SQLKey: MakeSQLKey([]sql.Value{sql.Int64Value(tx.tid.Node), sql.Int64Value(tx.tid.Epoch),
-			sql.Int64Value(tx.tid.LocalID)}, transactionsPrimary),
-	}
+func (tx *transaction) makeKey() []byte {
+	return MakeSQLKey([]sql.Value{sql.Int64Value(tx.tid.Node), sql.Int64Value(tx.tid.Epoch),
+		sql.Int64Value(tx.tid.LocalID)}, transactionsPrimary)
 }
 
 func (kv *KVRows) forWrite(ctx context.Context, etx engine.Transaction) (*transaction, error) {
@@ -604,7 +592,7 @@ func (kv *KVRows) forWrite(ctx context.Context, etx engine.Transaction) (*transa
 		State: ActiveState,
 		TID:   tx.tid,
 	}
-	err := kv.writeGob(ctx, transactionsMID, tx.makeKey(), &md)
+	err := kv.writeGob(ctx, transactionsMID, tx.makeKey(), 0, &md)
 	if err != nil {
 		tx.state = AbortedState
 		return nil, err
@@ -628,7 +616,8 @@ func (kv *KVRows) finalizeTransaction(ctx context.Context, tx *transaction,
 	}
 
 	var md transactionMetadata
-	key, err := kv.readGob(ctx, transactionsMID, tx.makeKey(), &md)
+	key := tx.makeKey()
+	ver, err := kv.readGob(ctx, transactionsMID, key, &md)
 	if err != nil {
 		return err
 	}
@@ -647,7 +636,7 @@ func (kv *KVRows) finalizeTransaction(ctx context.Context, tx *transaction,
 	}
 
 	md.State = ts
-	err = kv.writeGob(ctx, transactionsMID, key, &md)
+	err = kv.writeGob(ctx, transactionsMID, key, ver, &md)
 	if err != nil {
 		tx.state = AbortedState
 		return err

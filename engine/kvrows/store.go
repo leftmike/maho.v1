@@ -7,6 +7,8 @@ import (
 
 type GetTxState func(tid TransactionID) (TransactionState, uint64)
 
+type ListKeyValue func(key []byte, ver uint64, val []byte) (bool, error)
+
 type ScanKeyValue func(key []byte, ver uint64, val []byte) (bool, error)
 
 type ModifyKeyValue func(key []byte, ver uint64, val []byte) ([]byte, error)
@@ -22,15 +24,14 @@ func (err *ErrBlockingProposal) Error() string {
 
 type Store interface {
 	// ReadValue will return the most recent version and value of key in mid.
-	ReadValue(ctx context.Context, mid uint64, key Key) (uint64, []byte, error)
+	ReadValue(ctx context.Context, mid uint64, key []byte) (uint64, []byte, error)
 
-	// ListValues will return all of the keys and values in mid.
-	ListValues(ctx context.Context, mid uint64) ([]Key, [][]byte, error)
+	// ListValues will call listKeyValue for all of the keys and values in mid.
+	ListValues(ctx context.Context, mid uint64, listKeyValue ListKeyValue) error
 
 	// WriteValue will atomically check that the most recent version of key in mid is
-	// key.Version; if it is, the value will be updated to val and the version to ver, which
-	// must be greater than key.Version.
-	WriteValue(ctx context.Context, mid uint64, key Key, ver uint64, val []byte) error
+	// ver; if it is, the value will be updated to val and the version to ver+1.
+	WriteValue(ctx context.Context, mid uint64, key []byte, ver uint64, val []byte) error
 
 	// CleanKeys makes proposals by committed transactions durable and deletes proposals by
 	// aborted transactions; it only does this for the keys specified.

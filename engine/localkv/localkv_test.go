@@ -22,9 +22,10 @@ const (
 
 type cmd struct {
 	cmd  int
-	key  kvrows.Key
+	key  []byte
 	val  []byte
-	keys []kvrows.Key
+	keys [][]byte
+	vers []uint64
 	vals [][]byte
 	ver  uint64
 	fail bool
@@ -56,7 +57,16 @@ func runCmds(t *testing.T, st kvrows.Store, mid uint64, cmds []cmd) {
 				}
 			}
 		case cmdListValues:
-			keys, vals, err := st.ListValues(ctx, mid)
+			var keys [][]byte
+			var vers []uint64
+			var vals [][]byte
+			err := st.ListValues(ctx, mid,
+				func(key []byte, ver uint64, val []byte) (bool, error) {
+					keys = append(keys, key)
+					vers = append(vers, ver)
+					vals = append(vals, val)
+					return false, nil
+				})
 			if err != nil {
 				if !cmd.fail {
 					t.Errorf("ListValues(%d) failed with %s", i, err)
@@ -67,6 +77,9 @@ func runCmds(t *testing.T, st kvrows.Store, mid uint64, cmds []cmd) {
 				} else {
 					if !testutil.DeepEqual(keys, cmd.keys) {
 						t.Errorf("ListValues(%d) got %v for keys; want %v", i, keys, cmd.keys)
+					}
+					if !testutil.DeepEqual(vers, cmd.vers) {
+						t.Errorf("ListValues(%d) got %v for vers; want %v", i, vers, cmd.vers)
 					}
 					if !testutil.DeepEqual(vals, cmd.vals) {
 						t.Errorf("ListValues(%d) got %v for vales; want %v", i, vals, cmd.vals)
@@ -94,7 +107,7 @@ func testReadWriteList(t *testing.T, st kvrows.Store) {
 	runCmds(t, st, 1, []cmd{
 		{
 			cmd:  cmdReadValue,
-			key:  kvrows.Key{SQLKey: []byte("abcd0")},
+			key:  []byte("abcd0"),
 			fail: true,
 		},
 		{
@@ -102,20 +115,22 @@ func testReadWriteList(t *testing.T, st kvrows.Store) {
 		},
 		{
 			cmd: cmdWriteValue,
-			key: kvrows.Key{SQLKey: []byte("abcd0")},
-			ver: 1,
+			key: []byte("abcd0"),
 			val: []byte("1234567890"),
 		},
 		{
 			cmd: cmdReadValue,
-			key: kvrows.Key{SQLKey: []byte("abcd0")},
+			key: []byte("abcd0"),
 			ver: 1,
 			val: []byte("1234567890"),
 		},
 		{
 			cmd: cmdListValues,
-			keys: []kvrows.Key{
-				{SQLKey: []byte("abcd0"), Version: 1},
+			keys: [][]byte{
+				[]byte("abcd0"),
+			},
+			vers: []uint64{
+				1,
 			},
 			vals: [][]byte{
 				[]byte("1234567890"),
@@ -123,53 +138,56 @@ func testReadWriteList(t *testing.T, st kvrows.Store) {
 		},
 		{
 			cmd:  cmdWriteValue,
-			key:  kvrows.Key{SQLKey: []byte("abcd0")},
-			ver:  2,
+			key:  []byte("abcd0"),
+			ver:  0,
 			val:  []byte("0987654321"),
 			fail: true,
 		},
 		{
 			cmd:  cmdWriteValue,
-			key:  kvrows.Key{SQLKey: []byte("xxxyyyzzz"), Version: 10},
-			ver:  11,
+			key:  []byte("xxxyyyzzz"),
+			ver:  10,
 			val:  []byte("0987654321"),
 			fail: true,
 		},
 		{
 			cmd: cmdWriteValue,
-			key: kvrows.Key{SQLKey: []byte("abcd0"), Version: 1},
-			ver: 2,
+			key: []byte("abcd0"),
+			ver: 1,
 			val: []byte("0987654321"),
 		},
 		{
 			cmd: cmdReadValue,
-			key: kvrows.Key{SQLKey: []byte("abcd0")},
+			key: []byte("abcd0"),
 			ver: 2,
 			val: []byte("0987654321"),
 		},
 		{
 			cmd: cmdWriteValue,
-			key: kvrows.Key{SQLKey: []byte("abcd0"), Version: 2},
-			ver: 10,
+			key: []byte("abcd0"),
+			ver: 2,
 			val: []byte("1234567890987654321"),
 		},
 		{
 			cmd:  cmdWriteValue,
-			key:  kvrows.Key{SQLKey: []byte("abcd0"), Version: 10},
+			key:  []byte("abcd0"),
 			ver:  5,
 			val:  []byte("0000000000"),
 			fail: true,
 		},
 		{
 			cmd: cmdReadValue,
-			key: kvrows.Key{SQLKey: []byte("abcd0")},
-			ver: 10,
+			key: []byte("abcd0"),
+			ver: 3,
 			val: []byte("1234567890987654321"),
 		},
 		{
 			cmd: cmdListValues,
-			keys: []kvrows.Key{
-				{SQLKey: []byte("abcd0"), Version: 10},
+			keys: [][]byte{
+				[]byte("abcd0"),
+			},
+			vers: []uint64{
+				3,
 			},
 			vals: [][]byte{
 				[]byte("1234567890987654321"),
@@ -177,36 +195,79 @@ func testReadWriteList(t *testing.T, st kvrows.Store) {
 		},
 		{
 			cmd: cmdWriteValue,
-			key: kvrows.Key{SQLKey: []byte("abcd1")},
-			ver: 1,
+			key: []byte("abcd1"),
+			ver: 0,
 			val: []byte("one"),
 		},
 		{
 			cmd: cmdWriteValue,
-			key: kvrows.Key{SQLKey: []byte("abcd2")},
-			ver: 2,
+			key: []byte("abcd2"),
+			ver: 0,
+			val: []byte("two #1"),
+		},
+		{
+			cmd: cmdWriteValue,
+			key: []byte("abcd2"),
+			ver: 1,
 			val: []byte("two"),
 		},
 		{
 			cmd: cmdWriteValue,
-			key: kvrows.Key{SQLKey: []byte("abcd3")},
-			ver: 3,
+			key: []byte("abcd3"),
+			ver: 0,
+			val: []byte("three #1"),
+		},
+		{
+			cmd: cmdWriteValue,
+			key: []byte("abcd3"),
+			ver: 1,
+			val: []byte("three #2"),
+		},
+		{
+			cmd: cmdWriteValue,
+			key: []byte("abcd3"),
+			ver: 2,
 			val: []byte("three"),
 		},
 		{
 			cmd: cmdWriteValue,
-			key: kvrows.Key{SQLKey: []byte("abcd4")},
-			ver: 4,
+			key: []byte("abcd4"),
+			ver: 0,
+			val: []byte("four #1"),
+		},
+		{
+			cmd: cmdWriteValue,
+			key: []byte("abcd4"),
+			ver: 1,
+			val: []byte("four #2"),
+		},
+		{
+			cmd: cmdWriteValue,
+			key: []byte("abcd4"),
+			ver: 2,
+			val: []byte("four #3"),
+		},
+		{
+			cmd: cmdWriteValue,
+			key: []byte("abcd4"),
+			ver: 3,
 			val: []byte("four"),
 		},
 		{
 			cmd: cmdListValues,
-			keys: []kvrows.Key{
-				{SQLKey: []byte("abcd0"), Version: 10},
-				{SQLKey: []byte("abcd1"), Version: 1},
-				{SQLKey: []byte("abcd2"), Version: 2},
-				{SQLKey: []byte("abcd3"), Version: 3},
-				{SQLKey: []byte("abcd4"), Version: 4},
+			keys: [][]byte{
+				[]byte("abcd0"),
+				[]byte("abcd1"),
+				[]byte("abcd2"),
+				[]byte("abcd3"),
+				[]byte("abcd4"),
+			},
+			vers: []uint64{
+				3,
+				1,
+				2,
+				3,
+				4,
 			},
 			vals: [][]byte{
 				[]byte("1234567890987654321"),
