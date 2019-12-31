@@ -67,6 +67,7 @@ type transactionState struct {
 var (
 	columns     = []sql.Identifier{sql.ID("ID"), sql.ID("intCol"), sql.ID("stringCol")}
 	columnTypes = []sql.ColumnType{int32ColType, int64ColType, stringColType}
+	primary     = []engine.ColumnKey{engine.MakeColumnKey(0, false)}
 )
 
 func allRows(t *testing.T, ctx context.Context, rows engine.Rows) [][]sql.Value {
@@ -232,7 +233,7 @@ func testDatabase(t *testing.T, e engine.Engine, dbname sql.Identifier, cmds []e
 			}
 		case cmdCreateTable:
 			err := e.CreateTable(ctx, state.tx, sql.TableName{dbname, scname, cmd.name},
-				columns, columnTypes, nil, false)
+				columns, columnTypes, primary, false)
 			if cmd.fail {
 				if err == nil {
 					t.Errorf("CreateTable(%s) did not fail", cmd.name)

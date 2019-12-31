@@ -584,8 +584,11 @@ func (kv *KVRows) DropTable(ctx context.Context, etx engine.Transaction, tn sql.
 
 	ttbl := kv.makeTablesTable(tx)
 	rows, err := ttbl.Seek(ctx,
-		[]sql.Value{sql.StringValue(tn.Database.String()), sql.StringValue(tn.Schema.String()),
-			sql.StringValue(tn.Table.String())})
+		[]sql.Value{
+			sql.StringValue(tn.Database.String()),
+			sql.StringValue(tn.Schema.String()),
+			sql.StringValue(tn.Table.String()),
+		})
 	if err != nil {
 		return err
 	}
@@ -762,7 +765,16 @@ func (kv *KVRows) getState(tid TransactionID) (TransactionState, uint64) {
 func (kv *KVRows) ListDatabases(ctx context.Context, tx engine.Transaction) ([]sql.Identifier,
 	error) {
 
-	return nil, notImplemented
+	kv.mutex.RLock()
+	defer kv.mutex.RUnlock()
+
+	var dbnames []sql.Identifier
+	for db, md := range kv.databases {
+		if md.Active {
+			dbnames = append(dbnames, db)
+		}
+	}
+	return dbnames, nil
 }
 
 func (kv *KVRows) ListSchemas(ctx context.Context, etx engine.Transaction,
@@ -774,7 +786,7 @@ func (kv *KVRows) ListSchemas(ctx context.Context, etx engine.Transaction,
 	}
 
 	ttbl := kv.makeSchemasTable(tx)
-	rows, err := ttbl.Rows(ctx)
+	rows, err := ttbl.Seek(ctx, []sql.Value{sql.StringValue(dbname.String()), sql.StringValue("")})
 	if err != nil {
 		return nil, err
 	}
@@ -789,17 +801,47 @@ func (kv *KVRows) ListSchemas(ctx context.Context, etx engine.Transaction,
 			return nil, err
 		}
 		if sr.Database != dbname.String() {
-			continue
+			break
 		}
 		scnames = append(scnames, sql.ID(sr.Schema))
 	}
 	return scnames, nil
 }
 
-func (kv *KVRows) ListTables(ctx context.Context, tx engine.Transaction,
+func (kv *KVRows) ListTables(ctx context.Context, etx engine.Transaction,
 	sn sql.SchemaName) ([]sql.Identifier, error) {
 
-	return nil, notImplemented
+	tx, err := kv.forRead(etx)
+	if err != nil {
+		return nil, err
+	}
+
+	ttbl := kv.makeTablesTable(tx)
+	rows, err := ttbl.Seek(ctx,
+		[]sql.Value{
+			sql.StringValue(sn.Database.String()),
+			sql.StringValue(sn.Schema.String()),
+			sql.StringValue(""),
+		})
+	if err != nil {
+		return nil, err
+	}
+
+	var tblnames []sql.Identifier
+	for {
+		var tr tableRow
+		err = rows.Next(ctx, &tr)
+		if err == io.EOF {
+			break
+		} else if err != nil {
+			return nil, err
+		}
+		if tr.Database != sn.Database.String() || tr.Schema != sn.Schema.String() {
+			break
+		}
+		tblnames = append(tblnames, sql.ID(tr.Table))
+	}
+	return tblnames, nil
 }
 
 func (tx *transaction) Commit(ctx context.Context) error {
