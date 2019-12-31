@@ -23,10 +23,10 @@ func testEngine(t *testing.T, st kvrows.Store) {
 
 	test.RunDatabaseTest(t, &kv, true)
 	test.RunTableTest(t, &kv)
+	test.RunSchemaTest(t, &kv)
 	/*
 		XXX
 		test.RunTableLifecycleTest(t, &kv)
-		test.RunSchemaTest(t, &kv)
 		test.RunTableDataTest(t, &kv)
 		test.RunParallelTest(t, &kv)
 		test.RunStressTest(t, &kv)

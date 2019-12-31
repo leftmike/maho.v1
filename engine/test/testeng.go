@@ -163,6 +163,7 @@ func testDatabase(t *testing.T, e engine.Engine, dbname sql.Identifier, cmds []e
 			} else if err != nil {
 				t.Errorf("CreateSchema(%s) failed with %s", cmd.name, err)
 			}
+			state.tx.NextStmt()
 		case cmdDropSchema:
 			err := e.DropSchema(ctx, state.tx, sql.SchemaName{dbname, cmd.name}, cmd.ifExists)
 			if cmd.fail {
@@ -172,6 +173,7 @@ func testDatabase(t *testing.T, e engine.Engine, dbname sql.Identifier, cmds []e
 			} else if err != nil {
 				t.Errorf("DropSchema(%s) failed with %s", cmd.name, err)
 			}
+			state.tx.NextStmt()
 		case cmdSetSchema:
 			scname = cmd.name
 		case cmdListSchemas:
@@ -238,6 +240,7 @@ func testDatabase(t *testing.T, e engine.Engine, dbname sql.Identifier, cmds []e
 			} else if err != nil {
 				t.Errorf("CreateTable(%s) failed with %s", cmd.name, err)
 			}
+			state.tx.NextStmt()
 		case cmdDropTable:
 			err := e.DropTable(ctx, state.tx, sql.TableName{dbname, scname, cmd.name},
 				cmd.ifExists)
@@ -248,6 +251,7 @@ func testDatabase(t *testing.T, e engine.Engine, dbname sql.Identifier, cmds []e
 			} else if err != nil {
 				t.Errorf("DropTable(%s) failed with %s", cmd.name, err)
 			}
+			state.tx.NextStmt()
 		case cmdListTables:
 			tblnames, err := e.ListTables(ctx, state.tx, sql.SchemaName{dbname, scname})
 			if err != nil {
@@ -409,17 +413,13 @@ func RunTableTest(t *testing.T, e engine.Engine) {
 		[]engCmd{
 			{cmd: cmdBegin},
 			{cmd: cmdLookupSchema, name: sql.ID("sc-a"), fail: true},
-			{cmd: cmdNextStmt},
 			{cmd: cmdCreateSchema, name: sql.ID("sc-a")},
-			{cmd: cmdNextStmt},
 			{cmd: cmdLookupSchema, name: sql.ID("sc-a")},
 			{cmd: cmdCommit},
 
 			{cmd: cmdBegin},
 			{cmd: cmdLookupTable, name: sql.ID("tbl-a"), fail: true},
-			{cmd: cmdNextStmt},
 			{cmd: cmdCreateTable, name: sql.ID("tbl-a")},
-			{cmd: cmdNextStmt},
 			{cmd: cmdLookupTable, name: sql.ID("tbl-a")},
 			{cmd: cmdCommit},
 		})
@@ -713,7 +713,6 @@ func RunSchemaTest(t *testing.T, e engine.Engine) {
 			{cmd: cmdSetSchema, name: sql.ID("sc-z")},
 			{cmd: cmdLookupTable, name: sql.ID("tbl"), fail: true},
 			{cmd: cmdDropTable, name: sql.ID("tbl"), fail: true},
-			{cmd: cmdDropTable, name: sql.ID("tbl"), ifExists: true},
 			{cmd: cmdCommit},
 		})
 

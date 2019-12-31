@@ -22,8 +22,6 @@ const (
 
 	schemasMID = 2048
 	tablesMID  = 2049
-
-	firstUserMID = 4096
 )
 
 var (
@@ -50,9 +48,10 @@ var (
 )
 
 type storeMetadata struct {
-	Node    uint32
-	Epoch   uint32
-	Version uint64
+	Node          uint32
+	Epoch         uint32
+	CommitVersion uint64
+	LastMID       uint64
 }
 
 type databaseMetadata struct {
@@ -60,14 +59,15 @@ type databaseMetadata struct {
 }
 
 type KVRows struct {
-	mutex        sync.RWMutex
-	st           Store
-	node         uint32
-	epoch        uint32
-	version      uint64
-	lastLocalID  uint64
-	databases    map[sql.Identifier]databaseMetadata
-	transactions map[TransactionID]*transaction
+	mutex         sync.RWMutex
+	st            Store
+	node          uint32
+	epoch         uint32
+	commitVersion uint64
+	lastMID       uint64
+	lastLocalID   uint64
+	databases     map[sql.Identifier]databaseMetadata
+	transactions  map[TransactionID]*transaction
 }
 
 type TransactionState byte
@@ -80,18 +80,19 @@ const (
 )
 
 type transactionMetadata struct {
-	State            TransactionState
-	TID              TransactionID
-	CommittedVersion uint64
+	State         TransactionState
+	TID           TransactionID
+	CommitVersion uint64
 }
 
 type transaction struct {
-	kv         *KVRows
-	tid        TransactionID
-	sid        uint64
-	sesid      uint64
-	state      TransactionState
-	hasWritten bool
+	kv            *KVRows
+	tid           TransactionID
+	sid           uint64
+	sesid         uint64
+	state         TransactionState
+	commitVersion uint64
+	hasWritten    bool
 }
 
 func (kv *KVRows) readGob(ctx context.Context, mid uint64, key []byte, value interface{}) (uint64,
@@ -118,17 +119,37 @@ func (kv *KVRows) writeGob(ctx context.Context, mid uint64, key []byte, ver uint
 	return kv.st.WriteValue(ctx, mid, key, ver, buf.Bytes())
 }
 
-func (kv *KVRows) loadMetadata(ctx context.Context) error {
+func (kv *KVRows) loadConfig(ctx context.Context) error {
 	var md storeMetadata
 	ver, err := kv.readGob(ctx, configMID, configKey, &md)
-	if err != nil && err != ErrKeyNotFound {
+	if err == ErrKeyNotFound {
+		md = storeMetadata{
+			Node:          1,
+			Epoch:         0,
+			CommitVersion: 0,
+			LastMID:       4095, // The first non-system table will be 4096.
+		}
+	} else if err != nil {
 		return err
 	}
 
 	kv.node = md.Node
 	md.Epoch += 1
 	kv.epoch = md.Epoch
-	kv.version = md.Version
+	kv.commitVersion = md.CommitVersion
+	kv.lastMID = md.LastMID
+	return kv.writeGob(ctx, configMID, configKey, ver, &md)
+}
+
+func (kv *KVRows) saveConfig(ctx context.Context) error {
+	var md storeMetadata
+	ver, err := kv.readGob(ctx, configMID, configKey, &md)
+	if err != nil {
+		return err
+	}
+
+	md.CommitVersion = kv.commitVersion
+	md.LastMID = kv.lastMID
 	return kv.writeGob(ctx, configMID, configKey, ver, &md)
 }
 
@@ -168,7 +189,7 @@ func (kv *KVRows) Startup(st Store) error {
 	kv.transactions = map[TransactionID]*transaction{}
 
 	ctx := context.Background()
-	err := kv.loadMetadata(ctx)
+	err := kv.loadConfig(ctx)
 	if err != nil {
 		return err
 	}
@@ -386,14 +407,12 @@ func (kv *KVRows) updateSchema(ctx context.Context, tx *transaction, sn sql.Sche
 	var sr schemaRow
 	err = rows.Next(ctx, &sr)
 	if err == io.EOF {
-		fmt.Println("io.EOF")
 		return fmt.Errorf("kvrows: schema %s not found", sn)
 	} else if err != nil {
 		return err
 	}
 
 	if sr.Database != sn.Database.String() || sr.Schema != sn.Schema.String() {
-		fmt.Printf("%s %v\n", sn, sr)
 		return fmt.Errorf("kvrows: schema %s not found", sn)
 	}
 	return rows.Update(ctx,
@@ -470,14 +489,40 @@ func (kv *KVRows) LookupTable(ctx context.Context, etx engine.Transaction,
 		return nil, fmt.Errorf("kvrows: table %s not found", tn)
 	}
 
+	var cols []sql.Identifier
+	var colTypes []sql.ColumnType
+	var primary []engine.ColumnKey
+	_, err = kv.readGob(ctx, mid, MakeMetadataKey([]sql.Value{sql.StringValue("columns")}), &cols)
+	if err != nil {
+		return nil, err
+	}
+	_, err = kv.readGob(ctx, mid, MakeMetadataKey([]sql.Value{sql.StringValue("column-types")}),
+		&colTypes)
+	if err != nil {
+		return nil, err
+	}
+	_, err = kv.readGob(ctx, mid, MakeMetadataKey([]sql.Value{sql.StringValue("primary")}),
+		&primary)
+	if err != nil {
+		return nil, err
+	}
+
 	return &table{
-		kv:  kv,
-		tx:  tx,
-		mid: mid,
-		// XXX: col:
-		// XXX: colTypes:
-		// XXX: primary:
+		kv:       kv,
+		tx:       tx,
+		mid:      mid,
+		cols:     cols,
+		colTypes: colTypes,
+		primary:  primary,
 	}, nil
+}
+
+func (kv *KVRows) allocateMID(ctx context.Context) (uint64, error) {
+	kv.mutex.Lock()
+	defer kv.mutex.Unlock()
+
+	kv.lastMID += 1
+	return kv.lastMID, kv.saveConfig(ctx)
 }
 
 func (kv *KVRows) CreateTable(ctx context.Context, etx engine.Transaction, tn sql.TableName,
@@ -494,9 +539,34 @@ func (kv *KVRows) CreateTable(ctx context.Context, etx engine.Transaction, tn sq
 		return err
 	}
 
-	//ttbl := kv.makeTablesTable(tx)
+	mid, err := kv.allocateMID(ctx)
+	if err != nil {
+		return err
+	}
 
-	return notImplemented
+	ttbl := kv.makeTablesTable(tx)
+	err = ttbl.Insert(ctx,
+		tableRow{
+			Database: tn.Database.String(),
+			Schema:   tn.Schema.String(),
+			Table:    tn.Table.String(),
+			MID:      int64(mid),
+		})
+	if err != nil {
+		return err
+	}
+
+	err = kv.writeGob(ctx, mid, MakeMetadataKey([]sql.Value{sql.StringValue("columns")}), 0, &cols)
+	if err != nil {
+		return err
+	}
+	err = kv.writeGob(ctx, mid, MakeMetadataKey([]sql.Value{sql.StringValue("column-types")}), 0,
+		&colTypes)
+	if err != nil {
+		return err
+	}
+	return kv.writeGob(ctx, mid, MakeMetadataKey([]sql.Value{sql.StringValue("primary")}), 0,
+		&primary)
 }
 
 func (kv *KVRows) DropTable(ctx context.Context, etx engine.Transaction, tn sql.TableName,
@@ -506,10 +576,41 @@ func (kv *KVRows) DropTable(ctx context.Context, etx engine.Transaction, tn sql.
 	if err != nil {
 		return err
 	}
-	_ = tx
-	//sqlKey := makeTableKey(tn)
 
-	return notImplemented
+	err = kv.updateSchema(ctx, tx, tn.SchemaName(), -1)
+	if err != nil {
+		return err
+	}
+
+	ttbl := kv.makeTablesTable(tx)
+	rows, err := ttbl.Seek(ctx,
+		[]sql.Value{sql.StringValue(tn.Database.String()), sql.StringValue(tn.Schema.String()),
+			sql.StringValue(tn.Table.String())})
+	if err != nil {
+		return err
+	}
+	defer rows.Close()
+
+	var tr tableRow
+	err = rows.Next(ctx, &tr)
+	if err == io.EOF {
+		if ifExists {
+			return nil
+		}
+		return fmt.Errorf("kvrows: table %s not found", tn)
+	} else if err != nil {
+		return err
+	}
+
+	if tr.Database != tn.Database.String() || tr.Schema != tn.Schema.String() ||
+		tr.Table != tn.Table.String() {
+
+		if ifExists {
+			return nil
+		}
+		return fmt.Errorf("kvrows: table %s not found", tn)
+	}
+	return rows.Delete(ctx)
 }
 
 func (_ *KVRows) CreateIndex(ctx context.Context, tx engine.Transaction, idxname sql.Identifier,
@@ -588,6 +689,14 @@ func (kv *KVRows) forWrite(ctx context.Context, etx engine.Transaction) (*transa
 	return tx, nil
 }
 
+func (kv *KVRows) allocateCommitVersion(ctx context.Context) (uint64, error) {
+	kv.mutex.Lock()
+	defer kv.mutex.Unlock()
+
+	kv.commitVersion += 1
+	return kv.commitVersion, kv.saveConfig(ctx)
+}
+
 func (kv *KVRows) finalizeTransaction(ctx context.Context, tx *transaction,
 	ts TransactionState) error {
 
@@ -621,7 +730,13 @@ func (kv *KVRows) finalizeTransaction(ctx context.Context, tx *transaction,
 		return fmt.Errorf("kvrows: internal error: transaction already committed: %v", tx)
 	}
 
+	var commitVersion uint64
+	if ts == CommittedState {
+
+	}
+
 	md.State = ts
+	md.CommitVersion = commitVersion
 	err = kv.writeGob(ctx, transactionsMID, key, ver, &md)
 	if err != nil {
 		tx.state = AbortedState
@@ -629,6 +744,7 @@ func (kv *KVRows) finalizeTransaction(ctx context.Context, tx *transaction,
 	}
 
 	tx.state = ts
+	tx.commitVersion = commitVersion
 	return nil
 }
 
@@ -640,7 +756,7 @@ func (kv *KVRows) getState(tid TransactionID) (TransactionState, uint64) {
 	if !ok {
 		return UnknownState, 0
 	}
-	return tx.state, 0 // XXX: need the commit version in the tx
+	return tx.state, tx.commitVersion
 }
 
 func (kv *KVRows) ListDatabases(ctx context.Context, tx engine.Transaction) ([]sql.Identifier,
