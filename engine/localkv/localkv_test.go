@@ -332,7 +332,7 @@ func countVisible(keyVals []keyValue) int {
 	return cnt
 }
 
-func checkScanMap(t *testing.T, keyVals []keyValue, idx int, kv *keyValues) int {
+func checkScanMap(t *testing.T, keyVals []keyValue, idx int, kv *keyValues, useCommitted bool) int {
 	if len(kv.keys) != len(kv.vals) {
 		t.Errorf("ScanMap: got %d keys and %d values", len(kv.keys), len(kv.vals))
 	}
@@ -349,11 +349,17 @@ func checkScanMap(t *testing.T, keyVals []keyValue, idx int, kv *keyValues) int 
 		}
 
 		if keyVals[idx].ver == kvrows.ProposalVersion {
-			// XXX: fix this
-			if (kv.vers[jdx] != committedVersion &&
-				kv.vers[jdx] != kvrows.ProposalVersion) ||
-				!testutil.DeepEqual(kv.keys[jdx], keyVals[idx].key) {
-
+			if useCommitted {
+				if kv.vers[jdx] != committedVersion {
+					t.Errorf("ScanMap: got %d version; wanted %v", kv.vers[jdx], committedVersion)
+				}
+			} else {
+				if kv.vers[jdx] != kvrows.ProposalVersion {
+					t.Errorf("ScanMap: got %d version; wanted %v", kv.vers[jdx],
+						kvrows.ProposalVersion)
+				}
+			}
+			if !testutil.DeepEqual(kv.keys[jdx], keyVals[idx].key) {
 				t.Errorf("ScanMap: got %v key; wanted %v", kv.keys[jdx], keyVals[idx].key)
 			}
 			if !bytes.Equal(kv.vals[jdx], keyVals[idx].scanVal) {
@@ -528,7 +534,7 @@ func testScanMap(t *testing.T, st localkv.Store) {
 	if next != nil {
 		t.Errorf("ScanMap did not reach EOF")
 	}
-	checkScanMap(t, keyVals, 0, kv)
+	checkScanMap(t, keyVals, 0, kv, false)
 	if countVisible(keyVals) != len(kv.keys) {
 		t.Errorf("ScanMap: got %d key-values; want %d", len(kv.keys), countVisible(keyVals))
 	}
@@ -542,7 +548,7 @@ func testScanMap(t *testing.T, st localkv.Store) {
 			t.Errorf("ScanMap failed with %s", err)
 		}
 		cnt += len(kv.keys)
-		idx = checkScanMap(t, keyVals, idx, kv)
+		idx = checkScanMap(t, keyVals, idx, kv, false)
 		if next == nil {
 			break
 		}
@@ -605,7 +611,7 @@ func testScanMap(t *testing.T, st localkv.Store) {
 	if next != nil {
 		t.Errorf("ScanMap did not reach EOF")
 	}
-	checkScanMap(t, keyVals2, 0, kv)
+	checkScanMap(t, keyVals2, 0, kv, true)
 	if countVisible(keyVals2) != len(kv.keys) {
 		t.Errorf("ScanMap: got %d key-values; want %d", len(kv.keys), countVisible(keyVals2))
 	}
@@ -623,7 +629,7 @@ func testScanMap(t *testing.T, st localkv.Store) {
 		t.Errorf("ScanMap: got %d keys; want 1", len(kv.keys))
 	}
 
-	idx = checkScanMap(t, keyVals2, 0, kv)
+	idx = checkScanMap(t, keyVals2, 0, kv, false)
 
 	cnt = len(kv.keys)
 	kv = &keyValues{num: 1024}
@@ -634,7 +640,7 @@ func testScanMap(t *testing.T, st localkv.Store) {
 	if next != nil {
 		t.Errorf("ScanMap did not reach EOF")
 	}
-	checkScanMap(t, keyVals2, idx, kv)
+	checkScanMap(t, keyVals2, idx, kv, true)
 	cnt += len(kv.keys)
 	if countVisible(keyVals2) != cnt {
 		t.Errorf("ScanMap: got %d key-values; want %d", cnt, countVisible(keyVals2))
