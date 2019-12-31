@@ -25,6 +25,8 @@ func testKey(t *testing.T, prevKey []byte, row []sql.Value, colKeys []engine.Col
 	t.Helper()
 
 	key := kvrows.MakeSQLKey(row, colKeys)
+	kvrows.MustBeSQLKey(key)
+
 	ck := kvrows.CopyKey(key)
 	if !bytes.Equal(key, ck) {
 		t.Errorf("CopyKey() got %v want %v", ck, key)
@@ -49,6 +51,32 @@ func testKey(t *testing.T, prevKey []byte, row []sql.Value, colKeys []engine.Col
 	}
 
 	return kbuf
+}
+
+func testMetadataKey(t *testing.T, values []sql.Value) {
+	for vl := 1; vl < len(values); vl += 1 {
+		mdk := kvrows.MakeMetadataKey(values[:vl])
+		kvrows.MustBeMetadataKey(mdk)
+
+		ret := make([]sql.Value, vl)
+		ok := kvrows.ParseMetadataKey(mdk, ret)
+		if !ok {
+			t.Errorf("ParseMetadataKey(%v) failed", mdk)
+		} else {
+			for idx := 0; idx < vl; idx += 1 {
+				if ret[idx] == nil || values[idx] == nil {
+					if ret[idx] != nil || values[idx] != nil {
+						t.Errorf("ParseMetadataKey: got %v want %v", ret[idx], values[idx])
+					}
+				} else {
+					cmp, _ := ret[idx].Compare(values[idx])
+					if cmp != 0 {
+						t.Errorf("ParseMetadataKey: got %v want %v", ret[idx], values[idx])
+					}
+				}
+			}
+		}
+	}
 }
 
 func checkPrefixes(t *testing.T, prefixes [][]byte, i int, key []byte) {
@@ -89,6 +117,8 @@ func testMakeKey(t *testing.T, cases []testCase) {
 		prevKey = testKey(t, prevKey, c.row, c.colKeys, ver-1)
 		prevKey = testKey(t, prevKey, c.row, c.colKeys, 1)
 		prevKey = testKey(t, prevKey, c.row, c.colKeys, 0)
+
+		testMetadataKey(t, c.row)
 	}
 }
 

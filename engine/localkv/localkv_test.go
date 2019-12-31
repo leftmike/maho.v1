@@ -107,7 +107,7 @@ func testReadWriteList(t *testing.T, st kvrows.Store) {
 	runCmds(t, st, 1, []cmd{
 		{
 			cmd:  cmdReadValue,
-			key:  []byte("abcd0"),
+			key:  []byte("\x00abcd0"),
 			fail: true,
 		},
 		{
@@ -115,19 +115,19 @@ func testReadWriteList(t *testing.T, st kvrows.Store) {
 		},
 		{
 			cmd: cmdWriteValue,
-			key: []byte("abcd0"),
+			key: []byte("\x00abcd0"),
 			val: []byte("1234567890"),
 		},
 		{
 			cmd: cmdReadValue,
-			key: []byte("abcd0"),
+			key: []byte("\x00abcd0"),
 			ver: 1,
 			val: []byte("1234567890"),
 		},
 		{
 			cmd: cmdListValues,
 			keys: [][]byte{
-				[]byte("abcd0"),
+				[]byte("\x00abcd0"),
 			},
 			vers: []uint64{
 				1,
@@ -138,53 +138,53 @@ func testReadWriteList(t *testing.T, st kvrows.Store) {
 		},
 		{
 			cmd:  cmdWriteValue,
-			key:  []byte("abcd0"),
+			key:  []byte("\x00abcd0"),
 			ver:  0,
 			val:  []byte("0987654321"),
 			fail: true,
 		},
 		{
 			cmd:  cmdWriteValue,
-			key:  []byte("xxxyyyzzz"),
+			key:  []byte("\x00xxxyyyzzz"),
 			ver:  10,
 			val:  []byte("0987654321"),
 			fail: true,
 		},
 		{
 			cmd: cmdWriteValue,
-			key: []byte("abcd0"),
+			key: []byte("\x00abcd0"),
 			ver: 1,
 			val: []byte("0987654321"),
 		},
 		{
 			cmd: cmdReadValue,
-			key: []byte("abcd0"),
+			key: []byte("\x00abcd0"),
 			ver: 2,
 			val: []byte("0987654321"),
 		},
 		{
 			cmd: cmdWriteValue,
-			key: []byte("abcd0"),
+			key: []byte("\x00abcd0"),
 			ver: 2,
 			val: []byte("1234567890987654321"),
 		},
 		{
 			cmd:  cmdWriteValue,
-			key:  []byte("abcd0"),
+			key:  []byte("\x00abcd0"),
 			ver:  5,
 			val:  []byte("0000000000"),
 			fail: true,
 		},
 		{
 			cmd: cmdReadValue,
-			key: []byte("abcd0"),
+			key: []byte("\x00abcd0"),
 			ver: 3,
 			val: []byte("1234567890987654321"),
 		},
 		{
 			cmd: cmdListValues,
 			keys: [][]byte{
-				[]byte("abcd0"),
+				[]byte("\x00abcd0"),
 			},
 			vers: []uint64{
 				3,
@@ -195,72 +195,72 @@ func testReadWriteList(t *testing.T, st kvrows.Store) {
 		},
 		{
 			cmd: cmdWriteValue,
-			key: []byte("abcd1"),
+			key: []byte("\x00abcd1"),
 			ver: 0,
 			val: []byte("one"),
 		},
 		{
 			cmd: cmdWriteValue,
-			key: []byte("abcd2"),
+			key: []byte("\x00abcd2"),
 			ver: 0,
 			val: []byte("two #1"),
 		},
 		{
 			cmd: cmdWriteValue,
-			key: []byte("abcd2"),
+			key: []byte("\x00abcd2"),
 			ver: 1,
 			val: []byte("two"),
 		},
 		{
 			cmd: cmdWriteValue,
-			key: []byte("abcd3"),
+			key: []byte("\x00abcd3"),
 			ver: 0,
 			val: []byte("three #1"),
 		},
 		{
 			cmd: cmdWriteValue,
-			key: []byte("abcd3"),
+			key: []byte("\x00abcd3"),
 			ver: 1,
 			val: []byte("three #2"),
 		},
 		{
 			cmd: cmdWriteValue,
-			key: []byte("abcd3"),
+			key: []byte("\x00abcd3"),
 			ver: 2,
 			val: []byte("three"),
 		},
 		{
 			cmd: cmdWriteValue,
-			key: []byte("abcd4"),
+			key: []byte("\x00abcd4"),
 			ver: 0,
 			val: []byte("four #1"),
 		},
 		{
 			cmd: cmdWriteValue,
-			key: []byte("abcd4"),
+			key: []byte("\x00abcd4"),
 			ver: 1,
 			val: []byte("four #2"),
 		},
 		{
 			cmd: cmdWriteValue,
-			key: []byte("abcd4"),
+			key: []byte("\x00abcd4"),
 			ver: 2,
 			val: []byte("four #3"),
 		},
 		{
 			cmd: cmdWriteValue,
-			key: []byte("abcd4"),
+			key: []byte("\x00abcd4"),
 			ver: 3,
 			val: []byte("four"),
 		},
 		{
 			cmd: cmdListValues,
 			keys: [][]byte{
-				[]byte("abcd0"),
-				[]byte("abcd1"),
-				[]byte("abcd2"),
-				[]byte("abcd3"),
-				[]byte("abcd4"),
+				[]byte("\x00abcd0"),
+				[]byte("\x00abcd1"),
+				[]byte("\x00abcd2"),
+				[]byte("\x00abcd3"),
+				[]byte("\x00abcd4"),
 			},
 			vers: []uint64{
 				3,
@@ -420,6 +420,11 @@ func testScanMap(t *testing.T, st localkv.Store) {
 		LocalID: 99,
 	}
 	keyVals := []keyValue{
+		{
+			key: kvrows.MakeMetadataKey([]sql.Value{sql.StringValue("bbbb@metadata")}),
+			ver: 1234,
+			val: []byte("metadata value"),
+		},
 		{
 			key:     []byte("bbbb"),
 			ver:     50,

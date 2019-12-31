@@ -135,6 +135,165 @@ func decodeByte(reverse bool, b byte) byte {
 	return b
 }
 
+func encodeValue(key []byte, reverse bool, value sql.Value) []byte {
+	switch val := value.(type) {
+	case sql.BoolValue:
+		key = encodeByte(key, reverse, boolKeyTag)
+		if val {
+			key = encodeByte(key, reverse, 1)
+		} else {
+			key = encodeByte(key, reverse, 0)
+		}
+	case sql.StringValue:
+		key = encodeByte(key, reverse, stringKeyTag)
+		key = encodeKeyBytes(key, reverse, []byte(val))
+	case sql.BytesValue:
+		key = encodeByte(key, reverse, bytesKeyTag)
+		key = encodeKeyBytes(key, reverse, []byte(val))
+	case sql.Float64Value:
+		if math.IsNaN(float64(val)) {
+			key = encodeByte(key, reverse, float64NaNKeyTag)
+		} else if val == 0 {
+			key = encodeByte(key, reverse, float64ZeroKeyTag)
+		} else {
+			u := math.Float64bits(float64(val))
+			if u&(1<<63) != 0 {
+				u = ^u
+				key = encodeByte(key, reverse, float64NegKeyTag)
+			} else {
+				key = encodeByte(key, reverse, float64PosKeyTag)
+			}
+			key = encodeUint64(key, reverse, u)
+		}
+	case sql.Int64Value:
+		if val < 0 {
+			key = encodeByte(key, reverse, int64NegKeyTag)
+		} else {
+			key = encodeByte(key, reverse, int64NotNegKeyTag)
+		}
+		key = encodeUint64(key, reverse, uint64(val))
+	default:
+		if val == nil {
+			key = encodeByte(key, reverse, nullKeyTag)
+		} else {
+			panic(fmt.Sprintf("unexpected type for sql.Value: %T: %v", val, val))
+		}
+	}
+	return key
+}
+
+func decodeValue(key []byte, reverse bool) ([]byte, sql.Value, bool) {
+	var val sql.Value
+
+	if len(key) < 1 {
+		return nil, val, false
+	}
+
+	switch decodeByte(reverse, key[0]) {
+	case nullKeyTag:
+		val = nil
+		key = key[1:]
+	case boolKeyTag:
+		if len(key) < 1 {
+			return nil, val, false
+		}
+		if decodeByte(reverse, key[1]) == 0 {
+			val = sql.BoolValue(false)
+		} else {
+			val = sql.BoolValue(true)
+		}
+		key = key[2:]
+	case stringKeyTag:
+		var b []byte
+		var ok bool
+		key, b, ok = decodeKeyBytes(key[1:], reverse)
+		if !ok {
+			return nil, val, false
+		}
+		val = sql.StringValue(b)
+	case bytesKeyTag:
+		var b []byte
+		var ok bool
+		key, b, ok = decodeKeyBytes(key[1:], reverse)
+		if !ok {
+			return nil, val, false
+		}
+		val = sql.BytesValue(b)
+	case float64NaNKeyTag:
+		val = sql.Float64Value(math.NaN())
+		key = key[1:]
+	case float64NegKeyTag:
+		var u uint64
+		if len(key) < 9 {
+			return nil, val, false
+		}
+		u = ^decodeUint64(key[1:], reverse)
+		val = sql.Float64Value(math.Float64frombits(u))
+		key = key[9:]
+	case float64ZeroKeyTag:
+		val = sql.Float64Value(0.0)
+		key = key[1:]
+	case float64PosKeyTag:
+		var u uint64
+		if len(key) < 9 {
+			return nil, val, false
+		}
+		u = decodeUint64(key[1:], reverse)
+		val = sql.Float64Value(math.Float64frombits(u))
+		key = key[9:]
+	case int64NegKeyTag, int64NotNegKeyTag:
+		var u uint64
+		if len(key) < 9 {
+			return nil, val, false
+		}
+		u = decodeUint64(key[1:], reverse)
+		val = sql.Int64Value(u)
+		key = key[9:]
+	default:
+		return nil, val, false
+	}
+
+	return key, val, true
+}
+
+func MakeMetadataKey(values []sql.Value) []byte {
+	if len(values) < 1 || len(values) > 255 {
+		panic(fmt.Sprintf("a metadata key must have between 1 and 255 values: %d", len(values)))
+	}
+
+	key := []byte{0, byte(len(values))}
+	for _, val := range values {
+		key = encodeValue(key, false, val)
+	}
+	return key
+}
+
+func ParseMetadataKey(key []byte, values []sql.Value) bool {
+	if len(key) < 2 || key[0] != 0 {
+		return false
+	}
+	cnt := int(key[1])
+	key = key[2:]
+
+	for idx := 0; idx < cnt; idx += 1 {
+		var val sql.Value
+		var ok bool
+
+		key, val, ok = decodeValue(key, false)
+		if !ok {
+			return false
+		}
+		values[idx] = val
+	}
+	return true
+}
+
+func MustBeMetadataKey(key []byte) {
+	if len(key) < 2 || key[0] != 0 {
+		panic(fmt.Sprintf("kvrows: %v is not a metadata key", key))
+	}
+}
+
 func MakeSQLKey(row []sql.Value, colKeys []engine.ColumnKey) []byte {
 	if len(colKeys) < 1 || len(colKeys) > 255 {
 		panic(fmt.Sprintf("a column key must have between 1 and 255 columns: %d", len(colKeys)))
@@ -146,49 +305,7 @@ func MakeSQLKey(row []sql.Value, colKeys []engine.ColumnKey) []byte {
 		if num >= len(row) {
 			key = encodeByte(key, ck.Reverse(), nullKeyTag)
 		} else {
-			switch val := row[num].(type) {
-			case sql.BoolValue:
-				key = encodeByte(key, ck.Reverse(), boolKeyTag)
-				if val {
-					key = encodeByte(key, ck.Reverse(), 1)
-				} else {
-					key = encodeByte(key, ck.Reverse(), 0)
-				}
-			case sql.StringValue:
-				key = encodeByte(key, ck.Reverse(), stringKeyTag)
-				key = encodeKeyBytes(key, ck.Reverse(), []byte(val))
-			case sql.BytesValue:
-				key = encodeByte(key, ck.Reverse(), bytesKeyTag)
-				key = encodeKeyBytes(key, ck.Reverse(), []byte(val))
-			case sql.Float64Value:
-				if math.IsNaN(float64(val)) {
-					key = encodeByte(key, ck.Reverse(), float64NaNKeyTag)
-				} else if val == 0 {
-					key = encodeByte(key, ck.Reverse(), float64ZeroKeyTag)
-				} else {
-					u := math.Float64bits(float64(val))
-					if u&(1<<63) != 0 {
-						u = ^u
-						key = encodeByte(key, ck.Reverse(), float64NegKeyTag)
-					} else {
-						key = encodeByte(key, ck.Reverse(), float64PosKeyTag)
-					}
-					key = encodeUint64(key, ck.Reverse(), u)
-				}
-			case sql.Int64Value:
-				if val < 0 {
-					key = encodeByte(key, ck.Reverse(), int64NegKeyTag)
-				} else {
-					key = encodeByte(key, ck.Reverse(), int64NotNegKeyTag)
-				}
-				key = encodeUint64(key, ck.Reverse(), uint64(val))
-			default:
-				if val == nil {
-					key = encodeByte(key, ck.Reverse(), nullKeyTag)
-				} else {
-					panic(fmt.Sprintf("unexpected type for sql.Value: %T: %v", val, val))
-				}
-			}
+			key = encodeValue(key, ck.Reverse(), row[num])
 		}
 	}
 
@@ -202,75 +319,13 @@ func ParseSQLKey(key []byte, colKeys []engine.ColumnKey, dest []sql.Value) bool 
 	key = key[1:]
 
 	for _, ck := range colKeys {
-		if len(key) < 1 {
-			return false
-		}
-
 		var val sql.Value
-		switch decodeByte(ck.Reverse(), key[0]) {
-		case nullKeyTag:
-			val = nil
-			key = key[1:]
-		case boolKeyTag:
-			if len(key) < 1 {
-				return false
-			}
-			if decodeByte(ck.Reverse(), key[1]) == 0 {
-				val = sql.BoolValue(false)
-			} else {
-				val = sql.BoolValue(true)
-			}
-			key = key[2:]
-		case stringKeyTag:
-			var b []byte
-			var ok bool
-			key, b, ok = decodeKeyBytes(key[1:], ck.Reverse())
-			if !ok {
-				return false
-			}
-			val = sql.StringValue(b)
-		case bytesKeyTag:
-			var b []byte
-			var ok bool
-			key, b, ok = decodeKeyBytes(key[1:], ck.Reverse())
-			if !ok {
-				return false
-			}
-			val = sql.BytesValue(b)
-		case float64NaNKeyTag:
-			val = sql.Float64Value(math.NaN())
-			key = key[1:]
-		case float64NegKeyTag:
-			var u uint64
-			if len(key) < 9 {
-				return false
-			}
-			u = ^decodeUint64(key[1:], ck.Reverse())
-			val = sql.Float64Value(math.Float64frombits(u))
-			key = key[9:]
-		case float64ZeroKeyTag:
-			val = sql.Float64Value(0.0)
-			key = key[1:]
-		case float64PosKeyTag:
-			var u uint64
-			if len(key) < 9 {
-				return false
-			}
-			u = decodeUint64(key[1:], ck.Reverse())
-			val = sql.Float64Value(math.Float64frombits(u))
-			key = key[9:]
-		case int64NegKeyTag, int64NotNegKeyTag:
-			var u uint64
-			if len(key) < 9 {
-				return false
-			}
-			u = decodeUint64(key[1:], ck.Reverse())
-			val = sql.Int64Value(u)
-			key = key[9:]
-		default:
+		var ok bool
+
+		key, val, ok = decodeValue(key, ck.Reverse())
+		if !ok {
 			return false
 		}
-
 		num := ck.Number()
 		if num < len(dest) {
 			dest[num] = val
@@ -278,6 +333,12 @@ func ParseSQLKey(key []byte, colKeys []engine.ColumnKey, dest []sql.Value) bool 
 	}
 
 	return true
+}
+
+func MustBeSQLKey(key []byte) {
+	if len(key) < 1 || key[0] == 0 {
+		panic(fmt.Sprintf("kvrows: %v is not a sql key", key))
+	}
 }
 
 func MakeKeyVersion(key []byte, ver uint64) []byte {

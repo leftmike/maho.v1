@@ -19,6 +19,8 @@ func NewStore(st Store) kvrows.Store {
 }
 
 func (lkv localKV) ReadValue(ctx context.Context, mid uint64, key []byte) (uint64, []byte, error) {
+	kvrows.MustBeMetadataKey(key)
+
 	tx, err := lkv.st.Begin(false)
 	if err != nil {
 		return 0, nil, err
@@ -106,6 +108,8 @@ func (lkv localKV) ListValues(ctx context.Context, mid uint64,
 func (lkv localKV) WriteValue(ctx context.Context, mid uint64, key []byte, ver uint64,
 	val []byte) error {
 
+	kvrows.MustBeMetadataKey(key)
+
 	tx, err := lkv.st.Begin(true)
 	if err != nil {
 		return err
@@ -183,6 +187,8 @@ func (lkv localKV) ScanMap(ctx context.Context, getState kvrows.GetTxState,
 			}
 		}
 	} else {
+		kvrows.MustBeSQLKey(seek)
+
 		kbuf, ok = w.Seek(seek)
 		if !ok {
 			return nil, nil
@@ -412,6 +418,8 @@ func (lkv localKV) ModifyMap(ctx context.Context, getState kvrows.GetTxState,
 	tid kvrows.TransactionID, sid, mid uint64, key []byte, ver uint64,
 	modifyKeyValue kvrows.ModifyKeyValue) error {
 
+	kvrows.MustBeSQLKey(key)
+
 	tx, err := lkv.st.Begin(true)
 	if err != nil {
 		return err
@@ -437,6 +445,8 @@ func deleteKeyValue(key []byte, ver uint64, val []byte) ([]byte, error) {
 
 func (lkv localKV) DeleteMap(ctx context.Context, getState kvrows.GetTxState,
 	tid kvrows.TransactionID, sid, mid uint64, key []byte, ver uint64) error {
+
+	kvrows.MustBeSQLKey(key)
 
 	tx, err := lkv.st.Begin(true)
 	if err != nil {
@@ -563,6 +573,8 @@ func insertMap(getState kvrows.GetTxState, tid kvrows.TransactionID, sid uint64,
 
 func (lkv localKV) InsertMap(ctx context.Context, getState kvrows.GetTxState,
 	tid kvrows.TransactionID, sid, mid uint64, key, val []byte) error {
+
+	kvrows.MustBeSQLKey(key)
 
 	tx, err := lkv.st.Begin(true)
 	if err != nil {
