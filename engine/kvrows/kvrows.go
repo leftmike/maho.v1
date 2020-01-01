@@ -86,13 +86,16 @@ type transactionMetadata struct {
 }
 
 type transaction struct {
-	kv            *KVRows
-	tid           TransactionID
-	sid           uint64
-	sesid         uint64
+	kv         *KVRows
+	tid        TransactionID
+	sid        uint64
+	sesid      uint64
+	hasWritten bool
+
+	mutex         sync.RWMutex
+	done          chan struct{}
 	state         TransactionState
 	commitVersion uint64
-	hasWritten    bool
 }
 
 func (kv *KVRows) readGob(ctx context.Context, mid uint64, key []byte, value interface{}) (uint64,
@@ -641,8 +644,10 @@ func (kv *KVRows) Begin(sesid uint64) engine.Transaction {
 		},
 		sid:        1,
 		sesid:      sesid,
-		state:      ActiveState,
 		hasWritten: false, // Assume read-only until proven otherwise.
+
+		done:  make(chan struct{}),
+		state: ActiveState,
 	}
 
 	kv.mutex.Lock()
@@ -684,7 +689,7 @@ func (kv *KVRows) forWrite(ctx context.Context, etx engine.Transaction) (*transa
 	}
 	err := kv.writeGob(ctx, transactionsMID, tx.makeKey(), 0, &md)
 	if err != nil {
-		tx.state = AbortedState
+		tx.setState(AbortedState, 0)
 		return nil, err
 	}
 
@@ -709,7 +714,7 @@ func (kv *KVRows) finalizeTransaction(ctx context.Context, tx *transaction,
 		return errTransactionAborted
 	}
 	if !tx.hasWritten {
-		tx.state = ts
+		tx.setState(ts, 0)
 		return nil
 	}
 
@@ -717,11 +722,12 @@ func (kv *KVRows) finalizeTransaction(ctx context.Context, tx *transaction,
 	key := tx.makeKey()
 	ver, err := kv.readGob(ctx, transactionsMID, key, &md)
 	if err != nil {
+		tx.setState(AbortedState, 0)
 		return err
 	}
 
 	if md.State == AbortedState {
-		tx.state = AbortedState
+		tx.setState(AbortedState, 0)
 		if ts == AbortedState {
 			// Someone else already aborted the transaction for us; since we are rolling back
 			// anyway, there is no error.
@@ -735,31 +741,60 @@ func (kv *KVRows) finalizeTransaction(ctx context.Context, tx *transaction,
 
 	var commitVersion uint64
 	if ts == CommittedState {
-
+		commitVersion, err = kv.allocateCommitVersion(ctx)
+		if err != nil {
+			tx.setState(AbortedState, 0)
+			return err
+		}
 	}
 
 	md.State = ts
 	md.CommitVersion = commitVersion
 	err = kv.writeGob(ctx, transactionsMID, key, ver, &md)
 	if err != nil {
-		tx.state = AbortedState
+		tx.setState(AbortedState, 0)
 		return err
 	}
 
-	tx.state = ts
-	tx.commitVersion = commitVersion
+	tx.setState(ts, commitVersion)
 	return nil
 }
 
 func (kv *KVRows) getState(tid TransactionID) (TransactionState, uint64) {
 	kv.mutex.RLock()
-	defer kv.mutex.RUnlock()
-
 	tx, ok := kv.transactions[tid]
+	kv.mutex.RUnlock()
 	if !ok {
 		return UnknownState, 0
 	}
+
+	tx.mutex.RLock()
+	defer tx.mutex.RUnlock()
 	return tx.state, tx.commitVersion
+}
+
+func (tx *transaction) setState(st TransactionState, ver uint64) {
+	if tx.state == ActiveState {
+		tx.mutex.Lock()
+		defer tx.mutex.Unlock()
+
+		tx.state = st
+		tx.commitVersion = ver
+		close(tx.done)
+	}
+}
+
+func (kv *KVRows) waitOnTID(ctx context.Context, tid TransactionID) error {
+	kv.mutex.RLock()
+	tx, ok := kv.transactions[tid]
+	kv.mutex.RUnlock()
+	if !ok {
+		// XXX: unknown transactions are assumed aborted?
+		return fmt.Errorf("kvrows: unknown transaction: %v", tid)
+	}
+
+	<-tx.done
+	return nil
 }
 
 func (kv *KVRows) ListDatabases(ctx context.Context, tx engine.Transaction) ([]sql.Identifier,

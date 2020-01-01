@@ -249,7 +249,7 @@ func (lkv localKV) ScanMap(ctx context.Context, getState kvrows.GetTxState,
 						return nil
 					})
 				if err != nil {
-					return kvrows.CopyKey(k), err
+					return nil, err
 				}
 				if found {
 					break

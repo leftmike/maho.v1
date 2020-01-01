@@ -19,12 +19,14 @@ type table struct {
 }
 
 type rows struct {
-	tbl    *table
-	next   []byte
-	idx    int
-	rows   [][]sql.Value
-	vers   []uint64
-	noMore bool
+	tbl         *table
+	next        []byte
+	idx         int
+	rows        [][]sql.Value
+	vers        []uint64
+	noMore      bool
+	needWait    bool
+	blockingTID TransactionID
 }
 
 func (tbl *table) Columns(ctx context.Context) []sql.Identifier {
@@ -86,16 +88,38 @@ func (r *rows) Next(ctx context.Context, dest []sql.Value) error {
 		if r.noMore {
 			return io.EOF
 		}
-
-		r.rows = nil
-		r.vers = nil
+		if r.needWait {
+			err := r.tbl.kv.waitOnTID(ctx, r.blockingTID)
+			if err != nil {
+				return err
+			}
+			r.needWait = false
+		}
 
 		kv := r.tbl.kv
 		tx := r.tbl.tx
+
+	scanAgain:
+		r.rows = nil
+		r.vers = nil
 		next, err := r.tbl.kv.st.ScanMap(ctx, kv.getState, tx.tid, tx.sid, r.tbl.mid, r.next,
 			r.scanKeyValue)
 		if err != nil {
-			return err
+			if bp, ok := err.(*ErrBlockingProposal); ok {
+				if len(r.rows) == 0 {
+					err = r.tbl.kv.waitOnTID(ctx, bp.TID)
+					if err != nil {
+						return err
+					}
+					r.next = bp.Key
+					goto scanAgain
+				}
+				r.needWait = true
+				r.blockingTID = bp.TID
+				next = bp.Key
+			} else {
+				return err
+			}
 		}
 		if next == nil {
 			r.noMore = true

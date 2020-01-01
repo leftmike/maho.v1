@@ -1335,7 +1335,6 @@ func RunParallelTest(t *testing.T, e engine.Engine) {
 }
 
 func incColumn(t *testing.T, e engine.Engine, tx engine.Transaction, i int, tn sql.TableName) bool {
-
 	var ctx context.Context
 
 	tbl, err := e.LookupTable(ctx, tx, tn)
@@ -1354,7 +1353,7 @@ func incColumn(t *testing.T, e engine.Engine, tx engine.Transaction, i int, tn s
 			if err != io.EOF {
 				t.Errorf("rows.Next() failed with %s", err)
 			}
-			break
+			t.Fatalf("rows.Next() row not found")
 		}
 		if i64, ok := dest[0].(sql.Int64Value); ok && int(i64) == i {
 			v := int(dest[1].(sql.Int64Value))
@@ -1366,6 +1365,7 @@ func incColumn(t *testing.T, e engine.Engine, tx engine.Transaction, i int, tn s
 			break
 		}
 	}
+
 	return false
 }
 

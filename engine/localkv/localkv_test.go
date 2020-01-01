@@ -619,11 +619,11 @@ func testScanMap(t *testing.T, st localkv.Store) {
 	kv = &keyValues{num: 1024}
 	next, err = lkv.ScanMap(ctx, getActiveState, tid, 999999, 2000, nil, kv.scanKeyValue)
 
-	bperr, ok := err.(*kvrows.ErrBlockingProposal)
+	bp, ok := err.(*kvrows.ErrBlockingProposal)
 	if !ok {
 		t.Errorf("ScanMap: got %s; want blocking proposals error", err)
-	} else if bperr.TID != tid2 {
-		t.Errorf("ScanMap: got key %v; want %v", bperr, tid2)
+	} else if bp.TID != tid2 {
+		t.Errorf("ScanMap: got tid %v; want %v", bp.TID, tid2)
 	}
 	if len(kv.keys) != 1 {
 		t.Errorf("ScanMap: got %d keys; want 1", len(kv.keys))
@@ -633,7 +633,7 @@ func testScanMap(t *testing.T, st localkv.Store) {
 
 	cnt = len(kv.keys)
 	kv = &keyValues{num: 1024}
-	next, err = lkv.ScanMap(ctx, getCommittedState, tid, 999999, 2000, next, kv.scanKeyValue)
+	next, err = lkv.ScanMap(ctx, getCommittedState, tid, 999999, 2000, bp.Key, kv.scanKeyValue)
 	if err != nil {
 		t.Errorf("ScanMap failed with %s", err)
 	}
