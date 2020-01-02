@@ -1334,7 +1334,9 @@ func RunParallelTest(t *testing.T, e engine.Engine) {
 	wg.Wait()
 }
 
-func incColumn(t *testing.T, e engine.Engine, tx engine.Transaction, i int, tn sql.TableName) bool {
+func incColumn(t *testing.T, e engine.Engine, tx engine.Transaction, tdx uint64, i int,
+	tn sql.TableName) bool {
+
 	var ctx context.Context
 
 	tbl, err := e.LookupTable(ctx, tx, tn)
@@ -1360,6 +1362,7 @@ func incColumn(t *testing.T, e engine.Engine, tx engine.Transaction, i int, tn s
 			err = rows.Update(ctx,
 				[]sql.ColumnUpdate{{Index: 1, Value: sql.Int64Value(v + 1)}})
 			if err == nil {
+				//fmt.Printf("%d: %d -> %d\n", tdx, i, v+1)
 				return true
 			}
 			break
@@ -1411,7 +1414,7 @@ func RunStressTest(t *testing.T, e engine.Engine) {
 				updated := false
 				for !updated {
 					tx := e.Begin(tdx)
-					updated = incColumn(t, e, tx, i, sql.TableName{dbname, sql.PUBLIC, name})
+					updated = incColumn(t, e, tx, tdx, i, sql.TableName{dbname, sql.PUBLIC, name})
 					if updated {
 						err := tx.Commit(ctx)
 						if err != nil {

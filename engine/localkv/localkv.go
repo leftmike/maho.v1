@@ -372,7 +372,7 @@ func modifyMap(getState kvrows.GetTxState, tid kvrows.TransactionID, sid uint64,
 						if err != nil {
 							return err
 						}
-						return appendProposal(tid, sid, key, newVal, proposals, m)
+						return appendProposal(tid, sid, key, newVal, nil, m)
 					} else if st != kvrows.AbortedState {
 						return &kvrows.ErrBlockingProposal{
 							TID: proTID,
@@ -526,7 +526,7 @@ func insertMap(getState kvrows.GetTxState, tid kvrows.TransactionID, sid uint64,
 							if err != nil {
 								return err
 							}
-							return appendProposal(tid, sid, insertKey, newVal, proposals, m)
+							return appendProposal(tid, sid, insertKey, newVal, nil, m)
 						}
 					} else if st != kvrows.AbortedState {
 						return &kvrows.ErrBlockingProposal{
