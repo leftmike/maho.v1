@@ -8,6 +8,7 @@ import (
 	"github.com/leftmike/maho/engine/bbolt"
 	"github.com/leftmike/maho/engine/kvrows"
 	"github.com/leftmike/maho/engine/localkv"
+	"github.com/leftmike/maho/engine/memkv"
 	"github.com/leftmike/maho/engine/test"
 	"github.com/leftmike/maho/testutil"
 )
@@ -57,4 +58,8 @@ func TestBBolt(t *testing.T) {
 		t.Fatal(err)
 	}
 	testEngine(t, localkv.NewStore(st))
+}
+
+func TestMemKV(t *testing.T) {
+	testEngine(t, localkv.NewStore(memkv.OpenStore()))
 }
