@@ -111,7 +111,7 @@ func (bw *badgerWalker) currentKey() ([]byte, bool) {
 
 func (bw *badgerWalker) Delete() error {
 	if !bw.it.Valid() {
-		return kvrows.ErrKeyNotFound
+		panic("badger: delete: walker not on a valid key")
 	}
 	return bw.tx.tx.Delete(bw.it.Item().Key())
 }
@@ -133,7 +133,7 @@ func (bw *badgerWalker) Seek(seek []byte) ([]byte, bool) {
 
 func (bw *badgerWalker) Value(vf func(val []byte) error) error {
 	if !bw.it.Valid() {
-		return kvrows.ErrKeyNotFound
+		panic("badger: value: walker not on a valid key")
 	}
 	return bw.it.Item().Value(vf)
 }

@@ -151,7 +151,6 @@ func (mw *memKVWalker) Delete() error {
 	if !mw.mtx.writable {
 		panic("memkv: set: transaction is not writable")
 	}
-	// XXX: move next to Get and Set in Map instead
 	if len(mw.keys) == 0 {
 		panic("memkv: delete: walker not on a valid key")
 	}
