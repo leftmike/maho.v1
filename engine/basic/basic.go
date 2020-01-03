@@ -2,57 +2,97 @@ package basic
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"io"
 	"sync"
 
+	"github.com/google/btree"
 	"github.com/leftmike/maho/engine"
+	"github.com/leftmike/maho/engine/typedtbl"
 	"github.com/leftmike/maho/engine/virtual"
 	"github.com/leftmike/maho/sql"
 )
 
+const (
+	schemasMID = 1
+	tablesMID  = 2
+)
+
+var (
+	notImplemented         = errors.New("basic: not implemented")
+	errTransactionComplete = errors.New("basic: transaction already completed")
+
+	schemasTableDef = &tableDef{
+		tn:          sql.TableName{sql.ID("system"), sql.ID("private"), sql.ID("schemas")},
+		columns:     []sql.Identifier{sql.ID("database"), sql.ID("schema"), sql.ID("tables")},
+		columnTypes: []sql.ColumnType{sql.IdColType, sql.IdColType, sql.Int64ColType},
+		primary: []engine.ColumnKey{
+			engine.MakeColumnKey(0, false),
+			engine.MakeColumnKey(1, false),
+		},
+		mid: schemasMID,
+	}
+
+	tablesTableDef = &tableDef{
+		tn: sql.TableName{sql.ID("system"), sql.ID("private"), sql.ID("tables")},
+		columns: []sql.Identifier{sql.ID("database"), sql.ID("schema"), sql.ID("table"),
+			sql.ID("mid")},
+		columnTypes: []sql.ColumnType{sql.IdColType, sql.IdColType, sql.IdColType,
+			sql.Int64ColType},
+		primary: []engine.ColumnKey{
+			engine.MakeColumnKey(0, false),
+			engine.MakeColumnKey(1, false),
+			engine.MakeColumnKey(2, false),
+		},
+		mid: tablesMID,
+	}
+)
+
 type basicEngine struct {
-	mutex     sync.RWMutex
-	databases map[sql.Identifier]*database
+	mutex       sync.Mutex
+	databases   map[sql.Identifier]struct{}
+	definitions map[uint64]*tableDef
+	tree        *btree.BTree
+	lastMID     uint64
 }
 
-type transaction struct{}
-
-type database struct {
-	be      *basicEngine
-	schemas map[sql.Identifier]*schema
+type transaction struct {
+	be   *basicEngine
+	tree *btree.BTree
 }
 
-type schema struct {
-	tables map[sql.Identifier]*table
-}
-
-type index struct {
-	keys   []engine.ColumnKey
-	unique bool
-}
-
-type table struct {
-	be          *basicEngine
+type tableDef struct {
 	tn          sql.TableName
 	columns     []sql.Identifier
 	columnTypes []sql.ColumnType
-	rows        [][]sql.Value
-	indexes     map[sql.Identifier]*index
+	primary     []engine.ColumnKey
+	mid         uint64
+}
+
+type table struct {
+	be  *basicEngine
+	tx  *transaction
+	def *tableDef
+}
+
+type midRow struct {
+	def *tableDef
+	row []sql.Value
 }
 
 type rows struct {
-	be      *basicEngine
-	tn      sql.TableName
-	columns []sql.Identifier
-	rows    [][]sql.Value
-	index   int
-	haveRow bool
+	tbl  *table
+	idx  int
+	rows [][]sql.Value
 }
 
 func NewEngine(dataDir string) (engine.Engine, error) {
 	be := &basicEngine{
-		databases: map[sql.Identifier]*database{},
+		databases:   map[sql.Identifier]struct{}{},
+		definitions: map[uint64]*tableDef{},
+		tree:        btree.New(16),
+		lastMID:     63,
 	}
 	ve := virtual.NewEngine(be)
 	return ve, nil
@@ -66,26 +106,77 @@ func (_ *basicEngine) CreateInfoTable(tblname sql.Identifier, maker engine.MakeV
 	panic("basic: use virtual engine with basic engine")
 }
 
-func (be *basicEngine) CreateDatabase(dbname sql.Identifier, options engine.Options) error {
+func (be *basicEngine) createDatabase(dbname sql.Identifier) error {
 	be.mutex.Lock()
 	defer be.mutex.Unlock()
 
 	if _, ok := be.databases[dbname]; ok {
 		return fmt.Errorf("basic: database %s already exists", dbname)
 	}
-	be.databases[dbname] = &database{
-		be: be,
-		schemas: map[sql.Identifier]*schema{
-			sql.PUBLIC: &schema{
-				tables: map[sql.Identifier]*table{},
-			},
-		},
+	be.databases[dbname] = struct{}{}
+
+	return nil
+}
+
+func (be *basicEngine) setupDatabase(dbname sql.Identifier) error {
+	ctx := context.Background()
+	etx := be.Begin(0)
+	err := be.CreateSchema(ctx, etx, sql.SchemaName{dbname, sql.PUBLIC})
+	if err != nil {
+		etx.Rollback()
+		return err
+	}
+	return etx.Commit(ctx)
+}
+
+func (be *basicEngine) CreateDatabase(dbname sql.Identifier, options engine.Options) error {
+	if len(options) != 0 {
+		return fmt.Errorf("basic: unexpected option to create database: %s", dbname)
+	}
+
+	err := be.createDatabase(dbname)
+	if err != nil {
+		return err
+	}
+	err = be.setupDatabase(dbname)
+	if err != nil {
+		be.mutex.Lock()
+		delete(be.databases, dbname)
+		be.mutex.Unlock()
+		return err
 	}
 	return nil
 }
 
+func (be *basicEngine) cleanupDatabase(dbname sql.Identifier) error {
+	ctx := context.Background()
+	etx := be.Begin(0)
+	scnames, err := be.ListSchemas(ctx, etx, dbname)
+	if err != nil {
+		etx.Rollback()
+		return err
+	}
+	for _, scname := range scnames {
+		err = be.DropSchema(ctx, etx, sql.SchemaName{dbname, scname}, true)
+		if err != nil {
+			etx.Rollback()
+			return err
+		}
+	}
+	return etx.Commit(ctx)
+}
+
 func (be *basicEngine) DropDatabase(dbname sql.Identifier, ifExists bool,
 	options engine.Options) error {
+
+	if len(options) != 0 {
+		return fmt.Errorf("basic: unexpected option to drop database: %s", dbname)
+	}
+
+	err := be.cleanupDatabase(dbname)
+	if err != nil {
+		return err
+	}
 
 	be.mutex.Lock()
 	defer be.mutex.Unlock()
@@ -101,112 +192,262 @@ func (be *basicEngine) DropDatabase(dbname sql.Identifier, ifExists bool,
 	return nil
 }
 
-func (be *basicEngine) CreateSchema(ctx context.Context, tx engine.Transaction,
+type schemaRow struct {
+	Database string
+	Schema   string
+	Tables   int64
+}
+
+func (be *basicEngine) makeSchemasTable(tx *transaction) *typedtbl.Table {
+	return typedtbl.MakeTable(schemasTableDef.tn,
+		&table{
+			be:  be,
+			tx:  tx,
+			def: schemasTableDef,
+		})
+}
+
+func (be *basicEngine) CreateSchema(ctx context.Context, etx engine.Transaction,
 	sn sql.SchemaName) error {
 
-	be.mutex.Lock()
-	defer be.mutex.Unlock()
+	// XXX: check for the database
 
-	bdb, ok := be.databases[sn.Database]
-	if !ok {
-		return fmt.Errorf("basic: database %s not found", sn.Database)
-	}
-	return bdb.createSchema(sn)
+	ttbl := be.makeSchemasTable(etx.(*transaction))
+	return ttbl.Insert(ctx,
+		schemaRow{
+			Database: sn.Database.String(),
+			Schema:   sn.Schema.String(),
+			Tables:   0,
+		})
 }
 
-func (be *basicEngine) DropSchema(ctx context.Context, tx engine.Transaction, sn sql.SchemaName,
+func (be *basicEngine) DropSchema(ctx context.Context, etx engine.Transaction, sn sql.SchemaName,
 	ifExists bool) error {
 
-	be.mutex.Lock()
-	defer be.mutex.Unlock()
-
-	bdb, ok := be.databases[sn.Database]
-	if !ok {
-		return fmt.Errorf("basic: database %s not found", sn.Database)
+	ttbl := be.makeSchemasTable(etx.(*transaction))
+	rows, err := ttbl.Seek(ctx,
+		[]sql.Value{sql.StringValue(sn.Database.String()), sql.StringValue(sn.Schema.String())})
+	if err != nil {
+		return err
 	}
-	return bdb.dropSchema(sn, ifExists)
+	defer rows.Close()
+
+	var sr schemaRow
+	err = rows.Next(ctx, &sr)
+	if err == io.EOF {
+		if ifExists {
+			return nil
+		}
+		return fmt.Errorf("basic: schema %s not found", sn)
+	} else if err != nil {
+		return err
+	}
+
+	if sr.Database != sn.Database.String() || sr.Schema != sn.Schema.String() {
+		if ifExists {
+			return nil
+		}
+		return fmt.Errorf("basic: schema %s not found", sn)
+	}
+	if sr.Tables > 0 {
+		return fmt.Errorf("basic: schema %s is not empty", sn)
+	}
+	return rows.Delete(ctx)
 }
 
-func (be *basicEngine) LookupTable(ctx context.Context, tx engine.Transaction,
+func (be *basicEngine) updateSchema(ctx context.Context, tx *transaction, sn sql.SchemaName,
+	delta int64) error {
+
+	ttbl := be.makeSchemasTable(tx)
+	rows, err := ttbl.Seek(ctx,
+		[]sql.Value{sql.StringValue(sn.Database.String()), sql.StringValue(sn.Schema.String())})
+	if err != nil {
+		return err
+	}
+	defer rows.Close()
+
+	var sr schemaRow
+	err = rows.Next(ctx, &sr)
+	if err == io.EOF {
+		return fmt.Errorf("basic: schema %s not found", sn)
+	} else if err != nil {
+		return err
+	}
+
+	if sr.Database != sn.Database.String() || sr.Schema != sn.Schema.String() {
+		return fmt.Errorf("basic: schema %s not found", sn)
+	}
+	return rows.Update(ctx,
+		struct {
+			Tables int64
+		}{sr.Tables + delta})
+}
+
+type tableRow struct {
+	Database string
+	Schema   string
+	Table    string
+	MID      int64
+}
+
+func (be *basicEngine) makeTablesTable(tx *transaction) *typedtbl.Table {
+	return typedtbl.MakeTable(tablesTableDef.tn,
+		&table{
+			be:  be,
+			tx:  tx,
+			def: tablesTableDef,
+		})
+}
+
+func (be *basicEngine) LookupTable(ctx context.Context, etx engine.Transaction,
 	tn sql.TableName) (engine.Table, error) {
 
-	be.mutex.RLock()
-	defer be.mutex.RUnlock()
-
-	bdb, ok := be.databases[tn.Database]
-	if !ok {
-		return nil, fmt.Errorf("basic: database %s not found", tn.Database)
+	tx := etx.(*transaction)
+	ttbl := be.makeTablesTable(tx)
+	rows, err := ttbl.Seek(ctx,
+		[]sql.Value{
+			sql.StringValue(tn.Database.String()),
+			sql.StringValue(tn.Schema.String()),
+			sql.StringValue(tn.Table.String()),
+		})
+	if err != nil {
+		return nil, err
 	}
-	return bdb.lookupTable(ctx, tx, tn)
+	defer rows.Close()
+
+	var tr tableRow
+	err = rows.Next(ctx, &tr)
+	if err == io.EOF {
+		return nil, fmt.Errorf("basic: table %s not found", tn)
+	} else if err != nil {
+		return nil, err
+	}
+
+	if tr.Database != tn.Database.String() || tr.Schema != tn.Schema.String() ||
+		tr.Table != tn.Table.String() {
+
+		return nil, fmt.Errorf("basic: table %s not found", tn)
+	}
+
+	def, ok := be.definitions[uint64(tr.MID)]
+	if !ok {
+		panic(fmt.Sprintf("basic: table %s missing table definition", tn))
+	}
+
+	return &table{
+		be:  be,
+		tx:  tx,
+		def: def,
+	}, nil
 }
 
-func (be *basicEngine) CreateTable(ctx context.Context, tx engine.Transaction, tn sql.TableName,
+func (be *basicEngine) CreateTable(ctx context.Context, etx engine.Transaction, tn sql.TableName,
 	cols []sql.Identifier, colTypes []sql.ColumnType, primary []engine.ColumnKey,
 	ifNotExists bool) error {
 
-	be.mutex.Lock()
-	defer be.mutex.Unlock()
-
-	bdb, ok := be.databases[tn.Database]
-	if !ok {
-		return fmt.Errorf("basic: database %s not found", tn.Database)
+	tx := etx.(*transaction)
+	err := be.updateSchema(ctx, tx, tn.SchemaName(), 1)
+	if err != nil {
+		return err
 	}
-	return bdb.createTable(ctx, tx, tn, cols, colTypes, primary, ifNotExists)
+
+	be.lastMID += 1
+	ttbl := be.makeTablesTable(tx)
+	err = ttbl.Insert(ctx,
+		tableRow{
+			Database: tn.Database.String(),
+			Schema:   tn.Schema.String(),
+			Table:    tn.Table.String(),
+			MID:      int64(be.lastMID),
+		})
+	if err != nil {
+		return err
+	}
+
+	be.definitions[be.lastMID] =
+		&tableDef{
+			tn:          tn,
+			columns:     cols,
+			columnTypes: colTypes,
+			primary:     primary,
+			mid:         be.lastMID,
+		}
+	return nil
 }
 
-func (be *basicEngine) DropTable(ctx context.Context, tx engine.Transaction, tn sql.TableName,
+func (be *basicEngine) DropTable(ctx context.Context, etx engine.Transaction, tn sql.TableName,
 	ifExists bool) error {
 
-	be.mutex.Lock()
-	defer be.mutex.Unlock()
-
-	bdb, ok := be.databases[tn.Database]
-	if !ok {
-		return fmt.Errorf("basic: database %s not found", tn.Database)
+	tx := etx.(*transaction)
+	err := be.updateSchema(ctx, tx, tn.SchemaName(), -1)
+	if err != nil {
+		return err
 	}
-	return bdb.dropTable(ctx, tx, tn, ifExists)
+
+	ttbl := be.makeTablesTable(tx)
+	rows, err := ttbl.Seek(ctx,
+		[]sql.Value{
+			sql.StringValue(tn.Database.String()),
+			sql.StringValue(tn.Schema.String()),
+			sql.StringValue(tn.Table.String()),
+		})
+	if err != nil {
+		return err
+	}
+	defer rows.Close()
+
+	var tr tableRow
+	err = rows.Next(ctx, &tr)
+	if err == io.EOF {
+		if ifExists {
+			return nil
+		}
+		return fmt.Errorf("basic: table %s not found", tn)
+	} else if err != nil {
+		return err
+	}
+
+	if tr.Database != tn.Database.String() || tr.Schema != tn.Schema.String() ||
+		tr.Table != tn.Table.String() {
+
+		if ifExists {
+			return nil
+		}
+		return fmt.Errorf("basic: table %s not found", tn)
+	}
+	return rows.Delete(ctx)
 }
 
 func (be *basicEngine) CreateIndex(ctx context.Context, tx engine.Transaction,
 	idxname sql.Identifier, tn sql.TableName, unique bool, keys []engine.ColumnKey,
 	ifNotExists bool) error {
 
-	be.mutex.Lock()
-	defer be.mutex.Unlock()
-
-	bdb, ok := be.databases[tn.Database]
-	if !ok {
-		return fmt.Errorf("basic: database %s not found", tn.Database)
-	}
-	return bdb.createIndex(ctx, tx, idxname, tn, unique, keys, ifNotExists)
+	// XXX
+	return nil
 }
 
 func (be *basicEngine) DropIndex(ctx context.Context, tx engine.Transaction, idxname sql.Identifier,
 	tn sql.TableName, ifExists bool) error {
 
-	be.mutex.Lock()
-	defer be.mutex.Unlock()
-
-	bdb, ok := be.databases[tn.Database]
-	if !ok {
-		return fmt.Errorf("basic: database %s not found", tn.Database)
-	}
-	return bdb.dropIndex(ctx, tx, idxname, tn, ifExists)
+	// XXX
+	return nil
 }
 
-func (_ *basicEngine) Begin(sesid uint64) engine.Transaction {
-	return &transaction{}
+func (be *basicEngine) Begin(sesid uint64) engine.Transaction {
+	be.mutex.Lock()
+	return &transaction{
+		be:   be,
+		tree: be.tree,
+	}
 }
 
 func (_ *basicEngine) IsTransactional() bool {
-	return false
+	// XXX: get rid of IsTransactional
+	return true
 }
 
 func (be *basicEngine) ListDatabases(ctx context.Context, tx engine.Transaction) ([]sql.Identifier,
 	error) {
-
-	be.mutex.RLock()
-	defer be.mutex.RUnlock()
 
 	var dbnames []sql.Identifier
 	for dbname := range be.databases {
@@ -215,282 +456,231 @@ func (be *basicEngine) ListDatabases(ctx context.Context, tx engine.Transaction)
 	return dbnames, nil
 }
 
-func (be *basicEngine) ListSchemas(ctx context.Context, tx engine.Transaction,
+func (be *basicEngine) ListSchemas(ctx context.Context, etx engine.Transaction,
 	dbname sql.Identifier) ([]sql.Identifier, error) {
 
-	be.mutex.RLock()
-	defer be.mutex.RUnlock()
-
-	bdb, ok := be.databases[dbname]
-	if !ok {
-		return nil, fmt.Errorf("basic: database %s not found", dbname)
+	ttbl := be.makeSchemasTable(etx.(*transaction))
+	rows, err := ttbl.Seek(ctx, []sql.Value{sql.StringValue(dbname.String()), sql.StringValue("")})
+	if err != nil {
+		return nil, err
 	}
 
 	var scnames []sql.Identifier
-	for scname := range bdb.schemas {
-		scnames = append(scnames, scname)
+	for {
+		var sr schemaRow
+		err = rows.Next(ctx, &sr)
+		if err == io.EOF {
+			break
+		} else if err != nil {
+			return nil, err
+		}
+		if sr.Database != dbname.String() {
+			break
+		}
+		scnames = append(scnames, sql.ID(sr.Schema))
 	}
 	return scnames, nil
 }
 
-func (be *basicEngine) ListTables(ctx context.Context, tx engine.Transaction,
+func (be *basicEngine) ListTables(ctx context.Context, etx engine.Transaction,
 	sn sql.SchemaName) ([]sql.Identifier, error) {
 
-	be.mutex.RLock()
-	defer be.mutex.RUnlock()
-
-	bdb, ok := be.databases[sn.Database]
-	if !ok {
-		return nil, fmt.Errorf("basic: database %s not found", sn.Database)
-	}
-
-	bsc, ok := bdb.schemas[sn.Schema]
-	if !ok {
-		return nil, fmt.Errorf("basic: schema %s not found", sn)
+	tx := etx.(*transaction)
+	ttbl := be.makeTablesTable(tx)
+	rows, err := ttbl.Seek(ctx,
+		[]sql.Value{
+			sql.StringValue(sn.Database.String()),
+			sql.StringValue(sn.Schema.String()),
+			sql.StringValue(""),
+		})
+	if err != nil {
+		return nil, err
 	}
 
 	var tblnames []sql.Identifier
-	for tblname := range bsc.tables {
-		tblnames = append(tblnames, tblname)
+	for {
+		var tr tableRow
+		err = rows.Next(ctx, &tr)
+		if err == io.EOF {
+			break
+		} else if err != nil {
+			return nil, err
+		}
+		if tr.Database != sn.Database.String() || tr.Schema != sn.Schema.String() {
+			break
+		}
+		tblnames = append(tblnames, sql.ID(tr.Table))
 	}
 	return tblnames, nil
 }
 
-func (_ *transaction) Commit(ctx context.Context) error {
+func (btx *transaction) Commit(ctx context.Context) error {
+	if btx.be == nil {
+		return errTransactionComplete
+	}
+
+	btx.be.tree = btx.tree
+	btx.be.mutex.Unlock()
+	btx.be = nil
+	btx.tree = nil
 	return nil
 }
 
-func (_ *transaction) Rollback() error {
+func (btx *transaction) Rollback() error {
+	if btx.be == nil {
+		return errTransactionComplete
+	}
+
+	btx.be.mutex.Unlock()
+	btx.be = nil
+	btx.tree = nil
 	return nil
 }
 
 func (_ *transaction) NextStmt() {}
 
-func (bdb *database) createSchema(sn sql.SchemaName) error {
-	if _, ok := bdb.schemas[sn.Schema]; ok {
-		return fmt.Errorf("basic: schema %s already exists", sn)
+func (btx *transaction) forWrite() {
+	if btx.tree == btx.be.tree {
+		btx.tree = btx.be.tree.Clone()
 	}
-	bdb.schemas[sn.Schema] = &schema{
-		tables: map[sql.Identifier]*table{},
-	}
-	return nil
 }
 
-func (bdb *database) dropSchema(sn sql.SchemaName, ifExists bool) error {
-	bsc, ok := bdb.schemas[sn.Schema]
-	if !ok {
-		if ifExists {
-			return nil
+func (mr midRow) Less(item btree.Item) bool {
+	mr2 := item.(midRow)
+	if mr.def.mid < mr2.def.mid {
+		return true
+	} else if mr.def != mr2.def {
+		return false
+	} else if mr2.row == nil {
+		return false
+	} else if mr.row == nil {
+		return true
+	}
+
+	for _, ck := range mr.def.primary {
+		idx := ck.Number()
+		cmp := sql.Compare(mr.row[idx], mr2.row[idx])
+		if cmp == 0 {
+			continue
 		}
-		return fmt.Errorf("basic: schema %s not found", sn)
-	}
-	if len(bsc.tables) > 0 {
-		return fmt.Errorf("basic: schema %s is not empty", sn)
-	}
-
-	delete(bdb.schemas, sn.Schema)
-	return nil
-}
-
-func (bdb *database) lookupTable(ctx context.Context, tx engine.Transaction,
-	tn sql.TableName) (engine.Table, error) {
-
-	bsc, ok := bdb.schemas[tn.Schema]
-	if !ok {
-		return nil, fmt.Errorf("basic: schema %s not found", tn.SchemaName())
-	}
-
-	tbl, ok := bsc.tables[tn.Table]
-	if !ok {
-		return nil, fmt.Errorf("basic: table %s not found", tn)
-	}
-	return tbl, nil
-}
-
-func (bdb *database) createTable(ctx context.Context, tx engine.Transaction, tn sql.TableName,
-	cols []sql.Identifier, colTypes []sql.ColumnType, primary []engine.ColumnKey,
-	ifNotExists bool) error {
-
-	bsc, ok := bdb.schemas[tn.Schema]
-	if !ok {
-		return fmt.Errorf("basic: schema %s not found", tn.SchemaName())
-	}
-
-	if _, dup := bsc.tables[tn.Table]; dup {
-		if ifNotExists {
-			return nil
-		}
-		return fmt.Errorf("basic: table %s already exists", tn)
-	}
-
-	tbl := &table{
-		be:          bdb.be,
-		tn:          tn,
-		columns:     cols,
-		columnTypes: colTypes,
-		rows:        nil,
-		indexes:     map[sql.Identifier]*index{},
-	}
-	if primary != nil {
-		tbl.indexes[sql.PRIMARY] = &index{
-			keys:   primary,
-			unique: true,
+		if ck.Reverse() {
+			return cmp > 0
+		} else {
+			return cmp < 0
 		}
 	}
-	bsc.tables[tn.Table] = tbl
-	return nil
-}
 
-func (bdb *database) dropTable(ctx context.Context, tx engine.Transaction, tn sql.TableName,
-	ifExists bool) error {
-
-	bsc, ok := bdb.schemas[tn.Schema]
-	if !ok {
-		return fmt.Errorf("basic: schema %s not found", tn.SchemaName())
-	}
-
-	if _, ok := bsc.tables[tn.Table]; !ok {
-		if ifExists {
-			return nil
-		}
-		return fmt.Errorf("basic: table %s does not exist", tn)
-	}
-	delete(bsc.tables, tn.Table)
-	return nil
-}
-
-func (bdb *database) createIndex(ctx context.Context, tx engine.Transaction,
-	idxname sql.Identifier, tn sql.TableName, unique bool, keys []engine.ColumnKey,
-	ifNotExists bool) error {
-
-	bsc, ok := bdb.schemas[tn.Schema]
-	if !ok {
-		return fmt.Errorf("basic: schema %s not found", tn.SchemaName())
-	}
-
-	tbl, ok := bsc.tables[tn.Table]
-	if !ok {
-		return fmt.Errorf("basic: table %s not found", tn)
-	}
-
-	if _, dup := tbl.indexes[idxname]; dup {
-		if ifNotExists {
-			return nil
-		}
-		return fmt.Errorf("basic: index %s already exists in table %s", idxname, tn)
-	}
-
-	tbl.indexes[idxname] = &index{
-		keys:   keys,
-		unique: unique,
-	}
-	return nil
-}
-
-func (bdb *database) dropIndex(ctx context.Context, tx engine.Transaction, idxname sql.Identifier,
-	tn sql.TableName, ifExists bool) error {
-
-	bsc, ok := bdb.schemas[tn.Schema]
-	if !ok {
-		return fmt.Errorf("basic: schema %s not found", tn.SchemaName())
-	}
-
-	tbl, ok := bsc.tables[tn.Table]
-	if !ok {
-		return fmt.Errorf("basic: table %s not found", tn)
-	}
-
-	if _, ok := tbl.indexes[idxname]; !ok {
-		if ifExists {
-			return nil
-		}
-		return fmt.Errorf("basic: index %s does not exist in table %s", idxname, tn)
-	}
-	delete(tbl.indexes, idxname)
-	return nil
+	return false
 }
 
 func (bt *table) Columns(ctx context.Context) []sql.Identifier {
-	return bt.columns
+	return bt.def.columns
 }
 
 func (bt *table) ColumnTypes(ctx context.Context) []sql.ColumnType {
-	return bt.columnTypes
+	return bt.def.columnTypes
 }
 
 func (bt *table) PrimaryKey(ctx context.Context) []engine.ColumnKey {
-	return nil
+	return bt.def.primary
 }
 
 func (bt *table) Seek(ctx context.Context, row []sql.Value) (engine.Rows, error) {
-	return bt.Rows(ctx)
+	br := &rows{
+		tbl: bt,
+		idx: 0,
+	}
+	bt.tx.tree.AscendGreaterOrEqual(midRow{bt.def, row}, br.itemIterator)
+	return br, nil
 }
 
 func (bt *table) Rows(ctx context.Context) (engine.Rows, error) {
-	bt.be.mutex.RLock()
-	defer bt.be.mutex.RUnlock()
-
-	return &rows{be: bt.be, tn: bt.tn, columns: bt.columns, rows: bt.rows}, nil
+	return bt.Seek(ctx, nil)
 }
 
 func (bt *table) Insert(ctx context.Context, row []sql.Value) error {
-	bt.be.mutex.Lock()
-	defer bt.be.mutex.Unlock()
+	bt.tx.forWrite()
 
-	bt.rows = append(bt.rows, row)
+	if bt.tx.tree.Has(midRow{bt.def, row}) {
+		return fmt.Errorf("basic: %s: existing row with duplicate primary key", bt.def.tn)
+	}
+
+	bt.tx.tree.ReplaceOrInsert(midRow{bt.def, append(make([]sql.Value, 0, len(row)), row...)})
 	return nil
 }
 
+func (br *rows) itemIterator(item btree.Item) bool {
+	mr := item.(midRow)
+	if mr.def.mid != br.tbl.def.mid {
+		return false
+	}
+	br.rows = append(br.rows, mr.row)
+	return true
+}
+
 func (br *rows) Columns() []sql.Identifier {
-	return br.columns
+	return br.tbl.def.columns
 }
 
 func (br *rows) Close() error {
-	br.index = len(br.rows)
-	br.haveRow = false
+	br.tbl = nil
+	br.rows = nil
+	br.idx = 0
 	return nil
 }
 
 func (br *rows) Next(ctx context.Context, dest []sql.Value) error {
-	br.be.mutex.RLock()
-	defer br.be.mutex.RUnlock()
-
-	for br.index < len(br.rows) {
-		if br.rows[br.index] != nil {
-			copy(dest, br.rows[br.index])
-			br.index += 1
-			br.haveRow = true
-			return nil
-		}
-		br.index += 1
+	if br.idx == len(br.rows) {
+		return io.EOF
 	}
 
-	br.haveRow = false
-	return io.EOF
+	copy(dest, br.rows[br.idx])
+	br.idx += 1
+	return nil
 }
 
 func (br *rows) Delete(ctx context.Context) error {
-	br.be.mutex.Lock()
-	defer br.be.mutex.Unlock()
+	br.tbl.tx.forWrite()
 
-	if !br.haveRow {
-		return fmt.Errorf("basic: table %s no row to delete", br.tn)
+	if br.idx == 0 {
+		panic(fmt.Sprintf("basic: table %s no row to delete", br.tbl.def.tn))
 	}
-	br.haveRow = false
-	br.rows[br.index-1] = nil
+
+	br.tbl.tx.tree.Delete(midRow{br.tbl.def, br.rows[br.idx-1]})
 	return nil
 }
 
 func (br *rows) Update(ctx context.Context, updates []sql.ColumnUpdate) error {
-	br.be.mutex.Lock()
-	defer br.be.mutex.Unlock()
+	br.tbl.tx.forWrite()
 
-	if !br.haveRow {
-		return fmt.Errorf("basic: table %s no row to update", br.tn)
+	if br.idx == 0 {
+		// XXX: fix Update and Delete to panic rather than returning an error everywhere
+		panic(fmt.Sprintf("basic: table %s no row to delete", br.tbl.def.tn))
 	}
-	row := br.rows[br.index-1]
-	for _, up := range updates {
-		row[up.Index] = up.Value
+
+	var primaryUpdated bool
+	for _, update := range updates {
+		for _, ck := range br.tbl.def.primary {
+			if ck.Number() == update.Index {
+				primaryUpdated = true
+			}
+		}
 	}
+
+	if primaryUpdated {
+		br.Delete(ctx)
+
+		for _, update := range updates {
+			br.rows[br.idx-1][update.Index] = update.Value
+		}
+
+		return br.tbl.Insert(ctx, br.rows[br.idx-1])
+	}
+
+	row := append(make([]sql.Value, 0, len(br.rows[br.idx-1])), br.rows[br.idx-1]...)
+	for _, update := range updates {
+		row[update.Index] = update.Value
+	}
+	br.tbl.tx.tree.ReplaceOrInsert(midRow{br.tbl.def, row})
 	return nil
 }

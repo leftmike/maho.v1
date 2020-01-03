@@ -39,7 +39,7 @@ var (
 		engine.MakeColumnKey(1, false),
 	}
 
-	tablesTableName = sql.TableName{sql.ID("system"), sql.ID("private"), sql.ID("table")}
+	tablesTableName = sql.TableName{sql.ID("system"), sql.ID("private"), sql.ID("tables")}
 	tablesPrimary   = []engine.ColumnKey{
 		engine.MakeColumnKey(0, false),
 		engine.MakeColumnKey(1, false),
@@ -347,6 +347,8 @@ func (kv *KVRows) CreateSchema(ctx context.Context, etx engine.Transaction,
 	if err != nil {
 		return nil
 	}
+
+	// XXX: check for the database
 
 	ttbl := kv.makeSchemasTable(tx)
 	return ttbl.Insert(ctx,

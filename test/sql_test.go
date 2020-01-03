@@ -86,8 +86,11 @@ func testSQL(t *testing.T, typ string, dbname sql.Identifier, testData string) {
 }
 
 func TestSQLBasic(t *testing.T) {
-	testSQL(t, "basic", sql.ID("test_basic"), "testdata")
-	testSQL(t, "basic", sql.ID("sqltest_basic"), *testData)
+	/*
+		XXX: basic needs to support tables without a primary key
+		testSQL(t, "basic", sql.ID("test_basic"), "testdata")
+		testSQL(t, "basic", sql.ID("sqltest_basic"), *testData)
+	*/
 }
 
 func TestSQLMemRows(t *testing.T) {

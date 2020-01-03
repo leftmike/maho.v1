@@ -49,7 +49,7 @@ func (mkv midKeyVal) Less(item btree.Item) bool {
 
 func OpenStore() *memKVStore {
 	return &memKVStore{
-		tree: btree.New(128),
+		tree: btree.New(16),
 	}
 }
 

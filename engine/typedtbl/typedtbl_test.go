@@ -2,6 +2,7 @@ package typedtbl_test
 
 import (
 	"context"
+	"fmt"
 	"io"
 	"testing"
 
@@ -102,11 +103,10 @@ func TestTypedTable(t *testing.T) {
 	if !testutil.DeepEqual(colTypes, columnTypes) {
 		t.Errorf("ColumnTypes(): got %v want %v", colTypes, columnTypes)
 	}
-	// XXX: basic does not yet support primary keys
-	//pkey := ttbl.PrimaryKey(ctx)
-	//if !testutil.DeepEqual(pkey, primaryKey) {
-	//	t.Errorf("PrimaryKey(): got %v want %v", pkey, primaryKey)
-	//}
+	pkey := ttbl.PrimaryKey(ctx)
+	if !testutil.DeepEqual(pkey, primaryKey) {
+		t.Errorf("PrimaryKey(): got %v want %v", pkey, primaryKey)
+	}
 
 	tr := []testRow{
 		{
@@ -217,7 +217,7 @@ func TestTypedTable(t *testing.T) {
 		}
 		var s string
 		if dest.NullStr == nil {
-			s = "<nil>"
+			s = fmt.Sprintf("<nil> at %d", dest.I64)
 		} else {
 			s = *dest.NullStr
 		}
