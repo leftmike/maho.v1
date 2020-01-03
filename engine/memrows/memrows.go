@@ -807,7 +807,7 @@ func (mr *rows) Next(ctx context.Context, dest []sql.Value) error {
 
 func (mr *rows) Delete(ctx context.Context) error {
 	if !mr.haveRow {
-		return fmt.Errorf("memrows: table %s no row to delete", mr.table.tn)
+		panic(fmt.Sprintf("memrows: table %s no row to delete", mr.table.tn))
 	}
 	if !mr.table.modifyLock {
 		err := mr.table.tctx.tx.LockTable(ctx, mr.table.tn, service.ROW_MODIFY)
@@ -828,7 +828,7 @@ func (mr *rows) Delete(ctx context.Context) error {
 
 func (mr *rows) Update(ctx context.Context, updates []sql.ColumnUpdate) error {
 	if !mr.haveRow {
-		return fmt.Errorf("memrows: table %s no row to update", mr.table.tn)
+		panic(fmt.Sprintf("memrows: table %s no row to update", mr.table.tn))
 	}
 	if !mr.table.modifyLock {
 		err := mr.table.tctx.tx.LockTable(ctx, mr.table.tn, service.ROW_MODIFY)

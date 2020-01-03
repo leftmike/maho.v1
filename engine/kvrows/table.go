@@ -142,7 +142,7 @@ func (r *rows) Next(ctx context.Context, dest []sql.Value) error {
 
 func (r *rows) Delete(ctx context.Context) error {
 	if r.idx == 0 {
-		return fmt.Errorf("kvrows: table %d no row to delete", r.tbl.mid)
+		panic(fmt.Sprintf("kvrows: table %d no row to delete", r.tbl.mid))
 	}
 
 	kv := r.tbl.kv
@@ -169,7 +169,7 @@ func (ru rowUpdates) modifyKeyValue(key []byte, ver uint64, val []byte) ([]byte,
 
 func (r *rows) Update(ctx context.Context, updates []sql.ColumnUpdate) error {
 	if r.idx == 0 {
-		return fmt.Errorf("kvrows: table %d no row to update", r.tbl.mid)
+		panic(fmt.Sprintf("kvrows: table %d no row to update", r.tbl.mid))
 	}
 
 	var primaryUpdated bool

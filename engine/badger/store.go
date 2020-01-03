@@ -63,7 +63,7 @@ func (btx *badgerTx) Rollback() error {
 }
 
 func (bm *badgerMapper) addPrefix(key []byte) []byte {
-	return append(bm.prefix, key...) // XXX: need to copy bm.prefix
+	return append(bm.prefix, key...)
 }
 
 func (bm *badgerMapper) Get(key []byte, vf func(val []byte) error) error {
@@ -82,7 +82,8 @@ func (bm *badgerMapper) Set(key, val []byte) error {
 
 func (bm *badgerMapper) Walk(prefix []byte) localkv.Walker {
 	opts := badger.DefaultIteratorOptions
-	opts.Prefix = bm.addPrefix(prefix)
+	prefix = bm.addPrefix(prefix)
+	opts.Prefix = append(make([]byte, 0, len(prefix)), prefix...)
 	return &badgerWalker{
 		it:         bm.tx.tx.NewIterator(opts),
 		tx:         bm.tx,
@@ -111,7 +112,7 @@ func (bw *badgerWalker) currentKey() ([]byte, bool) {
 
 func (bw *badgerWalker) Delete() error {
 	if !bw.it.Valid() {
-		panic("badger: delete: walker not on a valid key")
+		panic("badger: no key to delete")
 	}
 	return bw.tx.tx.Delete(bw.it.Item().Key())
 }
@@ -127,13 +128,13 @@ func (bw *badgerWalker) Rewind() ([]byte, bool) {
 }
 
 func (bw *badgerWalker) Seek(seek []byte) ([]byte, bool) {
-	bw.it.Seek(append(bw.seekPrefix, seek...)) // XXX: need to copy bw.seekPrefix
+	bw.it.Seek(append(bw.seekPrefix, seek...))
 	return bw.currentKey()
 }
 
 func (bw *badgerWalker) Value(vf func(val []byte) error) error {
 	if !bw.it.Valid() {
-		panic("badger: value: walker not on a valid key")
+		panic("badger: no key to get value")
 	}
 	return bw.it.Item().Value(vf)
 }

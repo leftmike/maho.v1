@@ -171,7 +171,7 @@ func (bw *bboltWalker) Seek(seek []byte) ([]byte, bool) {
 
 func (bw *bboltWalker) Value(vf func(val []byte) error) error {
 	if bw.value == nil {
-		panic("bbolt: value: walker not on a valid key")
+		panic("bbolt: no key to get value")
 	}
 	return vf(bw.value)
 }

@@ -149,10 +149,10 @@ func (mw *memKVWalker) Close() {
 
 func (mw *memKVWalker) Delete() error {
 	if !mw.mtx.writable {
-		panic("memkv: set: transaction is not writable")
+		panic("memkv: delete: transaction is not writable")
 	}
 	if len(mw.keys) == 0 {
-		panic("memkv: delete: walker not on a valid key")
+		panic(fmt.Sprintf("memkv: map %d no key to delete", mw.mid))
 	}
 	item := mw.mtx.tree.Delete(midKeyVal{mid: mw.mid, key: mw.keys[0]})
 	if item == nil {
@@ -205,7 +205,7 @@ func (mw *memKVWalker) Seek(seek []byte) ([]byte, bool) {
 
 func (mw *memKVWalker) Value(vf func(val []byte) error) error {
 	if len(mw.keys) == 0 {
-		panic("memkv: value: walker not on a valid key")
+		panic(fmt.Sprintf("memkv: map %d no key to get value", mw.mid))
 	}
 	return vf(mw.vals[0])
 }

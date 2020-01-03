@@ -652,7 +652,6 @@ func (br *rows) Update(ctx context.Context, updates []sql.ColumnUpdate) error {
 	br.tbl.tx.forWrite()
 
 	if br.idx == 0 {
-		// XXX: fix Update and Delete to panic rather than returning an error everywhere
 		panic(fmt.Sprintf("basic: table %s no row to delete", br.tbl.def.tn))
 	}
 
