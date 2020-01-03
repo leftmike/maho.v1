@@ -37,7 +37,3 @@ func (_ *badgerEngine) CreateSystemTable(tblname sql.Identifier, maker engine.Ma
 func (_ *badgerEngine) CreateInfoTable(tblname sql.Identifier, maker engine.MakeVirtual) {
 	panic("badger: use virtual engine with badger engine")
 }
-
-func (_ *badgerEngine) IsTransactional() bool {
-	return true
-}

@@ -215,10 +215,6 @@ func (_ *KVRows) CreateInfoTable(tblname sql.Identifier, maker engine.MakeVirtua
 	panic("kvrows: use virtual engine with kvrows engine")
 }
 
-func (_ *KVRows) IsTransactional() bool {
-	return true
-}
-
 func makeDatabaseKey(dbname sql.Identifier) []byte {
 	return MakeMetadataKey([]sql.Value{sql.StringValue(dbname.String())})
 }

@@ -234,10 +234,6 @@ func (me *memrowsEngine) Begin(sesid uint64) engine.Transaction {
 	return me.txService.Begin(sesid)
 }
 
-func (_ *memrowsEngine) IsTransactional() bool {
-	return true
-}
-
 func (me *memrowsEngine) ListDatabases(ctx context.Context,
 	tx engine.Transaction) ([]sql.Identifier, error) {
 

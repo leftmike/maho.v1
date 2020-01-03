@@ -444,11 +444,6 @@ func (be *basicEngine) Begin(sesid uint64) engine.Transaction {
 	}
 }
 
-func (_ *basicEngine) IsTransactional() bool {
-	// XXX: get rid of IsTransactional
-	return true
-}
-
 func (be *basicEngine) ListDatabases(ctx context.Context, tx engine.Transaction) ([]sql.Identifier,
 	error) {
 

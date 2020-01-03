@@ -60,7 +60,6 @@ type Engine interface {
 		ifExists bool) error
 
 	Begin(sesid uint64) Transaction
-	IsTransactional() bool
 
 	ListDatabases(ctx context.Context, tx Transaction) ([]sql.Identifier, error)
 	ListSchemas(ctx context.Context, tx Transaction, dbname sql.Identifier) ([]sql.Identifier,

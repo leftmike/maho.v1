@@ -44,17 +44,16 @@ const (
 )
 
 type engCmd struct {
-	cmd              int
-	tdx              int                // Which transaction to use
-	fail             bool               // The command should fail
-	needTransactions bool               // The test requires that transactions are supported
-	ifExists         bool               // Flag for DropTable or DropSchema
-	name             sql.Identifier     // Name of the table or schema
-	list             []string           // List of table names or schema names
-	values           [][]sql.Value      // Expected rows (table.Rows)
-	row              []sql.Value        // Row to insert (table.Insert)
-	rowID            int                // Row to update (rows.Update) or delete (rows.Delete)
-	updates          []sql.ColumnUpdate // Updates to a row (rows.Update)
+	cmd      int
+	tdx      int                // Which transaction to use
+	fail     bool               // The command should fail
+	ifExists bool               // Flag for DropTable or DropSchema
+	name     sql.Identifier     // Name of the table or schema
+	list     []string           // List of table names or schema names
+	values   [][]sql.Value      // Expected rows (table.Rows)
+	row      []sql.Value        // Row to insert (table.Insert)
+	rowID    int                // Row to update (rows.Update) or delete (rows.Delete)
+	updates  []sql.ColumnUpdate // Updates to a row (rows.Update)
 }
 
 type transactionState struct {
@@ -124,9 +123,6 @@ func testDatabase(t *testing.T, e engine.Engine, dbname sql.Identifier, cmds []e
 		case cmdBegin:
 			if state.tx != nil {
 				panic("tx != nil: missing commit or rollback from commands")
-			}
-			if cmd.needTransactions && !e.IsTransactional() {
-				return // Engine does not support transactions, so skip these tests.
 			}
 			state.tx = e.Begin(uint64(state.tdx))
 			if state.tx == nil {
@@ -472,7 +468,7 @@ func RunTableLifecycleTest(t *testing.T, e engine.Engine) {
 			{cmd: cmdListTables, list: []string{"tbl-b", "tbl-c", "tbl-d"}},
 			{cmd: cmdCommit},
 
-			{cmd: cmdBegin, needTransactions: true},
+			{cmd: cmdBegin},
 			{cmd: cmdCreateTable, name: sql.ID("tbl-e")},
 			{cmd: cmdListTables, list: []string{"tbl-b", "tbl-c", "tbl-d", "tbl-e"}},
 			{cmd: cmdRollback},
@@ -692,7 +688,7 @@ func RunSchemaTest(t *testing.T, e engine.Engine) {
 			{cmd: cmdListSchemas, list: []string{"public", "sc-b", "sc-c", "sc-d"}},
 			{cmd: cmdCommit},
 
-			{cmd: cmdBegin, needTransactions: true},
+			{cmd: cmdBegin},
 			{cmd: cmdCreateSchema, name: sql.ID("sc-e")},
 			{cmd: cmdListSchemas, list: []string{"public", "sc-b", "sc-c", "sc-d", "sc-e"}},
 			{cmd: cmdRollback},
@@ -952,7 +948,7 @@ func RunTableRowsTest(t *testing.T, e engine.Engine) {
 			},
 			{cmd: cmdCommit},
 
-			{cmd: cmdBegin, needTransactions: true},
+			{cmd: cmdBegin},
 			{cmd: cmdLookupTable, name: sql.ID("tbl1")},
 			{cmd: cmdInsert, row: []sql.Value{sql.Int64Value(3), sql.Int64Value(9),
 				sql.StringValue("third row")}},
@@ -1065,7 +1061,7 @@ func RunTableRowsTest(t *testing.T, e engine.Engine) {
 			},
 			{cmd: cmdCommit},
 
-			{cmd: cmdBegin, needTransactions: true},
+			{cmd: cmdBegin},
 			{cmd: cmdLookupTable, name: sql.ID("tbl2")},
 			{cmd: cmdDelete, rowID: 1},
 			{cmd: cmdNextStmt},
@@ -1158,7 +1154,7 @@ func RunTableRowsTest(t *testing.T, e engine.Engine) {
 			},
 			{cmd: cmdCommit},
 
-			{cmd: cmdBegin, needTransactions: true},
+			{cmd: cmdBegin},
 			{cmd: cmdLookupTable, name: sql.ID("tbl3")},
 			{cmd: cmdUpdate, rowID: 2,
 				updates: []sql.ColumnUpdate{{Index: 1, Value: sql.Int64Value(40)}}},
@@ -1225,7 +1221,7 @@ func RunTableRowsTest(t *testing.T, e engine.Engine) {
 
 	testDatabase(t, e, dbname,
 		[]engCmd{
-			{cmd: cmdBegin, needTransactions: true},
+			{cmd: cmdBegin},
 			{cmd: cmdCreateTable, name: sql.ID("tbl4")},
 			{cmd: cmdLookupTable, name: sql.ID("tbl4")},
 			{cmd: cmdInsert, row: []sql.Value{sql.Int64Value(1), sql.Int64Value(1),

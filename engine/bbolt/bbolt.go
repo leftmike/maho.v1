@@ -228,10 +228,6 @@ func (be *bboltEngine) Begin(sesid uint64) engine.Transaction {
 	}
 }
 
-func (_ *bboltEngine) IsTransactional() bool {
-	return true
-}
-
 func (be *bboltEngine) ListDatabases(ctx context.Context, etx engine.Transaction) ([]sql.Identifier,
 	error) {
 

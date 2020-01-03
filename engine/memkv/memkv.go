@@ -29,7 +29,3 @@ func (_ *memKVEngine) CreateSystemTable(tblname sql.Identifier, maker engine.Mak
 func (_ *memKVEngine) CreateInfoTable(tblname sql.Identifier, maker engine.MakeVirtual) {
 	panic("badger: use virtual engine with memkv engine")
 }
-
-func (_ *memKVEngine) IsTransactional() bool {
-	return true
-}

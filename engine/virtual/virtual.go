@@ -172,10 +172,6 @@ func (ve *virtualEngine) Begin(sesid uint64) engine.Transaction {
 	return ve.e.Begin(sesid)
 }
 
-func (ve *virtualEngine) IsTransactional() bool {
-	return ve.e.IsTransactional()
-}
-
 func (ve *virtualEngine) ListDatabases(ctx context.Context,
 	tx engine.Transaction) ([]sql.Identifier, error) {
 

@@ -104,10 +104,6 @@ func (te *testEngine) Begin(sesid uint64) engine.Transaction {
 	return &tx
 }
 
-func (_ *testEngine) IsTransactional() bool {
-	return true
-}
-
 func (te *testEngine) ListDatabases(ctx context.Context,
 	tx engine.Transaction) ([]sql.Identifier, error) {
 
