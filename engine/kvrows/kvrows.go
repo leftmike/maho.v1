@@ -348,7 +348,13 @@ func (kv *KVRows) CreateSchema(ctx context.Context, etx engine.Transaction,
 		return nil
 	}
 
-	// XXX: check for the database
+	kv.mutex.Lock()
+	md, ok := kv.databases[sn.Database]
+	kv.mutex.Unlock()
+
+	if !ok || !md.Active {
+		return fmt.Errorf("kvrows: database %s not found", sn.Database)
+	}
 
 	ttbl := kv.makeSchemasTable(tx)
 	return ttbl.Insert(ctx,

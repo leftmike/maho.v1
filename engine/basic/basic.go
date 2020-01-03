@@ -210,7 +210,10 @@ func (be *basicEngine) makeSchemasTable(tx *transaction) *typedtbl.Table {
 func (be *basicEngine) CreateSchema(ctx context.Context, etx engine.Transaction,
 	sn sql.SchemaName) error {
 
-	// XXX: check for the database
+	_, ok := be.databases[sn.Database]
+	if !ok {
+		return fmt.Errorf("basic: database %s not found", sn.Database)
+	}
 
 	ttbl := be.makeSchemasTable(etx.(*transaction))
 	return ttbl.Insert(ctx,
