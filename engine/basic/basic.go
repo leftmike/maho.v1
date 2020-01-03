@@ -17,10 +17,10 @@ import (
 const (
 	schemasMID = 1
 	tablesMID  = 2
+	indexesMID = 3
 )
 
 var (
-	notImplemented         = errors.New("basic: not implemented")
 	errTransactionComplete = errors.New("basic: transaction already completed")
 
 	schemasTableDef = &tableDef{
@@ -46,6 +46,20 @@ var (
 			engine.MakeColumnKey(2, false),
 		},
 		mid: tablesMID,
+	}
+
+	indexesTableDef = &tableDef{
+		tn: sql.TableName{sql.ID("system"), sql.ID("private"), sql.ID("indexes")},
+		columns: []sql.Identifier{sql.ID("database"), sql.ID("schema"), sql.ID("table"),
+			sql.ID("index")},
+		columnTypes: []sql.ColumnType{sql.IdColType, sql.IdColType, sql.IdColType, sql.IdColType},
+		primary: []engine.ColumnKey{
+			engine.MakeColumnKey(0, false),
+			engine.MakeColumnKey(1, false),
+			engine.MakeColumnKey(2, false),
+			engine.MakeColumnKey(3, false),
+		},
+		mid: indexesMID,
 	}
 )
 
@@ -448,19 +462,126 @@ func (be *basicEngine) DropTable(ctx context.Context, etx engine.Transaction, tn
 	return rows.Delete(ctx)
 }
 
-func (be *basicEngine) CreateIndex(ctx context.Context, tx engine.Transaction,
+type indexRow struct {
+	Database string
+	Schema   string
+	Table    string
+	Index    string
+}
+
+func (be *basicEngine) makeIndexesTable(tx *transaction) *typedtbl.Table {
+	return typedtbl.MakeTable(indexesTableDef.tn,
+		&table{
+			be:  be,
+			tx:  tx,
+			def: indexesTableDef,
+		})
+}
+
+func (be *basicEngine) lookupIndex(ctx context.Context, tx *transaction, tn sql.TableName,
+	idxname sql.Identifier) (bool, error) {
+
+	ttbl := be.makeIndexesTable(tx)
+	rows, err := ttbl.Seek(ctx,
+		[]sql.Value{
+			sql.StringValue(tn.Database.String()),
+			sql.StringValue(tn.Schema.String()),
+			sql.StringValue(tn.Table.String()),
+			sql.StringValue(idxname.String()),
+		})
+	if err != nil {
+		return false, err
+	}
+	defer rows.Close()
+
+	var ir indexRow
+	err = rows.Next(ctx, &ir)
+	if err == io.EOF {
+		return false, nil
+	} else if err != nil {
+		return false, err
+	}
+
+	if ir.Database != tn.Database.String() || ir.Schema != tn.Schema.String() ||
+		ir.Table != tn.Table.String() || ir.Index != idxname.String() {
+
+		return false, nil
+	}
+	return true, nil
+}
+
+func (be *basicEngine) CreateIndex(ctx context.Context, etx engine.Transaction,
 	idxname sql.Identifier, tn sql.TableName, unique bool, keys []engine.ColumnKey,
 	ifNotExists bool) error {
 
-	// XXX
+	tx := etx.(*transaction)
+	ok, err := be.lookupIndex(ctx, tx, tn, idxname)
+	if err != nil {
+		return err
+	}
+	if ok {
+		if ifNotExists {
+			return nil
+		}
+		return fmt.Errorf("basic: index %s on table %s already exists", idxname, tn)
+	}
+
+	mid, err := be.lookupTable(ctx, tx, tn)
+	if err != nil {
+		return err
+	}
+	if mid == 0 {
+		return fmt.Errorf("basic: table %s not found", tn)
+	}
+
+	ttbl := be.makeIndexesTable(tx)
+	return ttbl.Insert(ctx,
+		indexRow{
+			Database: tn.Database.String(),
+			Schema:   tn.Schema.String(),
+			Table:    tn.Table.String(),
+			Index:    idxname.String(),
+		})
 	return nil
 }
 
-func (be *basicEngine) DropIndex(ctx context.Context, tx engine.Transaction, idxname sql.Identifier,
-	tn sql.TableName, ifExists bool) error {
+func (be *basicEngine) DropIndex(ctx context.Context, etx engine.Transaction,
+	idxname sql.Identifier, tn sql.TableName, ifExists bool) error {
 
-	// XXX
-	return nil
+	tx := etx.(*transaction)
+	ttbl := be.makeIndexesTable(tx)
+	rows, err := ttbl.Seek(ctx,
+		[]sql.Value{
+			sql.StringValue(tn.Database.String()),
+			sql.StringValue(tn.Schema.String()),
+			sql.StringValue(tn.Table.String()),
+			sql.StringValue(idxname.String()),
+		})
+	if err != nil {
+		return err
+	}
+	defer rows.Close()
+
+	var ir indexRow
+	err = rows.Next(ctx, &ir)
+	if err == io.EOF {
+		if ifExists {
+			return nil
+		}
+		return fmt.Errorf("basic: index %s on table %s not found", idxname, tn)
+	} else if err != nil {
+		return err
+	}
+
+	if ir.Database != tn.Database.String() || ir.Schema != tn.Schema.String() ||
+		ir.Table != tn.Table.String() || ir.Index != idxname.String() {
+
+		if ifExists {
+			return nil
+		}
+		return fmt.Errorf("basic: index %s on table %s not found", idxname, tn)
+	}
+	return rows.Delete(ctx)
 }
 
 func (be *basicEngine) Begin(sesid uint64) engine.Transaction {
