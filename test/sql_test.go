@@ -87,7 +87,7 @@ func testSQL(t *testing.T, typ string, dbname sql.Identifier, testData string) {
 
 func TestSQLBasic(t *testing.T) {
 	/*
-		XXX: basic needs to support tables without a primary key
+		XXX: basic needs to support creating and dropping indexes
 		testSQL(t, "basic", sql.ID("test_basic"), "testdata")
 		testSQL(t, "basic", sql.ID("sqltest_basic"), *testData)
 	*/

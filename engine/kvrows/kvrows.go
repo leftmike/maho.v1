@@ -450,7 +450,7 @@ func (kv *KVRows) makeTablesTable(tx *transaction) *typedtbl.Table {
 }
 
 func (kv *KVRows) lookupTable(ctx context.Context, tx *transaction, tn sql.TableName) (uint64,
-	bool, error) {
+	error) {
 
 	ttbl := kv.makeTablesTable(tx)
 	rows, err := ttbl.Seek(ctx,
@@ -460,25 +460,25 @@ func (kv *KVRows) lookupTable(ctx context.Context, tx *transaction, tn sql.Table
 			sql.StringValue(tn.Table.String()),
 		})
 	if err != nil {
-		return 0, false, err
+		return 0, err
 	}
 	defer rows.Close()
 
 	var tr tableRow
 	err = rows.Next(ctx, &tr)
 	if err == io.EOF {
-		return 0, false, nil
+		return 0, nil
 	} else if err != nil {
-		return 0, false, err
+		return 0, err
 	}
 
 	if tr.Database != tn.Database.String() || tr.Schema != tn.Schema.String() ||
 		tr.Table != tn.Table.String() {
 
-		return 0, false, nil
+		return 0, nil
 	}
 
-	return uint64(tr.MID), true, nil
+	return uint64(tr.MID), nil
 }
 
 func (kv *KVRows) LookupTable(ctx context.Context, etx engine.Transaction,
@@ -489,10 +489,10 @@ func (kv *KVRows) LookupTable(ctx context.Context, etx engine.Transaction,
 		return nil, err
 	}
 
-	mid, ok, err := kv.lookupTable(ctx, tx, tn)
+	mid, err := kv.lookupTable(ctx, tx, tn)
 	if err != nil {
 		return nil, err
-	} else if !ok {
+	} else if mid == 0 {
 		return nil, fmt.Errorf("kvrows: table %s not found", tn)
 	}
 
@@ -541,12 +541,23 @@ func (kv *KVRows) CreateTable(ctx context.Context, etx engine.Transaction, tn sq
 		return err
 	}
 
+	mid, err := kv.lookupTable(ctx, tx, tn)
+	if err != nil {
+		return err
+	}
+	if mid > 0 {
+		if ifNotExists {
+			return nil
+		}
+		return fmt.Errorf("kvrows: table %s already exists", tn)
+	}
+
 	err = kv.updateSchema(ctx, tx, tn.SchemaName(), 1)
 	if err != nil {
 		return err
 	}
 
-	mid, err := kv.allocateMID(ctx)
+	mid, err = kv.allocateMID(ctx)
 	if err != nil {
 		return err
 	}

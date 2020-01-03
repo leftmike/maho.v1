@@ -55,6 +55,7 @@ type basicEngine struct {
 	definitions map[uint64]*tableDef
 	tree        *btree.BTree
 	lastMID     uint64
+	lastRID     uint64
 }
 
 type transaction struct {
@@ -78,6 +79,7 @@ type table struct {
 
 type midRow struct {
 	def *tableDef
+	rid uint64
 	row []sql.Value
 }
 
@@ -85,6 +87,7 @@ type rows struct {
 	tbl  *table
 	idx  int
 	rows [][]sql.Value
+	rids []uint64
 }
 
 func NewEngine(dataDir string) (engine.Engine, error) {
@@ -302,10 +305,9 @@ func (be *basicEngine) makeTablesTable(tx *transaction) *typedtbl.Table {
 		})
 }
 
-func (be *basicEngine) LookupTable(ctx context.Context, etx engine.Transaction,
-	tn sql.TableName) (engine.Table, error) {
+func (be *basicEngine) lookupTable(ctx context.Context, tx *transaction, tn sql.TableName) (uint64,
+	error) {
 
-	tx := etx.(*transaction)
 	ttbl := be.makeTablesTable(tx)
 	rows, err := ttbl.Seek(ctx,
 		[]sql.Value{
@@ -314,25 +316,38 @@ func (be *basicEngine) LookupTable(ctx context.Context, etx engine.Transaction,
 			sql.StringValue(tn.Table.String()),
 		})
 	if err != nil {
-		return nil, err
+		return 0, err
 	}
 	defer rows.Close()
 
 	var tr tableRow
 	err = rows.Next(ctx, &tr)
 	if err == io.EOF {
-		return nil, fmt.Errorf("basic: table %s not found", tn)
+		return 0, nil
 	} else if err != nil {
-		return nil, err
+		return 0, err
 	}
 
 	if tr.Database != tn.Database.String() || tr.Schema != tn.Schema.String() ||
 		tr.Table != tn.Table.String() {
 
+		return 0, nil
+	}
+	return uint64(tr.MID), nil
+}
+
+func (be *basicEngine) LookupTable(ctx context.Context, etx engine.Transaction,
+	tn sql.TableName) (engine.Table, error) {
+
+	tx := etx.(*transaction)
+	mid, err := be.lookupTable(ctx, tx, tn)
+	if err != nil {
+		return nil, err
+	} else if mid == 0 {
 		return nil, fmt.Errorf("basic: table %s not found", tn)
 	}
 
-	def, ok := be.definitions[uint64(tr.MID)]
+	def, ok := be.definitions[mid]
 	if !ok {
 		panic(fmt.Sprintf("basic: table %s missing table definition", tn))
 	}
@@ -349,7 +364,19 @@ func (be *basicEngine) CreateTable(ctx context.Context, etx engine.Transaction, 
 	ifNotExists bool) error {
 
 	tx := etx.(*transaction)
-	err := be.updateSchema(ctx, tx, tn.SchemaName(), 1)
+
+	mid, err := be.lookupTable(ctx, tx, tn)
+	if err != nil {
+		return err
+	}
+	if mid > 0 {
+		if ifNotExists {
+			return nil
+		}
+		return fmt.Errorf("basic: table %s already exists", tn)
+	}
+
+	err = be.updateSchema(ctx, tx, tn.SchemaName(), 1)
 	if err != nil {
 		return err
 	}
@@ -549,6 +576,10 @@ func (mr midRow) Less(item btree.Item) bool {
 		return true
 	} else if mr.def != mr2.def {
 		return false
+	} else if mr.rid < mr2.rid {
+		return true
+	} else if mr.rid > mr2.rid {
+		return false
 	} else if mr2.row == nil {
 		return false
 	} else if mr.row == nil {
@@ -588,7 +619,7 @@ func (bt *table) Seek(ctx context.Context, row []sql.Value) (engine.Rows, error)
 		tbl: bt,
 		idx: 0,
 	}
-	bt.tx.tree.AscendGreaterOrEqual(midRow{bt.def, row}, br.itemIterator)
+	bt.tx.tree.AscendGreaterOrEqual(midRow{def: bt.def, row: row}, br.itemIterator)
 	return br, nil
 }
 
@@ -599,11 +630,18 @@ func (bt *table) Rows(ctx context.Context) (engine.Rows, error) {
 func (bt *table) Insert(ctx context.Context, row []sql.Value) error {
 	bt.tx.forWrite()
 
-	if bt.tx.tree.Has(midRow{bt.def, row}) {
-		return fmt.Errorf("basic: %s: existing row with duplicate primary key", bt.def.tn)
+	var rid uint64
+	if bt.def.primary == nil {
+		bt.be.lastRID += 1
+		rid = bt.be.lastRID
+	} else {
+		if bt.tx.tree.Has(midRow{def: bt.def, row: row}) {
+			return fmt.Errorf("basic: %s: existing row with duplicate primary key", bt.def.tn)
+		}
 	}
 
-	bt.tx.tree.ReplaceOrInsert(midRow{bt.def, append(make([]sql.Value, 0, len(row)), row...)})
+	bt.tx.tree.ReplaceOrInsert(
+		midRow{def: bt.def, rid: rid, row: append(make([]sql.Value, 0, len(row)), row...)})
 	return nil
 }
 
@@ -613,6 +651,9 @@ func (br *rows) itemIterator(item btree.Item) bool {
 		return false
 	}
 	br.rows = append(br.rows, mr.row)
+	if br.tbl.def.primary == nil {
+		br.rids = append(br.rids, mr.rid)
+	}
 	return true
 }
 
@@ -623,6 +664,7 @@ func (br *rows) Columns() []sql.Identifier {
 func (br *rows) Close() error {
 	br.tbl = nil
 	br.rows = nil
+	br.rids = nil
 	br.idx = 0
 	return nil
 }
@@ -644,7 +686,11 @@ func (br *rows) Delete(ctx context.Context) error {
 		panic(fmt.Sprintf("basic: table %s no row to delete", br.tbl.def.tn))
 	}
 
-	br.tbl.tx.tree.Delete(midRow{br.tbl.def, br.rows[br.idx-1]})
+	var rid uint64
+	if br.tbl.def.primary == nil {
+		rid = br.rids[br.idx-1]
+	}
+	br.tbl.tx.tree.Delete(midRow{def: br.tbl.def, rid: rid, row: br.rows[br.idx-1]})
 	return nil
 }
 
@@ -674,10 +720,15 @@ func (br *rows) Update(ctx context.Context, updates []sql.ColumnUpdate) error {
 		return br.tbl.Insert(ctx, br.rows[br.idx-1])
 	}
 
+	var rid uint64
+	if br.tbl.def.primary == nil {
+		rid = br.rids[br.idx-1]
+	}
+
 	row := append(make([]sql.Value, 0, len(br.rows[br.idx-1])), br.rows[br.idx-1]...)
 	for _, update := range updates {
 		row[update.Index] = update.Value
 	}
-	br.tbl.tx.tree.ReplaceOrInsert(midRow{br.tbl.def, row})
+	br.tbl.tx.tree.ReplaceOrInsert(midRow{def: br.tbl.def, rid: rid, row: row})
 	return nil
 }
