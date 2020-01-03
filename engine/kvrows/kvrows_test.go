@@ -29,6 +29,7 @@ func testEngine(t *testing.T, st kvrows.Store) {
 	/*
 		XXX
 		test.RunTableRowsTest(t, &kv)
+		test.RunNextStmtTest(t, e)
 		test.RunParallelTest(t, &kv)
 		test.RunStressTest(t, &kv)
 	*/

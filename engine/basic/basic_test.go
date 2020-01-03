@@ -14,9 +14,9 @@ func TestBasic(t *testing.T) {
 	}
 	test.RunDatabaseTest(t, e, true)
 	test.RunTableTest(t, e)
-	// XXX
-	//test.RunSchemaTest(t, e)
-	//test.RunTableLifecycleTest(t, e)
-	//test.RunTableRowsTest(t, e)
-	//test.RunParallelTest(t, e)
+	test.RunSchemaTest(t, e)
+	test.RunTableLifecycleTest(t, e)
+	test.RunTableRowsTest(t, e)
+	test.RunStressTest(t, e)
+	test.RunParallelTest(t, e)
 }
