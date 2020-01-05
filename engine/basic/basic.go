@@ -9,7 +9,7 @@ import (
 
 	"github.com/google/btree"
 	"github.com/leftmike/maho/engine"
-	"github.com/leftmike/maho/engine/typedtbl"
+	"github.com/leftmike/maho/engine/util"
 	"github.com/leftmike/maho/engine/virtual"
 	"github.com/leftmike/maho/sql"
 )
@@ -215,8 +215,8 @@ type schemaRow struct {
 	Tables   int64
 }
 
-func (be *basicEngine) makeSchemasTable(tx *transaction) *typedtbl.Table {
-	return typedtbl.MakeTable(schemasTableDef.tn,
+func (be *basicEngine) makeSchemasTable(tx *transaction) *util.TypedTable {
+	return util.MakeTypedTable(schemasTableDef.tn,
 		&table{
 			be:  be,
 			tx:  tx,
@@ -310,8 +310,8 @@ type tableRow struct {
 	MID      int64
 }
 
-func (be *basicEngine) makeTablesTable(tx *transaction) *typedtbl.Table {
-	return typedtbl.MakeTable(tablesTableDef.tn,
+func (be *basicEngine) makeTablesTable(tx *transaction) *util.TypedTable {
+	return util.MakeTypedTable(tablesTableDef.tn,
 		&table{
 			be:  be,
 			tx:  tx,
@@ -469,8 +469,8 @@ type indexRow struct {
 	Index    string
 }
 
-func (be *basicEngine) makeIndexesTable(tx *transaction) *typedtbl.Table {
-	return typedtbl.MakeTable(indexesTableDef.tn,
+func (be *basicEngine) makeIndexesTable(tx *transaction) *util.TypedTable {
+	return util.MakeTypedTable(indexesTableDef.tn,
 		&table{
 			be:  be,
 			tx:  tx,

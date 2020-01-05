@@ -11,7 +11,7 @@ import (
 	"sync/atomic"
 
 	"github.com/leftmike/maho/engine"
-	"github.com/leftmike/maho/engine/typedtbl"
+	"github.com/leftmike/maho/engine/util"
 	"github.com/leftmike/maho/sql"
 )
 
@@ -324,8 +324,8 @@ type schemaRow struct {
 	Tables   int64
 }
 
-func (kv *KVRows) makeSchemasTable(tx *transaction) *typedtbl.Table {
-	return typedtbl.MakeTable(schemasTableName,
+func (kv *KVRows) makeSchemasTable(tx *transaction) *util.TypedTable {
+	return util.MakeTypedTable(schemasTableName,
 		&table{
 			kv:       kv,
 			tx:       tx,
@@ -435,8 +435,8 @@ type tableRow struct {
 	MID      int64
 }
 
-func (kv *KVRows) makeTablesTable(tx *transaction) *typedtbl.Table {
-	return typedtbl.MakeTable(tablesTableName,
+func (kv *KVRows) makeTablesTable(tx *transaction) *util.TypedTable {
+	return util.MakeTypedTable(tablesTableName,
 		&table{
 			kv:  kv,
 			tx:  tx,

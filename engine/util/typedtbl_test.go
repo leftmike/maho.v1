@@ -1,4 +1,4 @@
-package typedtbl_test
+package util_test
 
 import (
 	"context"
@@ -8,7 +8,7 @@ import (
 
 	"github.com/leftmike/maho/engine"
 	"github.com/leftmike/maho/engine/basic"
-	"github.com/leftmike/maho/engine/typedtbl"
+	"github.com/leftmike/maho/engine/util"
 	"github.com/leftmike/maho/sql"
 	"github.com/leftmike/maho/testutil"
 )
@@ -93,7 +93,7 @@ func TestTypedTable(t *testing.T) {
 		}
 	}()
 
-	ttbl := typedtbl.MakeTable(tn, tbl)
+	ttbl := util.MakeTypedTable(tn, tbl)
 
 	cols := ttbl.Columns(ctx)
 	if !testutil.DeepEqual(cols, columns) {
@@ -121,8 +121,8 @@ func TestTypedTable(t *testing.T) {
 			Str:       "string #2",
 			I64:       2,
 			Bytes:     []byte{2, 2},
-			NullStr:   typedtbl.NullString("null string #1"),
-			NullF64:   typedtbl.NullFloat64(1.1),
+			NullStr:   util.NullString("null string #1"),
+			NullF64:   util.NullFloat64(1.1),
 			NullBytes: []byte{1, 1},
 		},
 		{
@@ -134,8 +134,8 @@ func TestTypedTable(t *testing.T) {
 			Str:       "string #4",
 			I64:       4,
 			Bytes:     []byte{4, 4, 4, 4},
-			NullStr:   typedtbl.NullString(""),
-			NullF64:   typedtbl.NullFloat64(0.0),
+			NullStr:   util.NullString(""),
+			NullF64:   util.NullFloat64(0.0),
 			NullBytes: []byte{},
 		},
 	}
@@ -227,7 +227,7 @@ func TestTypedTable(t *testing.T) {
 			NullBytes []byte
 		}{
 			Str:       s,
-			NullF64:   typedtbl.NullFloat64(float64(dest.I64) * 12.34),
+			NullF64:   util.NullFloat64(float64(dest.I64) * 12.34),
 			NullBytes: append(dest.NullBytes, dest.NullBytes...),
 		})
 		if err != nil {

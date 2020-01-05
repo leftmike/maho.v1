@@ -1,4 +1,4 @@
-package typedtbl
+package util
 
 import (
 	"context"
@@ -18,7 +18,7 @@ type columnField struct {
 	pointer  bool
 }
 
-type Table struct {
+type TypedTable struct {
 	tbl          engine.Table
 	tn           sql.TableName
 	rowType      reflect.Type
@@ -28,52 +28,52 @@ type Table struct {
 }
 
 type rows struct {
-	tbl  *Table
+	ttbl *TypedTable
 	rows engine.Rows
 }
 
-func MakeTable(tn sql.TableName, tbl engine.Table) *Table {
-	return &Table{
+func MakeTypedTable(tn sql.TableName, tbl engine.Table) *TypedTable {
+	return &TypedTable{
 		tbl: tbl,
 		tn:  tn,
 	}
 }
 
-func (tbl *Table) Columns(ctx context.Context) []sql.Identifier {
-	return tbl.tbl.Columns(ctx)
+func (ttbl *TypedTable) Columns(ctx context.Context) []sql.Identifier {
+	return ttbl.tbl.Columns(ctx)
 }
 
-func (tbl *Table) ColumnTypes(ctx context.Context) []sql.ColumnType {
-	return tbl.tbl.ColumnTypes(ctx)
+func (ttbl *TypedTable) ColumnTypes(ctx context.Context) []sql.ColumnType {
+	return ttbl.tbl.ColumnTypes(ctx)
 }
 
-func (tbl *Table) PrimaryKey(ctx context.Context) []engine.ColumnKey {
-	return tbl.tbl.PrimaryKey(ctx)
+func (ttbl *TypedTable) PrimaryKey(ctx context.Context) []engine.ColumnKey {
+	return ttbl.tbl.PrimaryKey(ctx)
 }
 
-func (tbl *Table) Seek(ctx context.Context, row []sql.Value) (*rows, error) {
-	r, err := tbl.tbl.Seek(ctx, row)
+func (ttbl *TypedTable) Seek(ctx context.Context, row []sql.Value) (*rows, error) {
+	r, err := ttbl.tbl.Seek(ctx, row)
 	if err != nil {
 		return nil, err
 	}
 	return &rows{
 		rows: r,
-		tbl:  tbl,
+		ttbl: ttbl,
 	}, nil
 }
 
-func (tbl *Table) Rows(ctx context.Context) (*rows, error) {
-	r, err := tbl.tbl.Rows(ctx)
+func (ttbl *TypedTable) Rows(ctx context.Context) (*rows, error) {
+	r, err := ttbl.tbl.Rows(ctx)
 	if err != nil {
 		return nil, err
 	}
 	return &rows{
 		rows: r,
-		tbl:  tbl,
+		ttbl: ttbl,
 	}, nil
 }
 
-func (tbl *Table) makeColumnField(cn string, ct sql.ColumnType, idx int,
+func (ttbl *TypedTable) makeColumnField(cn string, ct sql.ColumnType, idx int,
 	sf reflect.StructField) columnField {
 
 	ptr := !ct.NotNull
@@ -82,54 +82,54 @@ func (tbl *Table) makeColumnField(cn string, ct sql.ColumnType, idx int,
 		if ct.NotNull {
 			if sf.Type.Kind() != reflect.Bool {
 				panic(fmt.Sprintf("typed table: %s: column %s is bool; struct field %s is %s",
-					tbl.tn, cn, sf.Name, sf.Type.String()))
+					ttbl.tn, cn, sf.Name, sf.Type.String()))
 			}
 		} else {
 			if sf.Type.Kind() != reflect.Ptr || sf.Type.Elem().Kind() != reflect.Bool {
 				panic(fmt.Sprintf("typed table: %s: column %s is *bool; struct field %s is %s",
-					tbl.tn, cn, sf.Name, sf.Type.String()))
+					ttbl.tn, cn, sf.Name, sf.Type.String()))
 			}
 		}
 	case sql.StringType:
 		if ct.NotNull {
 			if sf.Type.Kind() != reflect.String {
 				panic(fmt.Sprintf("typed table: %s: column %s is string; struct field %s is %s",
-					tbl.tn, cn, sf.Name, sf.Type.String()))
+					ttbl.tn, cn, sf.Name, sf.Type.String()))
 			}
 		} else {
 			if sf.Type.Kind() != reflect.Ptr || sf.Type.Elem().Kind() != reflect.String {
 				panic(fmt.Sprintf("typed table: %s: column %s is *string; struct field %s is %s",
-					tbl.tn, cn, sf.Name, sf.Type.String()))
+					ttbl.tn, cn, sf.Name, sf.Type.String()))
 			}
 		}
 	case sql.BytesType:
 		if sf.Type.Kind() != reflect.Slice || sf.Type.Elem().Kind() != reflect.Uint8 {
 			panic(fmt.Sprintf("typed table: %s: column %s is []byte; struct field %s is %s",
-				tbl.tn, cn, sf.Name, sf.Type.String()))
+				ttbl.tn, cn, sf.Name, sf.Type.String()))
 		}
 		ptr = false // Bytes is never a pointer.
 	case sql.FloatType:
 		if ct.NotNull {
 			if sf.Type.Kind() != reflect.Float64 {
 				panic(fmt.Sprintf("typed table: %s: column %s is float64; struct field %s is %s",
-					tbl.tn, cn, sf.Name, sf.Type.String()))
+					ttbl.tn, cn, sf.Name, sf.Type.String()))
 			}
 		} else {
 			if sf.Type.Kind() != reflect.Ptr || sf.Type.Elem().Kind() != reflect.Float64 {
 				panic(fmt.Sprintf("typed table: %s: column %s is *float64; struct field %s is %s",
-					tbl.tn, cn, sf.Name, sf.Type.String()))
+					ttbl.tn, cn, sf.Name, sf.Type.String()))
 			}
 		}
 	case sql.IntegerType:
 		if ct.NotNull {
 			if sf.Type.Kind() != reflect.Int64 {
 				panic(fmt.Sprintf("typed table: %s: column %s is int64; struct field %s is %s",
-					tbl.tn, cn, sf.Name, sf.Type.String()))
+					ttbl.tn, cn, sf.Name, sf.Type.String()))
 			}
 		} else {
 			if sf.Type.Kind() != reflect.Ptr || sf.Type.Elem().Kind() != reflect.Int64 {
 				panic(fmt.Sprintf("typed table: %s: column %s is *int64; struct field %s is %s",
-					tbl.tn, cn, sf.Name, sf.Type.String()))
+					ttbl.tn, cn, sf.Name, sf.Type.String()))
 			}
 		}
 	}
@@ -142,7 +142,7 @@ func (tbl *Table) makeColumnField(cn string, ct sql.ColumnType, idx int,
 	}
 }
 
-func (tbl *Table) makeRowFields(ctx context.Context, rowType reflect.Type) []columnField {
+func (ttbl *TypedTable) makeRowFields(ctx context.Context, rowType reflect.Type) []columnField {
 	var rowFields []columnField
 
 	fields := map[string]reflect.StructField{}
@@ -152,25 +152,25 @@ func (tbl *Table) makeRowFields(ctx context.Context, rowType reflect.Type) []col
 		fields[strings.ToLower(sf.Name)] = sf
 	}
 
-	cols := tbl.tbl.Columns(ctx)
-	colTypes := tbl.tbl.ColumnTypes(ctx)
+	cols := ttbl.tbl.Columns(ctx)
+	colTypes := ttbl.tbl.ColumnTypes(ctx)
 	for cdx := range cols {
 		cn := cols[cdx].String()
 		ct := colTypes[cdx]
 		sf, ok := fields[strings.ToLower(cn)]
 		if !ok {
 			if ct.NotNull {
-				panic(fmt.Sprintf("typed table: %s: required column %s not found", tbl.tn, cn))
+				panic(fmt.Sprintf("typed table: %s: required column %s not found", ttbl.tn, cn))
 			}
 			rowFields = append(rowFields, columnField{skip: true})
 		} else {
-			rowFields = append(rowFields, tbl.makeColumnField(cn, ct, sf.Index[0], sf))
+			rowFields = append(rowFields, ttbl.makeColumnField(cn, ct, sf.Index[0], sf))
 		}
 	}
 	return rowFields
 }
 
-func (tbl *Table) Insert(ctx context.Context, rowObj interface{}) error {
+func (ttbl *TypedTable) Insert(ctx context.Context, rowObj interface{}) error {
 	rowType := reflect.TypeOf(rowObj)
 	rowVal := reflect.ValueOf(rowObj)
 	if rowType.Kind() == reflect.Ptr {
@@ -181,13 +181,13 @@ func (tbl *Table) Insert(ctx context.Context, rowObj interface{}) error {
 		panic(fmt.Sprintf("typed table: rowObj must be a struct or a pointer to a struct; got %v",
 			rowObj))
 	}
-	if rowType != tbl.rowType {
-		tbl.rowFields = tbl.makeRowFields(ctx, rowType)
-		tbl.rowType = rowType
+	if rowType != ttbl.rowType {
+		ttbl.rowFields = ttbl.makeRowFields(ctx, rowType)
+		ttbl.rowType = rowType
 	}
 
-	dest := make([]sql.Value, len(tbl.rowFields))
-	for cdx, cf := range tbl.rowFields {
+	dest := make([]sql.Value, len(ttbl.rowFields))
+	for cdx, cf := range ttbl.rowFields {
 		if cf.skip {
 			continue
 		}
@@ -214,7 +214,7 @@ func (tbl *Table) Insert(ctx context.Context, rowObj interface{}) error {
 		}
 	}
 
-	return tbl.tbl.Insert(ctx, dest)
+	return ttbl.tbl.Insert(ctx, dest)
 }
 
 func (r *rows) Columns() []sql.Identifier {
@@ -228,7 +228,7 @@ func (r *rows) Close() error {
 }
 
 func (r *rows) Next(ctx context.Context, destObj interface{}) error {
-	tbl := r.tbl
+	ttbl := r.ttbl
 
 	rowType := reflect.TypeOf(destObj)
 	rowVal := reflect.ValueOf(destObj)
@@ -238,18 +238,18 @@ func (r *rows) Next(ctx context.Context, destObj interface{}) error {
 	rowType = rowType.Elem()
 	rowVal = rowVal.Elem()
 
-	if rowType != tbl.rowType {
-		tbl.rowFields = tbl.makeRowFields(ctx, rowType)
-		tbl.rowType = rowType
+	if rowType != ttbl.rowType {
+		ttbl.rowFields = ttbl.makeRowFields(ctx, rowType)
+		ttbl.rowType = rowType
 	}
 
-	dest := make([]sql.Value, len(tbl.rowFields))
+	dest := make([]sql.Value, len(ttbl.rowFields))
 	err := r.rows.Next(ctx, dest)
 	if err != nil {
 		return err
 	}
 
-	for cdx, cf := range tbl.rowFields {
+	for cdx, cf := range ttbl.rowFields {
 		if cf.skip {
 			continue
 		}
@@ -315,7 +315,9 @@ func (r *rows) Delete(ctx context.Context) error {
 	return r.rows.Delete(ctx)
 }
 
-func (tbl *Table) makeUpdateFields(ctx context.Context, updateType reflect.Type) []columnField {
+func (ttbl *TypedTable) makeUpdateFields(ctx context.Context,
+	updateType reflect.Type) []columnField {
+
 	var updateFields []columnField
 
 	type column struct {
@@ -325,8 +327,8 @@ func (tbl *Table) makeUpdateFields(ctx context.Context, updateType reflect.Type)
 	}
 	fields := map[string]column{}
 
-	cols := tbl.tbl.Columns(ctx)
-	colTypes := tbl.tbl.ColumnTypes(ctx)
+	cols := ttbl.tbl.Columns(ctx)
+	colTypes := ttbl.tbl.ColumnTypes(ctx)
 	for cdx := range cols {
 		fields[strings.ToLower(cols[cdx].String())] = column{cols[cdx].String(), colTypes[cdx], cdx}
 	}
@@ -336,15 +338,15 @@ func (tbl *Table) makeUpdateFields(ctx context.Context, updateType reflect.Type)
 		sf := updateType.Field(fdx)
 		col, ok := fields[strings.ToLower(sf.Name)]
 		if !ok {
-			panic(fmt.Sprintf("typed table: %s: field %s not found", tbl.tn, sf.Name))
+			panic(fmt.Sprintf("typed table: %s: field %s not found", ttbl.tn, sf.Name))
 		}
-		updateFields = append(updateFields, tbl.makeColumnField(col.cn, col.ct, col.idx, sf))
+		updateFields = append(updateFields, ttbl.makeColumnField(col.cn, col.ct, col.idx, sf))
 	}
 	return updateFields
 }
 
 func (r *rows) Update(ctx context.Context, updateObj interface{}) error {
-	tbl := r.tbl
+	ttbl := r.ttbl
 
 	updateType := reflect.TypeOf(updateObj)
 	updateVal := reflect.ValueOf(updateObj)
@@ -357,13 +359,13 @@ func (r *rows) Update(ctx context.Context, updateObj interface{}) error {
 			fmt.Sprintf("typed table: updateObj must be a struct or a pointer to a struct; got %v",
 				updateObj))
 	}
-	if updateType != tbl.updateType {
-		tbl.updateFields = tbl.makeUpdateFields(ctx, updateType)
-		tbl.updateType = updateType
+	if updateType != ttbl.updateType {
+		ttbl.updateFields = ttbl.makeUpdateFields(ctx, updateType)
+		ttbl.updateType = updateType
 	}
 
-	updates := make([]sql.ColumnUpdate, len(tbl.updateFields))
-	for fdx, cf := range tbl.updateFields {
+	updates := make([]sql.ColumnUpdate, len(ttbl.updateFields))
+	for fdx, cf := range ttbl.updateFields {
 		updates[fdx].Index = cf.index
 
 		v := updateVal.Field(fdx)
