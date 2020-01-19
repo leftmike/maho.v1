@@ -66,7 +66,9 @@ type KVRows struct {
 	lastMID       uint64
 	lastLocalID   uint64
 	databases     map[sql.Identifier]databaseMetadata
-	transactions  map[TransactionID]*transaction
+
+	txMutex      sync.RWMutex
+	transactions map[TransactionID]*transaction
 }
 
 type TransactionState byte
@@ -553,10 +555,10 @@ func (kv *KVRows) Begin(sesid uint64) engine.Transaction {
 		state: ActiveState,
 	}
 
-	kv.mutex.Lock()
-	defer kv.mutex.Unlock()
-
+	kv.txMutex.Lock()
 	kv.transactions[tx.tid] = tx
+	kv.txMutex.Unlock()
+
 	return tx
 }
 
@@ -664,9 +666,9 @@ func (kv *KVRows) finalizeTransaction(ctx context.Context, tx *transaction,
 }
 
 func (kv *KVRows) getState(tid TransactionID) (TransactionState, uint64) {
-	kv.mutex.RLock()
+	kv.txMutex.RLock()
 	tx, ok := kv.transactions[tid]
-	kv.mutex.RUnlock()
+	kv.txMutex.RUnlock()
 	if !ok {
 		return UnknownState, 0
 	}
@@ -688,9 +690,9 @@ func (tx *transaction) setState(st TransactionState, ver uint64) {
 }
 
 func (kv *KVRows) waitOnTID(ctx context.Context, tid TransactionID) error {
-	kv.mutex.RLock()
+	kv.txMutex.RLock()
 	tx, ok := kv.transactions[tid]
-	kv.mutex.RUnlock()
+	kv.txMutex.RUnlock()
 	if !ok {
 		// XXX: unknown transactions are assumed aborted?
 		return fmt.Errorf("kvrows: unknown transaction: %v", tid)

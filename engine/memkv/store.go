@@ -93,6 +93,7 @@ func (mtx *memKVTx) Commit() error {
 
 	mtx.ms.mutex.RUnlock()
 	mtx.ms = nil
+	mtx.tree = nil
 	return nil
 }
 

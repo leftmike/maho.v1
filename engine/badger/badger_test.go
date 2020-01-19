@@ -18,13 +18,14 @@ func TestKV(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
+
 	test.RunDatabaseTest(t, e, true)
-	//test.RunTableTest(t, e)
+	test.RunTableTest(t, e)
+	test.RunTableLifecycleTest(t, e)
+	test.RunTableRowsTest(t, e)
 	/*
 		XXX
-		test.RunTableLifecycleTest(t, e)
 		test.RunSchemaTest(t, e)
-		test.RunTableDataTest(t, e)
 		test.RunParallelTest(t, e)
 		test.RunStressTest(t, e)
 	*/

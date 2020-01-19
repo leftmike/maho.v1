@@ -19,13 +19,11 @@ func TestBBolt(t *testing.T) {
 		t.Fatal(err)
 	}
 	test.RunDatabaseTest(t, e, false) // XXX: should be true
-	//test.RunTableTest(t, e)
-	/*
-		XXX
-		test.RunTableLifecycleTest(t, e)
-		test.RunSchemaTest(t, e)
-		test.RunTableDataTest(t, e)
-		test.RunParallelTest(t, e)
-		test.RunStressTest(t, e)
-	*/
+	test.RunTableTest(t, e)
+	test.RunTableLifecycleTest(t, e)
+	test.RunSchemaTest(t, e)
+	test.RunTableRowsTest(t, e)
+	// XXX
+	// test.RunParallelTest(t, e)
+	test.RunStressTest(t, e)
 }
