@@ -341,6 +341,42 @@ func MustBeSQLKey(key []byte) {
 	}
 }
 
+func parseKey(key []byte) string {
+	var k []byte
+	var cnt byte
+	var s string
+
+	if len(key) == 0 {
+		return "empty key"
+	} else if key[0] == 0 {
+		if len(key) == 1 {
+			return "bad metadata key"
+		}
+		cnt = key[1]
+		k = key[2:]
+		s = "metadata:"
+	} else {
+		cnt = key[0]
+		k = key[1:]
+		s = "sql:"
+	}
+
+	for cnt > 0 {
+		cnt -= 1
+
+		var val sql.Value
+		var ok bool
+
+		k, val, ok = decodeValue(k, false)
+		if !ok {
+			return fmt.Sprintf("bad key: %v", key)
+		}
+		s += " " + val.String()
+	}
+
+	return s
+}
+
 func MakeKeyVersion(key []byte, ver uint64) []byte {
 	k := append(make([]byte, 0, len(key)+8), key...)
 	// Encode the version _descending_ so that the most recent version will be encountered

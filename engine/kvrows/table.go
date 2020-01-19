@@ -11,7 +11,7 @@ import (
 
 type table struct {
 	kv       *KVRows
-	tx       *transaction
+	etx      engine.Transaction
 	mid      uint64
 	cols     []sql.Identifier
 	colTypes []sql.ColumnType
@@ -57,7 +57,11 @@ func (tbl *table) Rows(ctx context.Context) (engine.Rows, error) {
 }
 
 func (tbl *table) Insert(ctx context.Context, row []sql.Value) error {
-	return tbl.kv.st.InsertMap(ctx, tbl.kv.getState, tbl.tx.tid, tbl.tx.sid, tbl.mid,
+	tx, err := tbl.kv.forWrite(ctx, tbl.etx)
+	if err != nil {
+		return err
+	}
+	return tbl.kv.st.InsertMap(ctx, tbl.kv.getState, tx.tid, tx.sid, tbl.mid,
 		MakeSQLKey(row, tbl.primary), MakeRowValue(row))
 }
 
@@ -97,7 +101,10 @@ func (r *rows) Next(ctx context.Context, dest []sql.Value) error {
 		}
 
 		kv := r.tbl.kv
-		tx := r.tbl.tx
+		tx, err := kv.forRead(r.tbl.etx)
+		if err != nil {
+			return err
+		}
 
 	scanAgain:
 		r.rows = nil
@@ -146,7 +153,10 @@ func (r *rows) Delete(ctx context.Context) error {
 	}
 
 	kv := r.tbl.kv
-	tx := r.tbl.tx
+	tx, err := kv.forWrite(ctx, r.tbl.etx)
+	if err != nil {
+		return err
+	}
 	return kv.st.DeleteMap(ctx, kv.getState, tx.tid, tx.sid, r.tbl.mid,
 		MakeSQLKey(r.rows[r.idx-1], r.tbl.primary), r.vers[r.idx-1])
 }
@@ -182,7 +192,10 @@ func (r *rows) Update(ctx context.Context, updates []sql.ColumnUpdate) error {
 	}
 
 	kv := r.tbl.kv
-	tx := r.tbl.tx
+	tx, err := kv.forWrite(ctx, r.tbl.etx)
+	if err != nil {
+		return err
+	}
 	if primaryUpdated {
 		err := kv.st.DeleteMap(ctx, kv.getState, tx.tid, tx.sid, r.tbl.mid,
 			MakeSQLKey(r.rows[r.idx-1], r.tbl.primary), r.vers[r.idx-1])

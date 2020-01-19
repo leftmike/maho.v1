@@ -105,20 +105,20 @@ func (kv *KVRows) readGob(ctx context.Context, mid uint64, key []byte, value int
 		return 0, err
 	}
 
-	dec := gob.NewDecoder(bytes.NewBuffer(val))
-	return ver, dec.Decode(value)
+	if !ParseGobValue(val, value) {
+		return 0, fmt.Errorf("kvrows: table: %d: key: %v unable to parse gob: %v", mid, key, val)
+	}
+	return ver, nil
 }
 
 func (kv *KVRows) writeGob(ctx context.Context, mid uint64, key []byte, ver uint64,
 	value interface{}) error {
 
-	var buf bytes.Buffer
-	enc := gob.NewEncoder(&buf)
-	err := enc.Encode(value)
+	val, err := MakeGobValue(value)
 	if err != nil {
 		return err
 	}
-	return kv.st.WriteValue(ctx, mid, key, ver, buf.Bytes())
+	return kv.st.WriteValue(ctx, mid, key, ver, val)
 }
 
 func (kv *KVRows) loadConfig(ctx context.Context) error {
@@ -333,7 +333,7 @@ func (kv *KVRows) MakeSchemasTable(etx engine.Transaction) *util.TypedTable {
 	return util.MakeTypedTable(schemasTableName,
 		&table{
 			kv:       kv,
-			tx:       etx.(*transaction),
+			etx:      etx,
 			mid:      schemasMID,
 			cols:     []sql.Identifier{sql.ID("database"), sql.ID("schema"), sql.ID("tables")},
 			colTypes: []sql.ColumnType{sql.IdColType, sql.IdColType, sql.Int64ColType},
@@ -375,7 +375,7 @@ func (kv *KVRows) MakeTablesTable(etx engine.Transaction) *util.TypedTable {
 	return util.MakeTypedTable(tablesTableName,
 		&table{
 			kv:  kv,
-			tx:  etx.(*transaction),
+			etx: etx,
 			mid: tablesMID,
 			cols: []sql.Identifier{sql.ID("database"), sql.ID("schema"), sql.ID("table"),
 				sql.ID("mid")},
@@ -385,13 +385,62 @@ func (kv *KVRows) MakeTablesTable(etx engine.Transaction) *util.TypedTable {
 		})
 }
 
+func (kv *KVRows) printKeyValue(key []byte, ver uint64, val []byte) (bool, error) {
+	if ver == ProposalVersion {
+		fmt.Printf("%s (proposal): ", parseKey(key))
+		tid, proposals, ok := ParseProposalValue(val)
+		if !ok {
+			fmt.Printf("bad proposal: %v\n", val)
+			return false, nil
+		} else {
+			ts, ver := kv.getState(tid)
+			if ts == ActiveState {
+				fmt.Printf("active: tid: %d sid: %d:", tid.LocalID, proposals[len(proposals)-1].SID)
+			} else if ts == CommittedState {
+				fmt.Printf("committed at %d:", ver)
+			} else if ts == AbortedState {
+				fmt.Printf("aborted: tid: %d\n", tid.LocalID)
+				return false, nil
+			} else {
+				fmt.Printf("unknown: tid: %d\n", tid.LocalID)
+				return false, nil
+			}
+
+			val = proposals[len(proposals)-1].Value
+		}
+	} else {
+		fmt.Printf("%s at %d:", parseKey(key), ver)
+	}
+	if IsTombstoneValue(val) {
+		fmt.Println(" tombstone")
+	} else if IsRowValue(val) {
+		dest := make([]sql.Value, 256)
+		if ParseRowValue(val, dest) {
+			for _, v := range dest {
+				if v == nil {
+					break
+				}
+				fmt.Printf(" %s", v)
+			}
+			fmt.Println()
+		} else {
+			fmt.Printf(" bad row value: %v\n", val)
+		}
+	} else if IsGobValue(val) {
+		fmt.Println(" gob")
+	} else {
+		fmt.Printf(" bad value: %v\n", val)
+	}
+	return false, nil
+}
+
+func (kv *KVRows) printTable(ctx context.Context, tn sql.TableName, mid uint64) error {
+	fmt.Printf("\ntable: %s\n", tn)
+	return kv.st.ListValues(ctx, mid, kv.printKeyValue)
+}
+
 func (kv *KVRows) LookupTable(ctx context.Context, etx engine.Transaction,
 	tn sql.TableName) (engine.Table, error) {
-
-	tx, err := kv.forRead(etx)
-	if err != nil {
-		return nil, err
-	}
 
 	mid, err := util.LookupTable(ctx, kv, etx, tn)
 	if err != nil {
@@ -420,7 +469,7 @@ func (kv *KVRows) LookupTable(ctx context.Context, etx engine.Transaction,
 
 	return &table{
 		kv:       kv,
-		tx:       tx,
+		etx:      etx,
 		mid:      mid,
 		cols:     cols,
 		colTypes: colTypes,

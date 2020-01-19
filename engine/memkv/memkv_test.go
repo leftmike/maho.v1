@@ -16,9 +16,9 @@ func TestKV(t *testing.T) {
 	test.RunTableTest(t, e)
 	test.RunSchemaTest(t, e)
 	test.RunTableLifecycleTest(t, e)
+	test.RunTableRowsTest(t, e)
 	/*
 		XXX
-		test.RunTableRowsTest(t, e)
 		test.RunParallelTest(t, e)
 		test.RunStressTest(t, e)
 	*/
