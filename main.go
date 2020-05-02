@@ -8,9 +8,6 @@ To Do:
 
 - add test for not seeing modified rows within a single SQL statement
 
-- basic: midRow: combine key+value back into row; put key columns at the start of row;
-  add numKeyCols byte for the number of key columns
-
 - indexes: basic
 - get rid of memrows and use basic instead
 

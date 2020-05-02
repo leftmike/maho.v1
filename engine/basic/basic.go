@@ -68,9 +68,8 @@ type tableDef struct {
 	primary     []engine.ColumnKey
 	mid         uint64
 
-	reverse   uint
-	keyCols   []int
-	valueCols []int
+	reverse uint32
+	rowCols []int
 }
 
 type table struct {
@@ -80,10 +79,10 @@ type table struct {
 }
 
 type midRow struct {
-	mid     uint64
-	reverse uint
-	key     []sql.Value // primary key
-	value   []sql.Value // remaining columns in a row
+	mid        uint64
+	reverse    uint32
+	numKeyCols uint8
+	row        []sql.Value
 }
 
 type rows struct {
@@ -395,7 +394,10 @@ func makeTableDef(tn sql.TableName, cols []sql.Identifier, colTypes []sql.Column
 	primary []engine.ColumnKey, mid uint64) *tableDef {
 
 	if len(primary) == 0 {
-		panic(fmt.Sprintf("basic: mising required primary key from table %s", tn))
+		panic(fmt.Sprintf("basic: missing required primary key from table %s", tn))
+	}
+	if len(primary) > 32 {
+		panic(fmt.Sprintf("basic: primary key includes too many columns in table %s", tn))
 	}
 
 	def := tableDef{
@@ -407,15 +409,14 @@ func makeTableDef(tn sql.TableName, cols []sql.Identifier, colTypes []sql.Column
 	}
 
 	def.reverse = 0
-	def.keyCols = make([]int, len(primary))
-	def.valueCols = make([]int, len(cols)-len(primary))
-	vn := 0
+	def.rowCols = make([]int, len(cols))
+	vn := len(primary)
 	for cn := range cols {
 		isValue := true
 
 		for kn, ck := range primary {
 			if ck.Number() == cn {
-				def.keyCols[kn] = cn
+				def.rowCols[kn] = cn
 				if ck.Reverse() {
 					def.reverse |= 1 << kn
 				}
@@ -425,7 +426,7 @@ func makeTableDef(tn sql.TableName, cols []sql.Identifier, colTypes []sql.Column
 		}
 
 		if isValue {
-			def.valueCols[vn] = cn
+			def.rowCols[vn] = cn
 			vn += 1
 		}
 	}
@@ -435,23 +436,18 @@ func makeTableDef(tn sql.TableName, cols []sql.Identifier, colTypes []sql.Column
 
 func (def *tableDef) toItem(row []sql.Value) btree.Item {
 	mr := midRow{
-		mid:     def.mid,
-		reverse: def.reverse,
+		mid:        def.mid,
+		reverse:    def.reverse,
+		numKeyCols: uint8(len(def.primary)),
 	}
 
 	if row != nil {
-		mr.key = make([]sql.Value, len(def.keyCols))
-		mr.value = make([]sql.Value, len(def.valueCols))
-
-		for kdx := range def.keyCols {
-			mr.key[kdx] = row[def.keyCols[kdx]]
-		}
-		for vdx := range def.valueCols {
-			rdx := def.valueCols[vdx]
-			if rdx == len(row) { // XXX: Seek called with a partial row from typedtbl.go
-				break
+		mr.row = make([]sql.Value, len(def.columns))
+		for rdx := range def.rowCols {
+			if def.rowCols[rdx] == len(row) {
+				break // XXX: Seek called with a partial row from typedtbl.go
 			}
-			mr.value[vdx] = row[rdx]
+			mr.row[rdx] = row[def.rowCols[rdx]]
 		}
 	}
 
@@ -463,15 +459,12 @@ func (def *tableDef) toRow(item btree.Item) ([]sql.Value, bool) {
 	if mr.mid != def.mid {
 		return nil, false
 	}
-	if mr.key == nil {
+	if mr.row == nil {
 		return nil, true
 	}
 	row := make([]sql.Value, len(def.columns))
-	for kdx := range def.keyCols {
-		row[def.keyCols[kdx]] = mr.key[kdx]
-	}
-	for vdx := range def.valueCols {
-		row[def.valueCols[vdx]] = mr.value[vdx]
+	for rdx := range def.rowCols {
+		row[def.rowCols[rdx]] = mr.row[rdx]
 	}
 	return row, true
 }
@@ -482,14 +475,14 @@ func (mr midRow) Less(item btree.Item) bool {
 		return true
 	} else if mr.mid != mr2.mid {
 		return false
-	} else if mr2.key == nil {
+	} else if mr2.row == nil {
 		return false
-	} else if mr.key == nil {
+	} else if mr.row == nil {
 		return true
 	}
 
-	for kdx := range mr.key {
-		cmp := sql.Compare(mr.key[kdx], mr2.key[kdx])
+	for kdx := uint8(0); kdx < mr.numKeyCols; kdx += 1 {
+		cmp := sql.Compare(mr.row[kdx], mr2.row[kdx])
 		if cmp == 0 {
 			continue
 		}
