@@ -2,17 +2,15 @@ package main
 
 /*
 To Do:
-- databases should be standalone ==> identifiers should be converted back to strings on storage
-- update t.Errorf to be "Operation(args) got %s want %s" and use %q for args
-- or "Operation(args) failed with %s" or "Operation(args) did not fail"
-
 - fuzzing: parser.Parse
 
 - keep track of databases per engine as a simple config file that gets read and written by maho
 
 - add test for not seeing modified rows within a single SQL statement
 
-- primary index: basic
+- basic: midRow: combine key+value back into row; put key columns at the start of row;
+  add numKeyCols byte for the number of key columns
+
 - indexes: basic
 - get rid of memrows and use basic instead
 

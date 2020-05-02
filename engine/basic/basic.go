@@ -24,52 +24,36 @@ const (
 var (
 	errTransactionComplete = errors.New("basic: transaction already completed")
 
-	schemasTableDef = &tableDef{
-		tn:          sql.TableName{sql.ID("system"), sql.ID("private"), sql.ID("schemas")},
-		columns:     []sql.Identifier{sql.ID("database"), sql.ID("schema"), sql.ID("tables")},
-		columnTypes: []sql.ColumnType{sql.IdColType, sql.IdColType, sql.Int64ColType},
-		primary: []engine.ColumnKey{
-			engine.MakeColumnKey(0, false),
-			engine.MakeColumnKey(1, false),
-		},
-		mid: schemasMID,
-	}
+	schemasTableDef = makeTableDef(
+		sql.TableName{sql.ID("system"), sql.ID("private"), sql.ID("schemas")},
+		[]sql.Identifier{sql.ID("database"), sql.ID("schema"), sql.ID("tables")},
+		[]sql.ColumnType{sql.IdColType, sql.IdColType, sql.Int64ColType},
+		[]engine.ColumnKey{engine.MakeColumnKey(0, false), engine.MakeColumnKey(1, false)},
+		schemasMID)
 
-	tablesTableDef = &tableDef{
-		tn: sql.TableName{sql.ID("system"), sql.ID("private"), sql.ID("tables")},
-		columns: []sql.Identifier{sql.ID("database"), sql.ID("schema"), sql.ID("table"),
-			sql.ID("mid")},
-		columnTypes: []sql.ColumnType{sql.IdColType, sql.IdColType, sql.IdColType,
-			sql.Int64ColType},
-		primary: []engine.ColumnKey{
-			engine.MakeColumnKey(0, false),
-			engine.MakeColumnKey(1, false),
-			engine.MakeColumnKey(2, false),
-		},
-		mid: tablesMID,
-	}
+	tablesTableDef = makeTableDef(
+		sql.TableName{sql.ID("system"), sql.ID("private"), sql.ID("tables")},
+		[]sql.Identifier{sql.ID("database"), sql.ID("schema"), sql.ID("table"), sql.ID("mid")},
+		[]sql.ColumnType{sql.IdColType, sql.IdColType, sql.IdColType, sql.Int64ColType},
+		[]engine.ColumnKey{engine.MakeColumnKey(0, false), engine.MakeColumnKey(1, false),
+			engine.MakeColumnKey(2, false)},
+		tablesMID)
 
-	indexesTableDef = &tableDef{
-		tn: sql.TableName{sql.ID("system"), sql.ID("private"), sql.ID("indexes")},
-		columns: []sql.Identifier{sql.ID("database"), sql.ID("schema"), sql.ID("table"),
-			sql.ID("index")},
-		columnTypes: []sql.ColumnType{sql.IdColType, sql.IdColType, sql.IdColType, sql.IdColType},
-		primary: []engine.ColumnKey{
-			engine.MakeColumnKey(0, false),
-			engine.MakeColumnKey(1, false),
-			engine.MakeColumnKey(2, false),
-			engine.MakeColumnKey(3, false),
-		},
-		mid: indexesMID,
-	}
+	indexesTableDef = makeTableDef(
+		sql.TableName{sql.ID("system"), sql.ID("private"), sql.ID("indexes")},
+		[]sql.Identifier{sql.ID("database"), sql.ID("schema"), sql.ID("table"), sql.ID("index")},
+		[]sql.ColumnType{sql.IdColType, sql.IdColType, sql.IdColType, sql.IdColType},
+		[]engine.ColumnKey{engine.MakeColumnKey(0, false), engine.MakeColumnKey(1, false),
+			engine.MakeColumnKey(2, false), engine.MakeColumnKey(3, false)},
+		indexesMID)
 )
 
 type basicEngine struct {
-	mutex       sync.Mutex
-	databases   map[sql.Identifier]struct{}
-	definitions map[uint64]*tableDef
-	tree        *btree.BTree
-	lastMID     uint64
+	mutex     sync.Mutex
+	databases map[sql.Identifier]struct{}
+	tableDefs map[uint64]*tableDef
+	tree      *btree.BTree
+	lastMID   uint64
 }
 
 type transaction struct {
@@ -83,6 +67,10 @@ type tableDef struct {
 	columnTypes []sql.ColumnType
 	primary     []engine.ColumnKey
 	mid         uint64
+
+	reverse   uint
+	keyCols   []int
+	valueCols []int
 }
 
 type table struct {
@@ -92,8 +80,10 @@ type table struct {
 }
 
 type midRow struct {
-	def *tableDef
-	row []sql.Value
+	mid     uint64
+	reverse uint
+	key     []sql.Value // primary key
+	value   []sql.Value // remaining columns in a row
 }
 
 type rows struct {
@@ -104,10 +94,10 @@ type rows struct {
 
 func NewEngine(dataDir string) (engine.Engine, error) {
 	be := &basicEngine{
-		databases:   map[sql.Identifier]struct{}{},
-		definitions: map[uint64]*tableDef{},
-		tree:        btree.New(16),
-		lastMID:     63,
+		databases: map[sql.Identifier]struct{}{},
+		tableDefs: map[uint64]*tableDef{},
+		tree:      btree.New(16),
+		lastMID:   63,
 	}
 	ve := virtual.NewEngine(be)
 	return ve, nil
@@ -261,7 +251,7 @@ func (be *basicEngine) LookupTable(ctx context.Context, etx engine.Transaction,
 		return nil, fmt.Errorf("basic: table %s not found", tn)
 	}
 
-	def, ok := be.definitions[mid]
+	def, ok := be.tableDefs[mid]
 	if !ok {
 		panic(fmt.Sprintf("basic: table %s missing table definition", tn))
 	}
@@ -308,14 +298,7 @@ func (be *basicEngine) CreateTable(ctx context.Context, etx engine.Transaction, 
 		return nil
 	}
 
-	be.definitions[mid] =
-		&tableDef{
-			tn:          tn,
-			columns:     cols,
-			columnTypes: colTypes,
-			primary:     primary,
-			mid:         mid,
-		}
+	be.tableDefs[mid] = makeTableDef(tn, cols, colTypes, primary, mid)
 	return nil
 }
 
@@ -408,25 +391,109 @@ func (btx *transaction) forWrite() {
 	}
 }
 
+func makeTableDef(tn sql.TableName, cols []sql.Identifier, colTypes []sql.ColumnType,
+	primary []engine.ColumnKey, mid uint64) *tableDef {
+
+	if len(primary) == 0 {
+		panic(fmt.Sprintf("basic: mising required primary key from table %s", tn))
+	}
+
+	def := tableDef{
+		tn:          tn,
+		columns:     cols,
+		columnTypes: colTypes,
+		primary:     primary,
+		mid:         mid,
+	}
+
+	def.reverse = 0
+	def.keyCols = make([]int, len(primary))
+	def.valueCols = make([]int, len(cols)-len(primary))
+	vn := 0
+	for cn := range cols {
+		isValue := true
+
+		for kn, ck := range primary {
+			if ck.Number() == cn {
+				def.keyCols[kn] = cn
+				if ck.Reverse() {
+					def.reverse |= 1 << kn
+				}
+				isValue = false
+				break
+			}
+		}
+
+		if isValue {
+			def.valueCols[vn] = cn
+			vn += 1
+		}
+	}
+
+	return &def
+}
+
+func (def *tableDef) toItem(row []sql.Value) btree.Item {
+	mr := midRow{
+		mid:     def.mid,
+		reverse: def.reverse,
+	}
+
+	if row != nil {
+		mr.key = make([]sql.Value, len(def.keyCols))
+		mr.value = make([]sql.Value, len(def.valueCols))
+
+		for kdx := range def.keyCols {
+			mr.key[kdx] = row[def.keyCols[kdx]]
+		}
+		for vdx := range def.valueCols {
+			rdx := def.valueCols[vdx]
+			if rdx == len(row) { // XXX: Seek called with a partial row from typedtbl.go
+				break
+			}
+			mr.value[vdx] = row[rdx]
+		}
+	}
+
+	return mr
+}
+
+func (def *tableDef) toRow(item btree.Item) ([]sql.Value, bool) {
+	mr := item.(midRow)
+	if mr.mid != def.mid {
+		return nil, false
+	}
+	if mr.key == nil {
+		return nil, true
+	}
+	row := make([]sql.Value, len(def.columns))
+	for kdx := range def.keyCols {
+		row[def.keyCols[kdx]] = mr.key[kdx]
+	}
+	for vdx := range def.valueCols {
+		row[def.valueCols[vdx]] = mr.value[vdx]
+	}
+	return row, true
+}
+
 func (mr midRow) Less(item btree.Item) bool {
 	mr2 := item.(midRow)
-	if mr.def.mid < mr2.def.mid {
+	if mr.mid < mr2.mid {
 		return true
-	} else if mr.def != mr2.def {
+	} else if mr.mid != mr2.mid {
 		return false
-	} else if mr2.row == nil {
+	} else if mr2.key == nil {
 		return false
-	} else if mr.row == nil {
+	} else if mr.key == nil {
 		return true
 	}
 
-	for _, ck := range mr.def.primary {
-		idx := ck.Number()
-		cmp := sql.Compare(mr.row[idx], mr2.row[idx])
+	for kdx := range mr.key {
+		cmp := sql.Compare(mr.key[kdx], mr2.key[kdx])
 		if cmp == 0 {
 			continue
 		}
-		if ck.Reverse() {
+		if mr.reverse&(1<<kdx) != 0 {
 			return cmp > 0
 		} else {
 			return cmp < 0
@@ -453,7 +520,7 @@ func (bt *table) Seek(ctx context.Context, row []sql.Value) (engine.Rows, error)
 		tbl: bt,
 		idx: 0,
 	}
-	bt.tx.tree.AscendGreaterOrEqual(midRow{def: bt.def, row: row}, br.itemIterator)
+	bt.tx.tree.AscendGreaterOrEqual(bt.def.toItem(row), br.itemIterator)
 	return br, nil
 }
 
@@ -464,21 +531,20 @@ func (bt *table) Rows(ctx context.Context) (engine.Rows, error) {
 func (bt *table) Insert(ctx context.Context, row []sql.Value) error {
 	bt.tx.forWrite()
 
-	if bt.tx.tree.Has(midRow{def: bt.def, row: row}) {
+	if bt.tx.tree.Has(bt.def.toItem(row)) {
 		return fmt.Errorf("basic: %s: existing row with duplicate primary key", bt.def.tn)
 	}
 
-	bt.tx.tree.ReplaceOrInsert(
-		midRow{def: bt.def, row: append(make([]sql.Value, 0, len(row)), row...)})
+	bt.tx.tree.ReplaceOrInsert(bt.def.toItem(append(make([]sql.Value, 0, len(row)), row...)))
 	return nil
 }
 
 func (br *rows) itemIterator(item btree.Item) bool {
-	mr := item.(midRow)
-	if mr.def.mid != br.tbl.def.mid {
+	row, ok := br.tbl.def.toRow(item)
+	if !ok {
 		return false
 	}
-	br.rows = append(br.rows, mr.row)
+	br.rows = append(br.rows, row)
 	return true
 }
 
@@ -510,7 +576,7 @@ func (br *rows) Delete(ctx context.Context) error {
 		panic(fmt.Sprintf("basic: table %s no row to delete", br.tbl.def.tn))
 	}
 
-	br.tbl.tx.tree.Delete(midRow{def: br.tbl.def, row: br.rows[br.idx-1]})
+	br.tbl.tx.tree.Delete(br.tbl.def.toItem(br.rows[br.idx-1]))
 	return nil
 }
 
@@ -518,7 +584,7 @@ func (br *rows) Update(ctx context.Context, updates []sql.ColumnUpdate) error {
 	br.tbl.tx.forWrite()
 
 	if br.idx == 0 {
-		panic(fmt.Sprintf("basic: table %s no row to delete", br.tbl.def.tn))
+		panic(fmt.Sprintf("basic: table %s no row to update", br.tbl.def.tn))
 	}
 
 	var primaryUpdated bool
@@ -544,6 +610,6 @@ func (br *rows) Update(ctx context.Context, updates []sql.ColumnUpdate) error {
 	for _, update := range updates {
 		row[update.Index] = update.Value
 	}
-	br.tbl.tx.tree.ReplaceOrInsert(midRow{def: br.tbl.def, row: row})
+	br.tbl.tx.tree.ReplaceOrInsert(br.tbl.def.toItem(row))
 	return nil
 }
