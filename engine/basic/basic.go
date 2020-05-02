@@ -11,6 +11,7 @@ import (
 	"github.com/leftmike/maho/engine"
 	"github.com/leftmike/maho/engine/util"
 	"github.com/leftmike/maho/engine/virtual"
+	"github.com/leftmike/maho/evaluate/expr"
 	"github.com/leftmike/maho/sql"
 )
 
@@ -278,6 +279,29 @@ func (be *basicEngine) LookupTable(ctx context.Context, etx engine.Transaction,
 func (be *basicEngine) CreateTable(ctx context.Context, etx engine.Transaction, tn sql.TableName,
 	cols []sql.Identifier, colTypes []sql.ColumnType, primary []engine.ColumnKey,
 	ifNotExists bool) error {
+
+	if primary == nil {
+		rowID := sql.ID("rowid")
+
+		for _, col := range cols {
+			if col == rowID {
+				return fmt.Errorf(
+					"basic: unable to add %s column for table %s missing primary key",
+					rowID, tn)
+			}
+		}
+
+		primary = []engine.ColumnKey{
+			engine.MakeColumnKey(len(cols), false),
+		}
+		cols = append(cols, rowID)
+		colTypes = append(colTypes, sql.ColumnType{
+			Type:    sql.IntegerType,
+			Size:    8,
+			NotNull: true,
+			Default: &expr.Call{Name: sql.ID("unique_rowid")},
+		})
+	}
 
 	mid, err := util.CreateTable(ctx, be, etx, tn, ifNotExists)
 	if err != nil {

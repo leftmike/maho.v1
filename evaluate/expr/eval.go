@@ -5,6 +5,7 @@ import (
 	"errors"
 	"fmt"
 	"io"
+	"sync/atomic"
 
 	"github.com/leftmike/maho/engine"
 	"github.com/leftmike/maho/sql"
@@ -363,4 +364,12 @@ func absCall(ctx EvalContext, args []sql.Value) (sql.Value, error) {
 		return a0, nil
 	}
 	return nil, fmt.Errorf("engine: want number got %v", args[0])
+}
+
+var (
+	rowID = uint64(0)
+)
+
+func uniqueRowIDCall(ctx EvalContext, args []sql.Value) (sql.Value, error) {
+	return sql.Int64Value(atomic.AddUint64(&rowID, 1)), nil
 }

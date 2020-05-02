@@ -8,8 +8,6 @@ To Do:
 
 - fuzzing: parser.Parse
 
-- engine/util/relations.go to maps.go
-
 - keep track of databases per engine as a simple config file that gets read and written by maho
 
 - add test for not seeing modified rows within a single SQL statement

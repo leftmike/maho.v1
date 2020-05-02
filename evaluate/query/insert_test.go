@@ -219,7 +219,7 @@ func statement(ses *evaluate.Session, tx engine.Transaction, s string) error {
 	return err
 }
 
-func allRows(ses *evaluate.Session, rows engine.Rows) ([][]sql.Value, error) {
+func allRows(ses *evaluate.Session, rows engine.Rows, numCols int) ([][]sql.Value, error) {
 	all := [][]sql.Value{}
 	l := len(rows.Columns())
 	for {
@@ -230,7 +230,7 @@ func allRows(ses *evaluate.Session, rows engine.Rows) ([][]sql.Value, error) {
 		} else if err != nil {
 			return nil, err
 		}
-		all = append(all, dest)
+		all = append(all, dest[:numCols])
 	}
 	return all, nil
 }
@@ -267,7 +267,7 @@ func testInsert(t *testing.T, e engine.Engine, ses *evaluate.Session, tn sql.Tab
 				continue
 			}
 			var all [][]sql.Value
-			all, err = allRows(ses, rows)
+			all, err = allRows(ses, rows, len(cols))
 			if err != nil {
 				t.Errorf("(%s).Rows().Next() failed with %s", tn, err)
 				continue
