@@ -8,17 +8,15 @@ To Do:
 
 - fuzzing: parser.Parse
 
-- run engine/test/testkvrows.go and teststore.go so as to be able to check code coverage; look
-  at engine/localkv/localkv_test.go
+- engine/util/relations.go to maps.go
 
 - keep track of databases per engine as a simple config file that gets read and written by maho
-  depends on the engine: yes for bbolt, no for badger
 
 - add test for not seeing modified rows within a single SQL statement
 
-- primary index: kvrows, basic
-- indexes: kvrows, basic
-- get rid of memrows and use something like memkv instead
+- primary index: basic
+- indexes: basic
+- get rid of memrows and use basic instead
 
 - [CONSTRAINT constraint]
 - CHECK '(' logical_expression ')'
@@ -53,9 +51,7 @@ import (
 
 	"github.com/leftmike/maho/config"
 	"github.com/leftmike/maho/engine"
-	"github.com/leftmike/maho/engine/badger"
 	"github.com/leftmike/maho/engine/basic"
-	"github.com/leftmike/maho/engine/bbolt"
 	"github.com/leftmike/maho/engine/memrows"
 	"github.com/leftmike/maho/evaluate"
 	"github.com/leftmike/maho/parser"
@@ -198,13 +194,9 @@ func main() {
 		e, err = basic.NewEngine(*dataDir)
 	case "memrows":
 		e, err = memrows.NewEngine(*dataDir)
-	case "bolt", "bbolt":
-		e, err = bbolt.NewEngine(*dataDir)
-	case "badger":
-		e, err = badger.NewEngine(*dataDir)
 	default:
 		fmt.Fprintf(os.Stderr,
-			"maho: got %s for engine; want basic, memrows, bbolt, or badger", *eng)
+			"maho: got %s for engine; want basic or memrows", *eng)
 		return
 	}
 	if err != nil {
