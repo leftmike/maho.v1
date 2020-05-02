@@ -70,7 +70,6 @@ type basicEngine struct {
 	definitions map[uint64]*tableDef
 	tree        *btree.BTree
 	lastMID     uint64
-	lastRID     uint64
 }
 
 type transaction struct {
@@ -94,7 +93,6 @@ type table struct {
 
 type midRow struct {
 	def *tableDef
-	rid uint64
 	row []sql.Value
 }
 
@@ -102,7 +100,6 @@ type rows struct {
 	tbl  *table
 	idx  int
 	rows [][]sql.Value
-	rids []uint64
 }
 
 func NewEngine(dataDir string) (engine.Engine, error) {
@@ -417,10 +414,6 @@ func (mr midRow) Less(item btree.Item) bool {
 		return true
 	} else if mr.def != mr2.def {
 		return false
-	} else if mr.rid < mr2.rid {
-		return true
-	} else if mr.rid > mr2.rid {
-		return false
 	} else if mr2.row == nil {
 		return false
 	} else if mr.row == nil {
@@ -471,18 +464,12 @@ func (bt *table) Rows(ctx context.Context) (engine.Rows, error) {
 func (bt *table) Insert(ctx context.Context, row []sql.Value) error {
 	bt.tx.forWrite()
 
-	var rid uint64
-	if bt.def.primary == nil {
-		bt.be.lastRID += 1
-		rid = bt.be.lastRID
-	} else {
-		if bt.tx.tree.Has(midRow{def: bt.def, row: row}) {
-			return fmt.Errorf("basic: %s: existing row with duplicate primary key", bt.def.tn)
-		}
+	if bt.tx.tree.Has(midRow{def: bt.def, row: row}) {
+		return fmt.Errorf("basic: %s: existing row with duplicate primary key", bt.def.tn)
 	}
 
 	bt.tx.tree.ReplaceOrInsert(
-		midRow{def: bt.def, rid: rid, row: append(make([]sql.Value, 0, len(row)), row...)})
+		midRow{def: bt.def, row: append(make([]sql.Value, 0, len(row)), row...)})
 	return nil
 }
 
@@ -492,9 +479,6 @@ func (br *rows) itemIterator(item btree.Item) bool {
 		return false
 	}
 	br.rows = append(br.rows, mr.row)
-	if br.tbl.def.primary == nil {
-		br.rids = append(br.rids, mr.rid)
-	}
 	return true
 }
 
@@ -505,7 +489,6 @@ func (br *rows) Columns() []sql.Identifier {
 func (br *rows) Close() error {
 	br.tbl = nil
 	br.rows = nil
-	br.rids = nil
 	br.idx = 0
 	return nil
 }
@@ -527,11 +510,7 @@ func (br *rows) Delete(ctx context.Context) error {
 		panic(fmt.Sprintf("basic: table %s no row to delete", br.tbl.def.tn))
 	}
 
-	var rid uint64
-	if br.tbl.def.primary == nil {
-		rid = br.rids[br.idx-1]
-	}
-	br.tbl.tx.tree.Delete(midRow{def: br.tbl.def, rid: rid, row: br.rows[br.idx-1]})
+	br.tbl.tx.tree.Delete(midRow{def: br.tbl.def, row: br.rows[br.idx-1]})
 	return nil
 }
 
@@ -561,15 +540,10 @@ func (br *rows) Update(ctx context.Context, updates []sql.ColumnUpdate) error {
 		return br.tbl.Insert(ctx, br.rows[br.idx-1])
 	}
 
-	var rid uint64
-	if br.tbl.def.primary == nil {
-		rid = br.rids[br.idx-1]
-	}
-
 	row := append(make([]sql.Value, 0, len(br.rows[br.idx-1])), br.rows[br.idx-1]...)
 	for _, update := range updates {
 		row[update.Index] = update.Value
 	}
-	br.tbl.tx.tree.ReplaceOrInsert(midRow{def: br.tbl.def, rid: rid, row: row})
+	br.tbl.tx.tree.ReplaceOrInsert(midRow{def: br.tbl.def, row: row})
 	return nil
 }
