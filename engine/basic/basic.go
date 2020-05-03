@@ -538,7 +538,7 @@ func (bt *table) Insert(ctx context.Context, row []sql.Value) error {
 		return fmt.Errorf("basic: %s: existing row with duplicate primary key", bt.def.tn)
 	}
 
-	bt.tx.tree.ReplaceOrInsert(bt.def.toItem(append(make([]sql.Value, 0, len(row)), row...)))
+	bt.tx.tree.ReplaceOrInsert(bt.def.toItem(row))
 	return nil
 }
 
