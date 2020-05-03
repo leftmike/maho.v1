@@ -93,7 +93,7 @@ func (stmt *Update) Plan(ses *evaluate.Session, tx engine.Transaction) (interfac
 	if err != nil {
 		return nil, err
 	}
-	rows, err := tbl.Rows(ses.Context())
+	rows, err := tbl.Rows(ses.Context(), nil, nil)
 	if err != nil {
 		return nil, err
 	}

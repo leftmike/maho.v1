@@ -34,7 +34,7 @@ func lookupRows(ses *evaluate.Session, tx engine.Transaction, tn sql.TableName) 
 	if err != nil {
 		return nil, err
 	}
-	return tbl.Rows(ses.Context())
+	return tbl.Rows(ses.Context(), nil, nil)
 }
 
 func (fta FromTableAlias) rows(ses *evaluate.Session, tx engine.Transaction) (engine.Rows,

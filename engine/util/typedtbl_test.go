@@ -181,7 +181,7 @@ func TestTypedTable(t *testing.T) {
 			t.Errorf("Insert(%v) did not panic", tr)
 		})
 
-	r, err := ttbl.Rows(ctx)
+	r, err := ttbl.Rows(ctx, nil, nil)
 	if err != nil {
 		t.Errorf("Rows() failed with %s", err)
 	}
@@ -203,7 +203,7 @@ func TestTypedTable(t *testing.T) {
 		t.Errorf("Close() failed with %s", err)
 	}
 
-	r, err = ttbl.Rows(ctx)
+	r, err = ttbl.Rows(ctx, nil, nil)
 	if err != nil {
 		t.Errorf("Rows() failed with %s", err)
 	}

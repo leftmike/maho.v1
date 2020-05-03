@@ -8,22 +8,22 @@ To Do:
 
 - add test for not seeing modified rows within a single SQL statement
 
+- TypedTable.Rows: take a rowObjs for minRow and maxRow like Insert
+
+- basic: change midRow to rowItem
+
+- add type sql.ColumnValue interface{} and type BoolColumn []bool, type Int64Column []int64, etc
+- specify a subset of columns to return: Table.Rows(cols []int, ...)
+- Rows.NextColumns(ctx context.Context, destCols []sql.ColumnValue) error
+
+- add rowcols engine
+
 - indexes: basic
 - get rid of memrows and use basic instead
 
 - [CONSTRAINT constraint]
 - CHECK '(' logical_expression ')'
 - FOREIGN KEY
-
-- Rows interface:
--- return a chunk of rows at a time organized as a slice of values for each column
--- maybe get rid of Delete and Update
-- Table interface:
--- change Rows to RowsWhere and have it take a where clause
--- add DeleteWhere which takes a where clause
--- add UpdateWhere which takes a where clause and an update function
--- add support for where clauses where an Engine can choose to implement all, some, or none
-   of where clauses itself
 
 - ALTER TABLE ...
 - memrows: tableImpl: add versioned metadata and use METADATA_MODIFY locking level

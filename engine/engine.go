@@ -79,7 +79,6 @@ type Table interface {
 	Columns(ctx context.Context) []sql.Identifier
 	ColumnTypes(ctx context.Context) []sql.ColumnType
 	PrimaryKey(ctx context.Context) []ColumnKey
-	Seek(ctx context.Context, row []sql.Value) (Rows, error)
-	Rows(ctx context.Context) (Rows, error)
+	Rows(ctx context.Context, minRow, maxRow []sql.Value) (Rows, error)
 	Insert(ctx context.Context, row []sql.Value) error
 }

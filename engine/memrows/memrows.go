@@ -759,11 +759,10 @@ func (mt *table) PrimaryKey(ctx context.Context) []engine.ColumnKey {
 	return nil
 }
 
-func (mt *table) Seek(ctx context.Context, row []sql.Value) (engine.Rows, error) {
-	return mt.Rows(ctx)
-}
-
-func (mt *table) Rows(ctx context.Context) (engine.Rows, error) {
+func (mt *table) Rows(ctx context.Context, minRow, maxRow []sql.Value) (engine.Rows, error) {
+	if minRow != nil || maxRow != nil {
+		panic("memrows: not implemented: minRow != nil || maxRow != nil")
+	}
 	return &rows{table: mt}, nil
 }
 

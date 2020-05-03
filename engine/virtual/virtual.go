@@ -227,11 +227,10 @@ func (vt *virtualTable) PrimaryKey(ctx context.Context) []engine.ColumnKey {
 	return nil
 }
 
-func (vt *virtualTable) Seek(ctx context.Context, row []sql.Value) (engine.Rows, error) {
-	return vt.Rows(ctx)
-}
-
-func (vt *virtualTable) Rows(ctx context.Context) (engine.Rows, error) {
+func (vt *virtualTable) Rows(ctx context.Context, minRow, maxRow []sql.Value) (engine.Rows, error) {
+	if minRow != nil || maxRow != nil {
+		panic("virtual: not implemented: minRow != nil || maxRow != nil")
+	}
 	return &virtualRows{tn: vt.tn, columns: vt.cols, rows: vt.values}, nil
 }
 

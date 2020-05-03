@@ -51,19 +51,8 @@ func (ttbl *TypedTable) PrimaryKey(ctx context.Context) []engine.ColumnKey {
 	return ttbl.tbl.PrimaryKey(ctx)
 }
 
-func (ttbl *TypedTable) Seek(ctx context.Context, row []sql.Value) (*rows, error) {
-	r, err := ttbl.tbl.Seek(ctx, row)
-	if err != nil {
-		return nil, err
-	}
-	return &rows{
-		rows: r,
-		ttbl: ttbl,
-	}, nil
-}
-
-func (ttbl *TypedTable) Rows(ctx context.Context) (*rows, error) {
-	r, err := ttbl.tbl.Rows(ctx)
+func (ttbl *TypedTable) Rows(ctx context.Context, minRow, maxRow []sql.Value) (*rows, error) {
+	r, err := ttbl.tbl.Rows(ctx, minRow, maxRow)
 	if err != nil {
 		return nil, err
 	}

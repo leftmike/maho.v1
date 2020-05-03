@@ -261,7 +261,7 @@ func testInsert(t *testing.T, e engine.Engine, ses *evaluate.Session, tn sql.Tab
 				continue
 			}
 			var rows engine.Rows
-			rows, err = tbl.Rows(ses.Context())
+			rows, err = tbl.Rows(ses.Context(), nil, nil)
 			if err != nil {
 				t.Errorf("(%s).Rows() failed with %s", tn, err)
 				continue

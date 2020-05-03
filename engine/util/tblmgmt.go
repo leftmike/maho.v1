@@ -39,8 +39,8 @@ func DropSchema(ctx context.Context, ue utilEngine, etx engine.Transaction, sn s
 	ifExists bool) error {
 
 	ttbl := ue.MakeSchemasTable(etx)
-	rows, err := ttbl.Seek(ctx,
-		[]sql.Value{sql.StringValue(sn.Database.String()), sql.StringValue(sn.Schema.String())})
+	keyRow := []sql.Value{sql.StringValue(sn.Database.String()), sql.StringValue(sn.Schema.String())}
+	rows, err := ttbl.Rows(ctx, keyRow, keyRow)
 	if err != nil {
 		return err
 	}
@@ -73,8 +73,8 @@ func updateSchema(ctx context.Context, ue utilEngine, etx engine.Transaction, sn
 	delta int64) error {
 
 	ttbl := ue.MakeSchemasTable(etx)
-	rows, err := ttbl.Seek(ctx,
-		[]sql.Value{sql.StringValue(sn.Database.String()), sql.StringValue(sn.Schema.String())})
+	keyRow := []sql.Value{sql.StringValue(sn.Database.String()), sql.StringValue(sn.Schema.String())}
+	rows, err := ttbl.Rows(ctx, keyRow, keyRow)
 	if err != nil {
 		return err
 	}
@@ -108,12 +108,12 @@ func LookupTable(ctx context.Context, ue utilEngine, etx engine.Transaction,
 	tn sql.TableName) (uint64, error) {
 
 	ttbl := ue.MakeTablesTable(etx)
-	rows, err := ttbl.Seek(ctx,
-		[]sql.Value{
-			sql.StringValue(tn.Database.String()),
-			sql.StringValue(tn.Schema.String()),
-			sql.StringValue(tn.Table.String()),
-		})
+	keyRow := []sql.Value{
+		sql.StringValue(tn.Database.String()),
+		sql.StringValue(tn.Schema.String()),
+		sql.StringValue(tn.Table.String()),
+	}
+	rows, err := ttbl.Rows(ctx, keyRow, keyRow)
 	if err != nil {
 		return 0, err
 	}
@@ -182,12 +182,12 @@ func DropTable(ctx context.Context, ue utilEngine, etx engine.Transaction, tn sq
 	}
 
 	ttbl := ue.MakeTablesTable(etx)
-	rows, err := ttbl.Seek(ctx,
-		[]sql.Value{
-			sql.StringValue(tn.Database.String()),
-			sql.StringValue(tn.Schema.String()),
-			sql.StringValue(tn.Table.String()),
-		})
+	keyRow := []sql.Value{
+		sql.StringValue(tn.Database.String()),
+		sql.StringValue(tn.Schema.String()),
+		sql.StringValue(tn.Table.String()),
+	}
+	rows, err := ttbl.Rows(ctx, keyRow, keyRow)
 	if err != nil {
 		return err
 	}
@@ -226,13 +226,13 @@ func lookupIndex(ctx context.Context, ue utilEngine, etx engine.Transaction, tn 
 	idxname sql.Identifier) (bool, error) {
 
 	ttbl := ue.MakeIndexesTable(etx)
-	rows, err := ttbl.Seek(ctx,
-		[]sql.Value{
-			sql.StringValue(tn.Database.String()),
-			sql.StringValue(tn.Schema.String()),
-			sql.StringValue(tn.Table.String()),
-			sql.StringValue(idxname.String()),
-		})
+	keyRow := []sql.Value{
+		sql.StringValue(tn.Database.String()),
+		sql.StringValue(tn.Schema.String()),
+		sql.StringValue(tn.Table.String()),
+		sql.StringValue(idxname.String()),
+	}
+	rows, err := ttbl.Rows(ctx, keyRow, keyRow)
 	if err != nil {
 		return false, err
 	}
@@ -291,13 +291,13 @@ func DropIndex(ctx context.Context, ue utilEngine, etx engine.Transaction,
 	idxname sql.Identifier, tn sql.TableName, ifExists bool) error {
 
 	ttbl := ue.MakeIndexesTable(etx)
-	rows, err := ttbl.Seek(ctx,
-		[]sql.Value{
-			sql.StringValue(tn.Database.String()),
-			sql.StringValue(tn.Schema.String()),
-			sql.StringValue(tn.Table.String()),
-			sql.StringValue(idxname.String()),
-		})
+	keyRow := []sql.Value{
+		sql.StringValue(tn.Database.String()),
+		sql.StringValue(tn.Schema.String()),
+		sql.StringValue(tn.Table.String()),
+		sql.StringValue(idxname.String()),
+	}
+	rows, err := ttbl.Rows(ctx, keyRow, keyRow)
 	if err != nil {
 		return err
 	}
@@ -329,7 +329,8 @@ func ListSchemas(ctx context.Context, ue utilEngine, etx engine.Transaction,
 	dbname sql.Identifier) ([]sql.Identifier, error) {
 
 	ttbl := ue.MakeSchemasTable(etx)
-	rows, err := ttbl.Seek(ctx, []sql.Value{sql.StringValue(dbname.String()), sql.StringValue("")})
+	rows, err := ttbl.Rows(ctx, []sql.Value{sql.StringValue(dbname.String()), sql.StringValue("")},
+		nil)
 	if err != nil {
 		return nil, err
 	}
@@ -355,12 +356,12 @@ func ListTables(ctx context.Context, ue utilEngine, etx engine.Transaction,
 	sn sql.SchemaName) ([]sql.Identifier, error) {
 
 	ttbl := ue.MakeTablesTable(etx)
-	rows, err := ttbl.Seek(ctx,
+	rows, err := ttbl.Rows(ctx,
 		[]sql.Value{
 			sql.StringValue(sn.Database.String()),
 			sql.StringValue(sn.Schema.String()),
 			sql.StringValue(""),
-		})
+		}, nil)
 	if err != nil {
 		return nil, err
 	}

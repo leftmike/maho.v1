@@ -256,7 +256,7 @@ func testDatabase(t *testing.T, e engine.Engine, dbname sql.Identifier, cmds []e
 			}
 		case cmdRows:
 			var err error
-			state.rows, err = state.tbl.Rows(ctx)
+			state.rows, err = state.tbl.Rows(ctx, nil, nil)
 			if err != nil {
 				t.Errorf("table.Rows() failed with %s", err)
 			} else {
@@ -274,7 +274,7 @@ func testDatabase(t *testing.T, e engine.Engine, dbname sql.Identifier, cmds []e
 				t.Errorf("table.Insert() failed with %s", err)
 			}
 		case cmdUpdate:
-			rows, err := state.tbl.Rows(ctx)
+			rows, err := state.tbl.Rows(ctx, nil, nil)
 			if err != nil {
 				t.Errorf("table.Rows() failed with %s", err)
 			} else {
@@ -301,7 +301,7 @@ func testDatabase(t *testing.T, e engine.Engine, dbname sql.Identifier, cmds []e
 				}
 			}
 		case cmdDelete:
-			rows, err := state.tbl.Rows(ctx)
+			rows, err := state.tbl.Rows(ctx, nil, nil)
 			if err != nil {
 				t.Errorf("table.Rows() failed with %s", err)
 			} else {
@@ -1283,7 +1283,7 @@ func incColumn(t *testing.T, e engine.Engine, tx engine.Transaction, tdx uint64,
 	if err != nil {
 		t.Fatalf("LookupTable(%s) failed with %s", tn, err)
 	}
-	rows, err := tbl.Rows(ctx)
+	rows, err := tbl.Rows(ctx, nil, nil)
 	if err != nil {
 		t.Fatalf("table.Rows() failed with %s", err)
 	}

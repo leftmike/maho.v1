@@ -394,10 +394,10 @@ func makeTableDef(tn sql.TableName, cols []sql.Identifier, colTypes []sql.Column
 	primary []engine.ColumnKey, mid uint64) *tableDef {
 
 	if len(primary) == 0 {
-		panic(fmt.Sprintf("basic: missing required primary key from table %s", tn))
+		panic(fmt.Sprintf("basic: table %s: missing required primary key", tn))
 	}
 	if len(primary) > 32 {
-		panic(fmt.Sprintf("basic: primary key includes too many columns in table %s", tn))
+		panic(fmt.Sprintf("basic: table %s: primary key with too many columns", tn))
 	}
 
 	def := tableDef{
@@ -445,7 +445,7 @@ func (def *tableDef) toItem(row []sql.Value) btree.Item {
 		mr.row = make([]sql.Value, len(def.columns))
 		for rdx := range def.rowCols {
 			if def.rowCols[rdx] == len(row) {
-				break // XXX: Seek called with a partial row from typedtbl.go
+				break // XXX: Rows called with a partial row from typedtbl.go
 			}
 			mr.row[rdx] = row[def.rowCols[rdx]]
 		}
@@ -508,17 +508,30 @@ func (bt *table) PrimaryKey(ctx context.Context) []engine.ColumnKey {
 	return bt.def.primary
 }
 
-func (bt *table) Seek(ctx context.Context, row []sql.Value) (engine.Rows, error) {
+func (bt *table) Rows(ctx context.Context, minRow, maxRow []sql.Value) (engine.Rows, error) {
 	br := &rows{
 		tbl: bt,
 		idx: 0,
 	}
-	bt.tx.tree.AscendGreaterOrEqual(bt.def.toItem(row), br.itemIterator)
-	return br, nil
-}
 
-func (bt *table) Rows(ctx context.Context) (engine.Rows, error) {
-	return bt.Seek(ctx, nil)
+	var maxItem btree.Item
+	if maxRow != nil {
+		maxItem = bt.def.toItem(maxRow)
+	}
+
+	bt.tx.tree.AscendGreaterOrEqual(bt.def.toItem(minRow),
+		func(item btree.Item) bool {
+			if maxItem != nil && maxItem.Less(item) {
+				return false
+			}
+			row, ok := bt.def.toRow(item)
+			if !ok {
+				return false
+			}
+			br.rows = append(br.rows, row)
+			return true
+		})
+	return br, nil
 }
 
 func (bt *table) Insert(ctx context.Context, row []sql.Value) error {
@@ -530,15 +543,6 @@ func (bt *table) Insert(ctx context.Context, row []sql.Value) error {
 
 	bt.tx.tree.ReplaceOrInsert(bt.def.toItem(append(make([]sql.Value, 0, len(row)), row...)))
 	return nil
-}
-
-func (br *rows) itemIterator(item btree.Item) bool {
-	row, ok := br.tbl.def.toRow(item)
-	if !ok {
-		return false
-	}
-	br.rows = append(br.rows, row)
-	return true
 }
 
 func (br *rows) Columns() []sql.Identifier {
