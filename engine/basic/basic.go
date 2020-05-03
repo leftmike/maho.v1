@@ -451,31 +451,29 @@ func (def *tableDef) toItem(row []sql.Value) btree.Item {
 	return ri
 }
 
-func (def *tableDef) toRow(item btree.Item) ([]sql.Value, bool) {
-	ri := item.(rowItem)
-	if ri.mid != def.mid {
-		return nil, false
-	}
+func (def *tableDef) toRow(ri rowItem) []sql.Value {
 	if ri.row == nil {
-		return nil, true
+		panic(fmt.Sprintf("basic: table %s contains nil row", def.tn))
 	}
 	row := make([]sql.Value, len(def.columns))
 	for rdx := range def.rowCols {
 		row[def.rowCols[rdx]] = ri.row[rdx]
 	}
-	return row, true
+	return row
 }
 
-func (ri rowItem) Less(item btree.Item) bool {
-	ri2 := item.(rowItem)
+func (ri rowItem) compare(ri2 rowItem) int {
 	if ri.mid < ri2.mid {
-		return true
-	} else if ri.mid != ri2.mid {
-		return false
+		return -1
+	} else if ri.mid > ri2.mid {
+		return 1
 	} else if ri2.row == nil {
-		return false
+		if ri.row == nil {
+			return 0
+		}
+		return -1
 	} else if ri.row == nil {
-		return true
+		return -1
 	}
 
 	for kdx := uint8(0); kdx < ri.numKeyCols; kdx += 1 {
@@ -484,13 +482,17 @@ func (ri rowItem) Less(item btree.Item) bool {
 			continue
 		}
 		if ri.reverse&(1<<kdx) != 0 {
-			return cmp > 0
+			return -1 * cmp
 		} else {
-			return cmp < 0
+			return cmp
 		}
 	}
 
-	return false
+	return 0
+}
+
+func (ri rowItem) Less(item btree.Item) bool {
+	return ri.compare(item.(rowItem)) < 0
 }
 
 func (bt *table) Columns(ctx context.Context) []sql.Identifier {
@@ -521,11 +523,11 @@ func (bt *table) Rows(ctx context.Context, minRow, maxRow []sql.Value) (engine.R
 			if maxItem != nil && maxItem.Less(item) {
 				return false
 			}
-			row, ok := bt.def.toRow(item)
-			if !ok {
+			ri := item.(rowItem)
+			if ri.mid != bt.def.mid {
 				return false
 			}
-			br.rows = append(br.rows, row)
+			br.rows = append(br.rows, bt.def.toRow(ri))
 			return true
 		})
 	return br, nil
