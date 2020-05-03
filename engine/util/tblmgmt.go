@@ -39,7 +39,10 @@ func DropSchema(ctx context.Context, ue utilEngine, etx engine.Transaction, sn s
 	ifExists bool) error {
 
 	ttbl := ue.MakeSchemasTable(etx)
-	keyRow := []sql.Value{sql.StringValue(sn.Database.String()), sql.StringValue(sn.Schema.String())}
+	keyRow := schemaRow{
+		Database: sn.Database.String(),
+		Schema:   sn.Schema.String(),
+	}
 	rows, err := ttbl.Rows(ctx, keyRow, keyRow)
 	if err != nil {
 		return err
@@ -73,7 +76,10 @@ func updateSchema(ctx context.Context, ue utilEngine, etx engine.Transaction, sn
 	delta int64) error {
 
 	ttbl := ue.MakeSchemasTable(etx)
-	keyRow := []sql.Value{sql.StringValue(sn.Database.String()), sql.StringValue(sn.Schema.String())}
+	keyRow := schemaRow{
+		Database: sn.Database.String(),
+		Schema:   sn.Schema.String(),
+	}
 	rows, err := ttbl.Rows(ctx, keyRow, keyRow)
 	if err != nil {
 		return err
@@ -108,10 +114,10 @@ func LookupTable(ctx context.Context, ue utilEngine, etx engine.Transaction,
 	tn sql.TableName) (uint64, error) {
 
 	ttbl := ue.MakeTablesTable(etx)
-	keyRow := []sql.Value{
-		sql.StringValue(tn.Database.String()),
-		sql.StringValue(tn.Schema.String()),
-		sql.StringValue(tn.Table.String()),
+	keyRow := tableRow{
+		Database: tn.Database.String(),
+		Schema:   tn.Schema.String(),
+		Table:    tn.Table.String(),
 	}
 	rows, err := ttbl.Rows(ctx, keyRow, keyRow)
 	if err != nil {
@@ -182,10 +188,10 @@ func DropTable(ctx context.Context, ue utilEngine, etx engine.Transaction, tn sq
 	}
 
 	ttbl := ue.MakeTablesTable(etx)
-	keyRow := []sql.Value{
-		sql.StringValue(tn.Database.String()),
-		sql.StringValue(tn.Schema.String()),
-		sql.StringValue(tn.Table.String()),
+	keyRow := tableRow{
+		Database: tn.Database.String(),
+		Schema:   tn.Schema.String(),
+		Table:    tn.Table.String(),
 	}
 	rows, err := ttbl.Rows(ctx, keyRow, keyRow)
 	if err != nil {
@@ -226,11 +232,11 @@ func lookupIndex(ctx context.Context, ue utilEngine, etx engine.Transaction, tn 
 	idxname sql.Identifier) (bool, error) {
 
 	ttbl := ue.MakeIndexesTable(etx)
-	keyRow := []sql.Value{
-		sql.StringValue(tn.Database.String()),
-		sql.StringValue(tn.Schema.String()),
-		sql.StringValue(tn.Table.String()),
-		sql.StringValue(idxname.String()),
+	keyRow := indexRow{
+		Database: tn.Database.String(),
+		Schema:   tn.Schema.String(),
+		Table:    tn.Table.String(),
+		Index:    idxname.String(),
 	}
 	rows, err := ttbl.Rows(ctx, keyRow, keyRow)
 	if err != nil {
@@ -291,11 +297,11 @@ func DropIndex(ctx context.Context, ue utilEngine, etx engine.Transaction,
 	idxname sql.Identifier, tn sql.TableName, ifExists bool) error {
 
 	ttbl := ue.MakeIndexesTable(etx)
-	keyRow := []sql.Value{
-		sql.StringValue(tn.Database.String()),
-		sql.StringValue(tn.Schema.String()),
-		sql.StringValue(tn.Table.String()),
-		sql.StringValue(idxname.String()),
+	keyRow := indexRow{
+		Database: tn.Database.String(),
+		Schema:   tn.Schema.String(),
+		Table:    tn.Table.String(),
+		Index:    idxname.String(),
 	}
 	rows, err := ttbl.Rows(ctx, keyRow, keyRow)
 	if err != nil {
@@ -329,8 +335,7 @@ func ListSchemas(ctx context.Context, ue utilEngine, etx engine.Transaction,
 	dbname sql.Identifier) ([]sql.Identifier, error) {
 
 	ttbl := ue.MakeSchemasTable(etx)
-	rows, err := ttbl.Rows(ctx, []sql.Value{sql.StringValue(dbname.String()), sql.StringValue("")},
-		nil)
+	rows, err := ttbl.Rows(ctx, schemaRow{Database: dbname.String()}, nil)
 	if err != nil {
 		return nil, err
 	}
@@ -357,11 +362,7 @@ func ListTables(ctx context.Context, ue utilEngine, etx engine.Transaction,
 
 	ttbl := ue.MakeTablesTable(etx)
 	rows, err := ttbl.Rows(ctx,
-		[]sql.Value{
-			sql.StringValue(sn.Database.String()),
-			sql.StringValue(sn.Schema.String()),
-			sql.StringValue(""),
-		}, nil)
+		tableRow{Database: sn.Database.String(), Table: sn.Schema.String()}, nil)
 	if err != nil {
 		return nil, err
 	}

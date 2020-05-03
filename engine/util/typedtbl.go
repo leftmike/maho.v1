@@ -51,7 +51,15 @@ func (ttbl *TypedTable) PrimaryKey(ctx context.Context) []engine.ColumnKey {
 	return ttbl.tbl.PrimaryKey(ctx)
 }
 
-func (ttbl *TypedTable) Rows(ctx context.Context, minRow, maxRow []sql.Value) (*rows, error) {
+func (ttbl *TypedTable) Rows(ctx context.Context, minObj, maxObj interface{}) (*rows, error) {
+	var minRow, maxRow []sql.Value
+	if minObj != nil {
+		minRow = ttbl.rowObjToRow(ctx, "minObj", minObj)
+	}
+	if maxObj != nil {
+		maxRow = ttbl.rowObjToRow(ctx, "maxObj", maxObj)
+	}
+
 	r, err := ttbl.tbl.Rows(ctx, minRow, maxRow)
 	if err != nil {
 		return nil, err
@@ -159,7 +167,9 @@ func (ttbl *TypedTable) makeRowFields(ctx context.Context, rowType reflect.Type)
 	return rowFields
 }
 
-func (ttbl *TypedTable) Insert(ctx context.Context, rowObj interface{}) error {
+func (ttbl *TypedTable) rowObjToRow(ctx context.Context, nam string,
+	rowObj interface{}) []sql.Value {
+
 	rowType := reflect.TypeOf(rowObj)
 	rowVal := reflect.ValueOf(rowObj)
 	if rowType.Kind() == reflect.Ptr {
@@ -167,8 +177,8 @@ func (ttbl *TypedTable) Insert(ctx context.Context, rowObj interface{}) error {
 		rowVal = rowVal.Elem()
 	}
 	if rowType.Kind() != reflect.Struct {
-		panic(fmt.Sprintf("typed table: rowObj must be a struct or a pointer to a struct; got %v",
-			rowObj))
+		panic(fmt.Sprintf("typed table: %s must be a struct or a pointer to a struct; got %v",
+			nam, rowObj))
 	}
 	if rowType != ttbl.rowType {
 		ttbl.rowFields = ttbl.makeRowFields(ctx, rowType)
@@ -203,7 +213,11 @@ func (ttbl *TypedTable) Insert(ctx context.Context, rowObj interface{}) error {
 		}
 	}
 
-	return ttbl.tbl.Insert(ctx, dest)
+	return dest
+}
+
+func (ttbl *TypedTable) Insert(ctx context.Context, rowObj interface{}) error {
+	return ttbl.tbl.Insert(ctx, ttbl.rowObjToRow(ctx, "rowObj", rowObj))
 }
 
 func (r *rows) Columns() []sql.Identifier {

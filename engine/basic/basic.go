@@ -444,9 +444,6 @@ func (def *tableDef) toItem(row []sql.Value) btree.Item {
 	if row != nil {
 		ri.row = make([]sql.Value, len(def.columns))
 		for rdx := range def.rowCols {
-			if def.rowCols[rdx] == len(row) {
-				break // XXX: Rows called with a partial row from typedtbl.go
-			}
 			ri.row[rdx] = row[def.rowCols[rdx]]
 		}
 	}
