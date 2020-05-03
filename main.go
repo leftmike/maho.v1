@@ -15,7 +15,7 @@ To Do:
 - add rowcols engine
 
 - indexes: basic
-- get rid of memrows and use basic instead
+- get rid of memrows and use basic instead; engine/service might no longer be necessary?
 
 - [CONSTRAINT constraint]
 - CHECK '(' logical_expression ')'
@@ -42,6 +42,7 @@ import (
 	"github.com/leftmike/maho/engine"
 	"github.com/leftmike/maho/engine/basic"
 	"github.com/leftmike/maho/engine/memrows"
+	"github.com/leftmike/maho/engine/rowcols"
 	"github.com/leftmike/maho/evaluate"
 	"github.com/leftmike/maho/parser"
 	"github.com/leftmike/maho/server"
@@ -183,9 +184,11 @@ func main() {
 		e, err = basic.NewEngine(*dataDir)
 	case "memrows":
 		e, err = memrows.NewEngine(*dataDir)
+	case "rowcols":
+		e, err = rowcols.NewEngine(*dataDir)
 	default:
 		fmt.Fprintf(os.Stderr,
-			"maho: got %s for engine; want basic or memrows", *eng)
+			"maho: got %s for engine; want basic, memrows, or rowcols", *eng)
 		return
 	}
 	if err != nil {

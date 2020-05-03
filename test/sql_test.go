@@ -11,6 +11,7 @@ import (
 	"github.com/leftmike/maho/engine"
 	"github.com/leftmike/maho/engine/basic"
 	"github.com/leftmike/maho/engine/memrows"
+	"github.com/leftmike/maho/engine/rowcols"
 	"github.com/leftmike/maho/sql"
 	"github.com/leftmike/maho/test"
 )
@@ -56,9 +57,13 @@ func testSQL(t *testing.T, typ string, dbname sql.Identifier, testData string) {
 	var err error
 	switch typ {
 	case "basic":
-		e, err = basic.NewEngine("testdata")
+		e, err = basic.NewEngine(testData)
 	case "memrows":
-		e, err = memrows.NewEngine("testdata")
+		e, err = memrows.NewEngine(testData)
+	case "rowcols":
+		e, err = rowcols.NewEngine(testData)
+	default:
+		panic(fmt.Sprintf("unexpected engine type: %s", typ))
 	}
 	if err != nil {
 		t.Fatal(err)
@@ -93,4 +98,9 @@ func TestSQLBasic(t *testing.T) {
 func TestSQLMemRows(t *testing.T) {
 	testSQL(t, "memrows", sql.ID("test_memrows"), "testdata")
 	testSQL(t, "memrows", sql.ID("sqltest_memrows"), *testData)
+}
+
+func TestSQLRowCols(t *testing.T) {
+	testSQL(t, "rowcols", sql.ID("test_rowcols"), "testdata")
+	testSQL(t, "rowcols", sql.ID("sqltest_rowcols"), *testData)
 }
