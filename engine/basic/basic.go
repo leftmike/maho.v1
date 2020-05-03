@@ -78,7 +78,7 @@ type table struct {
 	def *tableDef
 }
 
-type midRow struct {
+type rowItem struct {
 	mid        uint64
 	reverse    uint32
 	numKeyCols uint8
@@ -435,58 +435,58 @@ func makeTableDef(tn sql.TableName, cols []sql.Identifier, colTypes []sql.Column
 }
 
 func (def *tableDef) toItem(row []sql.Value) btree.Item {
-	mr := midRow{
+	ri := rowItem{
 		mid:        def.mid,
 		reverse:    def.reverse,
 		numKeyCols: uint8(len(def.primary)),
 	}
 
 	if row != nil {
-		mr.row = make([]sql.Value, len(def.columns))
+		ri.row = make([]sql.Value, len(def.columns))
 		for rdx := range def.rowCols {
 			if def.rowCols[rdx] == len(row) {
 				break // XXX: Rows called with a partial row from typedtbl.go
 			}
-			mr.row[rdx] = row[def.rowCols[rdx]]
+			ri.row[rdx] = row[def.rowCols[rdx]]
 		}
 	}
 
-	return mr
+	return ri
 }
 
 func (def *tableDef) toRow(item btree.Item) ([]sql.Value, bool) {
-	mr := item.(midRow)
-	if mr.mid != def.mid {
+	ri := item.(rowItem)
+	if ri.mid != def.mid {
 		return nil, false
 	}
-	if mr.row == nil {
+	if ri.row == nil {
 		return nil, true
 	}
 	row := make([]sql.Value, len(def.columns))
 	for rdx := range def.rowCols {
-		row[def.rowCols[rdx]] = mr.row[rdx]
+		row[def.rowCols[rdx]] = ri.row[rdx]
 	}
 	return row, true
 }
 
-func (mr midRow) Less(item btree.Item) bool {
-	mr2 := item.(midRow)
-	if mr.mid < mr2.mid {
+func (ri rowItem) Less(item btree.Item) bool {
+	ri2 := item.(rowItem)
+	if ri.mid < ri2.mid {
 		return true
-	} else if mr.mid != mr2.mid {
+	} else if ri.mid != ri2.mid {
 		return false
-	} else if mr2.row == nil {
+	} else if ri2.row == nil {
 		return false
-	} else if mr.row == nil {
+	} else if ri.row == nil {
 		return true
 	}
 
-	for kdx := uint8(0); kdx < mr.numKeyCols; kdx += 1 {
-		cmp := sql.Compare(mr.row[kdx], mr2.row[kdx])
+	for kdx := uint8(0); kdx < ri.numKeyCols; kdx += 1 {
+		cmp := sql.Compare(ri.row[kdx], ri2.row[kdx])
 		if cmp == 0 {
 			continue
 		}
-		if mr.reverse&(1<<kdx) != 0 {
+		if ri.reverse&(1<<kdx) != 0 {
 			return cmp > 0
 		} else {
 			return cmp < 0

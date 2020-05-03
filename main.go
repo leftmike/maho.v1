@@ -10,8 +10,6 @@ To Do:
 
 - TypedTable.Rows: take a rowObjs for minRow and maxRow like Insert
 
-- basic: change midRow to rowItem
-
 - add type sql.ColumnValue interface{} and type BoolColumn []bool, type Int64Column []int64, etc
 - specify a subset of columns to return: Table.Rows(cols []int, ...)
 - Rows.NextColumns(ctx context.Context, destCols []sql.ColumnValue) error
