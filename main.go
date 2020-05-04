@@ -12,10 +12,11 @@ To Do:
 - specify a subset of columns to return: Table.Rows(cols []int, ...)
 - Rows.NextColumns(ctx context.Context, destCols []sql.ColumnValue) error
 
-- add rowcols engine
-
 - indexes: basic
 - get rid of memrows and use basic instead; engine/service might no longer be necessary?
+
+- rowcols and basic: test primaryUpdated
+- rowcols: add write ahead log
 
 - [CONSTRAINT constraint]
 - CHECK '(' logical_expression ')'

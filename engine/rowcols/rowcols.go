@@ -49,16 +49,20 @@ var (
 )
 
 type rowColsEngine struct {
-	mutex     sync.Mutex
-	databases map[sql.Identifier]struct{}
-	tableDefs map[uint64]*tableDef
-	tree      *btree.BTree
-	lastMID   uint64
+	mutex       sync.Mutex
+	databases   map[sql.Identifier]struct{}
+	tableDefs   map[uint64]*tableDef
+	tree        *btree.BTree
+	ver         uint64
+	lastMID     uint64
+	commitMutex sync.Mutex
 }
 
 type transaction struct {
-	rce  *rowColsEngine
-	tree *btree.BTree
+	rce   *rowColsEngine
+	tree  *btree.BTree
+	ver   uint64
+	delta *btree.BTree
 }
 
 type tableDef struct {
@@ -80,8 +84,10 @@ type table struct {
 
 type rowItem struct {
 	mid        uint64
+	ver        uint64
 	reverse    uint32
 	numKeyCols uint8
+	deleted    bool
 	row        []sql.Value
 }
 
@@ -331,10 +337,56 @@ func (rce *rowColsEngine) DropIndex(ctx context.Context, etx engine.Transaction,
 
 func (rce *rowColsEngine) Begin(sesid uint64) engine.Transaction {
 	rce.mutex.Lock()
+	defer rce.mutex.Unlock()
 	return &transaction{
 		rce:  rce,
-		tree: rce.tree,
+		tree: rce.tree.Clone(),
+		ver:  rce.ver,
 	}
+}
+
+func (rce *rowColsEngine) commit(ctx context.Context, txVer uint64, delta *btree.BTree) error {
+	rce.commitMutex.Lock()
+	defer rce.commitMutex.Unlock()
+
+	rce.mutex.Lock()
+	tree := rce.tree.Clone()
+	rce.mutex.Unlock()
+
+	ver := rce.ver + 1
+	var err error
+
+	delta.Ascend(
+		func(item btree.Item) bool {
+			txri := item.(rowItem)
+			cur := tree.Get(txri)
+			if cur == nil {
+				if !txri.deleted {
+					txri.ver = ver
+					tree.ReplaceOrInsert(txri)
+				}
+			} else {
+				ri := cur.(rowItem)
+				if ri.ver > txVer {
+					err = errors.New("rowcols: write conflict committing transaction")
+					return false
+				}
+				if !txri.deleted || !ri.deleted {
+					txri.ver = ver
+					tree.ReplaceOrInsert(txri)
+				}
+			}
+			return true
+		})
+
+	if err == nil {
+		rce.mutex.Lock()
+		rce.tree = tree
+		rce.ver = ver
+		rce.mutex.Unlock()
+	}
+
+	return err
 }
 
 func (rce *rowColsEngine) ListDatabases(ctx context.Context,
@@ -359,34 +411,38 @@ func (rce *rowColsEngine) ListTables(ctx context.Context, etx engine.Transaction
 	return util.ListTables(ctx, rce, etx, sn)
 }
 
-func (btx *transaction) Commit(ctx context.Context) error {
-	if btx.rce == nil {
+func (rctx *transaction) Commit(ctx context.Context) error {
+	if rctx.rce == nil {
 		return errTransactionComplete
 	}
 
-	btx.rce.tree = btx.tree
-	btx.rce.mutex.Unlock()
-	btx.rce = nil
-	btx.tree = nil
-	return nil
+	var err error
+	if rctx.delta != nil {
+		err = rctx.rce.commit(ctx, rctx.ver, rctx.delta)
+	}
+
+	rctx.rce = nil
+	rctx.tree = nil
+	rctx.delta = nil
+	return err
 }
 
-func (btx *transaction) Rollback() error {
-	if btx.rce == nil {
+func (rctx *transaction) Rollback() error {
+	if rctx.rce == nil {
 		return errTransactionComplete
 	}
 
-	btx.rce.mutex.Unlock()
-	btx.rce = nil
-	btx.tree = nil
+	rctx.rce = nil
+	rctx.tree = nil
+	rctx.delta = nil
 	return nil
 }
 
 func (_ *transaction) NextStmt() {}
 
-func (btx *transaction) forWrite() {
-	if btx.tree == btx.rce.tree {
-		btx.tree = btx.rce.tree.Clone()
+func (rctx *transaction) forWrite() {
+	if rctx.delta == nil {
+		rctx.delta = btree.New(16)
 	}
 }
 
@@ -434,10 +490,12 @@ func makeTableDef(tn sql.TableName, cols []sql.Identifier, colTypes []sql.Column
 	return &def
 }
 
-func (def *tableDef) toItem(row []sql.Value) btree.Item {
+func (def *tableDef) toItem(row []sql.Value, ver uint64, deleted bool) btree.Item {
 	ri := rowItem{
 		mid:        def.mid,
+		ver:        ver,
 		reverse:    def.reverse,
+		deleted:    deleted,
 		numKeyCols: uint8(len(def.primary)),
 	}
 
@@ -451,31 +509,29 @@ func (def *tableDef) toItem(row []sql.Value) btree.Item {
 	return ri
 }
 
-func (def *tableDef) toRow(item btree.Item) ([]sql.Value, bool) {
-	ri := item.(rowItem)
-	if ri.mid != def.mid {
-		return nil, false
-	}
+func (def *tableDef) toRow(ri rowItem) []sql.Value {
 	if ri.row == nil {
-		return nil, true
+		return nil
 	}
 	row := make([]sql.Value, len(def.columns))
 	for rdx := range def.rowCols {
 		row[def.rowCols[rdx]] = ri.row[rdx]
 	}
-	return row, true
+	return row
 }
 
-func (ri rowItem) Less(item btree.Item) bool {
-	ri2 := item.(rowItem)
+func (ri rowItem) compare(ri2 rowItem) int {
 	if ri.mid < ri2.mid {
-		return true
-	} else if ri.mid != ri2.mid {
-		return false
+		return -1
+	} else if ri.mid > ri2.mid {
+		return 1
 	} else if ri2.row == nil {
-		return false
+		if ri.row == nil {
+			return 0
+		}
+		return -1
 	} else if ri.row == nil {
-		return true
+		return -1
 	}
 
 	for kdx := uint8(0); kdx < ri.numKeyCols; kdx += 1 {
@@ -484,13 +540,17 @@ func (ri rowItem) Less(item btree.Item) bool {
 			continue
 		}
 		if ri.reverse&(1<<kdx) != 0 {
-			return cmp > 0
+			return -1 * cmp
 		} else {
-			return cmp < 0
+			return cmp
 		}
 	}
 
-	return false
+	return 0
+}
+
+func (ri rowItem) Less(item btree.Item) bool {
+	return ri.compare(item.(rowItem)) < 0
 }
 
 func (bt *table) Columns(ctx context.Context) []sql.Identifier {
@@ -513,32 +573,98 @@ func (bt *table) Rows(ctx context.Context, minRow, maxRow []sql.Value) (engine.R
 
 	var maxItem btree.Item
 	if maxRow != nil {
-		maxItem = bt.def.toItem(maxRow)
+		maxItem = bt.def.toItem(maxRow, 0, false)
 	}
 
-	bt.tx.tree.AscendGreaterOrEqual(bt.def.toItem(minRow),
+	if bt.tx.delta == nil {
+		bt.tx.tree.AscendGreaterOrEqual(bt.def.toItem(minRow, 0, false),
+			func(item btree.Item) bool {
+				if maxItem != nil && maxItem.Less(item) {
+					return false
+				}
+				ri := item.(rowItem)
+				if ri.mid != bt.def.mid {
+					return false
+				}
+				if !ri.deleted {
+					br.rows = append(br.rows, bt.def.toRow(ri))
+				}
+				return true
+			})
+		return br, nil
+	}
+
+	var deltaRows []rowItem
+	bt.tx.delta.AscendGreaterOrEqual(bt.def.toItem(minRow, 0, false),
 		func(item btree.Item) bool {
 			if maxItem != nil && maxItem.Less(item) {
 				return false
 			}
-			row, ok := bt.def.toRow(item)
-			if !ok {
+			ri := item.(rowItem)
+			if ri.mid != bt.def.mid {
 				return false
 			}
-			br.rows = append(br.rows, row)
+			deltaRows = append(deltaRows, ri)
 			return true
 		})
+
+	bt.tx.tree.AscendGreaterOrEqual(bt.def.toItem(minRow, 0, false),
+		func(item btree.Item) bool {
+			if maxItem != nil && maxItem.Less(item) {
+				return false
+			}
+			ri := item.(rowItem)
+			if ri.mid != bt.def.mid {
+				return false
+			}
+
+			for len(deltaRows) > 0 {
+				cmp := ri.compare(deltaRows[0])
+				if cmp < 0 {
+					break
+				} else if cmp > 0 {
+					if !deltaRows[0].deleted {
+						br.rows = append(br.rows, bt.def.toRow(deltaRows[0]))
+					}
+					deltaRows = deltaRows[1:]
+				} else {
+					if !deltaRows[0].deleted {
+						// Must be an update.
+						br.rows = append(br.rows, bt.def.toRow(deltaRows[0]))
+						deltaRows = deltaRows[1:]
+					}
+					return true
+				}
+			}
+
+			if !ri.deleted {
+				br.rows = append(br.rows, bt.def.toRow(ri))
+			}
+			return true
+		})
+
+	for _, ri := range deltaRows {
+		if !ri.deleted {
+			br.rows = append(br.rows, bt.def.toRow(ri))
+		}
+	}
+
 	return br, nil
 }
 
 func (bt *table) Insert(ctx context.Context, row []sql.Value) error {
 	bt.tx.forWrite()
 
-	if bt.tx.tree.Has(bt.def.toItem(row)) {
+	ri := bt.def.toItem(row, 0, false)
+	if item := bt.tx.delta.Get(ri); item != nil {
+		if !(item.(rowItem)).deleted {
+			return fmt.Errorf("rowcols: %s: existing row with duplicate primary key", bt.def.tn)
+		}
+	} else if item := bt.tx.tree.Get(ri); item != nil && !(item.(rowItem)).deleted {
 		return fmt.Errorf("rowcols: %s: existing row with duplicate primary key", bt.def.tn)
 	}
 
-	bt.tx.tree.ReplaceOrInsert(bt.def.toItem(append(make([]sql.Value, 0, len(row)), row...)))
+	bt.tx.delta.ReplaceOrInsert(ri)
 	return nil
 }
 
@@ -570,7 +696,7 @@ func (br *rows) Delete(ctx context.Context) error {
 		panic(fmt.Sprintf("rowcols: table %s no row to delete", br.tbl.def.tn))
 	}
 
-	br.tbl.tx.tree.Delete(br.tbl.def.toItem(br.rows[br.idx-1]))
+	br.tbl.tx.delta.ReplaceOrInsert(br.tbl.def.toItem(br.rows[br.idx-1], 0, true))
 	return nil
 }
 
@@ -591,6 +717,7 @@ func (br *rows) Update(ctx context.Context, updates []sql.ColumnUpdate) error {
 	}
 
 	if primaryUpdated {
+		panic("primary updated") // XXX
 		br.Delete(ctx)
 
 		for _, update := range updates {
@@ -604,6 +731,6 @@ func (br *rows) Update(ctx context.Context, updates []sql.ColumnUpdate) error {
 	for _, update := range updates {
 		row[update.Index] = update.Value
 	}
-	br.tbl.tx.tree.ReplaceOrInsert(br.tbl.def.toItem(row))
+	br.tbl.tx.delta.ReplaceOrInsert(br.tbl.def.toItem(row, 0, false))
 	return nil
 }

@@ -100,7 +100,10 @@ func TestSQLMemRows(t *testing.T) {
 	testSQL(t, "memrows", sql.ID("sqltest_memrows"), *testData)
 }
 
+/*
+XXX: rowcols
 func TestSQLRowCols(t *testing.T) {
 	testSQL(t, "rowcols", sql.ID("test_rowcols"), "testdata")
 	testSQL(t, "rowcols", sql.ID("sqltest_rowcols"), *testData)
 }
+*/

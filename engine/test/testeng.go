@@ -1350,15 +1350,16 @@ func RunStressTest(t *testing.T, e engine.Engine) {
 
 			var ctx context.Context
 			name := sql.ID("tbl")
-			for i := 0; i < r; i++ {
+			i := 0
+			for i < r {
 				updated := false
 				for !updated {
 					tx := e.Begin(tdx)
 					updated = incColumn(t, e, tx, tdx, i, sql.TableName{dbname, sql.PUBLIC, name})
 					if updated {
 						err := tx.Commit(ctx)
-						if err != nil {
-							t.Errorf("Commit() failed with %s", err)
+						if err == nil {
+							i += 1
 						}
 					} else {
 						err := tx.Rollback()
