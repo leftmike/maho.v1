@@ -717,7 +717,6 @@ func (br *rows) Update(ctx context.Context, updates []sql.ColumnUpdate) error {
 	}
 
 	if primaryUpdated {
-		panic("primary updated") // XXX
 		br.Delete(ctx)
 
 		for _, update := range updates {
@@ -727,10 +726,9 @@ func (br *rows) Update(ctx context.Context, updates []sql.ColumnUpdate) error {
 		return br.tbl.Insert(ctx, br.rows[br.idx-1])
 	}
 
-	row := append(make([]sql.Value, 0, len(br.rows[br.idx-1])), br.rows[br.idx-1]...)
 	for _, update := range updates {
-		row[update.Index] = update.Value
+		br.rows[br.idx-1][update.Index] = update.Value
 	}
-	br.tbl.tx.delta.ReplaceOrInsert(br.tbl.def.toItem(row, 0, false))
+	br.tbl.tx.delta.ReplaceOrInsert(br.tbl.def.toItem(br.rows[br.idx-1], 0, false))
 	return nil
 }

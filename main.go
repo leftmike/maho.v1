@@ -15,7 +15,6 @@ To Do:
 - indexes: basic
 - get rid of memrows and use basic instead; engine/service might no longer be necessary?
 
-- rowcols and basic: test primaryUpdated
 - rowcols: add write ahead log
 
 - [CONSTRAINT constraint]

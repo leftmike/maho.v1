@@ -44,10 +44,11 @@ var (
 
 type mahoDialect struct {
 	sqltest.DefaultDialect
+	name string
 }
 
-func (_ mahoDialect) DriverName() string {
-	return "maho"
+func (md mahoDialect) DriverName() string {
+	return md.name
 }
 
 func testSQL(t *testing.T, typ string, dbname sql.Identifier, testData string) {
@@ -78,7 +79,7 @@ func testSQL(t *testing.T, typ string, dbname sql.Identifier, testData string) {
 		Database: dbname,
 	}
 	var rptr reporter
-	err = sqltest.RunTests(testData, &run, &rptr, mahoDialect{}, *update)
+	err = sqltest.RunTests(testData, &run, &rptr, mahoDialect{name: "maho-" + typ}, *update)
 	if err != nil {
 		t.Errorf("RunTests(%q) failed with %s", testData, err)
 		return
@@ -100,10 +101,7 @@ func TestSQLMemRows(t *testing.T) {
 	testSQL(t, "memrows", sql.ID("sqltest_memrows"), *testData)
 }
 
-/*
-XXX: rowcols
 func TestSQLRowCols(t *testing.T) {
 	testSQL(t, "rowcols", sql.ID("test_rowcols"), "testdata")
 	testSQL(t, "rowcols", sql.ID("sqltest_rowcols"), *testData)
 }
-*/
