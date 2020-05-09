@@ -51,19 +51,18 @@ func (md mahoDialect) DriverName() string {
 	return md.name
 }
 
-func testSQL(t *testing.T, typ string, dbname sql.Identifier, testData string) {
+func testSQL(t *testing.T, typ string, dbname sql.Identifier, testData, dataDir string) {
 	t.Helper()
 
-	path := filepath.Join(testData, typ)
 	var e engine.Engine
 	var err error
 	switch typ {
 	case "basic":
-		e, err = basic.NewEngine(path)
+		e, err = basic.NewEngine(dataDir)
 	case "memrows":
-		e, err = memrows.NewEngine(path)
+		e, err = memrows.NewEngine(dataDir)
 	case "rowcols":
-		e, err = rowcols.NewEngine(path)
+		e, err = rowcols.NewEngine(dataDir)
 	default:
 		panic(fmt.Sprintf("unexpected engine type: %s", typ))
 	}
@@ -93,16 +92,18 @@ func testSQL(t *testing.T, typ string, dbname sql.Identifier, testData string) {
 }
 
 func TestSQLBasic(t *testing.T) {
-	testSQL(t, "basic", sql.ID("test_basic"), "testdata")
-	testSQL(t, "basic", sql.ID("sqltest_basic"), *testData)
+	testSQL(t, "basic", sql.ID("test_basic"), "testdata", "")
+	testSQL(t, "basic", sql.ID("sqltest_basic"), *testData, "")
 }
 
 func TestSQLMemRows(t *testing.T) {
-	testSQL(t, "memrows", sql.ID("test_memrows"), "testdata")
-	testSQL(t, "memrows", sql.ID("sqltest_memrows"), *testData)
+	testSQL(t, "memrows", sql.ID("test_memrows"), "testdata", "")
+	testSQL(t, "memrows", sql.ID("sqltest_memrows"), *testData, "")
 }
 
 func TestSQLRowCols(t *testing.T) {
-	testSQL(t, "rowcols", sql.ID("test_rowcols"), "testdata")
-	testSQL(t, "rowcols", sql.ID("sqltest_rowcols"), *testData)
+	testSQL(t, "rowcols", sql.ID("test_rowcols"), "testdata",
+		filepath.Join("testdata", "rowcols"))
+	testSQL(t, "rowcols", sql.ID("sqltest_rowcols"), *testData,
+		filepath.Join("testdata", "rowcols"))
 }
