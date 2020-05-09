@@ -54,15 +54,16 @@ func (md mahoDialect) DriverName() string {
 func testSQL(t *testing.T, typ string, dbname sql.Identifier, testData string) {
 	t.Helper()
 
+	path := filepath.Join(testData, typ)
 	var e engine.Engine
 	var err error
 	switch typ {
 	case "basic":
-		e, err = basic.NewEngine(testData)
+		e, err = basic.NewEngine(path)
 	case "memrows":
-		e, err = memrows.NewEngine(testData)
+		e, err = memrows.NewEngine(path)
 	case "rowcols":
-		e, err = rowcols.NewEngine(testData)
+		e, err = rowcols.NewEngine(path)
 	default:
 		panic(fmt.Sprintf("unexpected engine type: %s", typ))
 	}

@@ -5,6 +5,8 @@ import (
 	"errors"
 	"fmt"
 	"io"
+	"os"
+	"path/filepath"
 	"sync"
 
 	"github.com/google/btree"
@@ -50,6 +52,7 @@ var (
 
 type rowColsEngine struct {
 	mutex       sync.Mutex
+	wal         *WAL
 	databases   map[sql.Identifier]struct{}
 	tableDefs   map[uint64]*tableDef
 	tree        *btree.BTree
@@ -98,12 +101,28 @@ type rows struct {
 }
 
 func NewEngine(dataDir string) (engine.Engine, error) {
+	os.MkdirAll(dataDir, 0755)
+	f, err := os.OpenFile(filepath.Join(dataDir, "mahorowcols.wal"), os.O_RDWR|os.O_CREATE, 0755)
+	if err != nil {
+		return nil, err
+	}
+	wal, err := MakeWAL(f)
+	if err != nil {
+		return nil, err
+	}
+
 	rce := &rowColsEngine{
+		wal:       wal,
 		databases: map[sql.Identifier]struct{}{},
 		tableDefs: map[uint64]*tableDef{},
 		tree:      btree.New(16),
 		lastMID:   63,
 	}
+	err = rce.wal.ReadWAL(rce)
+	if err != nil {
+		return nil, err
+	}
+
 	ve := virtual.NewEngine(rce)
 	return ve, nil
 }
@@ -354,8 +373,9 @@ func (rce *rowColsEngine) commit(ctx context.Context, txVer uint64, delta *btree
 	rce.mutex.Unlock()
 
 	ver := rce.ver + 1
-	var err error
+	buf := EncodeUint64([]byte{versionRecordType}, ver)
 
+	var err error
 	delta.Ascend(
 		func(item btree.Item) bool {
 			txri := item.(rowItem)
@@ -364,6 +384,7 @@ func (rce *rowColsEngine) commit(ctx context.Context, txVer uint64, delta *btree
 				if !txri.deleted {
 					txri.ver = ver
 					tree.ReplaceOrInsert(txri)
+					buf = encodeRowItem(buf, txri)
 				}
 			} else {
 				ri := cur.(rowItem)
@@ -374,19 +395,25 @@ func (rce *rowColsEngine) commit(ctx context.Context, txVer uint64, delta *btree
 				if !txri.deleted || !ri.deleted {
 					txri.ver = ver
 					tree.ReplaceOrInsert(txri)
+					buf = encodeRowItem(buf, txri)
 				}
 			}
 			return true
 		})
-
-	if err == nil {
-		rce.mutex.Lock()
-		rce.tree = tree
-		rce.ver = ver
-		rce.mutex.Unlock()
+	if err != nil {
+		return err
 	}
 
-	return err
+	if err := rce.wal.writeCommit(buf); err != nil {
+		return err
+	}
+
+	rce.mutex.Lock()
+	rce.tree = tree
+	rce.ver = ver
+	rce.mutex.Unlock()
+
+	return nil
 }
 
 func (rce *rowColsEngine) ListDatabases(ctx context.Context,
