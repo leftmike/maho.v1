@@ -3,7 +3,9 @@ package rowcols
 import (
 	"bytes"
 	"encoding/binary"
+	"fmt"
 	"io"
+	"os"
 )
 
 const (
@@ -43,7 +45,9 @@ func WriteUint64(w io.Writer, u64 uint64) error {
 
 type walFile interface {
 	io.Writer
+	io.Reader
 	Truncate(size int64) error
+	Stat() (os.FileInfo, error)
 }
 
 type WAL struct {
@@ -58,32 +62,56 @@ func MakeWAL(f walFile) (*WAL, error) {
 
 type walHandler interface{}
 
-func (wal *WAL) ReadWAL(hndlr walHandler) error {
-	// XXX: read and apply WAL
+func (wal *WAL) newWAL() error {
 	err := wal.f.Truncate(0)
 	if err != nil {
 		return err
 	}
 
-	var buf bytes.Buffer
+	buf := make([]byte, 0, 16)
 	// walHeader.signature
-	_, err = buf.Write(walHeaderSignature[:])
-	if err != nil {
-		return err
-	}
+	buf = append(buf, walHeaderSignature[:]...)
+
 	// walHeader.walVersion
-	err = buf.WriteByte(walVersion)
+	buf = append(buf, walVersion)
+
+	// walHeader.unused
+	buf = append(buf, 0, 0, 0, 0, 0, 0, 0)
+
+	_, err = wal.f.Write(buf)
+	return err
+}
+
+func (wal *WAL) ReadWAL(hndlr walHandler) error {
+	fi, err := wal.f.Stat()
 	if err != nil {
 		return err
 	}
-	// walHeader.unused
-	_, err = buf.Write([]byte{0, 0, 0, 0, 0, 0, 0})
-	if err != nil {
-		return err
+	sz := fi.Size()
+	if sz < 16 { // Need at least the header.
+		return wal.newWAL()
 	}
 
-	_, err = wal.f.Write(buf.Bytes())
-	return err
+	var readBuf bytes.Buffer
+	readBuf.Grow(int(sz))
+	_, err = readBuf.ReadFrom(wal.f)
+	if err != nil {
+		return err
+	}
+	buf := readBuf.Bytes()
+
+	// walHeader
+	if !bytes.Equal(buf[0:8], walHeaderSignature[:]) {
+		return fmt.Errorf("rowcols: bad WAL signature: %v", buf[0:8])
+	}
+	if buf[8] > walVersion {
+		return fmt.Errorf("rowcols: bad WAL version: %d", buf[8])
+	}
+	buf = buf[16:]
+
+	// XXX: read and process records
+
+	return nil
 }
 
 func encodeRowItem(buf []byte, ri rowItem) []byte {
@@ -107,6 +135,8 @@ func encodeRowItem(buf []byte, ri rowItem) []byte {
 }
 
 func (wal *WAL) writeCommit(buf []byte) error {
+	// XXX: add length to the front of the buffer
+
 	// recordFooter.recType
 	buf = append(buf, commitRecordType)
 	// recordFooter.length

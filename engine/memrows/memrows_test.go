@@ -12,7 +12,7 @@ func TestMemRows(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	test.RunDatabaseTest(t, e, true)
+	test.RunDatabaseTest(t, e)
 	test.RunTableTest(t, e)
 	test.RunTableLifecycleTest(t, e)
 	test.RunSchemaTest(t, e)
