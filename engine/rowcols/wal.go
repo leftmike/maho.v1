@@ -54,12 +54,6 @@ type WAL struct {
 	f walFile
 }
 
-func MakeWAL(f walFile) (*WAL, error) {
-	return &WAL{
-		f: f,
-	}, nil
-}
-
 type walHandler interface{}
 
 func (wal *WAL) newWAL() error {

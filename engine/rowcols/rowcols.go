@@ -1,12 +1,15 @@
 package rowcols
 
 import (
+	"bufio"
 	"context"
 	"errors"
 	"fmt"
 	"io"
+	"io/ioutil"
 	"os"
 	"path/filepath"
+	"strings"
 	"sync"
 
 	"github.com/google/btree"
@@ -51,6 +54,7 @@ var (
 )
 
 type rowColsEngine struct {
+	dataDir     string
 	mutex       sync.Mutex
 	wal         *WAL
 	databases   map[sql.Identifier]struct{}
@@ -106,17 +110,17 @@ func NewEngine(dataDir string) (engine.Engine, error) {
 	if err != nil {
 		return nil, err
 	}
-	wal, err := MakeWAL(f)
-	if err != nil {
-		return nil, err
-	}
 
 	rce := &rowColsEngine{
-		wal:       wal,
-		databases: map[sql.Identifier]struct{}{},
+		dataDir:   dataDir,
+		wal:       &WAL{f: f},
 		tableDefs: map[uint64]*tableDef{},
 		tree:      btree.New(16),
 		lastMID:   63,
+	}
+	err = rce.readDatabases()
+	if err != nil {
+		return nil, err
 	}
 	err = rce.wal.ReadWAL(rce)
 	if err != nil {
@@ -133,6 +137,45 @@ func (_ *rowColsEngine) CreateSystemTable(tblname sql.Identifier, maker engine.M
 
 func (_ *rowColsEngine) CreateInfoTable(tblname sql.Identifier, maker engine.MakeVirtual) {
 	panic("rowcols: use virtual engine with rowcols engine")
+}
+
+func (rce *rowColsEngine) readDatabases() error {
+	if rce.databases != nil {
+		panic("rowColsEngine.readDatabases() should only be called once")
+	}
+
+	rce.databases = map[sql.Identifier]struct{}{}
+
+	buf, err := ioutil.ReadFile(filepath.Join(rce.dataDir, "mahorowcols.databases"))
+	if err != nil {
+		if os.IsNotExist(err) {
+			return nil
+		}
+		return err
+	}
+	for _, line := range strings.Split(string(buf), "\n") {
+		dbname := strings.TrimSpace(line)
+		if dbname == "" {
+			continue
+		}
+		rce.databases[sql.ID(dbname)] = struct{}{}
+	}
+	return nil
+}
+
+func (rce *rowColsEngine) writeDatabases() error {
+	f, err := os.Create(filepath.Join(rce.dataDir, "mahorowcols.databases"))
+	if err != nil {
+		return err
+	}
+	defer f.Close()
+
+	w := bufio.NewWriter(f)
+	for dbname := range rce.databases {
+		fmt.Fprintln(w, dbname.String())
+	}
+	w.Flush()
+	return nil
 }
 
 func (rce *rowColsEngine) createDatabase(dbname sql.Identifier) error {
@@ -174,7 +217,7 @@ func (rce *rowColsEngine) CreateDatabase(dbname sql.Identifier, options engine.O
 		rce.mutex.Unlock()
 		return err
 	}
-	return nil
+	return rce.writeDatabases()
 }
 
 func (rce *rowColsEngine) cleanupDatabase(dbname sql.Identifier) error {
@@ -218,7 +261,7 @@ func (rce *rowColsEngine) DropDatabase(dbname sql.Identifier, ifExists bool,
 		return fmt.Errorf("rowcols: database %s does not exist", dbname)
 	}
 	delete(rce.databases, dbname)
-	return nil
+	return rce.writeDatabases()
 }
 
 func (rce *rowColsEngine) Name() string {

@@ -4,8 +4,6 @@ package main
 To Do:
 - fuzzing: parser.Parse
 
-- keep track of databases per engine as a simple config file that gets read and written by maho
-
 - add test for not seeing modified rows within a single SQL statement
 
 - add type sql.ColumnValue interface{} and type BoolColumn []bool, type Int64Column []int64, etc
