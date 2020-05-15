@@ -12,10 +12,14 @@ import (
 )
 
 var (
-	durabilityTests = [][]engCmd{
+	durabilityDBName = sql.ID("durability_test")
+	durabilityTests  = []interface{}{
 		// TableLifecycleTest
-		nil, // cleanDir
-		{
+		"cleanDir",
+		[]dbCmd{
+			{fln: fln(), cmd: cmdCreateDatabase, name: durabilityDBName},
+		},
+		[]engCmd{
 			{fln: fln(), cmd: cmdBegin},
 			{fln: fln(), cmd: cmdLookupTable, name: sql.ID("tbl-a"), fail: true},
 			{fln: fln(), cmd: cmdCreateTable, name: sql.ID("tbl-a")},
@@ -23,7 +27,7 @@ var (
 			{fln: fln(), cmd: cmdCommit},
 		},
 		/*
-			{
+			[]engCmd{
 				{fln: fln(), cmd: cmdBegin},
 				{fln: fln(), cmd: cmdLookupTable, name: sql.ID("tbl-a")},
 				{fln: fln(), cmd: cmdCreateTable, name: sql.ID("tbl-a"), fail: true},
@@ -78,7 +82,7 @@ var (
 
 func RunDurabilityTest(t *testing.T, cleanDir func() error) {
 	for testNum, dt := range durabilityTests {
-		if dt == nil {
+		if s, ok := dt.(string); ok && s == "cleanDir" {
 			err := cleanDir()
 			if err != nil {
 				t.Fatal(err)
@@ -115,11 +119,10 @@ func DurabilityHelper(t *testing.T, createEng func() (engine.Engine, error)) {
 		t.Fatal(err)
 	}
 
-	dbname := sql.ID("durability_test")
-	err = e.CreateDatabase(dbname, nil)
-	if err != nil {
-		t.Fatal(err)
+	switch tst := durabilityTests[testNum].(type) {
+	case []engCmd:
+		testDatabase(t, e, durabilityDBName, tst)
+	case []dbCmd:
+		testEngine(t, e, tst)
 	}
-
-	testDatabase(t, e, dbname, durabilityTests[testNum])
 }

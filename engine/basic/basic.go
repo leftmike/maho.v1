@@ -25,27 +25,16 @@ var (
 	errTransactionComplete = errors.New("basic: transaction already completed")
 
 	schemasTableDef = makeTableDef(
-		sql.TableName{sql.ID("system"), sql.ID("private"), sql.ID("schemas")},
-		[]sql.Identifier{sql.ID("database"), sql.ID("schema"), sql.ID("tables")},
-		[]sql.ColumnType{sql.IdColType, sql.IdColType, sql.Int64ColType},
-		[]engine.ColumnKey{engine.MakeColumnKey(0, false), engine.MakeColumnKey(1, false)},
-		schemasMID)
+		sql.TableName{sql.ID("system"), sql.ID("private"), sql.ID("schemas")}, util.SchemasColumns,
+		util.SchemasColumnTypes, util.SchemasPrimaryKey, schemasMID)
 
 	tablesTableDef = makeTableDef(
-		sql.TableName{sql.ID("system"), sql.ID("private"), sql.ID("tables")},
-		[]sql.Identifier{sql.ID("database"), sql.ID("schema"), sql.ID("table"), sql.ID("mid")},
-		[]sql.ColumnType{sql.IdColType, sql.IdColType, sql.IdColType, sql.Int64ColType},
-		[]engine.ColumnKey{engine.MakeColumnKey(0, false), engine.MakeColumnKey(1, false),
-			engine.MakeColumnKey(2, false)},
-		tablesMID)
+		sql.TableName{sql.ID("system"), sql.ID("private"), sql.ID("tables")}, util.TablesColumns,
+		util.TablesColumnTypes, util.TablesPrimaryKey, tablesMID)
 
 	indexesTableDef = makeTableDef(
-		sql.TableName{sql.ID("system"), sql.ID("private"), sql.ID("indexes")},
-		[]sql.Identifier{sql.ID("database"), sql.ID("schema"), sql.ID("table"), sql.ID("index")},
-		[]sql.ColumnType{sql.IdColType, sql.IdColType, sql.IdColType, sql.IdColType},
-		[]engine.ColumnKey{engine.MakeColumnKey(0, false), engine.MakeColumnKey(1, false),
-			engine.MakeColumnKey(2, false), engine.MakeColumnKey(3, false)},
-		indexesMID)
+		sql.TableName{sql.ID("system"), sql.ID("private"), sql.ID("indexes")}, util.IndexesColumns,
+		util.IndexesColumnTypes, util.IndexesPrimaryKey, indexesMID)
 )
 
 type basicEngine struct {

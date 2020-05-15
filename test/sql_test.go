@@ -14,6 +14,7 @@ import (
 	"github.com/leftmike/maho/engine/rowcols"
 	"github.com/leftmike/maho/sql"
 	"github.com/leftmike/maho/test"
+	"github.com/leftmike/maho/testutil"
 )
 
 type report struct {
@@ -102,8 +103,17 @@ func TestSQLMemRows(t *testing.T) {
 }
 
 func TestSQLRowCols(t *testing.T) {
-	testSQL(t, "rowcols", sql.ID("test_rowcols"), "testdata",
-		filepath.Join("testdata", "rowcols"))
-	testSQL(t, "rowcols", sql.ID("sqltest_rowcols"), *testData,
-		filepath.Join("testdata", "rowcols"))
+	dataDir := filepath.Join("testdata", "rowcols")
+
+	err := testutil.CleanDir(dataDir, []string{".gitignore", "expected", "output", "sql"})
+	if err != nil {
+		t.Fatal(err)
+	}
+	testSQL(t, "rowcols", sql.ID("test_rowcols"), "testdata", dataDir)
+
+	err = testutil.CleanDir(dataDir, []string{".gitignore", "expected", "output", "sql"})
+	if err != nil {
+		t.Fatal(err)
+	}
+	testSQL(t, "rowcols", sql.ID("sqltest_rowcols"), *testData, dataDir)
 }

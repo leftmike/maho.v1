@@ -23,6 +23,66 @@ type schemaRow struct {
 	Tables   int64
 }
 
+type tableRow struct {
+	Database string
+	Schema   string
+	Table    string
+	MID      int64
+}
+
+type indexRow struct {
+	Database string
+	Schema   string
+	Table    string
+	Index    string
+}
+
+var (
+	SchemasColumns     = []sql.Identifier{sql.ID("database"), sql.ID("schema"), sql.ID("tables")}
+	SchemasColumnTypes = []sql.ColumnType{sql.IdColType, sql.IdColType, sql.Int64ColType}
+	SchemasPrimaryKey  = []engine.ColumnKey{
+		engine.MakeColumnKey(0, false),
+		engine.MakeColumnKey(1, false),
+	}
+
+	TablesColumns = []sql.Identifier{
+		sql.ID("database"),
+		sql.ID("schema"),
+		sql.ID("table"),
+		sql.ID("mid"),
+	}
+	TablesColumnTypes = []sql.ColumnType{
+		sql.IdColType,
+		sql.IdColType,
+		sql.IdColType,
+		sql.Int64ColType,
+	}
+	TablesPrimaryKey = []engine.ColumnKey{
+		engine.MakeColumnKey(0, false),
+		engine.MakeColumnKey(1, false),
+		engine.MakeColumnKey(2, false),
+	}
+
+	IndexesColumns = []sql.Identifier{
+		sql.ID("database"),
+		sql.ID("schema"),
+		sql.ID("table"),
+		sql.ID("index"),
+	}
+	IndexesColumnTypes = []sql.ColumnType{
+		sql.IdColType,
+		sql.IdColType,
+		sql.IdColType,
+		sql.IdColType,
+	}
+	IndexesPrimaryKey = []engine.ColumnKey{
+		engine.MakeColumnKey(0, false),
+		engine.MakeColumnKey(1, false),
+		engine.MakeColumnKey(2, false),
+		engine.MakeColumnKey(3, false),
+	}
+)
+
 func CreateSchema(ctx context.Context, ue utilEngine, etx engine.Transaction,
 	sn sql.SchemaName) error {
 
@@ -101,13 +161,6 @@ func updateSchema(ctx context.Context, ue utilEngine, etx engine.Transaction, sn
 		struct {
 			Tables int64
 		}{sr.Tables + delta})
-}
-
-type tableRow struct {
-	Database string
-	Schema   string
-	Table    string
-	MID      int64
 }
 
 func LookupTable(ctx context.Context, ue utilEngine, etx engine.Transaction,
@@ -219,13 +272,6 @@ func DropTable(ctx context.Context, ue utilEngine, etx engine.Transaction, tn sq
 		return fmt.Errorf("%s: table %s not found", ue.Name(), tn)
 	}
 	return rows.Delete(ctx)
-}
-
-type indexRow struct {
-	Database string
-	Schema   string
-	Table    string
-	Index    string
 }
 
 func lookupIndex(ctx context.Context, ue utilEngine, etx engine.Transaction, tn sql.TableName,

@@ -358,7 +358,9 @@ func testDatabase(t *testing.T, e engine.Engine, dbname sql.Identifier, cmds []e
 	}
 }
 
-func testEngine(t *testing.T, e engine.Engine, cmds []engCmd) {
+type dbCmd engCmd
+
+func testEngine(t *testing.T, e engine.Engine, cmds []dbCmd) {
 	for _, cmd := range cmds {
 		switch cmd.cmd {
 		case cmdCreateDatabase:
@@ -389,7 +391,7 @@ func RunDatabaseTest(t *testing.T, e engine.Engine) {
 	t.Helper()
 
 	testEngine(t, e,
-		[]engCmd{
+		[]dbCmd{
 			{fln: fln(), cmd: cmdCreateDatabase, name: sql.ID("dbtest-db1")},
 			{fln: fln(), cmd: cmdCreateDatabase, name: sql.ID("dbtest-db1"), fail: true},
 			{fln: fln(), cmd: cmdCreateDatabase, name: sql.ID("dbtest-db2")},
@@ -401,7 +403,7 @@ func RunDatabaseTest(t *testing.T, e engine.Engine) {
 		})
 
 	testEngine(t, e,
-		[]engCmd{
+		[]dbCmd{
 			{fln: fln(), cmd: cmdCreateDatabase, name: sql.ID("dbtest-db4")},
 			{fln: fln(), cmd: cmdCreateDatabase, name: sql.ID("dbtest-db1")},
 			{fln: fln(), cmd: cmdCreateDatabase, name: sql.ID("dbtest-db3"), fail: true},

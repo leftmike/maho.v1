@@ -1,5 +1,7 @@
 package rowcols
 
+//go:generate protoc --go_opt=paths=source_relative --go_out=. metadata.proto
+
 import (
 	"bufio"
 	"context"
@@ -30,27 +32,16 @@ var (
 	errTransactionComplete = errors.New("rowcols: transaction already completed")
 
 	schemasTableDef = makeTableDef(
-		sql.TableName{sql.ID("system"), sql.ID("private"), sql.ID("schemas")},
-		[]sql.Identifier{sql.ID("database"), sql.ID("schema"), sql.ID("tables")},
-		[]sql.ColumnType{sql.IdColType, sql.IdColType, sql.Int64ColType},
-		[]engine.ColumnKey{engine.MakeColumnKey(0, false), engine.MakeColumnKey(1, false)},
-		schemasMID)
+		sql.TableName{sql.ID("system"), sql.ID("private"), sql.ID("schemas")}, util.SchemasColumns,
+		util.SchemasColumnTypes, util.SchemasPrimaryKey, schemasMID)
 
 	tablesTableDef = makeTableDef(
-		sql.TableName{sql.ID("system"), sql.ID("private"), sql.ID("tables")},
-		[]sql.Identifier{sql.ID("database"), sql.ID("schema"), sql.ID("table"), sql.ID("mid")},
-		[]sql.ColumnType{sql.IdColType, sql.IdColType, sql.IdColType, sql.Int64ColType},
-		[]engine.ColumnKey{engine.MakeColumnKey(0, false), engine.MakeColumnKey(1, false),
-			engine.MakeColumnKey(2, false)},
-		tablesMID)
+		sql.TableName{sql.ID("system"), sql.ID("private"), sql.ID("tables")}, util.TablesColumns,
+		util.TablesColumnTypes, util.TablesPrimaryKey, tablesMID)
 
 	indexesTableDef = makeTableDef(
-		sql.TableName{sql.ID("system"), sql.ID("private"), sql.ID("indexes")},
-		[]sql.Identifier{sql.ID("database"), sql.ID("schema"), sql.ID("table"), sql.ID("index")},
-		[]sql.ColumnType{sql.IdColType, sql.IdColType, sql.IdColType, sql.IdColType},
-		[]engine.ColumnKey{engine.MakeColumnKey(0, false), engine.MakeColumnKey(1, false),
-			engine.MakeColumnKey(2, false), engine.MakeColumnKey(3, false)},
-		indexesMID)
+		sql.TableName{sql.ID("system"), sql.ID("private"), sql.ID("indexes")}, util.IndexesColumns,
+		util.IndexesColumnTypes, util.IndexesPrimaryKey, indexesMID)
 )
 
 type rowColsEngine struct {
@@ -174,8 +165,7 @@ func (rce *rowColsEngine) writeDatabases() error {
 	for dbname := range rce.databases {
 		fmt.Fprintln(w, dbname.String())
 	}
-	w.Flush()
-	return nil
+	return w.Flush()
 }
 
 func (rce *rowColsEngine) createDatabase(dbname sql.Identifier) error {
@@ -210,14 +200,18 @@ func (rce *rowColsEngine) CreateDatabase(dbname sql.Identifier, options engine.O
 	if err != nil {
 		return err
 	}
+
 	err = rce.setupDatabase(dbname)
+	if err == nil {
+		err = rce.writeDatabases()
+	}
 	if err != nil {
 		rce.mutex.Lock()
 		delete(rce.databases, dbname)
 		rce.mutex.Unlock()
-		return err
 	}
-	return rce.writeDatabases()
+
+	return err
 }
 
 func (rce *rowColsEngine) cleanupDatabase(dbname sql.Identifier) error {
@@ -238,6 +232,21 @@ func (rce *rowColsEngine) cleanupDatabase(dbname sql.Identifier) error {
 	return etx.Commit(ctx)
 }
 
+func (rce *rowColsEngine) dropDatabase(dbname sql.Identifier, ifExists bool) error {
+	rce.mutex.Lock()
+	defer rce.mutex.Unlock()
+
+	_, ok := rce.databases[dbname]
+	if !ok {
+		if ifExists {
+			return nil
+		}
+		return fmt.Errorf("rowcols: database %s does not exist", dbname)
+	}
+	delete(rce.databases, dbname)
+	return nil
+}
+
 func (rce *rowColsEngine) DropDatabase(dbname sql.Identifier, ifExists bool,
 	options engine.Options) error {
 
@@ -250,18 +259,19 @@ func (rce *rowColsEngine) DropDatabase(dbname sql.Identifier, ifExists bool,
 		return err
 	}
 
-	rce.mutex.Lock()
-	defer rce.mutex.Unlock()
-
-	_, ok := rce.databases[dbname]
-	if !ok {
-		if ifExists {
-			return nil
-		}
-		return fmt.Errorf("rowcols: database %s does not exist", dbname)
+	err = rce.dropDatabase(dbname, ifExists)
+	if err != nil {
+		return err
 	}
-	delete(rce.databases, dbname)
-	return rce.writeDatabases()
+
+	err = rce.writeDatabases()
+	if err != nil {
+		rce.mutex.Lock()
+		rce.databases[dbname] = struct{}{}
+		rce.mutex.Unlock()
+	}
+
+	return err
 }
 
 func (rce *rowColsEngine) Name() string {
@@ -407,6 +417,14 @@ func (rce *rowColsEngine) Begin(sesid uint64) engine.Transaction {
 	}
 }
 
+func (rce *rowColsEngine) RowItem(ri rowItem) error {
+	if ri.ver > rce.ver {
+		rce.ver = ri.ver
+	}
+	rce.tree.ReplaceOrInsert(ri)
+	return nil
+}
+
 func (rce *rowColsEngine) commit(ctx context.Context, txVer uint64, delta *btree.BTree) error {
 	rce.commitMutex.Lock()
 	defer rce.commitMutex.Unlock()
@@ -416,7 +434,8 @@ func (rce *rowColsEngine) commit(ctx context.Context, txVer uint64, delta *btree
 	rce.mutex.Unlock()
 
 	ver := rce.ver + 1
-	buf := EncodeUint64([]byte{versionRecordType}, ver)
+	buf := EncodeUint32([]byte{commitRecordType}, 0) // Reserve space for length.
+	buf = EncodeUint64(buf, ver)
 
 	var err error
 	delta.Ascend(

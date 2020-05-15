@@ -110,6 +110,7 @@ func (ve *virtualEngine) LookupTable(ctx context.Context, tx engine.Transaction,
 		if maker, ok := ve.infoTables[tn.Table]; ok && tn.Schema == sql.INFORMATION_SCHEMA {
 			return maker(ctx, tx, tn)
 		}
+		// XXX: should this fall through to ve.e.LookupTable?
 		return nil, fmt.Errorf("virtual: table %s not found", tn)
 	}
 	if maker, ok := ve.infoTables[tn.Table]; ok && tn.Schema == sql.INFORMATION_SCHEMA {

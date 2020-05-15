@@ -3,18 +3,19 @@ package rowcols
 import (
 	"bytes"
 	"encoding/binary"
+	"errors"
 	"fmt"
 	"io"
+	"math"
 	"os"
 )
 
 const (
 	walVersion = 1
 
-	versionRecordType = 0
-	deleteRecordType  = 1
-	setRecordType     = 2
-	commitRecordType  = 3
+	commitRecordType = 1
+	deleteRecordType = 2
+	setRecordType    = 3
 )
 
 var (
@@ -54,7 +55,9 @@ type WAL struct {
 	f walFile
 }
 
-type walHandler interface{}
+type walHandler interface {
+	RowItem(ri rowItem) error
+}
 
 func (wal *WAL) newWAL() error {
 	err := wal.f.Truncate(0)
@@ -74,6 +77,62 @@ func (wal *WAL) newWAL() error {
 
 	_, err = wal.f.Write(buf)
 	return err
+}
+
+func decodeCommit(hndlr walHandler, ver uint64, buf []byte) error {
+	for len(buf) > 0 {
+		var ok bool
+		var mid, reverse uint64
+
+		typ := buf[0]
+		buf = buf[1:]
+		if typ != deleteRecordType && typ != setRecordType {
+			return fmt.Errorf("rowcols: bad WAL record type, got %d", typ)
+		}
+
+		buf, mid, ok = DecodeVarint(buf)
+		if !ok {
+			return errors.New("rowcols: bad WAL record, mid field")
+		}
+		buf, reverse, ok = DecodeVarint(buf)
+		if !ok || reverse > math.MaxUint32 {
+			return errors.New("rowcols: bad WAL record, reverse field")
+		}
+
+		if len(buf) == 0 {
+			return errors.New("rowcols: truncated WAL record")
+		}
+		nkc := buf[0]
+		buf = buf[1:]
+
+		var rbl uint64
+		buf, rbl, ok = DecodeVarint(buf)
+		if !ok {
+			return errors.New("rowcols: bad WAL record, row length field")
+		}
+		if len(buf) < int(rbl) {
+			return fmt.Errorf("rowcols: bad WAL record length, have %d, want %d", len(buf), rbl)
+		}
+		row := DecodeRowValue(buf[:rbl])
+		if row == nil {
+			return errors.New("rowcols: bad WAL record, row field")
+		}
+		buf = buf[rbl:]
+
+		err := hndlr.RowItem(
+			rowItem{
+				mid:        mid,
+				ver:        ver,
+				reverse:    uint32(reverse),
+				numKeyCols: nkc,
+				deleted:    typ == deleteRecordType,
+				row:        row,
+			})
+		if err != nil {
+			return err
+		}
+	}
+	return nil
 }
 
 func (wal *WAL) ReadWAL(hndlr walHandler) error {
@@ -103,7 +162,22 @@ func (wal *WAL) ReadWAL(hndlr walHandler) error {
 	}
 	buf = buf[16:]
 
-	// XXX: read and process records
+	for len(buf) > 0 {
+		if buf[0] != commitRecordType {
+			return fmt.Errorf("rowcols: bad WAL record type: %d", buf[0])
+		}
+		buf = buf[1:]
+		length := binary.BigEndian.Uint32(buf)
+		buf = buf[4:]
+		ver := binary.BigEndian.Uint64(buf)
+		buf = buf[8:]
+
+		err = decodeCommit(hndlr, ver, buf[:length])
+		if err != nil {
+			return err
+		}
+		buf = buf[length:]
+	}
 
 	return nil
 }
@@ -111,30 +185,33 @@ func (wal *WAL) ReadWAL(hndlr walHandler) error {
 func encodeRowItem(buf []byte, ri rowItem) []byte {
 	if ri.deleted {
 		buf = append(buf, deleteRecordType)
-		buf = EncodeVarint(buf, ri.mid)
-		buf = EncodeVarint(buf, uint64(ri.reverse))
-		rowBuf := EncodeRowValue(ri.row, int(ri.numKeyCols))
-		buf = EncodeVarint(buf, uint64(len(rowBuf)))
-		buf = append(buf, rowBuf...)
 	} else {
 		buf = append(buf, setRecordType)
-		buf = EncodeVarint(buf, ri.mid)
-		buf = EncodeVarint(buf, uint64(ri.reverse))
-		buf = append(buf, ri.numKeyCols)
-		rowBuf := EncodeRowValue(ri.row, len(ri.row))
-		buf = EncodeVarint(buf, uint64(len(rowBuf)))
-		buf = append(buf, rowBuf...)
 	}
+
+	buf = EncodeVarint(buf, ri.mid)
+	buf = EncodeVarint(buf, uint64(ri.reverse))
+	buf = append(buf, ri.numKeyCols)
+
+	var rowBuf []byte
+	if ri.deleted {
+		rowBuf = EncodeRowValue(ri.row, int(ri.numKeyCols))
+	} else {
+		rowBuf = EncodeRowValue(ri.row, len(ri.row))
+	}
+	buf = EncodeVarint(buf, uint64(len(rowBuf)))
+	buf = append(buf, rowBuf...)
+
 	return buf
 }
 
 func (wal *WAL) writeCommit(buf []byte) error {
-	// XXX: add length to the front of the buffer
+	if len(buf) < 13 {
+		panic(fmt.Sprintf("rowcols: WAL commit buffer too small: %d", len(buf)))
+	}
+	// Set the length of the commit record.
+	binary.BigEndian.PutUint32(buf[1:5], uint32(len(buf)-13))
 
-	// recordFooter.recType
-	buf = append(buf, commitRecordType)
-	// recordFooter.length
-	buf = EncodeUint32(buf, uint32(len(buf))+4)
 	_, err := wal.f.Write(buf)
 	return err
 }

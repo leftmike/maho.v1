@@ -1,0 +1,33 @@
+syntax = "proto3";
+
+option go_package = "./rowcols";
+
+message TableMetadata {
+    repeated ColumnMetadata Columns = 1;
+    repeated ColumnKey Primary = 2;
+}
+
+// These need to match the values in maho/sql/datatype.go
+enum DataType {
+    Unknown = 0;
+    Boolean = 1;
+    String = 2;
+    Bytes = 3;
+    Float = 4;
+    Integer = 5;
+}
+
+message ColumnMetadata {
+    string Name = 1;
+    uint32 ColNum = 2;
+    DataType Type = 3;
+    uint32 Size = 4;
+    bool Fixed = 5;
+    bool NotNull = 6;
+    string Default = 7;
+}
+
+message ColumnKey {
+    uint32 ColNum = 1;
+    bool Reverse = 2;
+}

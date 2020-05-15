@@ -13,7 +13,14 @@ To Do:
 - indexes: basic
 - get rid of memrows and use basic instead; engine/service might no longer be necessary?
 
-- rowcols: add write ahead log
+- rowcols
+-- add write ahead log
+-- persistently track lastMID, maybe in WAL
+-- persist table definitions
+-- move columns, columnTypes, primaryKey into tblmgmt.go
+-- add metadata to tablesTable; maybe TableDef should be an interface
+-- init system tables into schemas and tables
+-- system database and virtualEngine: should LookupTable fall through?
 
 - [CONSTRAINT constraint]
 - CHECK '(' logical_expression ')'
