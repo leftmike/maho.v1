@@ -19,13 +19,15 @@ var (
 		[]dbCmd{
 			{fln: fln(), cmd: cmdCreateDatabase, name: durabilityDBName},
 		},
-		[]engCmd{
-			{fln: fln(), cmd: cmdBegin},
-			{fln: fln(), cmd: cmdLookupTable, name: sql.ID("tbl-a"), fail: true},
-			{fln: fln(), cmd: cmdCreateTable, name: sql.ID("tbl-a")},
-			{fln: fln(), cmd: cmdLookupTable, name: sql.ID("tbl-a")},
-			{fln: fln(), cmd: cmdCommit},
-		},
+		/*
+			[]engCmd{
+				{fln: fln(), cmd: cmdBegin},
+				{fln: fln(), cmd: cmdLookupTable, name: sql.ID("tbl-a"), fail: true},
+				{fln: fln(), cmd: cmdCreateTable, name: sql.ID("tbl-a")},
+				{fln: fln(), cmd: cmdLookupTable, name: sql.ID("tbl-a")},
+				{fln: fln(), cmd: cmdCommit},
+			},
+		*/
 		/*
 			[]engCmd{
 				{fln: fln(), cmd: cmdBegin},

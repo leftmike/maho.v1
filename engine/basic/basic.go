@@ -19,9 +19,8 @@ var (
 )
 
 type basicEngine struct {
-	mutex     sync.Mutex
-	tableDefs map[uint64]*tableDef
-	tree      *btree.BTree
+	mutex sync.Mutex
+	tree  *btree.BTree
 }
 
 type transaction struct {
@@ -61,8 +60,7 @@ type rows struct {
 
 func NewEngine(dataDir string) (engine.Engine, error) {
 	be := &basicEngine{
-		tableDefs: map[uint64]*tableDef{},
-		tree:      btree.New(16),
+		tree: btree.New(16),
 	}
 	me, err := mideng.NewEngine("basic", be, true)
 	if err != nil {

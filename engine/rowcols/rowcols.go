@@ -3,56 +3,31 @@ package rowcols
 //go:generate protoc --go_opt=paths=source_relative --go_out=. metadata.proto
 
 import (
-	"bufio"
 	"context"
 	"errors"
 	"fmt"
 	"io"
-	"io/ioutil"
 	"os"
 	"path/filepath"
-	"strings"
 	"sync"
 
 	"github.com/google/btree"
 	"github.com/leftmike/maho/engine"
-	"github.com/leftmike/maho/engine/util"
+	"github.com/leftmike/maho/engine/mideng"
 	"github.com/leftmike/maho/engine/virtual"
-	"github.com/leftmike/maho/evaluate/expr"
 	"github.com/leftmike/maho/sql"
-)
-
-const (
-	schemasMID = 1
-	tablesMID  = 2
-	indexesMID = 3
 )
 
 var (
 	errTransactionComplete = errors.New("rowcols: transaction already completed")
-
-	schemasTableDef = makeTableDef(
-		sql.TableName{sql.ID("system"), sql.ID("private"), sql.ID("schemas")}, util.SchemasColumns,
-		util.SchemasColumnTypes, util.SchemasPrimaryKey, schemasMID)
-
-	tablesTableDef = makeTableDef(
-		sql.TableName{sql.ID("system"), sql.ID("private"), sql.ID("tables")}, util.TablesColumns,
-		util.TablesColumnTypes, util.TablesPrimaryKey, tablesMID)
-
-	indexesTableDef = makeTableDef(
-		sql.TableName{sql.ID("system"), sql.ID("private"), sql.ID("indexes")}, util.IndexesColumns,
-		util.IndexesColumnTypes, util.IndexesPrimaryKey, indexesMID)
 )
 
 type rowColsEngine struct {
 	dataDir     string
 	mutex       sync.Mutex
 	wal         *WAL
-	databases   map[sql.Identifier]struct{}
-	tableDefs   map[uint64]*tableDef
 	tree        *btree.BTree
 	ver         uint64
-	lastMID     uint64
 	commitMutex sync.Mutex
 }
 
@@ -103,308 +78,76 @@ func NewEngine(dataDir string) (engine.Engine, error) {
 	}
 
 	rce := &rowColsEngine{
-		dataDir:   dataDir,
-		wal:       &WAL{f: f},
-		tableDefs: map[uint64]*tableDef{},
-		tree:      btree.New(16),
-		lastMID:   63,
-	}
-	err = rce.readDatabases()
-	if err != nil {
-		return nil, err
+		dataDir: dataDir,
+		wal:     &WAL{f: f},
+		tree:    btree.New(16),
 	}
 	err = rce.wal.ReadWAL(rce)
 	if err != nil {
 		return nil, err
 	}
 
-	ve := virtual.NewEngine(rce)
+	me, err := mideng.NewEngine("rowcols", rce, true) // XXX: handle persistence
+	if err != nil {
+		return nil, err
+	}
+
+	ve := virtual.NewEngine(me)
 	return ve, nil
 }
 
-func (_ *rowColsEngine) CreateSystemTable(tblname sql.Identifier, maker engine.MakeVirtual) {
-	panic("rowcols: use virtual engine with rowcols engine")
-}
-
-func (_ *rowColsEngine) CreateInfoTable(tblname sql.Identifier, maker engine.MakeVirtual) {
-	panic("rowcols: use virtual engine with rowcols engine")
-}
-
-func (rce *rowColsEngine) readDatabases() error {
-	if rce.databases != nil {
-		panic("rowColsEngine.readDatabases() should only be called once")
-	}
-
-	rce.databases = map[sql.Identifier]struct{}{}
-
-	buf, err := ioutil.ReadFile(filepath.Join(rce.dataDir, "mahorowcols.databases"))
-	if err != nil {
-		if os.IsNotExist(err) {
-			return nil
-		}
-		return err
-	}
-	for _, line := range strings.Split(string(buf), "\n") {
-		dbname := strings.TrimSpace(line)
-		if dbname == "" {
-			continue
-		}
-		rce.databases[sql.ID(dbname)] = struct{}{}
-	}
-	return nil
-}
-
-func (rce *rowColsEngine) writeDatabases() error {
-	f, err := os.Create(filepath.Join(rce.dataDir, "mahorowcols.databases"))
-	if err != nil {
-		return err
-	}
-	defer f.Close()
-
-	w := bufio.NewWriter(f)
-	for dbname := range rce.databases {
-		fmt.Fprintln(w, dbname.String())
-	}
-	return w.Flush()
-}
-
-func (rce *rowColsEngine) createDatabase(dbname sql.Identifier) error {
-	rce.mutex.Lock()
-	defer rce.mutex.Unlock()
-
-	if _, ok := rce.databases[dbname]; ok {
-		return fmt.Errorf("rowcols: database %s already exists", dbname)
-	}
-	rce.databases[dbname] = struct{}{}
-
-	return nil
-}
-
-func (rce *rowColsEngine) setupDatabase(dbname sql.Identifier) error {
-	ctx := context.Background()
-	etx := rce.Begin(0)
-	err := rce.CreateSchema(ctx, etx, sql.SchemaName{dbname, sql.PUBLIC})
-	if err != nil {
-		etx.Rollback()
-		return err
-	}
-	return etx.Commit(ctx)
-}
-
-func (rce *rowColsEngine) CreateDatabase(dbname sql.Identifier, options engine.Options) error {
-	if len(options) != 0 {
-		return fmt.Errorf("rowcols: unexpected option to create database: %s", dbname)
-	}
-
-	err := rce.createDatabase(dbname)
-	if err != nil {
-		return err
-	}
-
-	err = rce.setupDatabase(dbname)
-	if err == nil {
-		err = rce.writeDatabases()
-	}
-	if err != nil {
-		rce.mutex.Lock()
-		delete(rce.databases, dbname)
-		rce.mutex.Unlock()
-	}
-
-	return err
-}
-
-func (rce *rowColsEngine) cleanupDatabase(dbname sql.Identifier) error {
-	ctx := context.Background()
-	etx := rce.Begin(0)
-	scnames, err := rce.ListSchemas(ctx, etx, dbname)
-	if err != nil {
-		etx.Rollback()
-		return err
-	}
-	for _, scname := range scnames {
-		err = rce.DropSchema(ctx, etx, sql.SchemaName{dbname, scname}, true)
-		if err != nil {
-			etx.Rollback()
-			return err
-		}
-	}
-	return etx.Commit(ctx)
-}
-
-func (rce *rowColsEngine) dropDatabase(dbname sql.Identifier, ifExists bool) error {
-	rce.mutex.Lock()
-	defer rce.mutex.Unlock()
-
-	_, ok := rce.databases[dbname]
-	if !ok {
-		if ifExists {
-			return nil
-		}
-		return fmt.Errorf("rowcols: database %s does not exist", dbname)
-	}
-	delete(rce.databases, dbname)
-	return nil
-}
-
-func (rce *rowColsEngine) DropDatabase(dbname sql.Identifier, ifExists bool,
-	options engine.Options) error {
-
-	if len(options) != 0 {
-		return fmt.Errorf("rowcols: unexpected option to drop database: %s", dbname)
-	}
-
-	err := rce.cleanupDatabase(dbname)
-	if err != nil {
-		return err
-	}
-
-	err = rce.dropDatabase(dbname, ifExists)
-	if err != nil {
-		return err
-	}
-
-	err = rce.writeDatabases()
-	if err != nil {
-		rce.mutex.Lock()
-		rce.databases[dbname] = struct{}{}
-		rce.mutex.Unlock()
-	}
-
-	return err
-}
-
-func (rce *rowColsEngine) Name() string {
-	return "rowcols"
-}
-
-func (rce *rowColsEngine) AllocateMID(ctx context.Context) (uint64, error) {
-	rce.lastMID += 1
-	return rce.lastMID, nil
-}
-
-func (rce *rowColsEngine) MakeSchemasTable(etx engine.Transaction) *util.TypedTable {
-	return util.MakeTypedTable(schemasTableDef.tn,
-		&table{
-			rce: rce,
-			tx:  etx.(*transaction),
-			def: schemasTableDef,
-		})
-}
-
-func (rce *rowColsEngine) CreateSchema(ctx context.Context, etx engine.Transaction,
-	sn sql.SchemaName) error {
-
-	_, ok := rce.databases[sn.Database]
-	if !ok {
-		return fmt.Errorf("rowcols: database %s not found", sn.Database)
-	}
-
-	return util.CreateSchema(ctx, rce, etx, sn)
-}
-
-func (rce *rowColsEngine) DropSchema(ctx context.Context, etx engine.Transaction,
-	sn sql.SchemaName, ifExists bool) error {
-
-	return util.DropSchema(ctx, rce, etx, sn, ifExists)
-}
-
-func (rce *rowColsEngine) MakeTablesTable(etx engine.Transaction) *util.TypedTable {
-	return util.MakeTypedTable(tablesTableDef.tn,
-		&table{
-			rce: rce,
-			tx:  etx.(*transaction),
-			def: tablesTableDef,
-		})
-}
-
-func (rce *rowColsEngine) LookupTable(ctx context.Context, etx engine.Transaction,
-	tn sql.TableName) (engine.Table, error) {
-
-	mid, err := util.LookupTable(ctx, rce, etx, tn)
-	if err != nil {
-		return nil, err
-	} else if mid == 0 {
-		return nil, fmt.Errorf("rowcols: table %s not found", tn)
-	}
-
-	def, ok := rce.tableDefs[mid]
-	if !ok {
-		panic(fmt.Sprintf("rowcols: table %s missing table definition", tn))
-	}
-
+func (td *tableDef) Table(ctx context.Context, tx engine.Transaction) (engine.Table, error) {
+	etx := tx.(*transaction)
 	return &table{
-		rce: rce,
-		tx:  etx.(*transaction),
-		def: def,
+		rce: etx.rce,
+		tx:  etx,
+		def: td,
 	}, nil
+
 }
 
-func (rce *rowColsEngine) CreateTable(ctx context.Context, etx engine.Transaction,
-	tn sql.TableName, cols []sql.Identifier, colTypes []sql.ColumnType, primary []engine.ColumnKey,
-	ifNotExists bool) error {
+func (_ *rowColsEngine) MakeTableDef(tn sql.TableName, mid uint64, cols []sql.Identifier,
+	colTypes []sql.ColumnType, primary []engine.ColumnKey) (mideng.TableDef, error) {
 
-	if primary == nil {
-		rowID := sql.ID("rowid")
+	if len(primary) == 0 {
+		panic(fmt.Sprintf("rowcols: table %s: missing required primary key", tn))
+	}
+	if len(primary) > 32 {
+		panic(fmt.Sprintf("rowcols: table %s: primary key with too many columns", tn))
+	}
 
-		for _, col := range cols {
-			if col == rowID {
-				return fmt.Errorf(
-					"rowcols: unable to add %s column for table %s missing primary key",
-					rowID, tn)
+	def := tableDef{
+		tn:          tn,
+		columns:     cols,
+		columnTypes: colTypes,
+		primary:     primary,
+		mid:         mid,
+	}
+
+	def.reverse = 0
+	def.rowCols = make([]int, len(cols))
+	vn := len(primary)
+	for cn := range cols {
+		isValue := true
+
+		for kn, ck := range primary {
+			if ck.Number() == cn {
+				def.rowCols[kn] = cn
+				if ck.Reverse() {
+					def.reverse |= 1 << kn
+				}
+				isValue = false
+				break
 			}
 		}
 
-		primary = []engine.ColumnKey{
-			engine.MakeColumnKey(len(cols), false),
+		if isValue {
+			def.rowCols[vn] = cn
+			vn += 1
 		}
-		cols = append(cols, rowID)
-		colTypes = append(colTypes, sql.ColumnType{
-			Type:    sql.IntegerType,
-			Size:    8,
-			NotNull: true,
-			Default: &expr.Call{Name: sql.ID("unique_rowid")},
-		})
 	}
 
-	mid, err := util.CreateTable(ctx, rce, etx, tn, ifNotExists)
-	if err != nil {
-		return err
-	}
-	if mid == 0 {
-		return nil
-	}
-
-	rce.tableDefs[mid] = makeTableDef(tn, cols, colTypes, primary, mid)
-	return nil
-}
-
-func (rce *rowColsEngine) DropTable(ctx context.Context, etx engine.Transaction, tn sql.TableName,
-	ifExists bool) error {
-
-	return util.DropTable(ctx, rce, etx, tn, ifExists)
-}
-
-func (rce *rowColsEngine) MakeIndexesTable(etx engine.Transaction) *util.TypedTable {
-	return util.MakeTypedTable(indexesTableDef.tn,
-		&table{
-			rce: rce,
-			tx:  etx.(*transaction),
-			def: indexesTableDef,
-		})
-}
-
-func (rce *rowColsEngine) CreateIndex(ctx context.Context, etx engine.Transaction,
-	idxname sql.Identifier, tn sql.TableName, unique bool, keys []engine.ColumnKey,
-	ifNotExists bool) error {
-
-	return util.CreateIndex(ctx, rce, etx, idxname, tn, ifNotExists)
-}
-
-func (rce *rowColsEngine) DropIndex(ctx context.Context, etx engine.Transaction,
-	idxname sql.Identifier, tn sql.TableName, ifExists bool) error {
-
-	return util.DropIndex(ctx, rce, etx, idxname, tn, ifExists)
+	return &def, nil
 }
 
 func (rce *rowColsEngine) Begin(sesid uint64) engine.Transaction {
@@ -476,28 +219,6 @@ func (rce *rowColsEngine) commit(ctx context.Context, txVer uint64, delta *btree
 	rce.mutex.Unlock()
 
 	return nil
-}
-
-func (rce *rowColsEngine) ListDatabases(ctx context.Context,
-	tx engine.Transaction) ([]sql.Identifier, error) {
-
-	var dbnames []sql.Identifier
-	for dbname := range rce.databases {
-		dbnames = append(dbnames, dbname)
-	}
-	return dbnames, nil
-}
-
-func (rce *rowColsEngine) ListSchemas(ctx context.Context, etx engine.Transaction,
-	dbname sql.Identifier) ([]sql.Identifier, error) {
-
-	return util.ListSchemas(ctx, rce, etx, dbname)
-}
-
-func (rce *rowColsEngine) ListTables(ctx context.Context, etx engine.Transaction,
-	sn sql.SchemaName) ([]sql.Identifier, error) {
-
-	return util.ListTables(ctx, rce, etx, sn)
 }
 
 func (rctx *transaction) Commit(ctx context.Context) error {
