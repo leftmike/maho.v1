@@ -20,12 +20,9 @@ var (
 
 type basicEngine struct {
 	mutex     sync.Mutex
-	databases map[sql.Identifier]struct{}
 	tableDefs map[uint64]*tableDef
 	tree      *btree.BTree
 	lastMID   uint64
-
-	me engine.Engine // XXX: remove once databases table added
 }
 
 type transaction struct {
@@ -65,7 +62,6 @@ type rows struct {
 
 func NewEngine(dataDir string) (engine.Engine, error) {
 	be := &basicEngine{
-		databases: map[sql.Identifier]struct{}{},
 		tableDefs: map[uint64]*tableDef{},
 		tree:      btree.New(16),
 		lastMID:   63,
@@ -74,103 +70,8 @@ func NewEngine(dataDir string) (engine.Engine, error) {
 	if err != nil {
 		return nil, err
 	}
-	be.me = me
 	ve := virtual.NewEngine(me)
 	return ve, nil
-}
-
-func (_ *basicEngine) CreateSystemTable(tblname sql.Identifier, maker engine.MakeVirtual) {
-	panic("basic: use virtual engine with basic engine")
-}
-
-func (_ *basicEngine) CreateInfoTable(tblname sql.Identifier, maker engine.MakeVirtual) {
-	panic("basic: use virtual engine with basic engine")
-}
-
-func (be *basicEngine) createDatabase(dbname sql.Identifier) error {
-	be.mutex.Lock()
-	defer be.mutex.Unlock()
-
-	if _, ok := be.databases[dbname]; ok {
-		return fmt.Errorf("basic: database %s already exists", dbname)
-	}
-	be.databases[dbname] = struct{}{}
-
-	return nil
-}
-
-func (be *basicEngine) setupDatabase(dbname sql.Identifier) error {
-	ctx := context.Background()
-	etx := be.Begin(0)
-	err := be.me.CreateSchema(ctx, etx, sql.SchemaName{dbname, sql.PUBLIC})
-	if err != nil {
-		etx.Rollback()
-		return err
-	}
-	return etx.Commit(ctx)
-}
-
-func (be *basicEngine) CreateDatabase(dbname sql.Identifier, options engine.Options) error {
-	if len(options) != 0 {
-		return fmt.Errorf("basic: unexpected option to create database: %s", dbname)
-	}
-
-	err := be.createDatabase(dbname)
-	if err != nil {
-		return err
-	}
-	err = be.setupDatabase(dbname)
-	if err != nil {
-		be.mutex.Lock()
-		delete(be.databases, dbname)
-		be.mutex.Unlock()
-		return err
-	}
-	return nil
-}
-
-func (be *basicEngine) cleanupDatabase(dbname sql.Identifier) error {
-	ctx := context.Background()
-	etx := be.Begin(0)
-	scnames, err := be.me.ListSchemas(ctx, etx, dbname)
-	if err != nil {
-		etx.Rollback()
-		return err
-	}
-	for _, scname := range scnames {
-		err = be.me.DropSchema(ctx, etx, sql.SchemaName{dbname, scname}, true)
-		if err != nil {
-			etx.Rollback()
-			return err
-		}
-	}
-	return etx.Commit(ctx)
-}
-
-func (be *basicEngine) DropDatabase(dbname sql.Identifier, ifExists bool,
-	options engine.Options) error {
-
-	if len(options) != 0 {
-		return fmt.Errorf("basic: unexpected option to drop database: %s", dbname)
-	}
-
-	err := be.cleanupDatabase(dbname)
-	if err != nil {
-		return err
-	}
-
-	be.mutex.Lock()
-	defer be.mutex.Unlock()
-
-	_, ok := be.databases[dbname]
-	if !ok {
-		if ifExists {
-			return nil
-		}
-		return fmt.Errorf("basic: database %s does not exist", dbname)
-	}
-	delete(be.databases, dbname)
-	return nil
 }
 
 func (td *tableDef) Table(ctx context.Context, tx engine.Transaction) (engine.Table, error) {
@@ -182,73 +83,8 @@ func (td *tableDef) Table(ctx context.Context, tx engine.Transaction) (engine.Ta
 	}, nil
 }
 
-func (be *basicEngine) MakeTableDef(tn sql.TableName, mid uint64, cols []sql.Identifier,
+func (_ *basicEngine) MakeTableDef(tn sql.TableName, mid uint64, cols []sql.Identifier,
 	colTypes []sql.ColumnType, primary []engine.ColumnKey) (mideng.TableDef, error) {
-
-	return makeTableDef(tn, cols, colTypes, primary, mid), nil
-}
-
-func (be *basicEngine) AllocateMID(ctx context.Context) (uint64, error) {
-	be.lastMID += 1
-	return be.lastMID, nil
-}
-
-func (be *basicEngine) ValidDatabase(dbname sql.Identifier) bool { // XXX: get rid of
-	_, ok := be.databases[dbname]
-	return ok
-}
-
-func (be *basicEngine) Begin(sesid uint64) engine.Transaction {
-	be.mutex.Lock()
-	return &transaction{
-		be:   be,
-		tree: be.tree,
-	}
-}
-
-func (be *basicEngine) ListDatabases(ctx context.Context, tx engine.Transaction) ([]sql.Identifier,
-	error) {
-
-	var dbnames []sql.Identifier
-	for dbname := range be.databases {
-		dbnames = append(dbnames, dbname)
-	}
-	return dbnames, nil
-}
-
-func (btx *transaction) Commit(ctx context.Context) error {
-	if btx.be == nil {
-		return errTransactionComplete
-	}
-
-	btx.be.tree = btx.tree
-	btx.be.mutex.Unlock()
-	btx.be = nil
-	btx.tree = nil
-	return nil
-}
-
-func (btx *transaction) Rollback() error {
-	if btx.be == nil {
-		return errTransactionComplete
-	}
-
-	btx.be.mutex.Unlock()
-	btx.be = nil
-	btx.tree = nil
-	return nil
-}
-
-func (_ *transaction) NextStmt() {}
-
-func (btx *transaction) forWrite() {
-	if btx.tree == btx.be.tree {
-		btx.tree = btx.be.tree.Clone()
-	}
-}
-
-func makeTableDef(tn sql.TableName, cols []sql.Identifier, colTypes []sql.ColumnType,
-	primary []engine.ColumnKey, mid uint64) *tableDef {
 
 	if len(primary) == 0 {
 		panic(fmt.Sprintf("basic: table %s: missing required primary key", tn))
@@ -288,7 +124,51 @@ func makeTableDef(tn sql.TableName, cols []sql.Identifier, colTypes []sql.Column
 		}
 	}
 
-	return &def
+	return &def, nil
+}
+
+func (be *basicEngine) AllocateMID(ctx context.Context) (uint64, error) {
+	be.lastMID += 1
+	return be.lastMID, nil
+}
+
+func (be *basicEngine) Begin(sesid uint64) engine.Transaction {
+	be.mutex.Lock()
+	return &transaction{
+		be:   be,
+		tree: be.tree,
+	}
+}
+
+func (btx *transaction) Commit(ctx context.Context) error {
+	if btx.be == nil {
+		return errTransactionComplete
+	}
+
+	btx.be.tree = btx.tree
+	btx.be.mutex.Unlock()
+	btx.be = nil
+	btx.tree = nil
+	return nil
+}
+
+func (btx *transaction) Rollback() error {
+	if btx.be == nil {
+		return errTransactionComplete
+	}
+
+	btx.be.mutex.Unlock()
+	btx.be = nil
+	btx.tree = nil
+	return nil
+}
+
+func (_ *transaction) NextStmt() {}
+
+func (btx *transaction) forWrite() {
+	if btx.tree == btx.be.tree {
+		btx.tree = btx.be.tree.Clone()
+	}
 }
 
 func (def *tableDef) toItem(row []sql.Value) btree.Item {

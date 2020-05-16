@@ -27,7 +27,7 @@ type TypedTable struct {
 	updateFields []columnField
 }
 
-type rows struct {
+type Rows struct {
 	ttbl *TypedTable
 	rows engine.Rows
 }
@@ -51,7 +51,7 @@ func (ttbl *TypedTable) PrimaryKey(ctx context.Context) []engine.ColumnKey {
 	return ttbl.tbl.PrimaryKey(ctx)
 }
 
-func (ttbl *TypedTable) Rows(ctx context.Context, minObj, maxObj interface{}) (*rows, error) {
+func (ttbl *TypedTable) Rows(ctx context.Context, minObj, maxObj interface{}) (*Rows, error) {
 	var minRow, maxRow []sql.Value
 	if minObj != nil {
 		minRow = ttbl.rowObjToRow(ctx, "minObj", minObj)
@@ -64,7 +64,7 @@ func (ttbl *TypedTable) Rows(ctx context.Context, minObj, maxObj interface{}) (*
 	if err != nil {
 		return nil, err
 	}
-	return &rows{
+	return &Rows{
 		rows: r,
 		ttbl: ttbl,
 	}, nil
@@ -220,17 +220,17 @@ func (ttbl *TypedTable) Insert(ctx context.Context, rowObj interface{}) error {
 	return ttbl.tbl.Insert(ctx, ttbl.rowObjToRow(ctx, "rowObj", rowObj))
 }
 
-func (r *rows) Columns() []sql.Identifier {
+func (r *Rows) Columns() []sql.Identifier {
 	return r.rows.Columns()
 }
 
-func (r *rows) Close() error {
+func (r *Rows) Close() error {
 	err := r.rows.Close()
 	r.rows = nil
 	return err
 }
 
-func (r *rows) Next(ctx context.Context, destObj interface{}) error {
+func (r *Rows) Next(ctx context.Context, destObj interface{}) error {
 	ttbl := r.ttbl
 
 	rowType := reflect.TypeOf(destObj)
@@ -314,7 +314,7 @@ func (r *rows) Next(ctx context.Context, destObj interface{}) error {
 	return nil
 }
 
-func (r *rows) Delete(ctx context.Context) error {
+func (r *Rows) Delete(ctx context.Context) error {
 	return r.rows.Delete(ctx)
 }
 
@@ -348,7 +348,7 @@ func (ttbl *TypedTable) makeUpdateFields(ctx context.Context,
 	return updateFields
 }
 
-func (r *rows) Update(ctx context.Context, updateObj interface{}) error {
+func (r *Rows) Update(ctx context.Context, updateObj interface{}) error {
 	ttbl := r.ttbl
 
 	updateType := reflect.TypeOf(updateObj)

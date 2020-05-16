@@ -21,8 +21,8 @@ To Do:
 - add metadata to tablesTable; maybe TableDef should be an interface
 - init system tables into schemas and tables
 - system database and virtualEngine: should LookupTable fall through?
-- add databasesTable to mideng
 - replace util/tblmgmt.go with mideng
+- use table to keep track of last allocated mid
 
 - [CONSTRAINT constraint]
 - CHECK '(' logical_expression ')'

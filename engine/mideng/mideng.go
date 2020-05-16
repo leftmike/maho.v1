@@ -13,16 +13,22 @@ import (
 )
 
 const (
-	schemasMID = 1
-	tablesMID  = 2
-	indexesMID = 3
+	databasesMID = 1
+	schemasMID   = 2
+	tablesMID    = 3
+	indexesMID   = 4
 )
 
 var (
-	schemasTableName = sql.TableName{sql.ID("system"), sql.ID("private"), sql.ID("schemas")}
-	tablesTableName  = sql.TableName{sql.ID("system"), sql.ID("private"), sql.ID("tables")}
-	indexesTableName = sql.TableName{sql.ID("system"), sql.ID("private"), sql.ID("indexes")}
+	databasesTableName = sql.TableName{sql.ID("system"), sql.ID("private"), sql.ID("databases")}
+	schemasTableName   = sql.TableName{sql.ID("system"), sql.ID("private"), sql.ID("schemas")}
+	tablesTableName    = sql.TableName{sql.ID("system"), sql.ID("private"), sql.ID("tables")}
+	indexesTableName   = sql.TableName{sql.ID("system"), sql.ID("private"), sql.ID("indexes")}
 )
+
+type databaseRow struct {
+	Database string
+}
 
 type schemaRow struct {
 	Database string
@@ -55,26 +61,30 @@ type engineImpl interface {
 		primary []engine.ColumnKey) (TableDef, error)
 	//DecodeTableDef(tn sql.TableName, mid uint64, buf []byte) (TableDef, error)
 
-	ValidDatabase(dbname sql.Identifier) bool // XXX: get rid of
-	CreateDatabase(dbname sql.Identifier, options engine.Options) error
-	DropDatabase(dbname sql.Identifier, ifExists bool, options engine.Options) error
 	Begin(sesid uint64) engine.Transaction
-	ListDatabases(ctx context.Context, tx engine.Transaction) ([]sql.Identifier, error)
 }
 
 type midEngine struct {
-	name    string
-	e       engineImpl
-	schemas TableDef
-	tables  TableDef
-	indexes TableDef
+	name      string
+	e         engineImpl
+	databases TableDef
+	schemas   TableDef
+	tables    TableDef
+	indexes   TableDef
 
 	// XXX: do we need these?
-	mutex     sync.Mutex // XXX: lock and unlock around tableDefs
+	mutex     sync.Mutex
 	tableDefs map[uint64]TableDef
 }
 
 func NewEngine(name string, e engineImpl) (engine.Engine, error) {
+	databases, err := e.MakeTableDef(databasesTableName, databasesMID,
+		[]sql.Identifier{sql.ID("database")},
+		[]sql.ColumnType{sql.IdColType},
+		[]engine.ColumnKey{engine.MakeColumnKey(0, false)})
+	if err != nil {
+		return nil, err
+	}
 	schemas, err := e.MakeTableDef(schemasTableName, schemasMID,
 		[]sql.Identifier{sql.ID("database"), sql.ID("schema"), sql.ID("tables")},
 		[]sql.ColumnType{sql.IdColType, sql.IdColType, sql.Int64ColType},
@@ -100,11 +110,12 @@ func NewEngine(name string, e engineImpl) (engine.Engine, error) {
 	}
 
 	return &midEngine{
-		name:    name,
-		e:       e,
-		schemas: schemas,
-		tables:  tables,
-		indexes: indexes,
+		name:      name,
+		e:         e,
+		databases: databases,
+		schemas:   schemas,
+		tables:    tables,
+		indexes:   indexes,
 
 		tableDefs: map[uint64]TableDef{},
 	}, nil
@@ -118,20 +129,140 @@ func (me *midEngine) CreateInfoTable(tblname sql.Identifier, maker engine.MakeVi
 	panic(fmt.Sprintf("%s: use virtual engine with %s engine", me.name, me.name))
 }
 
+func (me *midEngine) createDatabase(ctx context.Context, tx engine.Transaction,
+	dbname sql.Identifier) error {
+
+	tbl, err := me.databases.Table(ctx, tx)
+	if err != nil {
+		tx.Rollback()
+		return err
+	}
+	ttbl := util.MakeTypedTable(schemasTableName, tbl)
+
+	err = ttbl.Insert(ctx,
+		databaseRow{
+			Database: dbname.String(),
+		})
+	if err != nil {
+		return err
+	}
+
+	return me.CreateSchema(ctx, tx, sql.SchemaName{dbname, sql.PUBLIC})
+}
+
 func (me *midEngine) CreateDatabase(dbname sql.Identifier, options engine.Options) error {
-	return me.e.CreateDatabase(dbname, options)
+	if len(options) != 0 {
+		return fmt.Errorf("%s: unexpected option to create database: %s", me.name, dbname)
+	}
+
+	ctx := context.Background()
+	tx := me.e.Begin(0)
+	err := me.createDatabase(ctx, tx, dbname)
+	if err != nil {
+		tx.Rollback()
+		return err
+	}
+	return tx.Commit(ctx)
+}
+
+func (me *midEngine) lookupDatabase(ctx context.Context, tx engine.Transaction,
+	dbname sql.Identifier) (*util.Rows, error) {
+
+	tbl, err := me.databases.Table(ctx, tx)
+	if err != nil {
+		return nil, err
+	}
+	ttbl := util.MakeTypedTable(databasesTableName, tbl)
+
+	rows, err := ttbl.Rows(ctx, databaseRow{Database: dbname.String()}, nil)
+	if err != nil {
+		return nil, err
+	}
+
+	var dr databaseRow
+	err = rows.Next(ctx, &dr)
+	if err == io.EOF {
+		rows.Close()
+		return nil, nil
+	} else if err != nil {
+		rows.Close()
+		return nil, err
+	}
+	if dr.Database != dbname.String() {
+		rows.Close()
+		return nil, nil
+	}
+	return rows, nil
+}
+
+func (me *midEngine) validDatabase(ctx context.Context, tx engine.Transaction,
+	dbname sql.Identifier) (bool, error) {
+
+	rows, err := me.lookupDatabase(ctx, tx, dbname)
+	if err != nil {
+		return false, err
+	}
+	if rows == nil {
+		return false, nil
+	}
+	rows.Close()
+	return true, nil
+}
+
+func (me *midEngine) dropDatabase(ctx context.Context, tx engine.Transaction,
+	dbname sql.Identifier, ifExists bool) error {
+
+	rows, err := me.lookupDatabase(ctx, tx, dbname)
+	if err != nil {
+		return err
+	}
+	if rows == nil {
+		if ifExists {
+			return nil
+		}
+		return fmt.Errorf("%s: database %s does not exist", me.name, dbname)
+	}
+	defer rows.Close()
+
+	scnames, err := me.ListSchemas(ctx, tx, dbname)
+	if err != nil {
+		return err
+	}
+	for _, scname := range scnames {
+		err = me.DropSchema(ctx, tx, sql.SchemaName{dbname, scname}, true)
+		if err != nil {
+			return err
+		}
+	}
+
+	return rows.Delete(ctx)
 }
 
 func (me *midEngine) DropDatabase(dbname sql.Identifier, ifExists bool,
 	options engine.Options) error {
 
-	return me.e.DropDatabase(dbname, ifExists, options)
+	if len(options) != 0 {
+		return fmt.Errorf("%s: unexpected option to drop database: %s", me.name, dbname)
+	}
+
+	ctx := context.Background()
+	tx := me.e.Begin(0)
+	err := me.dropDatabase(ctx, tx, dbname, ifExists)
+	if err != nil {
+		tx.Rollback()
+		return err
+	}
+	return tx.Commit(ctx)
 }
 
 func (me *midEngine) CreateSchema(ctx context.Context, tx engine.Transaction,
 	sn sql.SchemaName) error {
 
-	if !me.e.ValidDatabase(sn.Database) {
+	ok, err := me.validDatabase(ctx, tx, sn.Database)
+	if err != nil {
+		return err
+	}
+	if !ok {
 		return fmt.Errorf("%s: database %s not found", me.name, sn.Database)
 	}
 
@@ -274,6 +405,9 @@ func (me *midEngine) LookupTable(ctx context.Context, tx engine.Transaction,
 		return nil, fmt.Errorf("%s: table %s not found", me.name, tn)
 	}
 
+	me.mutex.Lock()
+	defer me.mutex.Unlock()
+
 	def, ok := me.tableDefs[mid]
 	if !ok {
 		panic(fmt.Sprintf("%s: table %s missing table definition", me.name, tn))
@@ -350,6 +484,9 @@ func (me *midEngine) CreateTable(ctx context.Context, tx engine.Transaction, tn 
 	if err != nil {
 		return err
 	}
+
+	me.mutex.Lock()
+	defer me.mutex.Unlock()
 
 	me.tableDefs[mid] = def
 	return nil
@@ -528,7 +665,30 @@ func (me *midEngine) Begin(sesid uint64) engine.Transaction {
 func (me *midEngine) ListDatabases(ctx context.Context, tx engine.Transaction) ([]sql.Identifier,
 	error) {
 
-	return me.e.ListDatabases(ctx, tx)
+	tbl, err := me.databases.Table(ctx, tx)
+	if err != nil {
+		return nil, err
+	}
+	ttbl := util.MakeTypedTable(databasesTableName, tbl)
+
+	rows, err := ttbl.Rows(ctx, nil, nil)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+
+	var dbnames []sql.Identifier
+	for {
+		var dr databaseRow
+		err = rows.Next(ctx, &dr)
+		if err == io.EOF {
+			break
+		} else if err != nil {
+			return nil, err
+		}
+		dbnames = append(dbnames, sql.ID(dr.Database))
+	}
+	return dbnames, nil
 }
 
 func (me *midEngine) ListSchemas(ctx context.Context, tx engine.Transaction,
@@ -544,6 +704,7 @@ func (me *midEngine) ListSchemas(ctx context.Context, tx engine.Transaction,
 	if err != nil {
 		return nil, err
 	}
+	defer rows.Close()
 
 	var scnames []sql.Identifier
 	for {
@@ -576,6 +737,7 @@ func (me *midEngine) ListTables(ctx context.Context, tx engine.Transaction,
 	if err != nil {
 		return nil, err
 	}
+	defer rows.Close()
 
 	var tblnames []sql.Identifier
 	for {
