@@ -20,7 +20,6 @@ To Do:
 - system database and virtualEngine: should LookupTable fall through?
 - change mid from uint64 to int64
 - take advantage of Rows(..., maxItem)
-- change def to td
 
 - [CONSTRAINT constraint]
 - CHECK '(' logical_expression ')'

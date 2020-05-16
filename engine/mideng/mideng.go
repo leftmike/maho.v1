@@ -452,12 +452,12 @@ func (me *midEngine) LookupTable(ctx context.Context, tx engine.Transaction,
 	me.mutex.Lock()
 	defer me.mutex.Unlock()
 
-	def, ok := me.tableDefs[mid]
+	td, ok := me.tableDefs[mid]
 	if !ok {
 		panic(fmt.Sprintf("%s: table %s missing table definition", me.name, tn))
 	}
 
-	return def.Table(ctx, tx)
+	return td.Table(ctx, tx)
 }
 
 func (me *midEngine) CreateTable(ctx context.Context, tx engine.Transaction, tn sql.TableName,
@@ -508,7 +508,7 @@ func (me *midEngine) CreateTable(ctx context.Context, tx engine.Transaction, tn 
 	}
 	mid = uint64(i64)
 
-	def, err := me.e.MakeTableDef(tn, mid, cols, colTypes, primary)
+	td, err := me.e.MakeTableDef(tn, mid, cols, colTypes, primary)
 	if err != nil {
 		return err
 	}
@@ -533,7 +533,7 @@ func (me *midEngine) CreateTable(ctx context.Context, tx engine.Transaction, tn 
 	me.mutex.Lock()
 	defer me.mutex.Unlock()
 
-	me.tableDefs[mid] = def
+	me.tableDefs[mid] = td
 	return nil
 }
 

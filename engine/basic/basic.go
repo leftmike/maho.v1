@@ -40,9 +40,9 @@ type tableDef struct {
 }
 
 type table struct {
-	be  *basicEngine
-	tx  *transaction
-	def *tableDef
+	be *basicEngine
+	tx *transaction
+	td *tableDef
 }
 
 type rowItem struct {
@@ -73,9 +73,9 @@ func NewEngine(dataDir string) (engine.Engine, error) {
 func (td *tableDef) Table(ctx context.Context, tx engine.Transaction) (engine.Table, error) {
 	etx := tx.(*transaction)
 	return &table{
-		be:  etx.be,
-		tx:  etx,
-		def: td,
+		be: etx.be,
+		tx: etx,
+		td: td,
 	}, nil
 }
 
@@ -89,7 +89,7 @@ func (_ *basicEngine) MakeTableDef(tn sql.TableName, mid uint64, cols []sql.Iden
 		panic(fmt.Sprintf("basic: table %s: primary key with too many columns", tn))
 	}
 
-	def := tableDef{
+	td := tableDef{
 		tn:          tn,
 		columns:     cols,
 		columnTypes: colTypes,
@@ -97,17 +97,17 @@ func (_ *basicEngine) MakeTableDef(tn sql.TableName, mid uint64, cols []sql.Iden
 		mid:         mid,
 	}
 
-	def.reverse = 0
-	def.rowCols = make([]int, len(cols))
+	td.reverse = 0
+	td.rowCols = make([]int, len(cols))
 	vn := len(primary)
 	for cn := range cols {
 		isValue := true
 
 		for kn, ck := range primary {
 			if ck.Number() == cn {
-				def.rowCols[kn] = cn
+				td.rowCols[kn] = cn
 				if ck.Reverse() {
-					def.reverse |= 1 << kn
+					td.reverse |= 1 << kn
 				}
 				isValue = false
 				break
@@ -115,12 +115,12 @@ func (_ *basicEngine) MakeTableDef(tn sql.TableName, mid uint64, cols []sql.Iden
 		}
 
 		if isValue {
-			def.rowCols[vn] = cn
+			td.rowCols[vn] = cn
 			vn += 1
 		}
 	}
 
-	return &def, nil
+	return &td, nil
 }
 
 func (be *basicEngine) Begin(sesid uint64) engine.Transaction {
@@ -162,30 +162,30 @@ func (btx *transaction) forWrite() {
 	}
 }
 
-func (def *tableDef) toItem(row []sql.Value) btree.Item {
+func (td *tableDef) toItem(row []sql.Value) btree.Item {
 	ri := rowItem{
-		mid:        def.mid,
-		reverse:    def.reverse,
-		numKeyCols: uint8(len(def.primary)),
+		mid:        td.mid,
+		reverse:    td.reverse,
+		numKeyCols: uint8(len(td.primary)),
 	}
 
 	if row != nil {
-		ri.row = make([]sql.Value, len(def.columns))
-		for rdx := range def.rowCols {
-			ri.row[rdx] = row[def.rowCols[rdx]]
+		ri.row = make([]sql.Value, len(td.columns))
+		for rdx := range td.rowCols {
+			ri.row[rdx] = row[td.rowCols[rdx]]
 		}
 	}
 
 	return ri
 }
 
-func (def *tableDef) toRow(ri rowItem) []sql.Value {
+func (td *tableDef) toRow(ri rowItem) []sql.Value {
 	if ri.row == nil {
-		panic(fmt.Sprintf("basic: table %s contains nil row", def.tn))
+		panic(fmt.Sprintf("basic: table %s contains nil row", td.tn))
 	}
-	row := make([]sql.Value, len(def.columns))
-	for rdx := range def.rowCols {
-		row[def.rowCols[rdx]] = ri.row[rdx]
+	row := make([]sql.Value, len(td.columns))
+	for rdx := range td.rowCols {
+		row[td.rowCols[rdx]] = ri.row[rdx]
 	}
 	return row
 }
@@ -224,15 +224,15 @@ func (ri rowItem) Less(item btree.Item) bool {
 }
 
 func (bt *table) Columns(ctx context.Context) []sql.Identifier {
-	return bt.def.columns
+	return bt.td.columns
 }
 
 func (bt *table) ColumnTypes(ctx context.Context) []sql.ColumnType {
-	return bt.def.columnTypes
+	return bt.td.columnTypes
 }
 
 func (bt *table) PrimaryKey(ctx context.Context) []engine.ColumnKey {
-	return bt.def.primary
+	return bt.td.primary
 }
 
 func (bt *table) Rows(ctx context.Context, minRow, maxRow []sql.Value) (engine.Rows, error) {
@@ -243,19 +243,19 @@ func (bt *table) Rows(ctx context.Context, minRow, maxRow []sql.Value) (engine.R
 
 	var maxItem btree.Item
 	if maxRow != nil {
-		maxItem = bt.def.toItem(maxRow)
+		maxItem = bt.td.toItem(maxRow)
 	}
 
-	bt.tx.tree.AscendGreaterOrEqual(bt.def.toItem(minRow),
+	bt.tx.tree.AscendGreaterOrEqual(bt.td.toItem(minRow),
 		func(item btree.Item) bool {
 			if maxItem != nil && maxItem.Less(item) {
 				return false
 			}
 			ri := item.(rowItem)
-			if ri.mid != bt.def.mid {
+			if ri.mid != bt.td.mid {
 				return false
 			}
-			br.rows = append(br.rows, bt.def.toRow(ri))
+			br.rows = append(br.rows, bt.td.toRow(ri))
 			return true
 		})
 	return br, nil
@@ -264,16 +264,16 @@ func (bt *table) Rows(ctx context.Context, minRow, maxRow []sql.Value) (engine.R
 func (bt *table) Insert(ctx context.Context, row []sql.Value) error {
 	bt.tx.forWrite()
 
-	if bt.tx.tree.Has(bt.def.toItem(row)) {
-		return fmt.Errorf("basic: %s: existing row with duplicate primary key", bt.def.tn)
+	if bt.tx.tree.Has(bt.td.toItem(row)) {
+		return fmt.Errorf("basic: %s: existing row with duplicate primary key", bt.td.tn)
 	}
 
-	bt.tx.tree.ReplaceOrInsert(bt.def.toItem(row))
+	bt.tx.tree.ReplaceOrInsert(bt.td.toItem(row))
 	return nil
 }
 
 func (br *rows) Columns() []sql.Identifier {
-	return br.tbl.def.columns
+	return br.tbl.td.columns
 }
 
 func (br *rows) Close() error {
@@ -297,10 +297,10 @@ func (br *rows) Delete(ctx context.Context) error {
 	br.tbl.tx.forWrite()
 
 	if br.idx == 0 {
-		panic(fmt.Sprintf("basic: table %s no row to delete", br.tbl.def.tn))
+		panic(fmt.Sprintf("basic: table %s no row to delete", br.tbl.td.tn))
 	}
 
-	br.tbl.tx.tree.Delete(br.tbl.def.toItem(br.rows[br.idx-1]))
+	br.tbl.tx.tree.Delete(br.tbl.td.toItem(br.rows[br.idx-1]))
 	return nil
 }
 
@@ -308,12 +308,12 @@ func (br *rows) Update(ctx context.Context, updates []sql.ColumnUpdate) error {
 	br.tbl.tx.forWrite()
 
 	if br.idx == 0 {
-		panic(fmt.Sprintf("basic: table %s no row to update", br.tbl.def.tn))
+		panic(fmt.Sprintf("basic: table %s no row to update", br.tbl.td.tn))
 	}
 
 	var primaryUpdated bool
 	for _, update := range updates {
-		for _, ck := range br.tbl.def.primary {
+		for _, ck := range br.tbl.td.primary {
 			if ck.Number() == update.Index {
 				primaryUpdated = true
 			}
@@ -334,6 +334,6 @@ func (br *rows) Update(ctx context.Context, updates []sql.ColumnUpdate) error {
 	for _, update := range updates {
 		row[update.Index] = update.Value
 	}
-	br.tbl.tx.tree.ReplaceOrInsert(br.tbl.def.toItem(row))
+	br.tbl.tx.tree.ReplaceOrInsert(br.tbl.td.toItem(row))
 	return nil
 }
