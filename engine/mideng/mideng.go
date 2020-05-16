@@ -218,23 +218,20 @@ func (me *midEngine) lookupDatabase(ctx context.Context, tx engine.Transaction,
 	}
 	ttbl := util.MakeTypedTable(databasesTableName, tbl)
 
-	rows, err := ttbl.Rows(ctx, databaseRow{Database: dbname.String()}, nil)
+	keyRow := databaseRow{Database: dbname.String()}
+	rows, err := ttbl.Rows(ctx, keyRow, keyRow)
 	if err != nil {
 		return nil, err
 	}
 
 	var dr databaseRow
 	err = rows.Next(ctx, &dr)
-	if err == io.EOF {
+	if err != nil {
 		rows.Close()
-		return nil, nil
-	} else if err != nil {
-		rows.Close()
+		if err == io.EOF {
+			return nil, nil
+		}
 		return nil, err
-	}
-	if dr.Database != dbname.String() {
-		rows.Close()
-		return nil, nil
 	}
 	return rows, nil
 }
@@ -808,7 +805,8 @@ func (me *midEngine) nextSequenceValue(ctx context.Context, tx engine.Transactio
 	}
 	ttbl := util.MakeTypedTable(sequencesTableName, tbl)
 
-	rows, err := ttbl.Rows(ctx, sequenceRow{Sequence: sequence}, nil)
+	keyRow := sequenceRow{Sequence: sequence}
+	rows, err := ttbl.Rows(ctx, keyRow, keyRow)
 	if err != nil {
 		return 0, err
 	}
@@ -816,7 +814,7 @@ func (me *midEngine) nextSequenceValue(ctx context.Context, tx engine.Transactio
 
 	var sr sequenceRow
 	err = rows.Next(ctx, &sr)
-	if err != nil || sr.Sequence != sequence {
+	if err != nil {
 		return 0, fmt.Errorf("%s: sequence %s not found", me.name, sequence)
 	}
 	err = rows.Update(ctx,

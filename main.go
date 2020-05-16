@@ -18,7 +18,6 @@ To Do:
 - persist table definitions; add metadata to tablesTable
 - init system tables into schemas and tables
 - system database and virtualEngine: should LookupTable fall through?
-- take advantage of Rows(..., maxItem)
 
 - [CONSTRAINT constraint]
 - CHECK '(' logical_expression ')'
