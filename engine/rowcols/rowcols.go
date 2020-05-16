@@ -43,7 +43,7 @@ type tableDef struct {
 	columns     []sql.Identifier
 	columnTypes []sql.ColumnType
 	primary     []engine.ColumnKey
-	mid         uint64
+	mid         int64
 
 	reverse uint32
 	rowCols []int
@@ -56,7 +56,7 @@ type table struct {
 }
 
 type rowItem struct {
-	mid        uint64
+	mid        int64
 	ver        uint64
 	reverse    uint32
 	numKeyCols uint8
@@ -106,7 +106,7 @@ func (td *tableDef) Table(ctx context.Context, tx engine.Transaction) (engine.Ta
 
 }
 
-func (_ *rowColsEngine) MakeTableDef(tn sql.TableName, mid uint64, cols []sql.Identifier,
+func (_ *rowColsEngine) MakeTableDef(tn sql.TableName, mid int64, cols []sql.Identifier,
 	colTypes []sql.ColumnType, primary []engine.ColumnKey) (mideng.TableDef, error) {
 
 	if len(primary) == 0 {

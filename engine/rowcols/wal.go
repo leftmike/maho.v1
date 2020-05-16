@@ -121,7 +121,7 @@ func decodeCommit(hndlr walHandler, ver uint64, buf []byte) error {
 
 		err := hndlr.RowItem(
 			rowItem{
-				mid:        mid,
+				mid:        int64(mid),
 				ver:        ver,
 				reverse:    uint32(reverse),
 				numKeyCols: nkc,
@@ -189,7 +189,7 @@ func encodeRowItem(buf []byte, ri rowItem) []byte {
 		buf = append(buf, setRecordType)
 	}
 
-	buf = EncodeVarint(buf, ri.mid)
+	buf = EncodeVarint(buf, uint64(ri.mid))
 	buf = EncodeVarint(buf, uint64(ri.reverse))
 	buf = append(buf, ri.numKeyCols)
 

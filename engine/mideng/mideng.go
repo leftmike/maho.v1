@@ -65,9 +65,9 @@ type TableDef interface {
 }
 
 type engineStore interface {
-	MakeTableDef(tn sql.TableName, mid uint64, cols []sql.Identifier, colTypes []sql.ColumnType,
+	MakeTableDef(tn sql.TableName, mid int64, cols []sql.Identifier, colTypes []sql.ColumnType,
 		primary []engine.ColumnKey) (TableDef, error)
-	//DecodeTableDef(tn sql.TableName, mid uint64, buf []byte) (TableDef, error)
+	//DecodeTableDef(tn sql.TableName, mid int64, buf []byte) (TableDef, error)
 	Begin(sesid uint64) engine.Transaction
 }
 
@@ -82,7 +82,7 @@ type midEngine struct {
 
 	// XXX: do we need these?
 	mutex     sync.Mutex
-	tableDefs map[uint64]TableDef
+	tableDefs map[int64]TableDef
 }
 
 func NewEngine(name string, e engineStore, init bool) (engine.Engine, error) {
@@ -133,7 +133,7 @@ func NewEngine(name string, e engineStore, init bool) (engine.Engine, error) {
 		tables:    tables,
 		indexes:   indexes,
 
-		tableDefs: map[uint64]TableDef{},
+		tableDefs: map[int64]TableDef{},
 	}
 	if init {
 		ctx := context.Background()
@@ -403,7 +403,7 @@ func (me *midEngine) updateSchema(ctx context.Context, tx engine.Transaction, sn
 }
 
 func (me *midEngine) lookupTable(ctx context.Context, tx engine.Transaction,
-	tn sql.TableName) (uint64, error) {
+	tn sql.TableName) (int64, error) {
 
 	tbl, err := me.tables.Table(ctx, tx)
 	if err != nil {
@@ -435,7 +435,7 @@ func (me *midEngine) lookupTable(ctx context.Context, tx engine.Transaction,
 
 		return 0, nil
 	}
-	return uint64(tr.MID), nil
+	return tr.MID, nil
 
 }
 
@@ -502,11 +502,10 @@ func (me *midEngine) CreateTable(ctx context.Context, tx engine.Transaction, tn 
 		return err
 	}
 
-	i64, err := me.nextSequenceValue(ctx, tx, midSequence)
+	mid, err = me.nextSequenceValue(ctx, tx, midSequence)
 	if err != nil {
 		return err
 	}
-	mid = uint64(i64)
 
 	td, err := me.e.MakeTableDef(tn, mid, cols, colTypes, primary)
 	if err != nil {

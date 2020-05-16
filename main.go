@@ -18,7 +18,6 @@ To Do:
 - persist table definitions; add metadata to tablesTable
 - init system tables into schemas and tables
 - system database and virtualEngine: should LookupTable fall through?
-- change mid from uint64 to int64
 - take advantage of Rows(..., maxItem)
 
 - [CONSTRAINT constraint]
