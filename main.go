@@ -13,16 +13,14 @@ To Do:
 - indexes: basic
 - get rid of memrows and use basic instead; engine/service might no longer be necessary?
 
-- rowcols
--- add write ahead log
--- persistently track lastMID, maybe in WAL
+- rowcols: add write ahead log
 
-- persist table definitions
-- add metadata to tablesTable; maybe TableDef should be an interface
+- persist table definitions; add metadata to tablesTable
 - init system tables into schemas and tables
 - system database and virtualEngine: should LookupTable fall through?
 - replace util/tblmgmt.go with mideng
-- use table to keep track of last allocated mid
+- change mid from uint64 to int64
+- take advantage of Rows(..., maxItem)
 
 - [CONSTRAINT constraint]
 - CHECK '(' logical_expression ')'

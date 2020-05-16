@@ -13,18 +13,27 @@ import (
 )
 
 const (
-	databasesMID = 1
-	schemasMID   = 2
-	tablesMID    = 3
-	indexesMID   = 4
+	sequencesMID = 1
+	databasesMID = 2
+	schemasMID   = 3
+	tablesMID    = 4
+	indexesMID   = 5
+
+	midSequence = "mid"
 )
 
 var (
+	sequencesTableName = sql.TableName{sql.ID("system"), sql.ID("private"), sql.ID("sequences")}
 	databasesTableName = sql.TableName{sql.ID("system"), sql.ID("private"), sql.ID("databases")}
 	schemasTableName   = sql.TableName{sql.ID("system"), sql.ID("private"), sql.ID("schemas")}
 	tablesTableName    = sql.TableName{sql.ID("system"), sql.ID("private"), sql.ID("tables")}
 	indexesTableName   = sql.TableName{sql.ID("system"), sql.ID("private"), sql.ID("indexes")}
 )
+
+type sequenceRow struct {
+	Sequence string
+	Current  int64
+}
 
 type databaseRow struct {
 	Database string
@@ -55,18 +64,17 @@ type TableDef interface {
 	//Encode() ([]byte, error)
 }
 
-type engineImpl interface {
-	AllocateMID(ctx context.Context) (uint64, error) // XXX: do we need this?
+type engineStore interface {
 	MakeTableDef(tn sql.TableName, mid uint64, cols []sql.Identifier, colTypes []sql.ColumnType,
 		primary []engine.ColumnKey) (TableDef, error)
 	//DecodeTableDef(tn sql.TableName, mid uint64, buf []byte) (TableDef, error)
-
 	Begin(sesid uint64) engine.Transaction
 }
 
 type midEngine struct {
 	name      string
-	e         engineImpl
+	e         engineStore
+	sequences TableDef
 	databases TableDef
 	schemas   TableDef
 	tables    TableDef
@@ -77,7 +85,14 @@ type midEngine struct {
 	tableDefs map[uint64]TableDef
 }
 
-func NewEngine(name string, e engineImpl) (engine.Engine, error) {
+func NewEngine(name string, e engineStore, init bool) (engine.Engine, error) {
+	sequences, err := e.MakeTableDef(sequencesTableName, sequencesMID,
+		[]sql.Identifier{sql.ID("sequence"), sql.ID("current")},
+		[]sql.ColumnType{sql.IdColType, sql.Int64ColType},
+		[]engine.ColumnKey{engine.MakeColumnKey(0, false)})
+	if err != nil {
+		return nil, err
+	}
 	databases, err := e.MakeTableDef(databasesTableName, databasesMID,
 		[]sql.Identifier{sql.ID("database")},
 		[]sql.ColumnType{sql.IdColType},
@@ -109,16 +124,31 @@ func NewEngine(name string, e engineImpl) (engine.Engine, error) {
 		return nil, err
 	}
 
-	return &midEngine{
+	me := &midEngine{
 		name:      name,
 		e:         e,
+		sequences: sequences,
 		databases: databases,
 		schemas:   schemas,
 		tables:    tables,
 		indexes:   indexes,
 
 		tableDefs: map[uint64]TableDef{},
-	}, nil
+	}
+	if init {
+		ctx := context.Background()
+		tx := me.e.Begin(0)
+		err = me.init(ctx, tx)
+		if err != nil {
+			tx.Rollback()
+			return nil, err
+		}
+		err = tx.Commit(ctx)
+		if err != nil {
+			return nil, err
+		}
+	}
+	return me, nil
 }
 
 func (me *midEngine) CreateSystemTable(tblname sql.Identifier, maker engine.MakeVirtual) {
@@ -129,15 +159,29 @@ func (me *midEngine) CreateInfoTable(tblname sql.Identifier, maker engine.MakeVi
 	panic(fmt.Sprintf("%s: use virtual engine with %s engine", me.name, me.name))
 }
 
+func (me *midEngine) init(ctx context.Context, tx engine.Transaction) error {
+	tbl, err := me.sequences.Table(ctx, tx)
+	if err != nil {
+		return err
+	}
+	ttbl := util.MakeTypedTable(sequencesTableName, tbl)
+
+	return ttbl.Insert(ctx,
+		sequenceRow{
+			Sequence: midSequence,
+			Current:  2048,
+		})
+	return nil
+}
+
 func (me *midEngine) createDatabase(ctx context.Context, tx engine.Transaction,
 	dbname sql.Identifier) error {
 
 	tbl, err := me.databases.Table(ctx, tx)
 	if err != nil {
-		tx.Rollback()
 		return err
 	}
-	ttbl := util.MakeTypedTable(schemasTableName, tbl)
+	ttbl := util.MakeTypedTable(databasesTableName, tbl)
 
 	err = ttbl.Insert(ctx,
 		databaseRow{
@@ -458,10 +502,11 @@ func (me *midEngine) CreateTable(ctx context.Context, tx engine.Transaction, tn 
 		return err
 	}
 
-	mid, err = me.e.AllocateMID(ctx)
+	i64, err := me.nextSequenceValue(ctx, tx, midSequence)
 	if err != nil {
 		return err
 	}
+	mid = uint64(i64)
 
 	def, err := me.e.MakeTableDef(tn, mid, cols, colTypes, primary)
 	if err != nil {
@@ -612,7 +657,6 @@ func (me *midEngine) CreateIndex(ctx context.Context, tx engine.Transaction,
 			Table:    tn.Table.String(),
 			Index:    idxname.String(),
 		})
-	return nil
 }
 
 func (me *midEngine) DropIndex(ctx context.Context, tx engine.Transaction,
@@ -754,4 +798,34 @@ func (me *midEngine) ListTables(ctx context.Context, tx engine.Transaction,
 		tblnames = append(tblnames, sql.ID(tr.Table))
 	}
 	return tblnames, nil
+}
+
+func (me *midEngine) nextSequenceValue(ctx context.Context, tx engine.Transaction,
+	sequence string) (int64, error) {
+
+	tbl, err := me.sequences.Table(ctx, tx)
+	if err != nil {
+		return 0, err
+	}
+	ttbl := util.MakeTypedTable(sequencesTableName, tbl)
+
+	rows, err := ttbl.Rows(ctx, sequenceRow{Sequence: sequence}, nil)
+	if err != nil {
+		return 0, err
+	}
+	defer rows.Close()
+
+	var sr sequenceRow
+	err = rows.Next(ctx, &sr)
+	if err != nil || sr.Sequence != sequence {
+		return 0, fmt.Errorf("%s: sequence %s not found", me.name, sequence)
+	}
+	err = rows.Update(ctx,
+		struct {
+			Current int64
+		}{sr.Current + 1})
+	if err != nil {
+		return 0, err
+	}
+	return sr.Current + 1, nil
 }

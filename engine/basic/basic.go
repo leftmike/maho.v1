@@ -22,7 +22,6 @@ type basicEngine struct {
 	mutex     sync.Mutex
 	tableDefs map[uint64]*tableDef
 	tree      *btree.BTree
-	lastMID   uint64
 }
 
 type transaction struct {
@@ -64,9 +63,8 @@ func NewEngine(dataDir string) (engine.Engine, error) {
 	be := &basicEngine{
 		tableDefs: map[uint64]*tableDef{},
 		tree:      btree.New(16),
-		lastMID:   63,
 	}
-	me, err := mideng.NewEngine("basic", be)
+	me, err := mideng.NewEngine("basic", be, true)
 	if err != nil {
 		return nil, err
 	}
@@ -125,11 +123,6 @@ func (_ *basicEngine) MakeTableDef(tn sql.TableName, mid uint64, cols []sql.Iden
 	}
 
 	return &def, nil
-}
-
-func (be *basicEngine) AllocateMID(ctx context.Context) (uint64, error) {
-	be.lastMID += 1
-	return be.lastMID, nil
 }
 
 func (be *basicEngine) Begin(sesid uint64) engine.Transaction {
