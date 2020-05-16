@@ -16,11 +16,13 @@ To Do:
 - rowcols
 -- add write ahead log
 -- persistently track lastMID, maybe in WAL
--- persist table definitions
--- move columns, columnTypes, primaryKey into tblmgmt.go
--- add metadata to tablesTable; maybe TableDef should be an interface
--- init system tables into schemas and tables
--- system database and virtualEngine: should LookupTable fall through?
+
+- persist table definitions
+- add metadata to tablesTable; maybe TableDef should be an interface
+- init system tables into schemas and tables
+- system database and virtualEngine: should LookupTable fall through?
+- add databasesTable to mideng
+- replace util/tblmgmt.go with mideng
 
 - [CONSTRAINT constraint]
 - CHECK '(' logical_expression ')'

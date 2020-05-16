@@ -9,32 +9,13 @@ import (
 
 	"github.com/google/btree"
 	"github.com/leftmike/maho/engine"
-	"github.com/leftmike/maho/engine/util"
+	"github.com/leftmike/maho/engine/mideng"
 	"github.com/leftmike/maho/engine/virtual"
-	"github.com/leftmike/maho/evaluate/expr"
 	"github.com/leftmike/maho/sql"
-)
-
-const (
-	schemasMID = 1
-	tablesMID  = 2
-	indexesMID = 3
 )
 
 var (
 	errTransactionComplete = errors.New("basic: transaction already completed")
-
-	schemasTableDef = makeTableDef(
-		sql.TableName{sql.ID("system"), sql.ID("private"), sql.ID("schemas")}, util.SchemasColumns,
-		util.SchemasColumnTypes, util.SchemasPrimaryKey, schemasMID)
-
-	tablesTableDef = makeTableDef(
-		sql.TableName{sql.ID("system"), sql.ID("private"), sql.ID("tables")}, util.TablesColumns,
-		util.TablesColumnTypes, util.TablesPrimaryKey, tablesMID)
-
-	indexesTableDef = makeTableDef(
-		sql.TableName{sql.ID("system"), sql.ID("private"), sql.ID("indexes")}, util.IndexesColumns,
-		util.IndexesColumnTypes, util.IndexesPrimaryKey, indexesMID)
 )
 
 type basicEngine struct {
@@ -43,6 +24,8 @@ type basicEngine struct {
 	tableDefs map[uint64]*tableDef
 	tree      *btree.BTree
 	lastMID   uint64
+
+	me engine.Engine // XXX: remove once databases table added
 }
 
 type transaction struct {
@@ -87,7 +70,12 @@ func NewEngine(dataDir string) (engine.Engine, error) {
 		tree:      btree.New(16),
 		lastMID:   63,
 	}
-	ve := virtual.NewEngine(be)
+	me, err := mideng.NewEngine("basic", be)
+	if err != nil {
+		return nil, err
+	}
+	be.me = me
+	ve := virtual.NewEngine(me)
 	return ve, nil
 }
 
@@ -114,7 +102,7 @@ func (be *basicEngine) createDatabase(dbname sql.Identifier) error {
 func (be *basicEngine) setupDatabase(dbname sql.Identifier) error {
 	ctx := context.Background()
 	etx := be.Begin(0)
-	err := be.CreateSchema(ctx, etx, sql.SchemaName{dbname, sql.PUBLIC})
+	err := be.me.CreateSchema(ctx, etx, sql.SchemaName{dbname, sql.PUBLIC})
 	if err != nil {
 		etx.Rollback()
 		return err
@@ -144,13 +132,13 @@ func (be *basicEngine) CreateDatabase(dbname sql.Identifier, options engine.Opti
 func (be *basicEngine) cleanupDatabase(dbname sql.Identifier) error {
 	ctx := context.Background()
 	etx := be.Begin(0)
-	scnames, err := be.ListSchemas(ctx, etx, dbname)
+	scnames, err := be.me.ListSchemas(ctx, etx, dbname)
 	if err != nil {
 		etx.Rollback()
 		return err
 	}
 	for _, scname := range scnames {
-		err = be.DropSchema(ctx, etx, sql.SchemaName{dbname, scname}, true)
+		err = be.me.DropSchema(ctx, etx, sql.SchemaName{dbname, scname}, true)
 		if err != nil {
 			etx.Rollback()
 			return err
@@ -185,8 +173,19 @@ func (be *basicEngine) DropDatabase(dbname sql.Identifier, ifExists bool,
 	return nil
 }
 
-func (be *basicEngine) Name() string {
-	return "basic"
+func (td *tableDef) Table(ctx context.Context, tx engine.Transaction) (engine.Table, error) {
+	etx := tx.(*transaction)
+	return &table{
+		be:  etx.be,
+		tx:  etx,
+		def: td,
+	}, nil
+}
+
+func (be *basicEngine) MakeTableDef(tn sql.TableName, mid uint64, cols []sql.Identifier,
+	colTypes []sql.ColumnType, primary []engine.ColumnKey) (mideng.TableDef, error) {
+
+	return makeTableDef(tn, cols, colTypes, primary, mid), nil
 }
 
 func (be *basicEngine) AllocateMID(ctx context.Context) (uint64, error) {
@@ -194,128 +193,9 @@ func (be *basicEngine) AllocateMID(ctx context.Context) (uint64, error) {
 	return be.lastMID, nil
 }
 
-func (be *basicEngine) MakeSchemasTable(etx engine.Transaction) *util.TypedTable {
-	return util.MakeTypedTable(schemasTableDef.tn,
-		&table{
-			be:  be,
-			tx:  etx.(*transaction),
-			def: schemasTableDef,
-		})
-}
-
-func (be *basicEngine) CreateSchema(ctx context.Context, etx engine.Transaction,
-	sn sql.SchemaName) error {
-
-	_, ok := be.databases[sn.Database]
-	if !ok {
-		return fmt.Errorf("basic: database %s not found", sn.Database)
-	}
-
-	return util.CreateSchema(ctx, be, etx, sn)
-}
-
-func (be *basicEngine) DropSchema(ctx context.Context, etx engine.Transaction, sn sql.SchemaName,
-	ifExists bool) error {
-
-	return util.DropSchema(ctx, be, etx, sn, ifExists)
-}
-
-func (be *basicEngine) MakeTablesTable(etx engine.Transaction) *util.TypedTable {
-	return util.MakeTypedTable(tablesTableDef.tn,
-		&table{
-			be:  be,
-			tx:  etx.(*transaction),
-			def: tablesTableDef,
-		})
-}
-
-func (be *basicEngine) LookupTable(ctx context.Context, etx engine.Transaction,
-	tn sql.TableName) (engine.Table, error) {
-
-	mid, err := util.LookupTable(ctx, be, etx, tn)
-	if err != nil {
-		return nil, err
-	} else if mid == 0 {
-		return nil, fmt.Errorf("basic: table %s not found", tn)
-	}
-
-	def, ok := be.tableDefs[mid]
-	if !ok {
-		panic(fmt.Sprintf("basic: table %s missing table definition", tn))
-	}
-
-	return &table{
-		be:  be,
-		tx:  etx.(*transaction),
-		def: def,
-	}, nil
-}
-
-func (be *basicEngine) CreateTable(ctx context.Context, etx engine.Transaction, tn sql.TableName,
-	cols []sql.Identifier, colTypes []sql.ColumnType, primary []engine.ColumnKey,
-	ifNotExists bool) error {
-
-	if primary == nil {
-		rowID := sql.ID("rowid")
-
-		for _, col := range cols {
-			if col == rowID {
-				return fmt.Errorf(
-					"basic: unable to add %s column for table %s missing primary key",
-					rowID, tn)
-			}
-		}
-
-		primary = []engine.ColumnKey{
-			engine.MakeColumnKey(len(cols), false),
-		}
-		cols = append(cols, rowID)
-		colTypes = append(colTypes, sql.ColumnType{
-			Type:    sql.IntegerType,
-			Size:    8,
-			NotNull: true,
-			Default: &expr.Call{Name: sql.ID("unique_rowid")},
-		})
-	}
-
-	mid, err := util.CreateTable(ctx, be, etx, tn, ifNotExists)
-	if err != nil {
-		return err
-	}
-	if mid == 0 {
-		return nil
-	}
-
-	be.tableDefs[mid] = makeTableDef(tn, cols, colTypes, primary, mid)
-	return nil
-}
-
-func (be *basicEngine) DropTable(ctx context.Context, etx engine.Transaction, tn sql.TableName,
-	ifExists bool) error {
-
-	return util.DropTable(ctx, be, etx, tn, ifExists)
-}
-
-func (be *basicEngine) MakeIndexesTable(etx engine.Transaction) *util.TypedTable {
-	return util.MakeTypedTable(indexesTableDef.tn,
-		&table{
-			be:  be,
-			tx:  etx.(*transaction),
-			def: indexesTableDef,
-		})
-}
-
-func (be *basicEngine) CreateIndex(ctx context.Context, etx engine.Transaction,
-	idxname sql.Identifier, tn sql.TableName, unique bool, keys []engine.ColumnKey,
-	ifNotExists bool) error {
-
-	return util.CreateIndex(ctx, be, etx, idxname, tn, ifNotExists)
-}
-
-func (be *basicEngine) DropIndex(ctx context.Context, etx engine.Transaction,
-	idxname sql.Identifier, tn sql.TableName, ifExists bool) error {
-
-	return util.DropIndex(ctx, be, etx, idxname, tn, ifExists)
+func (be *basicEngine) ValidDatabase(dbname sql.Identifier) bool { // XXX: get rid of
+	_, ok := be.databases[dbname]
+	return ok
 }
 
 func (be *basicEngine) Begin(sesid uint64) engine.Transaction {
@@ -334,18 +214,6 @@ func (be *basicEngine) ListDatabases(ctx context.Context, tx engine.Transaction)
 		dbnames = append(dbnames, dbname)
 	}
 	return dbnames, nil
-}
-
-func (be *basicEngine) ListSchemas(ctx context.Context, etx engine.Transaction,
-	dbname sql.Identifier) ([]sql.Identifier, error) {
-
-	return util.ListSchemas(ctx, be, etx, dbname)
-}
-
-func (be *basicEngine) ListTables(ctx context.Context, etx engine.Transaction,
-	sn sql.SchemaName) ([]sql.Identifier, error) {
-
-	return util.ListTables(ctx, be, etx, sn)
 }
 
 func (btx *transaction) Commit(ctx context.Context) error {
