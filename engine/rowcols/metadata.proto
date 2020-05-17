@@ -19,7 +19,6 @@ enum DataType {
 
 message ColumnMetadata {
     string Name = 1;
-    uint32 ColNum = 2;
     DataType Type = 3;
     uint32 Size = 4;
     bool Fixed = 5;
@@ -28,6 +27,6 @@ message ColumnMetadata {
 }
 
 message ColumnKey {
-    uint32 ColNum = 1;
+    int32 Number = 1;
     bool Reverse = 2;
 }

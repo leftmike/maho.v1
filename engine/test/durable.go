@@ -19,25 +19,21 @@ var (
 		[]dbCmd{
 			{fln: fln(), cmd: cmdCreateDatabase, name: durabilityDBName},
 		},
-		/*
-			[]engCmd{
-				{fln: fln(), cmd: cmdBegin},
-				{fln: fln(), cmd: cmdLookupTable, name: sql.ID("tbl-a"), fail: true},
-				{fln: fln(), cmd: cmdCreateTable, name: sql.ID("tbl-a")},
-				{fln: fln(), cmd: cmdLookupTable, name: sql.ID("tbl-a")},
-				{fln: fln(), cmd: cmdCommit},
-			},
-		*/
-		/*
-			[]engCmd{
-				{fln: fln(), cmd: cmdBegin},
-				{fln: fln(), cmd: cmdLookupTable, name: sql.ID("tbl-a")},
-				{fln: fln(), cmd: cmdCreateTable, name: sql.ID("tbl-a"), fail: true},
-				{fln: fln(), cmd: cmdLookupTable, name: sql.ID("tbl-a")},
-				{fln: fln(), cmd: cmdCommit},
-			},
-		*/
-		/*
+		[]engCmd{
+			{fln: fln(), cmd: cmdBegin},
+			{fln: fln(), cmd: cmdLookupTable, name: sql.ID("tbl-a"), fail: true},
+			{fln: fln(), cmd: cmdCreateTable, name: sql.ID("tbl-a")},
+			{fln: fln(), cmd: cmdLookupTable, name: sql.ID("tbl-a")},
+			{fln: fln(), cmd: cmdCommit},
+		},
+		[]engCmd{
+			{fln: fln(), cmd: cmdBegin},
+			{fln: fln(), cmd: cmdLookupTable, name: sql.ID("tbl-a")},
+			{fln: fln(), cmd: cmdCreateTable, name: sql.ID("tbl-a"), fail: true},
+			{fln: fln(), cmd: cmdLookupTable, name: sql.ID("tbl-a")},
+			{fln: fln(), cmd: cmdCommit},
+		},
+		[]engCmd{
 			{fln: fln(), cmd: cmdBegin},
 			{fln: fln(), cmd: cmdListTables, list: []string{"tbl-a"}},
 			{fln: fln(), cmd: cmdCommit},
@@ -47,38 +43,45 @@ var (
 			{fln: fln(), cmd: cmdCreateTable, name: sql.ID("tbl-d")},
 			{fln: fln(), cmd: cmdListTables, list: []string{"tbl-a", "tbl-b", "tbl-c", "tbl-d"}},
 			{fln: fln(), cmd: cmdCommit},
-
+		},
+		[]engCmd{
 			{fln: fln(), cmd: cmdBegin},
 			{fln: fln(), cmd: cmdListTables, list: []string{"tbl-a", "tbl-b", "tbl-c", "tbl-d"}},
 			{fln: fln(), cmd: cmdCommit},
-
+		},
+		[]engCmd{
 			{fln: fln(), cmd: cmdBegin},
 			{fln: fln(), cmd: cmdDropTable, name: sql.ID("tbl-a")},
 			{fln: fln(), cmd: cmdListTables, list: []string{"tbl-b", "tbl-c", "tbl-d"}},
 			{fln: fln(), cmd: cmdCommit},
-
+		},
+		[]engCmd{
 			{fln: fln(), cmd: cmdBegin},
 			{fln: fln(), cmd: cmdListTables, list: []string{"tbl-b", "tbl-c", "tbl-d"}},
 			{fln: fln(), cmd: cmdCommit},
-
+		},
+		[]engCmd{
 			{fln: fln(), cmd: cmdBegin},
 			{fln: fln(), cmd: cmdCreateTable, name: sql.ID("tbl-e")},
 			{fln: fln(), cmd: cmdListTables, list: []string{"tbl-b", "tbl-c", "tbl-d", "tbl-e"}},
 			{fln: fln(), cmd: cmdRollback},
-
+		},
+		[]engCmd{
 			{fln: fln(), cmd: cmdBegin},
 			{fln: fln(), cmd: cmdListTables, list: []string{"tbl-b", "tbl-c", "tbl-d"}},
 			{fln: fln(), cmd: cmdCommit},
-
+		},
+		[]engCmd{
 			{fln: fln(), cmd: cmdBegin},
 			{fln: fln(), cmd: cmdDropTable, name: sql.ID("tbl-c")},
 			{fln: fln(), cmd: cmdListTables, list: []string{"tbl-b", "tbl-d"}},
 			{fln: fln(), cmd: cmdRollback},
-
+		},
+		[]engCmd{
 			{fln: fln(), cmd: cmdBegin},
 			{fln: fln(), cmd: cmdListTables, list: []string{"tbl-b", "tbl-c", "tbl-d"}},
 			{fln: fln(), cmd: cmdCommit},
-		*/
+		},
 	}
 )
 

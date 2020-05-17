@@ -4,7 +4,6 @@ import (
 	"context"
 	"fmt"
 	"io"
-	"sync"
 
 	"github.com/leftmike/maho/engine"
 	"github.com/leftmike/maho/engine/util"
@@ -50,6 +49,7 @@ type tableRow struct {
 	Schema   string
 	Table    string
 	MID      int64
+	Metadata []byte
 }
 
 type indexRow struct {
@@ -61,13 +61,13 @@ type indexRow struct {
 
 type TableDef interface {
 	Table(ctx context.Context, tx engine.Transaction) (engine.Table, error)
-	//Encode() ([]byte, error)
+	Encode() ([]byte, error)
 }
 
 type engineStore interface {
 	MakeTableDef(tn sql.TableName, mid int64, cols []sql.Identifier, colTypes []sql.ColumnType,
 		primary []engine.ColumnKey) (TableDef, error)
-	//DecodeTableDef(tn sql.TableName, mid int64, buf []byte) (TableDef, error)
+	DecodeTableDef(tn sql.TableName, mid int64, buf []byte) (TableDef, error)
 	Begin(sesid uint64) engine.Transaction
 }
 
@@ -79,10 +79,6 @@ type midEngine struct {
 	schemas   TableDef
 	tables    TableDef
 	indexes   TableDef
-
-	// XXX: do we need these?
-	mutex     sync.Mutex
-	tableDefs map[int64]TableDef
 }
 
 func NewEngine(name string, e engineStore, init bool) (engine.Engine, error) {
@@ -108,8 +104,10 @@ func NewEngine(name string, e engineStore, init bool) (engine.Engine, error) {
 		return nil, err
 	}
 	tables, err := e.MakeTableDef(tablesTableName, tablesMID,
-		[]sql.Identifier{sql.ID("database"), sql.ID("schema"), sql.ID("table"), sql.ID("mid")},
-		[]sql.ColumnType{sql.IdColType, sql.IdColType, sql.IdColType, sql.Int64ColType},
+		[]sql.Identifier{sql.ID("database"), sql.ID("schema"), sql.ID("table"), sql.ID("mid"),
+			sql.ID("metadata")},
+		[]sql.ColumnType{sql.IdColType, sql.IdColType, sql.IdColType, sql.Int64ColType,
+			{Type: sql.BytesType, Fixed: false, Size: sql.MaxColumnSize}},
 		[]engine.ColumnKey{engine.MakeColumnKey(0, false), engine.MakeColumnKey(1, false),
 			engine.MakeColumnKey(2, false)})
 	if err != nil {
@@ -132,8 +130,6 @@ func NewEngine(name string, e engineStore, init bool) (engine.Engine, error) {
 		schemas:   schemas,
 		tables:    tables,
 		indexes:   indexes,
-
-		tableDefs: map[int64]TableDef{},
 	}
 	if init {
 		ctx := context.Background()
@@ -350,13 +346,6 @@ func (me *midEngine) DropSchema(ctx context.Context, tx engine.Transaction, sn s
 	} else if err != nil {
 		return err
 	}
-
-	if sr.Database != sn.Database.String() || sr.Schema != sn.Schema.String() {
-		if ifExists {
-			return nil
-		}
-		return fmt.Errorf("%s: schema %s not found", me.name, sn)
-	}
 	if sr.Tables > 0 {
 		return fmt.Errorf("%s: schema %s is not empty", me.name, sn)
 	}
@@ -390,9 +379,6 @@ func (me *midEngine) updateSchema(ctx context.Context, tx engine.Transaction, sn
 		return err
 	}
 
-	if sr.Database != sn.Database.String() || sr.Schema != sn.Schema.String() {
-		return fmt.Errorf("%s: schema %s not found", me.name, sn)
-	}
 	return rows.Update(ctx,
 		struct {
 			Tables int64
@@ -400,11 +386,11 @@ func (me *midEngine) updateSchema(ctx context.Context, tx engine.Transaction, sn
 }
 
 func (me *midEngine) lookupTable(ctx context.Context, tx engine.Transaction,
-	tn sql.TableName) (int64, error) {
+	tn sql.TableName) (*util.Rows, error) {
 
 	tbl, err := me.tables.Table(ctx, tx)
 	if err != nil {
-		return 0, err
+		return nil, err
 	}
 	ttbl := util.MakeTypedTable(tablesTableName, tbl)
 
@@ -415,43 +401,54 @@ func (me *midEngine) lookupTable(ctx context.Context, tx engine.Transaction,
 	}
 	rows, err := ttbl.Rows(ctx, keyRow, keyRow)
 	if err != nil {
-		return 0, err
+		return nil, err
+	}
+	return rows, nil
+}
+
+func (me *midEngine) validTable(ctx context.Context, tx engine.Transaction,
+	tn sql.TableName) (bool, error) {
+
+	rows, err := me.lookupTable(ctx, tx, tn)
+	if err != nil {
+		return false, err
 	}
 	defer rows.Close()
 
 	var tr tableRow
 	err = rows.Next(ctx, &tr)
-	if err == io.EOF {
-		return 0, nil
-	} else if err != nil {
-		return 0, err
+	if err != nil {
+		if err == io.EOF {
+			return false, nil
+		}
+		return false, err
 	}
 
-	if tr.Database != tn.Database.String() || tr.Schema != tn.Schema.String() ||
-		tr.Table != tn.Table.String() {
-
-		return 0, nil
-	}
-	return tr.MID, nil
-
+	return true, nil
 }
 
 func (me *midEngine) LookupTable(ctx context.Context, tx engine.Transaction,
 	tn sql.TableName) (engine.Table, error) {
 
-	mid, err := me.lookupTable(ctx, tx, tn)
+	rows, err := me.lookupTable(ctx, tx, tn)
 	if err != nil {
 		return nil, err
-	} else if mid == 0 {
-		return nil, fmt.Errorf("%s: table %s not found", me.name, tn)
 	}
+	defer rows.Close()
 
-	me.mutex.Lock()
-	defer me.mutex.Unlock()
+	var tr tableRow
+	err = rows.Next(ctx, &tr)
+	if err != nil {
+		if err == io.EOF {
+			return nil, fmt.Errorf("%s: table %s not found", me.name, tn)
+		}
+		return nil, err
+	}
+	mid := tr.MID
 
-	td, ok := me.tableDefs[mid]
-	if !ok {
-		panic(fmt.Sprintf("%s: table %s missing table definition", me.name, tn))
+	td, err := me.e.DecodeTableDef(tn, mid, tr.Metadata)
+	if err != nil {
+		return nil, err
 	}
 
 	return td.Table(ctx, tx)
@@ -483,11 +480,11 @@ func (me *midEngine) CreateTable(ctx context.Context, tx engine.Transaction, tn 
 		})
 	}
 
-	mid, err := me.lookupTable(ctx, tx, tn)
+	ok, err := me.validTable(ctx, tx, tn)
 	if err != nil {
 		return err
 	}
-	if mid > 0 {
+	if ok {
 		if ifNotExists {
 			return nil
 		}
@@ -499,12 +496,16 @@ func (me *midEngine) CreateTable(ctx context.Context, tx engine.Transaction, tn 
 		return err
 	}
 
-	mid, err = me.nextSequenceValue(ctx, tx, midSequence)
+	mid, err := me.nextSequenceValue(ctx, tx, midSequence)
 	if err != nil {
 		return err
 	}
 
 	td, err := me.e.MakeTableDef(tn, mid, cols, colTypes, primary)
+	if err != nil {
+		return err
+	}
+	md, err := td.Encode()
 	if err != nil {
 		return err
 	}
@@ -520,16 +521,13 @@ func (me *midEngine) CreateTable(ctx context.Context, tx engine.Transaction, tn 
 			Database: tn.Database.String(),
 			Schema:   tn.Schema.String(),
 			Table:    tn.Table.String(),
-			MID:      int64(mid),
+			MID:      mid,
+			Metadata: md,
 		})
 	if err != nil {
 		return err
 	}
 
-	me.mutex.Lock()
-	defer me.mutex.Unlock()
-
-	me.tableDefs[mid] = td
 	return nil
 }
 
@@ -569,14 +567,6 @@ func (me *midEngine) DropTable(ctx context.Context, tx engine.Transaction, tn sq
 		return err
 	}
 
-	if tr.Database != tn.Database.String() || tr.Schema != tn.Schema.String() ||
-		tr.Table != tn.Table.String() {
-
-		if ifExists {
-			return nil
-		}
-		return fmt.Errorf("%s: table %s not found", me.name, tn)
-	}
 	return rows.Delete(ctx)
 }
 
@@ -609,11 +599,6 @@ func (me *midEngine) lookupIndex(ctx context.Context, tx engine.Transaction, tn 
 		return false, err
 	}
 
-	if ir.Database != tn.Database.String() || ir.Schema != tn.Schema.String() ||
-		ir.Table != tn.Table.String() || ir.Index != idxname.String() {
-
-		return false, nil
-	}
 	return true, nil
 }
 
@@ -632,11 +617,11 @@ func (me *midEngine) CreateIndex(ctx context.Context, tx engine.Transaction,
 		return fmt.Errorf("%s: index %s on table %s already exists", me.name, idxname, tn)
 	}
 
-	mid, err := me.lookupTable(ctx, tx, tn)
+	ok, err = me.validTable(ctx, tx, tn)
 	if err != nil {
 		return err
 	}
-	if mid == 0 {
+	if !ok {
 		return fmt.Errorf("%s: table %s not found", me.name, tn)
 	}
 
@@ -687,14 +672,6 @@ func (me *midEngine) DropIndex(ctx context.Context, tx engine.Transaction,
 		return err
 	}
 
-	if ir.Database != tn.Database.String() || ir.Schema != tn.Schema.String() ||
-		ir.Table != tn.Table.String() || ir.Index != idxname.String() {
-
-		if ifExists {
-			return nil
-		}
-		return fmt.Errorf("%s: index %s on table %s not found", me.name, idxname, tn)
-	}
 	return rows.Delete(ctx)
 }
 

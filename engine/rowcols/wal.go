@@ -135,36 +135,36 @@ func decodeCommit(hndlr walHandler, ver uint64, buf []byte) error {
 	return nil
 }
 
-func (wal *WAL) ReadWAL(hndlr walHandler) error {
+func (wal *WAL) ReadWAL(hndlr walHandler) (bool, error) {
 	fi, err := wal.f.Stat()
 	if err != nil {
-		return err
+		return false, err
 	}
 	sz := fi.Size()
 	if sz < 16 { // Need at least the header.
-		return wal.newWAL()
+		return true, wal.newWAL()
 	}
 
 	var readBuf bytes.Buffer
 	readBuf.Grow(int(sz))
 	_, err = readBuf.ReadFrom(wal.f)
 	if err != nil {
-		return err
+		return false, err
 	}
 	buf := readBuf.Bytes()
 
 	// walHeader
 	if !bytes.Equal(buf[0:8], walHeaderSignature[:]) {
-		return fmt.Errorf("rowcols: bad WAL signature: %v", buf[0:8])
+		return false, fmt.Errorf("rowcols: bad WAL signature: %v", buf[0:8])
 	}
 	if buf[8] > walVersion {
-		return fmt.Errorf("rowcols: bad WAL version: %d", buf[8])
+		return false, fmt.Errorf("rowcols: bad WAL version: %d", buf[8])
 	}
 	buf = buf[16:]
 
 	for len(buf) > 0 {
 		if buf[0] != commitRecordType {
-			return fmt.Errorf("rowcols: bad WAL record type: %d", buf[0])
+			return false, fmt.Errorf("rowcols: bad WAL record type: %d", buf[0])
 		}
 		buf = buf[1:]
 		length := binary.BigEndian.Uint32(buf)
@@ -174,12 +174,12 @@ func (wal *WAL) ReadWAL(hndlr walHandler) error {
 
 		err = decodeCommit(hndlr, ver, buf[:length])
 		if err != nil {
-			return err
+			return false, err
 		}
 		buf = buf[length:]
 	}
 
-	return nil
+	return false, nil
 }
 
 func encodeRowItem(buf []byte, ri rowItem) []byte {

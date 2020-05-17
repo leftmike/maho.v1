@@ -1,16 +1,20 @@
 package basic
 
 import (
+	"bytes"
 	"context"
+	"encoding/gob"
 	"errors"
 	"fmt"
 	"io"
+	"strings"
 	"sync"
 
 	"github.com/google/btree"
 	"github.com/leftmike/maho/engine"
 	"github.com/leftmike/maho/engine/mideng"
 	"github.com/leftmike/maho/engine/virtual"
+	"github.com/leftmike/maho/parser"
 	"github.com/leftmike/maho/sql"
 )
 
@@ -77,6 +81,91 @@ func (td *tableDef) Table(ctx context.Context, tx engine.Transaction) (engine.Ta
 		tx: etx,
 		td: td,
 	}, nil
+}
+
+type columnMetadata struct {
+	Name    string
+	Type    sql.DataType
+	Size    uint32
+	Fixed   bool
+	NotNull bool
+	Default string
+}
+
+func (td *tableDef) Encode() ([]byte, error) {
+	md := make([]columnMetadata, 0, len(td.columns))
+	for cdx := range td.columns {
+		var dflt string
+		if td.columnTypes[cdx].Default != nil {
+			dflt = td.columnTypes[cdx].Default.String()
+		}
+		md = append(md,
+			columnMetadata{
+				Name:    td.columns[cdx].String(),
+				Type:    td.columnTypes[cdx].Type,
+				Size:    td.columnTypes[cdx].Size,
+				Fixed:   td.columnTypes[cdx].Fixed,
+				NotNull: td.columnTypes[cdx].NotNull,
+				Default: dflt,
+			})
+	}
+
+	var buf bytes.Buffer
+	enc := gob.NewEncoder(&buf)
+
+	err := enc.Encode(md)
+	if err != nil {
+		return nil, err
+	}
+	err = enc.Encode(td.primary)
+	if err != nil {
+		return nil, err
+	}
+	return buf.Bytes(), nil
+}
+
+func (be *basicEngine) DecodeTableDef(tn sql.TableName, mid int64, buf []byte) (mideng.TableDef,
+	error) {
+
+	dec := gob.NewDecoder(bytes.NewReader(buf))
+
+	var md []columnMetadata
+	err := dec.Decode(&md)
+	if err != nil {
+		return nil, err
+	}
+
+	cols := make([]sql.Identifier, 0, len(md))
+	colTypes := make([]sql.ColumnType, 0, len(md))
+	for mdx := range md {
+		cols = append(cols, sql.QuotedID(md[mdx].Name))
+
+		var dflt sql.Expr
+		if md[mdx].Default != "" {
+			p := parser.NewParser(strings.NewReader(md[mdx].Default),
+				fmt.Sprintf("%s metadata", tn))
+			dflt, err = p.ParseExpr()
+			if err != nil {
+				return nil, err
+			}
+		}
+		colTypes = append(colTypes,
+			sql.ColumnType{
+				Type:    md[mdx].Type,
+				Size:    md[mdx].Size,
+				Fixed:   md[mdx].Fixed,
+				NotNull: md[mdx].NotNull,
+				Default: dflt,
+			})
+	}
+
+	var primary []engine.ColumnKey
+	err = dec.Decode(&primary)
+	if err != nil {
+		return nil, err
+	}
+
+	return be.MakeTableDef(tn, mid, cols, colTypes, primary)
 }
 
 func (_ *basicEngine) MakeTableDef(tn sql.TableName, mid int64, cols []sql.Identifier,

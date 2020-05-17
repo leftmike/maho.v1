@@ -10,6 +10,9 @@ import (
 func CleanDir(dirname string, keeps []string) error {
 	d, err := os.Open(dirname)
 	if err != nil {
+		if os.IsNotExist(err) {
+			return nil
+		}
 		return err
 	}
 	fis, err := d.Readdir(-1)

@@ -9,12 +9,15 @@ import (
 	"io"
 	"os"
 	"path/filepath"
+	"strings"
 	"sync"
 
+	"github.com/golang/protobuf/proto"
 	"github.com/google/btree"
 	"github.com/leftmike/maho/engine"
 	"github.com/leftmike/maho/engine/mideng"
 	"github.com/leftmike/maho/engine/virtual"
+	"github.com/leftmike/maho/parser"
 	"github.com/leftmike/maho/sql"
 )
 
@@ -82,12 +85,12 @@ func NewEngine(dataDir string) (engine.Engine, error) {
 		wal:     &WAL{f: f},
 		tree:    btree.New(16),
 	}
-	err = rce.wal.ReadWAL(rce)
+	init, err := rce.wal.ReadWAL(rce)
 	if err != nil {
 		return nil, err
 	}
 
-	me, err := mideng.NewEngine("rowcols", rce, true) // XXX: handle persistence
+	me, err := mideng.NewEngine("rowcols", rce, init)
 	if err != nil {
 		return nil, err
 	}
@@ -104,6 +107,37 @@ func (td *tableDef) Table(ctx context.Context, tx engine.Transaction) (engine.Ta
 		td:  td,
 	}, nil
 
+}
+
+func (td *tableDef) Encode() ([]byte, error) {
+	var md TableMetadata
+	md.Columns = make([]*ColumnMetadata, 0, len(td.columns))
+	for cdx := range td.columns {
+		var dflt string
+		if td.columnTypes[cdx].Default != nil {
+			dflt = td.columnTypes[cdx].Default.String()
+		}
+		md.Columns = append(md.Columns,
+			&ColumnMetadata{
+				Name:    td.columns[cdx].String(),
+				Type:    DataType(td.columnTypes[cdx].Type),
+				Size:    td.columnTypes[cdx].Size,
+				Fixed:   td.columnTypes[cdx].Fixed,
+				NotNull: td.columnTypes[cdx].NotNull,
+				Default: dflt,
+			})
+	}
+
+	md.Primary = make([]*ColumnKey, 0, len(td.primary))
+	for _, pk := range td.primary {
+		md.Primary = append(md.Primary,
+			&ColumnKey{
+				Number:  int32(pk.Number()),
+				Reverse: pk.Reverse(),
+			})
+	}
+
+	return proto.Marshal(&md)
 }
 
 func (_ *rowColsEngine) MakeTableDef(tn sql.TableName, mid int64, cols []sql.Identifier,
@@ -148,6 +182,47 @@ func (_ *rowColsEngine) MakeTableDef(tn sql.TableName, mid int64, cols []sql.Ide
 	}
 
 	return &td, nil
+}
+
+func (rce *rowColsEngine) DecodeTableDef(tn sql.TableName, mid int64, buf []byte) (mideng.TableDef,
+	error) {
+
+	var md TableMetadata
+	err := proto.Unmarshal(buf, &md)
+	if err != nil {
+		return nil, err
+	}
+
+	cols := make([]sql.Identifier, 0, len(md.Columns))
+	colTypes := make([]sql.ColumnType, 0, len(md.Columns))
+	for cdx := range md.Columns {
+		cols = append(cols, sql.QuotedID(md.Columns[cdx].Name))
+
+		var dflt sql.Expr
+		if md.Columns[cdx].Default != "" {
+			p := parser.NewParser(strings.NewReader(md.Columns[cdx].Default),
+				fmt.Sprintf("%s metadata", tn))
+			dflt, err = p.ParseExpr()
+			if err != nil {
+				return nil, err
+			}
+		}
+		colTypes = append(colTypes,
+			sql.ColumnType{
+				Type:    sql.DataType(md.Columns[cdx].Type),
+				Size:    md.Columns[cdx].Size,
+				Fixed:   md.Columns[cdx].Fixed,
+				NotNull: md.Columns[cdx].NotNull,
+				Default: dflt,
+			})
+	}
+
+	primary := make([]engine.ColumnKey, 0, len(md.Primary))
+	for _, pk := range md.Primary {
+		primary = append(primary, engine.MakeColumnKey(int(pk.Number), pk.Reverse))
+	}
+
+	return rce.MakeTableDef(tn, mid, cols, colTypes, primary)
 }
 
 func (rce *rowColsEngine) Begin(sesid uint64) engine.Transaction {

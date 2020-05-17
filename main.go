@@ -15,7 +15,6 @@ To Do:
 
 - rowcols: add write ahead log
 
-- persist table definitions; add metadata to tablesTable
 - init system tables into schemas and tables
 - system database and virtualEngine: should LookupTable fall through?
 
