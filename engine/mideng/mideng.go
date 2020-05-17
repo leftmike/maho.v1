@@ -64,7 +64,7 @@ type TableDef interface {
 	Encode() ([]byte, error)
 }
 
-type engineStore interface {
+type store interface {
 	MakeTableDef(tn sql.TableName, mid int64, cols []sql.Identifier, colTypes []sql.ColumnType,
 		primary []engine.ColumnKey) (TableDef, error)
 	DecodeTableDef(tn sql.TableName, mid int64, buf []byte) (TableDef, error)
@@ -73,7 +73,7 @@ type engineStore interface {
 
 type midEngine struct {
 	name      string
-	e         engineStore
+	st        store
 	sequences TableDef
 	databases TableDef
 	schemas   TableDef
@@ -81,29 +81,29 @@ type midEngine struct {
 	indexes   TableDef
 }
 
-func NewEngine(name string, e engineStore, init bool) (engine.Engine, error) {
-	sequences, err := e.MakeTableDef(sequencesTableName, sequencesMID,
+func NewEngine(name string, st store, init bool) (engine.Engine, error) {
+	sequences, err := st.MakeTableDef(sequencesTableName, sequencesMID,
 		[]sql.Identifier{sql.ID("sequence"), sql.ID("current")},
 		[]sql.ColumnType{sql.IdColType, sql.Int64ColType},
 		[]engine.ColumnKey{engine.MakeColumnKey(0, false)})
 	if err != nil {
 		return nil, err
 	}
-	databases, err := e.MakeTableDef(databasesTableName, databasesMID,
+	databases, err := st.MakeTableDef(databasesTableName, databasesMID,
 		[]sql.Identifier{sql.ID("database")},
 		[]sql.ColumnType{sql.IdColType},
 		[]engine.ColumnKey{engine.MakeColumnKey(0, false)})
 	if err != nil {
 		return nil, err
 	}
-	schemas, err := e.MakeTableDef(schemasTableName, schemasMID,
+	schemas, err := st.MakeTableDef(schemasTableName, schemasMID,
 		[]sql.Identifier{sql.ID("database"), sql.ID("schema"), sql.ID("tables")},
 		[]sql.ColumnType{sql.IdColType, sql.IdColType, sql.Int64ColType},
 		[]engine.ColumnKey{engine.MakeColumnKey(0, false), engine.MakeColumnKey(1, false)})
 	if err != nil {
 		return nil, err
 	}
-	tables, err := e.MakeTableDef(tablesTableName, tablesMID,
+	tables, err := st.MakeTableDef(tablesTableName, tablesMID,
 		[]sql.Identifier{sql.ID("database"), sql.ID("schema"), sql.ID("table"), sql.ID("mid"),
 			sql.ID("metadata")},
 		[]sql.ColumnType{sql.IdColType, sql.IdColType, sql.IdColType, sql.Int64ColType,
@@ -113,7 +113,7 @@ func NewEngine(name string, e engineStore, init bool) (engine.Engine, error) {
 	if err != nil {
 		return nil, err
 	}
-	indexes, err := e.MakeTableDef(indexesTableName, indexesMID,
+	indexes, err := st.MakeTableDef(indexesTableName, indexesMID,
 		[]sql.Identifier{sql.ID("database"), sql.ID("schema"), sql.ID("table"), sql.ID("index")},
 		[]sql.ColumnType{sql.IdColType, sql.IdColType, sql.IdColType, sql.IdColType},
 		[]engine.ColumnKey{engine.MakeColumnKey(0, false), engine.MakeColumnKey(1, false),
@@ -124,7 +124,7 @@ func NewEngine(name string, e engineStore, init bool) (engine.Engine, error) {
 
 	me := &midEngine{
 		name:      name,
-		e:         e,
+		st:        st,
 		sequences: sequences,
 		databases: databases,
 		schemas:   schemas,
@@ -133,7 +133,7 @@ func NewEngine(name string, e engineStore, init bool) (engine.Engine, error) {
 	}
 	if init {
 		ctx := context.Background()
-		tx := me.e.Begin(0)
+		tx := me.st.Begin(0)
 		err = me.init(ctx, tx)
 		if err != nil {
 			tx.Rollback()
@@ -196,7 +196,7 @@ func (me *midEngine) CreateDatabase(dbname sql.Identifier, options engine.Option
 	}
 
 	ctx := context.Background()
-	tx := me.e.Begin(0)
+	tx := me.st.Begin(0)
 	err := me.createDatabase(ctx, tx, dbname)
 	if err != nil {
 		tx.Rollback()
@@ -283,7 +283,7 @@ func (me *midEngine) DropDatabase(dbname sql.Identifier, ifExists bool,
 	}
 
 	ctx := context.Background()
-	tx := me.e.Begin(0)
+	tx := me.st.Begin(0)
 	err := me.dropDatabase(ctx, tx, dbname, ifExists)
 	if err != nil {
 		tx.Rollback()
@@ -446,7 +446,7 @@ func (me *midEngine) LookupTable(ctx context.Context, tx engine.Transaction,
 	}
 	mid := tr.MID
 
-	td, err := me.e.DecodeTableDef(tn, mid, tr.Metadata)
+	td, err := me.st.DecodeTableDef(tn, mid, tr.Metadata)
 	if err != nil {
 		return nil, err
 	}
@@ -501,7 +501,7 @@ func (me *midEngine) CreateTable(ctx context.Context, tx engine.Transaction, tn 
 		return err
 	}
 
-	td, err := me.e.MakeTableDef(tn, mid, cols, colTypes, primary)
+	td, err := me.st.MakeTableDef(tn, mid, cols, colTypes, primary)
 	if err != nil {
 		return err
 	}
@@ -676,7 +676,7 @@ func (me *midEngine) DropIndex(ctx context.Context, tx engine.Transaction,
 }
 
 func (me *midEngine) Begin(sesid uint64) engine.Transaction {
-	return me.e.Begin(sesid)
+	return me.st.Begin(sesid)
 }
 
 func (me *midEngine) ListDatabases(ctx context.Context, tx engine.Transaction) ([]sql.Identifier,

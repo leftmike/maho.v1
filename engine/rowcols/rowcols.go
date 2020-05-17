@@ -25,7 +25,7 @@ var (
 	errTransactionComplete = errors.New("rowcols: transaction already completed")
 )
 
-type rowColsEngine struct {
+type rowColsStore struct {
 	dataDir     string
 	mutex       sync.Mutex
 	wal         *WAL
@@ -35,7 +35,7 @@ type rowColsEngine struct {
 }
 
 type transaction struct {
-	rce   *rowColsEngine
+	rcst  *rowColsStore
 	tree  *btree.BTree
 	ver   uint64
 	delta *btree.BTree
@@ -53,9 +53,9 @@ type tableDef struct {
 }
 
 type table struct {
-	rce *rowColsEngine
-	tx  *transaction
-	td  *tableDef
+	rcst *rowColsStore
+	tx   *transaction
+	td   *tableDef
 }
 
 type rowItem struct {
@@ -80,17 +80,17 @@ func NewEngine(dataDir string) (engine.Engine, error) {
 		return nil, err
 	}
 
-	rce := &rowColsEngine{
+	rcst := &rowColsStore{
 		dataDir: dataDir,
 		wal:     &WAL{f: f},
 		tree:    btree.New(16),
 	}
-	init, err := rce.wal.ReadWAL(rce)
+	init, err := rcst.wal.ReadWAL(rcst)
 	if err != nil {
 		return nil, err
 	}
 
-	me, err := mideng.NewEngine("rowcols", rce, init)
+	me, err := mideng.NewEngine("rowcols", rcst, init)
 	if err != nil {
 		return nil, err
 	}
@@ -102,9 +102,9 @@ func NewEngine(dataDir string) (engine.Engine, error) {
 func (td *tableDef) Table(ctx context.Context, tx engine.Transaction) (engine.Table, error) {
 	etx := tx.(*transaction)
 	return &table{
-		rce: etx.rce,
-		tx:  etx,
-		td:  td,
+		rcst: etx.rcst,
+		tx:   etx,
+		td:   td,
 	}, nil
 
 }
@@ -140,7 +140,7 @@ func (td *tableDef) Encode() ([]byte, error) {
 	return proto.Marshal(&md)
 }
 
-func (_ *rowColsEngine) MakeTableDef(tn sql.TableName, mid int64, cols []sql.Identifier,
+func (_ *rowColsStore) MakeTableDef(tn sql.TableName, mid int64, cols []sql.Identifier,
 	colTypes []sql.ColumnType, primary []engine.ColumnKey) (mideng.TableDef, error) {
 
 	if len(primary) == 0 {
@@ -184,7 +184,7 @@ func (_ *rowColsEngine) MakeTableDef(tn sql.TableName, mid int64, cols []sql.Ide
 	return &td, nil
 }
 
-func (rce *rowColsEngine) DecodeTableDef(tn sql.TableName, mid int64, buf []byte) (mideng.TableDef,
+func (rcst *rowColsStore) DecodeTableDef(tn sql.TableName, mid int64, buf []byte) (mideng.TableDef,
 	error) {
 
 	var md TableMetadata
@@ -222,36 +222,36 @@ func (rce *rowColsEngine) DecodeTableDef(tn sql.TableName, mid int64, buf []byte
 		primary = append(primary, engine.MakeColumnKey(int(pk.Number), pk.Reverse))
 	}
 
-	return rce.MakeTableDef(tn, mid, cols, colTypes, primary)
+	return rcst.MakeTableDef(tn, mid, cols, colTypes, primary)
 }
 
-func (rce *rowColsEngine) Begin(sesid uint64) engine.Transaction {
-	rce.mutex.Lock()
-	defer rce.mutex.Unlock()
+func (rcst *rowColsStore) Begin(sesid uint64) engine.Transaction {
+	rcst.mutex.Lock()
+	defer rcst.mutex.Unlock()
 	return &transaction{
-		rce:  rce,
-		tree: rce.tree.Clone(),
-		ver:  rce.ver,
+		rcst: rcst,
+		tree: rcst.tree.Clone(),
+		ver:  rcst.ver,
 	}
 }
 
-func (rce *rowColsEngine) RowItem(ri rowItem) error {
-	if ri.ver > rce.ver {
-		rce.ver = ri.ver
+func (rcst *rowColsStore) RowItem(ri rowItem) error {
+	if ri.ver > rcst.ver {
+		rcst.ver = ri.ver
 	}
-	rce.tree.ReplaceOrInsert(ri)
+	rcst.tree.ReplaceOrInsert(ri)
 	return nil
 }
 
-func (rce *rowColsEngine) commit(ctx context.Context, txVer uint64, delta *btree.BTree) error {
-	rce.commitMutex.Lock()
-	defer rce.commitMutex.Unlock()
+func (rcst *rowColsStore) commit(ctx context.Context, txVer uint64, delta *btree.BTree) error {
+	rcst.commitMutex.Lock()
+	defer rcst.commitMutex.Unlock()
 
-	rce.mutex.Lock()
-	tree := rce.tree.Clone()
-	rce.mutex.Unlock()
+	rcst.mutex.Lock()
+	tree := rcst.tree.Clone()
+	rcst.mutex.Unlock()
 
-	ver := rce.ver + 1
+	ver := rcst.ver + 1
 	buf := EncodeUint32([]byte{commitRecordType}, 0) // Reserve space for length.
 	buf = EncodeUint64(buf, ver)
 
@@ -284,40 +284,40 @@ func (rce *rowColsEngine) commit(ctx context.Context, txVer uint64, delta *btree
 		return err
 	}
 
-	if err := rce.wal.writeCommit(buf); err != nil {
+	if err := rcst.wal.writeCommit(buf); err != nil {
 		return err
 	}
 
-	rce.mutex.Lock()
-	rce.tree = tree
-	rce.ver = ver
-	rce.mutex.Unlock()
+	rcst.mutex.Lock()
+	rcst.tree = tree
+	rcst.ver = ver
+	rcst.mutex.Unlock()
 
 	return nil
 }
 
 func (rctx *transaction) Commit(ctx context.Context) error {
-	if rctx.rce == nil {
+	if rctx.rcst == nil {
 		return errTransactionComplete
 	}
 
 	var err error
 	if rctx.delta != nil {
-		err = rctx.rce.commit(ctx, rctx.ver, rctx.delta)
+		err = rctx.rcst.commit(ctx, rctx.ver, rctx.delta)
 	}
 
-	rctx.rce = nil
+	rctx.rcst = nil
 	rctx.tree = nil
 	rctx.delta = nil
 	return err
 }
 
 func (rctx *transaction) Rollback() error {
-	if rctx.rce == nil {
+	if rctx.rcst == nil {
 		return errTransactionComplete
 	}
 
-	rctx.rce = nil
+	rctx.rcst = nil
 	rctx.tree = nil
 	rctx.delta = nil
 	return nil

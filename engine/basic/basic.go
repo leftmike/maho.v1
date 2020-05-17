@@ -22,13 +22,13 @@ var (
 	errTransactionComplete = errors.New("basic: transaction already completed")
 )
 
-type basicEngine struct {
+type basicStore struct {
 	mutex sync.Mutex
 	tree  *btree.BTree
 }
 
 type transaction struct {
-	be   *basicEngine
+	bst  *basicStore
 	tree *btree.BTree
 }
 
@@ -44,9 +44,9 @@ type tableDef struct {
 }
 
 type table struct {
-	be *basicEngine
-	tx *transaction
-	td *tableDef
+	bst *basicStore
+	tx  *transaction
+	td  *tableDef
 }
 
 type rowItem struct {
@@ -63,10 +63,10 @@ type rows struct {
 }
 
 func NewEngine(dataDir string) (engine.Engine, error) {
-	be := &basicEngine{
+	bst := &basicStore{
 		tree: btree.New(16),
 	}
-	me, err := mideng.NewEngine("basic", be, true)
+	me, err := mideng.NewEngine("basic", bst, true)
 	if err != nil {
 		return nil, err
 	}
@@ -77,9 +77,9 @@ func NewEngine(dataDir string) (engine.Engine, error) {
 func (td *tableDef) Table(ctx context.Context, tx engine.Transaction) (engine.Table, error) {
 	etx := tx.(*transaction)
 	return &table{
-		be: etx.be,
-		tx: etx,
-		td: td,
+		bst: etx.bst,
+		tx:  etx,
+		td:  td,
 	}, nil
 }
 
@@ -124,7 +124,7 @@ func (td *tableDef) Encode() ([]byte, error) {
 	return buf.Bytes(), nil
 }
 
-func (be *basicEngine) DecodeTableDef(tn sql.TableName, mid int64, buf []byte) (mideng.TableDef,
+func (bst *basicStore) DecodeTableDef(tn sql.TableName, mid int64, buf []byte) (mideng.TableDef,
 	error) {
 
 	dec := gob.NewDecoder(bytes.NewReader(buf))
@@ -165,10 +165,10 @@ func (be *basicEngine) DecodeTableDef(tn sql.TableName, mid int64, buf []byte) (
 		return nil, err
 	}
 
-	return be.MakeTableDef(tn, mid, cols, colTypes, primary)
+	return bst.MakeTableDef(tn, mid, cols, colTypes, primary)
 }
 
-func (_ *basicEngine) MakeTableDef(tn sql.TableName, mid int64, cols []sql.Identifier,
+func (_ *basicStore) MakeTableDef(tn sql.TableName, mid int64, cols []sql.Identifier,
 	colTypes []sql.ColumnType, primary []engine.ColumnKey) (mideng.TableDef, error) {
 
 	if len(primary) == 0 {
@@ -212,33 +212,33 @@ func (_ *basicEngine) MakeTableDef(tn sql.TableName, mid int64, cols []sql.Ident
 	return &td, nil
 }
 
-func (be *basicEngine) Begin(sesid uint64) engine.Transaction {
-	be.mutex.Lock()
+func (bst *basicStore) Begin(sesid uint64) engine.Transaction {
+	bst.mutex.Lock()
 	return &transaction{
-		be:   be,
-		tree: be.tree,
+		bst:  bst,
+		tree: bst.tree,
 	}
 }
 
 func (btx *transaction) Commit(ctx context.Context) error {
-	if btx.be == nil {
+	if btx.bst == nil {
 		return errTransactionComplete
 	}
 
-	btx.be.tree = btx.tree
-	btx.be.mutex.Unlock()
-	btx.be = nil
+	btx.bst.tree = btx.tree
+	btx.bst.mutex.Unlock()
+	btx.bst = nil
 	btx.tree = nil
 	return nil
 }
 
 func (btx *transaction) Rollback() error {
-	if btx.be == nil {
+	if btx.bst == nil {
 		return errTransactionComplete
 	}
 
-	btx.be.mutex.Unlock()
-	btx.be = nil
+	btx.bst.mutex.Unlock()
+	btx.bst = nil
 	btx.tree = nil
 	return nil
 }
@@ -246,8 +246,8 @@ func (btx *transaction) Rollback() error {
 func (_ *transaction) NextStmt() {}
 
 func (btx *transaction) forWrite() {
-	if btx.tree == btx.be.tree {
-		btx.tree = btx.be.tree.Clone()
+	if btx.tree == btx.bst.tree {
+		btx.tree = btx.bst.tree.Clone()
 	}
 }
 
