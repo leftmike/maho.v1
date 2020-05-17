@@ -29,14 +29,16 @@ func TestRowCols(t *testing.T) {
 }
 
 func TestDurability(t *testing.T) {
-	test.RunDurabilityTest(t,
-		func() error {
-			return testutil.CleanDir("testdata", []string{".gitignore"})
-		})
+	err := testutil.CleanDir("testdata", []string{".gitignore"})
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	test.DurableTableLifecycleTest(t)
 }
 
-func TestDurabilityHelper(t *testing.T) {
-	test.DurabilityHelper(t,
+func TestDurableHelper(t *testing.T) {
+	test.DurableHelper(t,
 		func() (engine.Engine, error) {
 			e, err := rowcols.NewEngine("testdata")
 			if err != nil {

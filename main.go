@@ -13,6 +13,8 @@ To Do:
 - indexes: basic
 - get rid of memrows and use basic instead; engine/service might no longer be necessary?
 
+- testeng.RunNextStmtTest: fix for basic and rowcols
+
 - rowcols: add write ahead log
 
 - init system tables into schemas and tables
