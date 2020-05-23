@@ -14,14 +14,15 @@ import (
 type virtualEngine struct {
 	mutex        sync.RWMutex
 	e            engine.Engine
-	systemTables map[sql.TableName]engine.MakeVirtual
-	infoTables   map[sql.Identifier]engine.MakeVirtual
+	systemTables map[sql.Identifier]engine.MakeVirtual
+	// XXX: change to *.virtual.* rather than infoschema?
+	infoTables map[sql.Identifier]engine.MakeVirtual
 }
 
 func NewEngine(e engine.Engine) engine.Engine {
 	ve := &virtualEngine{
 		e:            e,
-		systemTables: map[sql.TableName]engine.MakeVirtual{},
+		systemTables: map[sql.Identifier]engine.MakeVirtual{},
 		infoTables:   map[sql.Identifier]engine.MakeVirtual{},
 	}
 
@@ -40,11 +41,10 @@ func (ve *virtualEngine) CreateSystemTable(tblname sql.Identifier, maker engine.
 	ve.mutex.Lock()
 	defer ve.mutex.Unlock()
 
-	tn := sql.TableName{sql.SYSTEM, sql.PUBLIC, tblname}
-	if _, ok := ve.systemTables[tn]; ok {
-		panic(fmt.Sprintf("system table already created: %s", tn))
+	if _, ok := ve.systemTables[tblname]; ok {
+		panic(fmt.Sprintf("system table already created: %s", tblname))
 	}
-	ve.systemTables[tn] = maker
+	ve.systemTables[tblname] = maker
 }
 
 func (ve *virtualEngine) CreateInfoTable(tblname sql.Identifier, maker engine.MakeVirtual) {
@@ -104,13 +104,18 @@ func (ve *virtualEngine) LookupTable(ctx context.Context, tx engine.Transaction,
 	defer ve.mutex.RUnlock()
 
 	if tn.Database == sql.SYSTEM {
-		if maker, ok := ve.systemTables[tn]; ok {
-			return maker(ctx, tx, tn)
+		switch tn.Schema { // XXX: test both of them once move to *.virtual.* instead of info_schema
+		case sql.VIRTUAL:
+			if maker, ok := ve.systemTables[tn.Table]; ok {
+				return maker(ctx, tx, tn)
+			}
+		case sql.INFORMATION_SCHEMA:
+			if maker, ok := ve.infoTables[tn.Table]; ok {
+				return maker(ctx, tx, tn)
+			}
+		default:
+			return ve.e.LookupTable(ctx, tx, tn)
 		}
-		if maker, ok := ve.infoTables[tn.Table]; ok && tn.Schema == sql.INFORMATION_SCHEMA {
-			return maker(ctx, tx, tn)
-		}
-		// XXX: should this fall through to ve.e.LookupTable?
 		return nil, fmt.Errorf("virtual: table %s not found", tn)
 	}
 	if maker, ok := ve.infoTables[tn.Table]; ok && tn.Schema == sql.INFORMATION_SCHEMA {
@@ -273,7 +278,7 @@ func (ve *virtualEngine) listSchemas(ctx context.Context, tx engine.Transaction,
 	dbname sql.Identifier) ([]sql.Identifier, error) {
 
 	if dbname == sql.SYSTEM {
-		return []sql.Identifier{sql.INFORMATION_SCHEMA, sql.PUBLIC}, nil
+		return []sql.Identifier{sql.INFORMATION_SCHEMA, sql.VIRTUAL}, nil
 	}
 
 	scnames, err := ve.e.ListSchemas(ctx, tx, dbname)
@@ -317,9 +322,9 @@ func (ve *virtualEngine) listTables(ctx context.Context, tx engine.Transaction,
 		for tblname := range ve.infoTables {
 			tblnames = append(tblnames, tblname)
 		}
-	} else if sn.Database == sql.SYSTEM {
-		for tn := range ve.systemTables {
-			tblnames = append(tblnames, tn.Table)
+	} else if sn.Database == sql.SYSTEM && sn.Schema == sql.VIRTUAL {
+		for tblname := range ve.systemTables {
+			tblnames = append(tblnames, tblname)
 		}
 	} else {
 		return ve.e.ListTables(ctx, tx, sn)
@@ -443,17 +448,23 @@ func (ve *virtualEngine) makeDatabasesTable(ctx context.Context, tx engine.Trans
 		return nil, err
 	}
 
-	values := [][]sql.Value{
-		[]sql.Value{
-			sql.StringValue(sql.SYSTEM.String()),
-		},
-	}
-
+	var found bool
+	var values [][]sql.Value
 	for _, dbname := range dbnames {
 		values = append(values, []sql.Value{
 			sql.StringValue(dbname.String()),
 		})
+		if dbname == sql.SYSTEM {
+			found = true
+		}
 	}
+	if !found {
+		values = append(values,
+			[]sql.Value{
+				sql.StringValue(sql.SYSTEM.String()),
+			})
+	}
+
 	return MakeTable(tn, []sql.Identifier{sql.ID("database")}, []sql.ColumnType{sql.IdColType},
 		values), nil
 

@@ -1249,7 +1249,7 @@ func (p *parser) parseShow() evaluate.Stmt {
 			From: query.FromTableAlias{
 				TableName: sql.TableName{
 					Database: sql.SYSTEM,
-					Schema:   sql.PUBLIC,
+					Schema:   sql.VIRTUAL,
 					Table:    sql.DATABASES,
 				},
 			},

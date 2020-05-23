@@ -22,11 +22,11 @@ const (
 )
 
 var (
-	sequencesTableName = sql.TableName{sql.ID("system"), sql.ID("private"), sql.ID("sequences")}
-	databasesTableName = sql.TableName{sql.ID("system"), sql.ID("private"), sql.ID("databases")}
-	schemasTableName   = sql.TableName{sql.ID("system"), sql.ID("private"), sql.ID("schemas")}
-	tablesTableName    = sql.TableName{sql.ID("system"), sql.ID("private"), sql.ID("tables")}
-	indexesTableName   = sql.TableName{sql.ID("system"), sql.ID("private"), sql.ID("indexes")}
+	sequencesTableName = sql.TableName{sql.SYSTEM, sql.PRIVATE, sql.SEQUENCES}
+	databasesTableName = sql.TableName{sql.SYSTEM, sql.PRIVATE, sql.DATABASES}
+	schemasTableName   = sql.TableName{sql.SYSTEM, sql.PRIVATE, sql.SCHEMAS}
+	tablesTableName    = sql.TableName{sql.SYSTEM, sql.PRIVATE, sql.TABLES}
+	indexesTableName   = sql.TableName{sql.SYSTEM, sql.PRIVATE, sql.INDEXES}
 )
 
 type sequenceRow struct {
@@ -144,6 +144,7 @@ func NewEngine(name string, st store, init bool) (engine.Engine, error) {
 			return nil, err
 		}
 	}
+
 	return me, nil
 }
 
@@ -161,12 +162,67 @@ func (me *midEngine) init(ctx context.Context, tx engine.Transaction) error {
 		return err
 	}
 	ttbl := util.MakeTypedTable(sequencesTableName, tbl)
-
-	return ttbl.Insert(ctx,
+	err = ttbl.Insert(ctx,
 		sequenceRow{
 			Sequence: midSequence,
 			Current:  2048,
 		})
+	if err != nil {
+		return err
+	}
+
+	tbl, err = me.databases.Table(ctx, tx)
+	if err != nil {
+		return err
+	}
+	ttbl = util.MakeTypedTable(databasesTableName, tbl)
+	err = ttbl.Insert(ctx,
+		databaseRow{
+			Database: sql.SYSTEM.String(),
+		})
+	if err != nil {
+		return err
+	}
+
+	tbl, err = me.schemas.Table(ctx, tx)
+	if err != nil {
+		return err
+	}
+	ttbl = util.MakeTypedTable(schemasTableName, tbl)
+	err = ttbl.Insert(ctx,
+		schemaRow{
+			Database: sql.SYSTEM.String(),
+			Schema:   sql.PRIVATE.String(),
+			Tables:   0,
+		})
+	if err != nil {
+		return err
+	}
+
+	err = me.createTable(ctx, tx, sequencesTableName, sequencesMID, me.sequences)
+	if err != nil {
+		return err
+	}
+	err = me.createTable(ctx, tx, databasesTableName, databasesMID, me.databases)
+	if err != nil {
+		return err
+	}
+
+	err = me.createTable(ctx, tx, schemasTableName, schemasMID, me.schemas)
+	if err != nil {
+		return err
+	}
+
+	err = me.createTable(ctx, tx, tablesTableName, tablesMID, me.tables)
+	if err != nil {
+		return err
+	}
+
+	err = me.createTable(ctx, tx, indexesTableName, indexesMID, me.indexes)
+	if err != nil {
+		return err
+	}
+
 	return nil
 }
 
@@ -454,6 +510,40 @@ func (me *midEngine) LookupTable(ctx context.Context, tx engine.Transaction,
 	return td.Table(ctx, tx)
 }
 
+func (me *midEngine) createTable(ctx context.Context, tx engine.Transaction, tn sql.TableName,
+	mid int64, td TableDef) error {
+
+	err := me.updateSchema(ctx, tx, tn.SchemaName(), 1)
+	if err != nil {
+		return err
+	}
+
+	md, err := td.Encode()
+	if err != nil {
+		return err
+	}
+
+	tbl, err := me.tables.Table(ctx, tx)
+	if err != nil {
+		return err
+	}
+	ttbl := util.MakeTypedTable(tablesTableName, tbl)
+
+	err = ttbl.Insert(ctx,
+		tableRow{
+			Database: tn.Database.String(),
+			Schema:   tn.Schema.String(),
+			Table:    tn.Table.String(),
+			MID:      mid,
+			Metadata: md,
+		})
+	if err != nil {
+		return err
+	}
+
+	return nil
+}
+
 func (me *midEngine) CreateTable(ctx context.Context, tx engine.Transaction, tn sql.TableName,
 	cols []sql.Identifier, colTypes []sql.ColumnType, primary []engine.ColumnKey,
 	ifNotExists bool) error {
@@ -491,11 +581,6 @@ func (me *midEngine) CreateTable(ctx context.Context, tx engine.Transaction, tn 
 		return fmt.Errorf("%s: table %s already exists", me.name, tn)
 	}
 
-	err = me.updateSchema(ctx, tx, tn.SchemaName(), 1)
-	if err != nil {
-		return err
-	}
-
 	mid, err := me.nextSequenceValue(ctx, tx, midSequence)
 	if err != nil {
 		return err
@@ -505,30 +590,8 @@ func (me *midEngine) CreateTable(ctx context.Context, tx engine.Transaction, tn 
 	if err != nil {
 		return err
 	}
-	md, err := td.Encode()
-	if err != nil {
-		return err
-	}
 
-	tbl, err := me.tables.Table(ctx, tx)
-	if err != nil {
-		return err
-	}
-	ttbl := util.MakeTypedTable(tablesTableName, tbl)
-
-	err = ttbl.Insert(ctx,
-		tableRow{
-			Database: tn.Database.String(),
-			Schema:   tn.Schema.String(),
-			Table:    tn.Table.String(),
-			MID:      mid,
-			Metadata: md,
-		})
-	if err != nil {
-		return err
-	}
-
-	return nil
+	return me.createTable(ctx, tx, tn, mid, td)
 }
 
 func (me *midEngine) DropTable(ctx context.Context, tx engine.Transaction, tn sql.TableName,

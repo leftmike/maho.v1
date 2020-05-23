@@ -23,6 +23,7 @@ const (
 	COUNT_ALL
 	DATABASES
 	DOUBLE
+	INDEXES
 	INFORMATION_SCHEMA
 	INT
 	INT2
@@ -30,17 +31,20 @@ const (
 	INT8
 	INTEGER
 	PATH
+	PRIVATE
 	PUBLIC
 	PRECISION
 	REAL
 	SCHEMAS
 	SCHEMATA
+	SEQUENCES
 	SMALLINT
 	SYSTEM
 	TABLES
 	TEXT
 	VARBINARY
 	VARCHAR
+	VIRTUAL
 )
 
 const (
@@ -105,12 +109,16 @@ var knownIdentifiers = map[string]Identifier{
 	"count":              COUNT,
 	"count_all":          COUNT_ALL,
 	"databases":          DATABASES,
+	"indexes":            INDEXES,
 	"information_schema": INFORMATION_SCHEMA,
+	"private":            PRIVATE,
 	"public":             PUBLIC,
 	"schemas":            SCHEMAS,
 	"schemata":           SCHEMATA,
+	"sequences":          SEQUENCES,
 	"system":             SYSTEM,
 	"tables":             TABLES,
+	"virtual":            VIRTUAL,
 }
 
 var knownKeywords = map[string]struct {

@@ -15,10 +15,11 @@ To Do:
 
 - testeng.RunNextStmtTest: fix for basic and rowcols
 
-- rowcols: add write ahead log
+- virtual: prevent modification of system.virtual.* and *.virtual.*
 
-- init system tables into schemas and tables
-- system database and virtualEngine: should LookupTable fall through?
+- rowcols
+-- add write ahead log
+-- snapshot store and truncate WAL
 
 - [CONSTRAINT constraint]
 - CHECK '(' logical_expression ')'
@@ -212,10 +213,25 @@ func main() {
 		DefaultDatabase: sql.ID(*database),
 	}
 
-	err = e.CreateDatabase(sql.ID(*database), nil)
-	if err != nil {
-		fmt.Fprintf(os.Stderr, "maho: %s: %s\n", *database, err)
-		return
+	tx := e.Begin(0)
+	dbs, err := e.ListDatabases(context.Background(), tx)
+	tx.Rollback()
+
+	defaultDB := sql.ID(*database)
+	var found bool
+	for _, db := range dbs {
+		if db == defaultDB {
+			found = true
+			break
+		}
+	}
+
+	if !found {
+		err = e.CreateDatabase(defaultDB, nil)
+		if err != nil {
+			fmt.Fprintf(os.Stderr, "maho: %s: %s\n", defaultDB, err)
+			return
+		}
 	}
 
 	for idx, arg := range sqlArgs {
