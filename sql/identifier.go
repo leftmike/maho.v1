@@ -24,19 +24,19 @@ const (
 	DATABASES
 	DOUBLE
 	INDEXES
-	INFORMATION_SCHEMA
+	INFO
 	INT
 	INT2
 	INT4
 	INT8
 	INTEGER
+	METADATA
 	PATH
 	PRIVATE
 	PUBLIC
 	PRECISION
 	REAL
 	SCHEMAS
-	SCHEMATA
 	SEQUENCES
 	SMALLINT
 	SYSTEM
@@ -44,7 +44,6 @@ const (
 	TEXT
 	VARBINARY
 	VARCHAR
-	VIRTUAL
 )
 
 const (
@@ -105,20 +104,19 @@ const (
 )
 
 var knownIdentifiers = map[string]Identifier{
-	"columns":            COLUMNS,
-	"count":              COUNT,
-	"count_all":          COUNT_ALL,
-	"databases":          DATABASES,
-	"indexes":            INDEXES,
-	"information_schema": INFORMATION_SCHEMA,
-	"private":            PRIVATE,
-	"public":             PUBLIC,
-	"schemas":            SCHEMAS,
-	"schemata":           SCHEMATA,
-	"sequences":          SEQUENCES,
-	"system":             SYSTEM,
-	"tables":             TABLES,
-	"virtual":            VIRTUAL,
+	"columns":   COLUMNS,
+	"count":     COUNT,
+	"count_all": COUNT_ALL,
+	"databases": DATABASES,
+	"indexes":   INDEXES,
+	"info":      INFO,
+	"metadata":  METADATA,
+	"private":   PRIVATE,
+	"public":    PUBLIC,
+	"schemas":   SCHEMAS,
+	"sequences": SEQUENCES,
+	"system":    SYSTEM,
+	"tables":    TABLES,
 }
 
 var knownKeywords = map[string]struct {

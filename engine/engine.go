@@ -40,8 +40,8 @@ func (ck ColumnKey) Number() int {
 }
 
 type Engine interface {
-	CreateSystemTable(tblname sql.Identifier, maker MakeVirtual)
-	CreateInfoTable(tblname sql.Identifier, maker MakeVirtual)
+	CreateSystemInfoTable(tblname sql.Identifier, maker MakeVirtual)
+	CreateMetadataTable(tblname sql.Identifier, maker MakeVirtual)
 
 	CreateDatabase(dbname sql.Identifier, options Options) error
 	DropDatabase(dbname sql.Identifier, ifExists bool, options Options) error

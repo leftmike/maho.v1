@@ -109,7 +109,7 @@ type LockService struct {
 func (svc *LockService) Init(e engine.Engine) {
 	svc.objects = map[lockKey]*object{}
 	if e != nil {
-		e.CreateSystemTable(sql.ID("locks"), svc.makeLocksTable)
+		e.CreateSystemInfoTable(sql.ID("locks"), svc.makeLocksTable)
 	}
 }
 

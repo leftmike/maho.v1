@@ -1216,13 +1216,13 @@ func (p *parser) parseShow() evaluate.Stmt {
 		if tn.Schema == 0 {
 			schemaTest = &expr.Binary{
 				Op:    expr.EqualOp,
-				Left:  expr.Ref{sql.ID("table_schema")},
+				Left:  expr.Ref{sql.ID("schema_name")},
 				Right: expr.Stmt{&misc.Show{sql.SCHEMA}},
 			}
 		} else {
 			schemaTest = &expr.Binary{
 				Op:    expr.EqualOp,
-				Left:  expr.Ref{sql.ID("table_schema")},
+				Left:  expr.Ref{sql.ID("schema_name")},
 				Right: expr.StringLiteral(tn.Schema.String()),
 			}
 		}
@@ -1230,7 +1230,7 @@ func (p *parser) parseShow() evaluate.Stmt {
 			From: query.FromTableAlias{
 				TableName: sql.TableName{
 					Database: tn.Database,
-					Schema:   sql.INFORMATION_SCHEMA,
+					Schema:   sql.METADATA,
 					Table:    sql.COLUMNS,
 				},
 			},
@@ -1249,7 +1249,7 @@ func (p *parser) parseShow() evaluate.Stmt {
 			From: query.FromTableAlias{
 				TableName: sql.TableName{
 					Database: sql.SYSTEM,
-					Schema:   sql.VIRTUAL,
+					Schema:   sql.INFO,
 					Table:    sql.DATABASES,
 				},
 			},
@@ -1263,8 +1263,8 @@ func (p *parser) parseShow() evaluate.Stmt {
 			From: query.FromTableAlias{
 				TableName: sql.TableName{
 					Database: db,
-					Schema:   sql.INFORMATION_SCHEMA,
-					Table:    sql.SCHEMATA,
+					Schema:   sql.METADATA,
+					Table:    sql.SCHEMAS,
 				},
 			},
 		}
@@ -1276,13 +1276,13 @@ func (p *parser) parseShow() evaluate.Stmt {
 			sn = p.parseSchemaName()
 			where = &expr.Binary{
 				Op:    expr.EqualOp,
-				Left:  expr.Ref{sql.ID("table_schema")},
+				Left:  expr.Ref{sql.ID("schema_name")},
 				Right: expr.StringLiteral(sn.Schema.String()),
 			}
 		} else {
 			where = &expr.Binary{
 				Op:    expr.EqualOp,
-				Left:  expr.Ref{sql.ID("table_schema")},
+				Left:  expr.Ref{sql.ID("schema_name")},
 				Right: expr.Stmt{&misc.Show{sql.SCHEMA}},
 			}
 		}
@@ -1290,7 +1290,7 @@ func (p *parser) parseShow() evaluate.Stmt {
 			From: query.FromTableAlias{
 				TableName: sql.TableName{
 					Database: sn.Database,
-					Schema:   sql.INFORMATION_SCHEMA,
+					Schema:   sql.METADATA,
 					Table:    sql.TABLES,
 				},
 			},

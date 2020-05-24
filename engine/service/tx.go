@@ -36,7 +36,7 @@ func (ts *TransactionService) Init(e engine.Engine) {
 	ts.transactions = map[*Transaction]struct{}{}
 	ts.lockService.Init(e)
 	if e != nil {
-		e.CreateSystemTable(sql.ID("transactions"), ts.makeTransactionsTable)
+		e.CreateSystemInfoTable(sql.ID("transactions"), ts.makeTransactionsTable)
 	}
 }
 

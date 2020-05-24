@@ -12,49 +12,48 @@ import (
 )
 
 type virtualEngine struct {
-	mutex        sync.RWMutex
-	e            engine.Engine
-	systemTables map[sql.Identifier]engine.MakeVirtual
-	// XXX: change to *.virtual.* rather than infoschema?
-	infoTables map[sql.Identifier]engine.MakeVirtual
+	mutex            sync.RWMutex
+	e                engine.Engine
+	systemInfoTables map[sql.Identifier]engine.MakeVirtual
+	metadataTables   map[sql.Identifier]engine.MakeVirtual
 }
 
 func NewEngine(e engine.Engine) engine.Engine {
 	ve := &virtualEngine{
-		e:            e,
-		systemTables: map[sql.Identifier]engine.MakeVirtual{},
-		infoTables:   map[sql.Identifier]engine.MakeVirtual{},
+		e:                e,
+		systemInfoTables: map[sql.Identifier]engine.MakeVirtual{},
+		metadataTables:   map[sql.Identifier]engine.MakeVirtual{},
 	}
 
-	ve.CreateSystemTable(sql.ID("config"), makeConfigTable)
-	ve.CreateSystemTable(sql.DATABASES, ve.makeDatabasesTable)
-	ve.CreateSystemTable(sql.ID("identifiers"), makeIdentifiersTable)
+	ve.CreateSystemInfoTable(sql.ID("config"), makeConfigTable)
+	ve.CreateSystemInfoTable(sql.DATABASES, ve.makeDatabasesTable)
+	ve.CreateSystemInfoTable(sql.ID("identifiers"), makeIdentifiersTable)
 
-	ve.CreateInfoTable(sql.COLUMNS, ve.makeColumnsTable)
-	ve.CreateInfoTable(sql.SCHEMATA, ve.makeSchemataTable)
-	ve.CreateInfoTable(sql.TABLES, ve.makeTablesTable)
+	ve.CreateMetadataTable(sql.COLUMNS, ve.makeColumnsTable)
+	ve.CreateMetadataTable(sql.SCHEMAS, ve.makeSchemasTable)
+	ve.CreateMetadataTable(sql.TABLES, ve.makeTablesTable)
 
 	return ve
 }
 
-func (ve *virtualEngine) CreateSystemTable(tblname sql.Identifier, maker engine.MakeVirtual) {
+func (ve *virtualEngine) CreateSystemInfoTable(tblname sql.Identifier, maker engine.MakeVirtual) {
 	ve.mutex.Lock()
 	defer ve.mutex.Unlock()
 
-	if _, ok := ve.systemTables[tblname]; ok {
-		panic(fmt.Sprintf("system table already created: %s", tblname))
+	if _, ok := ve.systemInfoTables[tblname]; ok {
+		panic(fmt.Sprintf("system info table already created: %s", tblname))
 	}
-	ve.systemTables[tblname] = maker
+	ve.systemInfoTables[tblname] = maker
 }
 
-func (ve *virtualEngine) CreateInfoTable(tblname sql.Identifier, maker engine.MakeVirtual) {
+func (ve *virtualEngine) CreateMetadataTable(tblname sql.Identifier, maker engine.MakeVirtual) {
 	ve.mutex.Lock()
 	defer ve.mutex.Unlock()
 
-	if _, ok := ve.infoTables[tblname]; ok {
-		panic(fmt.Sprintf("information table already created: %s", tblname))
+	if _, ok := ve.metadataTables[tblname]; ok {
+		panic(fmt.Sprintf("metadata table already created: %s", tblname))
 	}
-	ve.infoTables[tblname] = maker
+	ve.metadataTables[tblname] = maker
 }
 
 func (ve *virtualEngine) CreateDatabase(dbname sql.Identifier, options engine.Options) error {
@@ -79,7 +78,7 @@ func (ve *virtualEngine) CreateSchema(ctx context.Context, tx engine.Transaction
 	if sn.Database == sql.SYSTEM {
 		return fmt.Errorf("virtual: database %s may not be modified", sn.Database)
 	}
-	if sn.Schema == sql.INFORMATION_SCHEMA {
+	if sn.Schema == sql.METADATA {
 		return fmt.Errorf("virtual: schema %s already exists", sn)
 	}
 	return ve.e.CreateSchema(ctx, tx, sn)
@@ -91,7 +90,7 @@ func (ve *virtualEngine) DropSchema(ctx context.Context, tx engine.Transaction, 
 	if sn.Database == sql.SYSTEM {
 		return fmt.Errorf("virtual: database %s may not be modified", sn.Database)
 	}
-	if sn.Schema == sql.INFORMATION_SCHEMA {
+	if sn.Schema == sql.METADATA {
 		return fmt.Errorf("virtual: schema %s may not be dropped", sn)
 	}
 	return ve.e.DropSchema(ctx, tx, sn, ifExists)
@@ -103,24 +102,18 @@ func (ve *virtualEngine) LookupTable(ctx context.Context, tx engine.Transaction,
 	ve.mutex.RLock()
 	defer ve.mutex.RUnlock()
 
-	if tn.Database == sql.SYSTEM {
-		switch tn.Schema { // XXX: test both of them once move to *.virtual.* instead of info_schema
-		case sql.VIRTUAL:
-			if maker, ok := ve.systemTables[tn.Table]; ok {
-				return maker(ctx, tx, tn)
-			}
-		case sql.INFORMATION_SCHEMA:
-			if maker, ok := ve.infoTables[tn.Table]; ok {
-				return maker(ctx, tx, tn)
-			}
-		default:
-			return ve.e.LookupTable(ctx, tx, tn)
+	if tn.Schema == sql.METADATA {
+		if maker, ok := ve.metadataTables[tn.Table]; ok {
+			return maker(ctx, tx, tn)
+		}
+		return nil, fmt.Errorf("virtual: table %s not found", tn)
+	} else if tn.Database == sql.SYSTEM && tn.Schema == sql.INFO {
+		if maker, ok := ve.systemInfoTables[tn.Table]; ok {
+			return maker(ctx, tx, tn)
 		}
 		return nil, fmt.Errorf("virtual: table %s not found", tn)
 	}
-	if maker, ok := ve.infoTables[tn.Table]; ok && tn.Schema == sql.INFORMATION_SCHEMA {
-		return maker(ctx, tx, tn)
-	}
+
 	return ve.e.LookupTable(ctx, tx, tn)
 }
 
@@ -131,7 +124,7 @@ func (ve *virtualEngine) CreateTable(ctx context.Context, tx engine.Transaction,
 	if tn.Database == sql.SYSTEM {
 		return fmt.Errorf("virtual: database %s may not be modified", tn.Database)
 	}
-	if tn.Schema == sql.INFORMATION_SCHEMA {
+	if tn.Schema == sql.METADATA {
 		return fmt.Errorf("virtual: schema %s may not be modified", tn.Schema)
 	}
 	return ve.e.CreateTable(ctx, tx, tn, cols, colTypes, primary, ifNotExists)
@@ -143,7 +136,7 @@ func (ve *virtualEngine) DropTable(ctx context.Context, tx engine.Transaction, t
 	if tn.Database == sql.SYSTEM {
 		return fmt.Errorf("virtual: database %s may not be modified", tn.Database)
 	}
-	if tn.Schema == sql.INFORMATION_SCHEMA {
+	if tn.Schema == sql.METADATA {
 		return fmt.Errorf("virtual: schema %s may not be modified", tn.Schema)
 	}
 	return ve.e.DropTable(ctx, tx, tn, ifExists)
@@ -156,7 +149,7 @@ func (ve *virtualEngine) CreateIndex(ctx context.Context, tx engine.Transaction,
 	if tn.Database == sql.SYSTEM {
 		return fmt.Errorf("virtual: database %s may not be modified", tn.Database)
 	}
-	if tn.Schema == sql.INFORMATION_SCHEMA {
+	if tn.Schema == sql.METADATA {
 		return fmt.Errorf("virtual: schema %s may not be modified", tn.Schema)
 	}
 	return ve.e.CreateIndex(ctx, tx, idxname, tn, unique, keys, ifNotExists)
@@ -168,7 +161,7 @@ func (ve *virtualEngine) DropIndex(ctx context.Context, tx engine.Transaction,
 	if tn.Database == sql.SYSTEM {
 		return fmt.Errorf("virtual: database %s may not be modified", tn.Database)
 	}
-	if tn.Schema == sql.INFORMATION_SCHEMA {
+	if tn.Schema == sql.METADATA {
 		return fmt.Errorf("virtual: schema %s may not be modified", tn.Schema)
 	}
 	return ve.e.DropIndex(ctx, tx, idxname, tn, ifExists)
@@ -278,17 +271,34 @@ func (ve *virtualEngine) listSchemas(ctx context.Context, tx engine.Transaction,
 	dbname sql.Identifier) ([]sql.Identifier, error) {
 
 	if dbname == sql.SYSTEM {
-		return []sql.Identifier{sql.INFORMATION_SCHEMA, sql.VIRTUAL}, nil
+		dbnames, err := ve.e.ListDatabases(ctx, tx)
+		if err != nil {
+			return nil, err
+		}
+
+		var found bool
+		for _, dbname := range dbnames {
+			if dbname == sql.SYSTEM {
+				found = true
+			}
+		}
+		if !found {
+			return []sql.Identifier{sql.METADATA, sql.INFO}, nil
+		}
 	}
 
 	scnames, err := ve.e.ListSchemas(ctx, tx, dbname)
 	if err != nil {
 		return nil, err
 	}
-	return append(scnames, sql.INFORMATION_SCHEMA), nil
+	scnames = append(scnames, sql.METADATA)
+	if dbname == sql.SYSTEM {
+		scnames = append(scnames, sql.INFO)
+	}
+	return scnames, nil
 }
 
-func (ve *virtualEngine) makeSchemataTable(ctx context.Context, tx engine.Transaction,
+func (ve *virtualEngine) makeSchemasTable(ctx context.Context, tx engine.Transaction,
 	tn sql.TableName) (engine.Table, error) {
 
 	ve.mutex.RLock()
@@ -309,28 +319,27 @@ func (ve *virtualEngine) makeSchemataTable(ctx context.Context, tx engine.Transa
 	}
 
 	return MakeTable(tn,
-		[]sql.Identifier{sql.ID("catalog_name"), sql.ID("schema_name")},
+		[]sql.Identifier{sql.ID("database_name"), sql.ID("schema_name")},
 		[]sql.ColumnType{sql.IdColType, sql.IdColType}, values), nil
 }
 
 func (ve *virtualEngine) listTables(ctx context.Context, tx engine.Transaction,
 	sn sql.SchemaName) ([]sql.Identifier, error) {
 
-	var tblnames []sql.Identifier
-
-	if sn.Schema == sql.INFORMATION_SCHEMA {
-		for tblname := range ve.infoTables {
+	if sn.Schema == sql.METADATA {
+		var tblnames []sql.Identifier
+		for tblname := range ve.metadataTables {
 			tblnames = append(tblnames, tblname)
 		}
-	} else if sn.Database == sql.SYSTEM && sn.Schema == sql.VIRTUAL {
-		for tblname := range ve.systemTables {
+		return tblnames, nil
+	} else if sn.Database == sql.SYSTEM && sn.Schema == sql.INFO {
+		var tblnames []sql.Identifier
+		for tblname := range ve.systemInfoTables {
 			tblnames = append(tblnames, tblname)
 		}
-	} else {
-		return ve.e.ListTables(ctx, tx, sn)
+		return tblnames, nil
 	}
-
-	return tblnames, nil
+	return ve.e.ListTables(ctx, tx, sn)
 }
 
 func (ve *virtualEngine) makeTablesTable(ctx context.Context, tx engine.Transaction,
@@ -362,14 +371,14 @@ func (ve *virtualEngine) makeTablesTable(ctx context.Context, tx engine.Transact
 	}
 
 	return MakeTable(tn,
-		[]sql.Identifier{sql.ID("table_catalog"), sql.ID("table_schema"), sql.ID("table_name")},
+		[]sql.Identifier{sql.ID("database_name"), sql.ID("schema_name"), sql.ID("table_name")},
 		[]sql.ColumnType{sql.IdColType, sql.IdColType}, values), nil
 }
 
 var (
-	columnsColumns = []sql.Identifier{sql.ID("table_catalog"), sql.ID("table_schema"),
-		sql.ID("table_name"), sql.ID("column_name"), sql.ID("ordinal_position"),
-		sql.ID("column_default"), sql.ID("is_nullable"), sql.ID("data_type"),
+	columnsColumns = []sql.Identifier{sql.ID("database_name"), sql.ID("schema_name"),
+		sql.ID("table_name"), sql.ID("column_name"), sql.ID("position"), sql.ID("default"),
+		sql.ID("is_nullable"), sql.ID("data_type"),
 	}
 	columnsColumnTypes = []sql.ColumnType{sql.IdColType, sql.IdColType, sql.IdColType,
 		sql.IdColType, sql.Int32ColType, sql.NullStringColType, sql.StringColType,
@@ -425,7 +434,7 @@ func (ve *virtualEngine) makeColumnsTable(ctx context.Context, tx engine.Transac
 
 		for _, tblname := range tblnames {
 			ttn := sql.TableName{tn.Database, scname, tblname}
-			if scname == sql.INFORMATION_SCHEMA && tblname == sql.ID("columns") {
+			if scname == sql.METADATA && tblname == sql.ID("columns") {
 				values = appendColumns(values, ttn, columnsColumns, columnsColumnTypes)
 			} else {
 				tbl, err := ve.LookupTable(ctx, tx, ttn)

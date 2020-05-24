@@ -48,7 +48,7 @@ func (svr *Server) addSession(ses *evaluate.Session) {
 
 	if svr.sessions == nil {
 		svr.sessions = map[*evaluate.Session]struct{}{}
-		svr.Engine.CreateSystemTable(sql.ID("sessions"), svr.makeSessionsVirtual)
+		svr.Engine.CreateSystemInfoTable(sql.ID("sessions"), svr.makeSessionsVirtual)
 	}
 	svr.sessions[ses] = struct{}{}
 	svr.lastSessionID += 1

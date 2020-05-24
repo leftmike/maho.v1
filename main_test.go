@@ -16,32 +16,33 @@ import (
 	"github.com/leftmike/maho/testutil"
 )
 
-func testEngine(t *testing.T, e engine.Engine) {
-	cases := []struct {
-		s string
-		r string
-	}{
+type testCase struct {
+	s, r string
+}
+
+var (
+	commonCases = []testCase{
 		{`
-select * from information_schema.tables
-    where table_name != 'locks' and table_name != 'transactions'
+select * from metadata.tables
+    where table_name != 'locks' and table_name != 'transactions' and schema_name != 'private'
     order by table_name
 `,
-			`   table_catalog         table_schema    table_name
-   -------------         ------------    ----------
- 1      'system' 'information_schema'     'columns'
- 2      'system'            'virtual'      'config'
- 3      'system'            'virtual'   'databases'
- 4      'system'            'virtual' 'identifiers'
- 5      'system' 'information_schema'    'schemata'
- 6      'system' 'information_schema'      'tables'
+			`   database_name schema_name    table_name
+   ------------- -----------    ----------
+ 1      'system'  'metadata'     'columns'
+ 2      'system'      'info'      'config'
+ 3      'system'      'info'   'databases'
+ 4      'system'      'info' 'identifiers'
+ 5      'system'  'metadata'     'schemas'
+ 6      'system'  'metadata'      'tables'
 (6 rows)
 `},
-		{"select table_schema, table_name, column_name from (show columns from identifiers) as c",
-			`   table_schema    table_name column_name
-   ------------    ---------- -----------
- 1    'virtual' 'identifiers'      'name'
- 2    'virtual' 'identifiers'        'id'
- 3    'virtual' 'identifiers'  'reserved'
+		{"select schema_name, table_name, column_name from (show columns from identifiers) as c",
+			`   schema_name    table_name column_name
+   -----------    ---------- -----------
+ 1      'info' 'identifiers'      'name'
+ 2      'info' 'identifiers'        'id'
+ 3      'info' 'identifiers'  'reserved'
 (3 rows)
 `},
 		{"show database",
@@ -57,34 +58,79 @@ select * from information_schema.tables
 (1 rows)
 `},
 		{"show schema",
-			`      SCHEMA
-      ------
- 1 'virtual'
+			`   SCHEMA
+   ------
+ 1 'info'
 (1 rows)
 `},
-		{"show schemas",
-			`   catalog_name          schema_name
-   ------------          -----------
- 1     'system' 'information_schema'
- 2     'system'            'virtual'
-(2 rows)
-`},
-		{"select * from (show tables from information_schema) as c order by table_name",
-			`   table_catalog         table_schema table_name
-   -------------         ------------ ----------
- 1      'system' 'information_schema'  'columns'
- 2      'system' 'information_schema' 'schemata'
- 3      'system' 'information_schema'   'tables'
+		{"select * from (show tables from metadata) as c order by table_name",
+			`   database_name schema_name table_name
+   ------------- ----------- ----------
+ 1      'system'  'metadata'  'columns'
+ 2      'system'  'metadata'  'schemas'
+ 3      'system'  'metadata'   'tables'
 (3 rows)
 `},
 	}
 
+	memrowsCases = []testCase{
+		{"show schemas",
+			`   database_name schema_name
+   ------------- -----------
+ 1      'system'  'metadata'
+ 2      'system'      'info'
+(2 rows)
+`},
+		{"select * from metadata.tables order by table_name",
+			`   database_name schema_name     table_name
+   ------------- -----------     ----------
+ 1      'system'  'metadata'      'columns'
+ 2      'system'      'info'       'config'
+ 3      'system'      'info'    'databases'
+ 4      'system'      'info'  'identifiers'
+ 5      'system'      'info'        'locks'
+ 6      'system'  'metadata'      'schemas'
+ 7      'system'  'metadata'       'tables'
+ 8      'system'      'info' 'transactions'
+(8 rows)
+`},
+	}
+
+	midCases = []testCase{
+		{"show schemas",
+			`   database_name schema_name
+   ------------- -----------
+ 1      'system'   'private'
+ 2      'system'  'metadata'
+ 3      'system'      'info'
+(3 rows)
+`},
+		{"select * from metadata.tables order by table_name, schema_name",
+			`    database_name schema_name    table_name
+    ------------- -----------    ----------
+  1      'system'  'metadata'     'columns'
+  2      'system'      'info'      'config'
+  3      'system'      'info'   'databases'
+  4      'system'   'private'   'databases'
+  5      'system'      'info' 'identifiers'
+  6      'system'   'private'     'indexes'
+  7      'system'  'metadata'     'schemas'
+  8      'system'   'private'     'schemas'
+  9      'system'   'private'   'sequences'
+ 10      'system'  'metadata'      'tables'
+ 11      'system'   'private'      'tables'
+(11 rows)
+`},
+	}
+)
+
+func testEngine(t *testing.T, e engine.Engine, cases []testCase) {
 	for i, c := range cases {
 		var b bytes.Buffer
 		ses := &evaluate.Session{
 			Engine:          e,
 			DefaultDatabase: sql.SYSTEM,
-			DefaultSchema:   sql.VIRTUAL,
+			DefaultSchema:   sql.INFO,
 		}
 		replSQL(ses, parser.NewParser(strings.NewReader(c.s), fmt.Sprintf("cases[%d]", i)), &b)
 		if b.String() != c.r {
@@ -98,13 +144,15 @@ func TestMain(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	testEngine(t, e)
+	testEngine(t, e, commonCases)
+	testEngine(t, e, midCases)
 
 	e, err = memrows.NewEngine("testdata")
 	if err != nil {
 		t.Fatal(err)
 	}
-	testEngine(t, e)
+	testEngine(t, e, commonCases)
+	testEngine(t, e, memrowsCases)
 
 	err = testutil.CleanDir("testdata", []string{".gitignore"})
 	if err != nil {
@@ -114,5 +162,6 @@ func TestMain(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	testEngine(t, e)
+	testEngine(t, e, commonCases)
+	testEngine(t, e, midCases)
 }

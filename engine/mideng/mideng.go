@@ -148,11 +148,11 @@ func NewEngine(name string, st store, init bool) (engine.Engine, error) {
 	return me, nil
 }
 
-func (me *midEngine) CreateSystemTable(tblname sql.Identifier, maker engine.MakeVirtual) {
+func (me *midEngine) CreateSystemInfoTable(tblname sql.Identifier, maker engine.MakeVirtual) {
 	panic(fmt.Sprintf("%s: use virtual engine with %s engine", me.name, me.name))
 }
 
-func (me *midEngine) CreateInfoTable(tblname sql.Identifier, maker engine.MakeVirtual) {
+func (me *midEngine) CreateMetadataTable(tblname sql.Identifier, maker engine.MakeVirtual) {
 	panic(fmt.Sprintf("%s: use virtual engine with %s engine", me.name, me.name))
 }
 

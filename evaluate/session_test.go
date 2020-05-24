@@ -22,12 +22,12 @@ type testTransaction struct {
 	nextStmtAllowed int
 }
 
-func (te *testEngine) CreateSystemTable(tblname sql.Identifier, maker engine.MakeVirtual) {
-	te.t.Error("CreateSystemTable should never be called")
+func (te *testEngine) CreateSystemInfoTable(tblname sql.Identifier, maker engine.MakeVirtual) {
+	te.t.Error("CreateSystemInfoTable should never be called")
 }
 
-func (te *testEngine) CreateInfoTable(tblname sql.Identifier, maker engine.MakeVirtual) {
-	te.t.Error("CreateInfoTable should never be called")
+func (te *testEngine) CreateMetadataTable(tblname sql.Identifier, maker engine.MakeVirtual) {
+	te.t.Error("CreateMetadataTable should never be called")
 }
 
 func (te *testEngine) CreateDatabase(dbname sql.Identifier, options engine.Options) error {

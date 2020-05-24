@@ -95,11 +95,11 @@ func NewEngine(dataDir string) (engine.Engine, error) {
 	return ve, nil
 }
 
-func (_ *memrowsEngine) CreateSystemTable(tblname sql.Identifier, maker engine.MakeVirtual) {
+func (_ *memrowsEngine) CreateSystemInfoTable(tblname sql.Identifier, maker engine.MakeVirtual) {
 	panic("memrows: use virtual engine with memrows engine")
 }
 
-func (_ *memrowsEngine) CreateInfoTable(tblname sql.Identifier, maker engine.MakeVirtual) {
+func (_ *memrowsEngine) CreateMetadataTable(tblname sql.Identifier, maker engine.MakeVirtual) {
 	panic("memrows: use virtual engine with memrows engine")
 }
 

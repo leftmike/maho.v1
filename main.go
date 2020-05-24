@@ -15,8 +15,6 @@ To Do:
 
 - testeng.RunNextStmtTest: fix for basic and rowcols
 
-- virtual: prevent modification of system.virtual.* and *.virtual.*
-
 - rowcols
 -- add write ahead log
 -- snapshot store and truncate WAL
