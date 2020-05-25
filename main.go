@@ -17,8 +17,6 @@ To Do:
 
 - MakeTableDef: basic and rowcols are identical
 
-- use testutil.FLN everywhere
-
 - rowcols
 -- add write ahead log
 -- snapshot store and truncate WAL

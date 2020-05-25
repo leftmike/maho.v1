@@ -4,9 +4,7 @@ import (
 	"context"
 	"fmt"
 	"io"
-	"path/filepath"
 	"reflect"
-	"runtime"
 	"sort"
 	"sync"
 	"testing"
@@ -44,28 +42,12 @@ const (
 	cmdDropDatabase
 )
 
-type fileLineNumber struct {
-	file string
-	line int
-}
-
-func (fln fileLineNumber) String() string {
-	if fln.file == "" || fln.line == 0 {
-		return ""
-	}
-	return fmt.Sprintf("%s:%d: ", filepath.Base(fln.file), fln.line)
-}
-
-func fln() fileLineNumber {
-	_, fn, ln, ok := runtime.Caller(1)
-	if !ok {
-		return fileLineNumber{}
-	}
-	return fileLineNumber{fn, ln}
+func fln() testutil.FileLineNumber {
+	return testutil.MakeFileLineNumber()
 }
 
 type engCmd struct {
-	fln      fileLineNumber
+	fln      testutil.FileLineNumber
 	cmd      int
 	tdx      int                // Which transaction to use
 	fail     bool               // The command should fail
@@ -92,7 +74,7 @@ var (
 )
 
 func allRows(t *testing.T, ctx context.Context, rows engine.Rows,
-	fln fileLineNumber) [][]sql.Value {
+	fln testutil.FileLineNumber) [][]sql.Value {
 
 	t.Helper()
 
