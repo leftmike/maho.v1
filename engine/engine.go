@@ -22,6 +22,7 @@ func MakeColumnKey(num int, reverse bool) ColumnKey {
 	if num < 0 {
 		panic("column numbers must be non-negative")
 	}
+	num += 1
 	if reverse {
 		return ColumnKey(-num)
 	}
@@ -34,9 +35,9 @@ func (ck ColumnKey) Reverse() bool {
 
 func (ck ColumnKey) Number() int {
 	if ck < 0 {
-		return int(-ck)
+		ck = -ck
 	}
-	return int(ck)
+	return int(ck - 1)
 }
 
 type Engine interface {

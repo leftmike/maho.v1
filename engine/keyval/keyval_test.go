@@ -4,7 +4,6 @@ import (
 	"path/filepath"
 	"testing"
 
-	"github.com/leftmike/maho/engine/keyval"
 	"github.com/leftmike/maho/testutil"
 )
 
@@ -15,11 +14,13 @@ func TestKeyVal(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	e, err := keyval.NewEngine(path)
-	if err != nil {
-		t.Fatal(err)
-	}
-	_ = e
+	/*
+		e, err := keyval.NewEngine(path)
+		if err != nil {
+			t.Fatal(err)
+		}
+		_ = e
+	*/
 	/*
 		test.RunDatabaseTest(t, e)
 		test.RunTableTest(t, e)
