@@ -10,10 +10,14 @@ To Do:
 - specify a subset of columns to return: Table.Rows(cols []int, ...)
 - Rows.NextColumns(ctx context.Context, destCols []sql.ColumnValue) error
 
-- indexes: basic
+- indexes: mideng (basic, rowcols, keyvals)
 - get rid of memrows and use basic instead; engine/service might no longer be necessary?
 
 - testeng.RunNextStmtTest: fix for basic and rowcols
+
+- MakeTableDef: basic and rowcols are identical
+
+- use testutil.FLN everywhere
 
 - rowcols
 -- add write ahead log

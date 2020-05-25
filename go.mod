@@ -4,6 +4,7 @@ go 1.14
 
 require (
 	github.com/andreyvit/diff v0.0.0-20170406064948-c7f18ee00883 // indirect
+	github.com/dgraph-io/badger v1.6.1
 	github.com/golang/protobuf v1.4.0
 	github.com/google/btree v1.0.0
 	github.com/hashicorp/hcl v1.0.0

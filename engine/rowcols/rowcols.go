@@ -14,6 +14,7 @@ import (
 
 	"github.com/golang/protobuf/proto"
 	"github.com/google/btree"
+
 	"github.com/leftmike/maho/engine"
 	"github.com/leftmike/maho/engine/mideng"
 	"github.com/leftmike/maho/engine/virtual"
@@ -228,6 +229,7 @@ func (rcst *rowColsStore) DecodeTableDef(tn sql.TableName, mid int64, buf []byte
 func (rcst *rowColsStore) Begin(sesid uint64) engine.Transaction {
 	rcst.mutex.Lock()
 	defer rcst.mutex.Unlock()
+
 	return &transaction{
 		rcst: rcst,
 		tree: rcst.tree.Clone(),
