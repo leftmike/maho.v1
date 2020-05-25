@@ -1,7 +1,5 @@
 package rowcols
 
-//go:generate protoc --go_opt=paths=source_relative --go_out=. metadata.proto
-
 import (
 	"context"
 	"errors"
@@ -9,16 +7,13 @@ import (
 	"io"
 	"os"
 	"path/filepath"
-	"strings"
 	"sync"
 
-	"github.com/golang/protobuf/proto"
 	"github.com/google/btree"
 
 	"github.com/leftmike/maho/engine"
 	"github.com/leftmike/maho/engine/mideng"
 	"github.com/leftmike/maho/engine/virtual"
-	"github.com/leftmike/maho/parser"
 	"github.com/leftmike/maho/sql"
 )
 
@@ -110,35 +105,16 @@ func (td *tableDef) Table(ctx context.Context, tx engine.Transaction) (engine.Ta
 
 }
 
-func (td *tableDef) Encode() ([]byte, error) {
-	var md TableMetadata
-	md.Columns = make([]*ColumnMetadata, 0, len(td.columns))
-	for cdx := range td.columns {
-		var dflt string
-		if td.columnTypes[cdx].Default != nil {
-			dflt = td.columnTypes[cdx].Default.String()
-		}
-		md.Columns = append(md.Columns,
-			&ColumnMetadata{
-				Name:    td.columns[cdx].String(),
-				Type:    DataType(td.columnTypes[cdx].Type),
-				Size:    td.columnTypes[cdx].Size,
-				Fixed:   td.columnTypes[cdx].Fixed,
-				NotNull: td.columnTypes[cdx].NotNull,
-				Default: dflt,
-			})
-	}
+func (td *tableDef) Columns() []sql.Identifier {
+	return td.columns
+}
 
-	md.Primary = make([]*ColumnKey, 0, len(td.primary))
-	for _, pk := range td.primary {
-		md.Primary = append(md.Primary,
-			&ColumnKey{
-				Number:  int32(pk.Number()),
-				Reverse: pk.Reverse(),
-			})
-	}
+func (td *tableDef) ColumnTypes() []sql.ColumnType {
+	return td.columnTypes
+}
 
-	return proto.Marshal(&md)
+func (td *tableDef) PrimaryKey() []engine.ColumnKey {
+	return td.primary
 }
 
 func (_ *rowColsStore) MakeTableDef(tn sql.TableName, mid int64, cols []sql.Identifier,
@@ -183,47 +159,6 @@ func (_ *rowColsStore) MakeTableDef(tn sql.TableName, mid int64, cols []sql.Iden
 	}
 
 	return &td, nil
-}
-
-func (rcst *rowColsStore) DecodeTableDef(tn sql.TableName, mid int64, buf []byte) (mideng.TableDef,
-	error) {
-
-	var md TableMetadata
-	err := proto.Unmarshal(buf, &md)
-	if err != nil {
-		return nil, err
-	}
-
-	cols := make([]sql.Identifier, 0, len(md.Columns))
-	colTypes := make([]sql.ColumnType, 0, len(md.Columns))
-	for cdx := range md.Columns {
-		cols = append(cols, sql.QuotedID(md.Columns[cdx].Name))
-
-		var dflt sql.Expr
-		if md.Columns[cdx].Default != "" {
-			p := parser.NewParser(strings.NewReader(md.Columns[cdx].Default),
-				fmt.Sprintf("%s metadata", tn))
-			dflt, err = p.ParseExpr()
-			if err != nil {
-				return nil, err
-			}
-		}
-		colTypes = append(colTypes,
-			sql.ColumnType{
-				Type:    sql.DataType(md.Columns[cdx].Type),
-				Size:    md.Columns[cdx].Size,
-				Fixed:   md.Columns[cdx].Fixed,
-				NotNull: md.Columns[cdx].NotNull,
-				Default: dflt,
-			})
-	}
-
-	primary := make([]engine.ColumnKey, 0, len(md.Primary))
-	for _, pk := range md.Primary {
-		primary = append(primary, engine.MakeColumnKey(int(pk.Number), pk.Reverse))
-	}
-
-	return rcst.MakeTableDef(tn, mid, cols, colTypes, primary)
 }
 
 func (rcst *rowColsStore) Begin(sesid uint64) engine.Transaction {

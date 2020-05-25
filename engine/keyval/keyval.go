@@ -83,8 +83,16 @@ func (td *tableDef) Table(ctx context.Context, tx engine.Transaction) (engine.Ta
 	}, nil
 }
 
-func (td *tableDef) Encode() ([]byte, error) {
-	return nil, errors.New("Encode: not implemented")
+func (td *tableDef) Columns() []sql.Identifier {
+	return td.columns
+}
+
+func (td *tableDef) ColumnTypes() []sql.ColumnType {
+	return td.columnTypes
+}
+
+func (td *tableDef) PrimaryKey() []engine.ColumnKey {
+	return td.primary
 }
 
 func (kvst *keyValStore) MakeTableDef(tn sql.TableName, mid int64, cols []sql.Identifier,
@@ -102,12 +110,6 @@ func (kvst *keyValStore) MakeTableDef(tn sql.TableName, mid int64, cols []sql.Id
 		mid:         mid,
 	}
 	return &td, nil
-}
-
-func (kvst *keyValStore) DecodeTableDef(tn sql.TableName, mid int64, buf []byte) (mideng.TableDef,
-	error) {
-
-	return nil, errors.New("DecodeTableDef: not implemented")
 }
 
 func (kvst *keyValStore) Begin(sesid uint64) engine.Transaction {

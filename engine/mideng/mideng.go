@@ -1,13 +1,18 @@
 package mideng
 
+//go:generate protoc --go_opt=paths=source_relative --go_out=. metadata.proto
+
 import (
 	"context"
 	"fmt"
 	"io"
+	"strings"
 
+	"github.com/golang/protobuf/proto"
 	"github.com/leftmike/maho/engine"
 	"github.com/leftmike/maho/engine/util"
 	"github.com/leftmike/maho/evaluate/expr"
+	"github.com/leftmike/maho/parser"
 	"github.com/leftmike/maho/sql"
 )
 
@@ -61,13 +66,14 @@ type indexRow struct {
 
 type TableDef interface {
 	Table(ctx context.Context, tx engine.Transaction) (engine.Table, error)
-	Encode() ([]byte, error)
+	Columns() []sql.Identifier
+	ColumnTypes() []sql.ColumnType
+	PrimaryKey() []engine.ColumnKey
 }
 
 type store interface {
 	MakeTableDef(tn sql.TableName, mid int64, cols []sql.Identifier, colTypes []sql.ColumnType,
 		primary []engine.ColumnKey) (TableDef, error)
-	DecodeTableDef(tn sql.TableName, mid int64, buf []byte) (TableDef, error)
 	Begin(sesid uint64) engine.Transaction
 }
 
@@ -483,6 +489,47 @@ func (me *midEngine) validTable(ctx context.Context, tx engine.Transaction,
 	return true, nil
 }
 
+func (me *midEngine) decodeTableMetadata(tn sql.TableName, mid int64, buf []byte) (TableDef,
+	error) {
+
+	var md TableMetadata
+	err := proto.Unmarshal(buf, &md)
+	if err != nil {
+		return nil, err
+	}
+
+	cols := make([]sql.Identifier, 0, len(md.Columns))
+	colTypes := make([]sql.ColumnType, 0, len(md.Columns))
+	for cdx := range md.Columns {
+		cols = append(cols, sql.QuotedID(md.Columns[cdx].Name))
+
+		var dflt sql.Expr
+		if md.Columns[cdx].Default != "" {
+			p := parser.NewParser(strings.NewReader(md.Columns[cdx].Default),
+				fmt.Sprintf("%s metadata", tn))
+			dflt, err = p.ParseExpr()
+			if err != nil {
+				return nil, err
+			}
+		}
+		colTypes = append(colTypes,
+			sql.ColumnType{
+				Type:    sql.DataType(md.Columns[cdx].Type),
+				Size:    md.Columns[cdx].Size,
+				Fixed:   md.Columns[cdx].Fixed,
+				NotNull: md.Columns[cdx].NotNull,
+				Default: dflt,
+			})
+	}
+
+	primary := make([]engine.ColumnKey, 0, len(md.Primary))
+	for _, pk := range md.Primary {
+		primary = append(primary, engine.MakeColumnKey(int(pk.Number), pk.Reverse))
+	}
+
+	return me.st.MakeTableDef(tn, mid, cols, colTypes, primary)
+}
+
 func (me *midEngine) LookupTable(ctx context.Context, tx engine.Transaction,
 	tn sql.TableName) (engine.Table, error) {
 
@@ -502,12 +549,47 @@ func (me *midEngine) LookupTable(ctx context.Context, tx engine.Transaction,
 	}
 	mid := tr.MID
 
-	td, err := me.st.DecodeTableDef(tn, mid, tr.Metadata)
+	td, err := me.decodeTableMetadata(tn, mid, tr.Metadata)
 	if err != nil {
 		return nil, err
 	}
 
 	return td.Table(ctx, tx)
+}
+
+func encodeTableMetadata(td TableDef) ([]byte, error) {
+	cols := td.Columns()
+	colTypes := td.ColumnTypes()
+
+	var md TableMetadata
+	md.Columns = make([]*ColumnMetadata, 0, len(cols))
+	for cdx := range cols {
+		var dflt string
+		if colTypes[cdx].Default != nil {
+			dflt = colTypes[cdx].Default.String()
+		}
+		md.Columns = append(md.Columns,
+			&ColumnMetadata{
+				Name:    cols[cdx].String(),
+				Type:    DataType(colTypes[cdx].Type),
+				Size:    colTypes[cdx].Size,
+				Fixed:   colTypes[cdx].Fixed,
+				NotNull: colTypes[cdx].NotNull,
+				Default: dflt,
+			})
+	}
+
+	primary := td.PrimaryKey()
+	md.Primary = make([]*ColumnKey, 0, len(primary))
+	for _, pk := range primary {
+		md.Primary = append(md.Primary,
+			&ColumnKey{
+				Number:  int32(pk.Number()),
+				Reverse: pk.Reverse(),
+			})
+	}
+
+	return proto.Marshal(&md)
 }
 
 func (me *midEngine) createTable(ctx context.Context, tx engine.Transaction, tn sql.TableName,
@@ -518,7 +600,7 @@ func (me *midEngine) createTable(ctx context.Context, tx engine.Transaction, tn 
 		return err
 	}
 
-	md, err := td.Encode()
+	md, err := encodeTableMetadata(td)
 	if err != nil {
 		return err
 	}
