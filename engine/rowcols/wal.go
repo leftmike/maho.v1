@@ -8,6 +8,8 @@ import (
 	"io"
 	"math"
 	"os"
+
+	"github.com/leftmike/maho/engine/encode"
 )
 
 const (
@@ -90,11 +92,11 @@ func decodeCommit(hndlr walHandler, ver uint64, buf []byte) error {
 			return fmt.Errorf("rowcols: bad WAL record type, got %d", typ)
 		}
 
-		buf, mid, ok = DecodeVarint(buf)
+		buf, mid, ok = encode.DecodeVarint(buf)
 		if !ok {
 			return errors.New("rowcols: bad WAL record, mid field")
 		}
-		buf, reverse, ok = DecodeVarint(buf)
+		buf, reverse, ok = encode.DecodeVarint(buf)
 		if !ok || reverse > math.MaxUint32 {
 			return errors.New("rowcols: bad WAL record, reverse field")
 		}
@@ -106,7 +108,7 @@ func decodeCommit(hndlr walHandler, ver uint64, buf []byte) error {
 		buf = buf[1:]
 
 		var rbl uint64
-		buf, rbl, ok = DecodeVarint(buf)
+		buf, rbl, ok = encode.DecodeVarint(buf)
 		if !ok {
 			return errors.New("rowcols: bad WAL record, row length field")
 		}
@@ -189,8 +191,8 @@ func encodeRowItem(buf []byte, ri rowItem) []byte {
 		buf = append(buf, setRecordType)
 	}
 
-	buf = EncodeVarint(buf, uint64(ri.mid))
-	buf = EncodeVarint(buf, uint64(ri.reverse))
+	buf = encode.EncodeVarint(buf, uint64(ri.mid))
+	buf = encode.EncodeVarint(buf, uint64(ri.reverse))
 	buf = append(buf, ri.numKeyCols)
 
 	var rowBuf []byte
@@ -199,7 +201,7 @@ func encodeRowItem(buf []byte, ri rowItem) []byte {
 	} else {
 		rowBuf = EncodeRowValue(ri.row, len(ri.row))
 	}
-	buf = EncodeVarint(buf, uint64(len(rowBuf)))
+	buf = encode.EncodeVarint(buf, uint64(len(rowBuf)))
 	buf = append(buf, rowBuf...)
 
 	return buf

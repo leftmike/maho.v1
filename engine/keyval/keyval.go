@@ -1,6 +1,7 @@
 package keyval
 
 import (
+	"bytes"
 	"context"
 	"errors"
 	"fmt"
@@ -33,6 +34,7 @@ type KV interface {
 
 type keyValStore struct {
 	mutex sync.Mutex
+	kv    KV
 	ver   uint64
 }
 
@@ -56,6 +58,11 @@ type table struct {
 	td   *tableDef
 }
 
+type rowItem struct {
+	key []byte
+	val []byte
+}
+
 type rows struct {
 	tbl  *table
 	idx  int
@@ -63,8 +70,14 @@ type rows struct {
 }
 
 func NewEngine(dataDir string) (engine.Engine, error) {
-	kvst := &keyValStore{}
+	kv, err := MakeBadgerKV(dataDir)
+	if err != nil {
+		return nil, err
+	}
 
+	kvst := &keyValStore{
+		kv: kv,
+	}
 	me, err := mideng.NewEngine("keyval", kvst, true)
 	if err != nil {
 		return nil, err
@@ -150,6 +163,25 @@ func (kvtx *transaction) forWrite() {
 	if kvtx.delta == nil {
 		kvtx.delta = btree.New(16)
 	}
+}
+
+func (td *tableDef) toItem(row []sql.Value, deleted bool) rowItem {
+	// XXX
+	return rowItem{}
+}
+
+func (td *tableDef) toRow(ri rowItem) []sql.Value {
+	if ri.key == nil {
+		panic("is this necessary?")
+		return nil
+	}
+
+	// XXX
+	return nil
+}
+
+func (ri rowItem) Less(item btree.Item) bool {
+	return bytes.Compare(ri.key, (item.(rowItem)).key) < 0
 }
 
 func (kvt *table) Columns(ctx context.Context) []sql.Identifier {

@@ -12,6 +12,7 @@ import (
 	"github.com/google/btree"
 
 	"github.com/leftmike/maho/engine"
+	"github.com/leftmike/maho/engine/encode"
 	"github.com/leftmike/maho/engine/mideng"
 	"github.com/leftmike/maho/engine/virtual"
 	"github.com/leftmike/maho/sql"
@@ -189,8 +190,8 @@ func (rcst *rowColsStore) commit(ctx context.Context, txVer uint64, delta *btree
 	rcst.mutex.Unlock()
 
 	ver := rcst.ver + 1
-	buf := EncodeUint32([]byte{commitRecordType}, 0) // Reserve space for length.
-	buf = EncodeUint64(buf, ver)
+	buf := encode.EncodeUint32([]byte{commitRecordType}, 0) // Reserve space for length.
+	buf = encode.EncodeUint64(buf, ver)
 
 	var err error
 	delta.Ascend(
