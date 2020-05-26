@@ -1,6 +1,7 @@
 package basic
 
 import (
+	"bytes"
 	"context"
 	"errors"
 	"fmt"
@@ -10,6 +11,7 @@ import (
 	"github.com/google/btree"
 
 	"github.com/leftmike/maho/engine"
+	"github.com/leftmike/maho/engine/encode"
 	"github.com/leftmike/maho/engine/mideng"
 	"github.com/leftmike/maho/engine/virtual"
 	"github.com/leftmike/maho/sql"
@@ -30,14 +32,11 @@ type transaction struct {
 }
 
 type tableDef struct {
+	mid         int64
 	tn          sql.TableName
 	columns     []sql.Identifier
 	columnTypes []sql.ColumnType
 	primary     []engine.ColumnKey
-	mid         int64
-
-	reverse uint32
-	rowCols []int
 }
 
 type table struct {
@@ -47,10 +46,9 @@ type table struct {
 }
 
 type rowItem struct {
-	mid        int64
-	reverse    uint32
-	numKeyCols uint8
-	row        []sql.Value
+	mid int64
+	key []byte
+	row []sql.Value
 }
 
 type rows struct {
@@ -98,42 +96,14 @@ func (_ *basicStore) MakeTableDef(tn sql.TableName, mid int64, cols []sql.Identi
 	if len(primary) == 0 {
 		panic(fmt.Sprintf("basic: table %s: missing required primary key", tn))
 	}
-	if len(primary) > 32 {
-		panic(fmt.Sprintf("basic: table %s: primary key with too many columns", tn))
-	}
 
-	td := tableDef{
+	return &tableDef{
+		mid:         mid,
 		tn:          tn,
 		columns:     cols,
 		columnTypes: colTypes,
 		primary:     primary,
-		mid:         mid,
-	}
-
-	td.reverse = 0
-	td.rowCols = make([]int, len(cols))
-	vn := len(primary)
-	for cn := range cols {
-		isValue := true
-
-		for kn, ck := range primary {
-			if ck.Number() == cn {
-				td.rowCols[kn] = cn
-				if ck.Reverse() {
-					td.reverse |= 1 << kn
-				}
-				isValue = false
-				break
-			}
-		}
-
-		if isValue {
-			td.rowCols[vn] = cn
-			vn += 1
-		}
-	}
-
-	return &td, nil
+	}, nil
 }
 
 func (bst *basicStore) Begin(sesid uint64) engine.Transaction {
@@ -177,18 +147,12 @@ func (btx *transaction) forWrite() {
 
 func (td *tableDef) toItem(row []sql.Value) btree.Item {
 	ri := rowItem{
-		mid:        td.mid,
-		reverse:    td.reverse,
-		numKeyCols: uint8(len(td.primary)),
+		mid: td.mid,
 	}
-
 	if row != nil {
-		ri.row = make([]sql.Value, len(td.columns))
-		for rdx := range td.rowCols {
-			ri.row[rdx] = row[td.rowCols[rdx]]
-		}
+		ri.key = encode.MakeKey(td.primary, row)
+		ri.row = append(make([]sql.Value, 0, len(td.columns)), row...)
 	}
-
 	return ri
 }
 
@@ -196,44 +160,15 @@ func (td *tableDef) toRow(ri rowItem) []sql.Value {
 	if ri.row == nil {
 		panic(fmt.Sprintf("basic: table %s contains nil row", td.tn))
 	}
-	row := make([]sql.Value, len(td.columns))
-	for rdx := range td.rowCols {
-		row[td.rowCols[rdx]] = ri.row[rdx]
-	}
-	return row
-}
-
-func (ri rowItem) compare(ri2 rowItem) int {
-	if ri.mid < ri2.mid {
-		return -1
-	} else if ri.mid > ri2.mid {
-		return 1
-	} else if ri2.row == nil {
-		if ri.row == nil {
-			return 0
-		}
-		return -1
-	} else if ri.row == nil {
-		return -1
-	}
-
-	for kdx := uint8(0); kdx < ri.numKeyCols; kdx += 1 {
-		cmp := sql.Compare(ri.row[kdx], ri2.row[kdx])
-		if cmp == 0 {
-			continue
-		}
-		if ri.reverse&(1<<kdx) != 0 {
-			return -1 * cmp
-		} else {
-			return cmp
-		}
-	}
-
-	return 0
+	return append(make([]sql.Value, 0, len(td.columns)), ri.row...)
 }
 
 func (ri rowItem) Less(item btree.Item) bool {
-	return ri.compare(item.(rowItem)) < 0
+	ri2 := item.(rowItem)
+	if ri.mid < ri2.mid {
+		return true
+	}
+	return ri.mid == ri2.mid && bytes.Compare(ri.key, ri2.key) < 0
 }
 
 func (bt *table) Columns(ctx context.Context) []sql.Identifier {
