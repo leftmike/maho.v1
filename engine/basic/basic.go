@@ -156,13 +156,6 @@ func (td *tableDef) toItem(row []sql.Value) btree.Item {
 	return ri
 }
 
-func (td *tableDef) toRow(ri rowItem) []sql.Value {
-	if ri.row == nil {
-		panic(fmt.Sprintf("basic: table %s contains nil row", td.tn))
-	}
-	return append(make([]sql.Value, 0, len(td.columns)), ri.row...)
-}
-
 func (ri rowItem) Less(item btree.Item) bool {
 	ri2 := item.(rowItem)
 	if ri.mid < ri2.mid {
@@ -203,7 +196,7 @@ func (bt *table) Rows(ctx context.Context, minRow, maxRow []sql.Value) (engine.R
 			if ri.mid != bt.td.mid {
 				return false
 			}
-			br.rows = append(br.rows, bt.td.toRow(ri))
+			br.rows = append(br.rows, append(make([]sql.Value, 0, len(ri.row)), ri.row...))
 			return true
 		})
 	return br, nil

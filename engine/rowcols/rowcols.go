@@ -307,11 +307,8 @@ func (bt *table) PrimaryKey(ctx context.Context) []engine.ColumnKey {
 	return bt.td.primary
 }
 
-func toRow(ri rowItem) []sql.Value {
-	if ri.row == nil {
-		return nil
-	}
-	return append(make([]sql.Value, 0, len(ri.row)), ri.row...)
+func copyRow(row []sql.Value) []sql.Value {
+	return append(make([]sql.Value, 0, len(row)), row...)
 }
 
 func (bt *table) Rows(ctx context.Context, minRow, maxRow []sql.Value) (engine.Rows, error) {
@@ -336,7 +333,7 @@ func (bt *table) Rows(ctx context.Context, minRow, maxRow []sql.Value) (engine.R
 					return false
 				}
 				if ri.row != nil {
-					br.rows = append(br.rows, toRow(ri))
+					br.rows = append(br.rows, copyRow(ri.row))
 				}
 				return true
 			})
@@ -373,13 +370,13 @@ func (bt *table) Rows(ctx context.Context, minRow, maxRow []sql.Value) (engine.R
 					break
 				} else if cmp > 0 {
 					if deltaRows[0].row != nil {
-						br.rows = append(br.rows, toRow(deltaRows[0]))
+						br.rows = append(br.rows, copyRow(deltaRows[0].row))
 					}
 					deltaRows = deltaRows[1:]
 				} else {
 					if deltaRows[0].row != nil {
 						// Must be an update.
-						br.rows = append(br.rows, toRow(deltaRows[0]))
+						br.rows = append(br.rows, copyRow(deltaRows[0].row))
 						deltaRows = deltaRows[1:]
 					}
 					return true
@@ -387,14 +384,14 @@ func (bt *table) Rows(ctx context.Context, minRow, maxRow []sql.Value) (engine.R
 			}
 
 			if ri.row != nil {
-				br.rows = append(br.rows, toRow(ri))
+				br.rows = append(br.rows, copyRow(ri.row))
 			}
 			return true
 		})
 
 	for _, ri := range deltaRows {
 		if ri.row != nil {
-			br.rows = append(br.rows, toRow(ri))
+			br.rows = append(br.rows, copyRow(ri.row))
 		}
 	}
 
