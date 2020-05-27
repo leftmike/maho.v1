@@ -1,9 +1,9 @@
-package rowcols_test
+package encode_test
 
 import (
 	"testing"
 
-	"github.com/leftmike/maho/engine/rowcols"
+	"github.com/leftmike/maho/engine/encode"
 	"github.com/leftmike/maho/sql"
 	"github.com/leftmike/maho/testutil"
 )
@@ -54,8 +54,8 @@ func TestRowValues(t *testing.T) {
 	}
 
 	for _, c := range cases {
-		buf := rowcols.EncodeRowValue(c.row, len(c.row))
-		dest := rowcols.DecodeRowValue(buf)
+		buf := encode.EncodeRowValue(c.row)
+		dest := encode.DecodeRowValue(buf)
 		if dest == nil {
 			t.Errorf("DecodeRowValue(%s) failed", c.s)
 		} else if !testutil.DeepEqual(c.row, dest) {

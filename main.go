@@ -15,7 +15,7 @@ To Do:
 
 - testeng.RunNextStmtTest: fix for basic and rowcols
 
-- MakeTableDef: basic and rowcols are identical
+- keyval: use encode.MakeKey; finish it up
 
 - rowcols
 -- add write ahead log

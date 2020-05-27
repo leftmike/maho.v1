@@ -6,18 +6,17 @@ import (
 	"errors"
 	"fmt"
 	"io"
-	"math"
 	"os"
 
 	"github.com/leftmike/maho/engine/encode"
+	"github.com/leftmike/maho/sql"
 )
 
 const (
 	walVersion = 1
 
 	commitRecordType = 1
-	deleteRecordType = 2
-	setRecordType    = 3
+	rowRecordType    = 2
 )
 
 var (
@@ -83,52 +82,54 @@ func (wal *WAL) newWAL() error {
 
 func decodeCommit(hndlr walHandler, ver uint64, buf []byte) error {
 	for len(buf) > 0 {
-		var ok bool
-		var mid, reverse uint64
-
-		typ := buf[0]
-		buf = buf[1:]
-		if typ != deleteRecordType && typ != setRecordType {
-			return fmt.Errorf("rowcols: bad WAL record type, got %d", typ)
+		if buf[0] != rowRecordType {
+			return fmt.Errorf("rowcols: bad WAL record type, got %d", buf[0])
 		}
+		buf = buf[1:]
 
+		var ok bool
+		var mid uint64
 		buf, mid, ok = encode.DecodeVarint(buf)
 		if !ok {
 			return errors.New("rowcols: bad WAL record, mid field")
 		}
-		buf, reverse, ok = encode.DecodeVarint(buf)
-		if !ok || reverse > math.MaxUint32 {
-			return errors.New("rowcols: bad WAL record, reverse field")
-		}
 
-		if len(buf) == 0 {
-			return errors.New("rowcols: truncated WAL record")
+		var kbl uint64
+		buf, kbl, ok = encode.DecodeVarint(buf)
+		if !ok {
+			return errors.New("rowcols: bad WAL record, key length field")
 		}
-		nkc := buf[0]
-		buf = buf[1:]
+		if len(buf) < int(kbl) {
+			return fmt.Errorf("rowcols: bad WAL record length, have %d, want %d", len(buf), kbl)
+		}
+		key := buf[:kbl]
+		buf = buf[kbl:]
 
 		var rbl uint64
 		buf, rbl, ok = encode.DecodeVarint(buf)
 		if !ok {
 			return errors.New("rowcols: bad WAL record, row length field")
 		}
-		if len(buf) < int(rbl) {
-			return fmt.Errorf("rowcols: bad WAL record length, have %d, want %d", len(buf), rbl)
+
+		var row []sql.Value
+		if rbl > 0 {
+			if len(buf) < int(rbl) {
+				return fmt.Errorf("rowcols: bad WAL record length, have %d, want %d", len(buf),
+					rbl)
+			}
+			row = encode.DecodeRowValue(buf[:rbl])
+			if row == nil {
+				return errors.New("rowcols: bad WAL record, row field")
+			}
+			buf = buf[rbl:]
 		}
-		row := DecodeRowValue(buf[:rbl])
-		if row == nil {
-			return errors.New("rowcols: bad WAL record, row field")
-		}
-		buf = buf[rbl:]
 
 		err := hndlr.RowItem(
 			rowItem{
-				mid:        int64(mid),
-				ver:        ver,
-				reverse:    uint32(reverse),
-				numKeyCols: nkc,
-				deleted:    typ == deleteRecordType,
-				row:        row,
+				mid: int64(mid),
+				ver: ver,
+				key: key,
+				row: row,
 			})
 		if err != nil {
 			return err
@@ -185,25 +186,17 @@ func (wal *WAL) ReadWAL(hndlr walHandler) (bool, error) {
 }
 
 func encodeRowItem(buf []byte, ri rowItem) []byte {
-	if ri.deleted {
-		buf = append(buf, deleteRecordType)
-	} else {
-		buf = append(buf, setRecordType)
-	}
-
+	buf = append(buf, rowRecordType)
 	buf = encode.EncodeVarint(buf, uint64(ri.mid))
-	buf = encode.EncodeVarint(buf, uint64(ri.reverse))
-	buf = append(buf, ri.numKeyCols)
-
-	var rowBuf []byte
-	if ri.deleted {
-		rowBuf = EncodeRowValue(ri.row, int(ri.numKeyCols))
+	buf = encode.EncodeVarint(buf, uint64(len(ri.key)))
+	buf = append(buf, ri.key...)
+	if len(ri.row) > 0 {
+		row := encode.EncodeRowValue(ri.row)
+		buf = encode.EncodeVarint(buf, uint64(len(row)))
+		buf = append(buf, row...)
 	} else {
-		rowBuf = EncodeRowValue(ri.row, len(ri.row))
+		buf = encode.EncodeVarint(buf, 0)
 	}
-	buf = encode.EncodeVarint(buf, uint64(len(rowBuf)))
-	buf = append(buf, rowBuf...)
-
 	return buf
 }
 

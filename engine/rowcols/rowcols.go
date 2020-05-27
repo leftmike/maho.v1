@@ -1,6 +1,7 @@
 package rowcols
 
 import (
+	"bytes"
 	"context"
 	"errors"
 	"fmt"
@@ -56,12 +57,10 @@ type table struct {
 }
 
 type rowItem struct {
-	mid        int64
-	ver        uint64
-	reverse    uint32
-	numKeyCols uint8
-	deleted    bool
-	row        []sql.Value
+	mid int64
+	ver uint64
+	key []byte
+	row []sql.Value // deleted: row = nil
 }
 
 type rows struct {
@@ -72,7 +71,7 @@ type rows struct {
 
 func NewEngine(dataDir string) (engine.Engine, error) {
 	os.MkdirAll(dataDir, 0755)
-	f, err := os.OpenFile(filepath.Join(dataDir, "mahorowcols.wal"), os.O_RDWR|os.O_CREATE, 0755)
+	f, err := os.OpenFile(filepath.Join(dataDir, "maho-rowcols.wal"), os.O_RDWR|os.O_CREATE, 0755)
 	if err != nil {
 		return nil, err
 	}
@@ -199,7 +198,7 @@ func (rcst *rowColsStore) commit(ctx context.Context, txVer uint64, delta *btree
 			txri := item.(rowItem)
 			cur := tree.Get(txri)
 			if cur == nil {
-				if !txri.deleted {
+				if txri.row != nil {
 					txri.ver = ver
 					tree.ReplaceOrInsert(txri)
 					buf = encodeRowItem(buf, txri)
@@ -210,7 +209,7 @@ func (rcst *rowColsStore) commit(ctx context.Context, txVer uint64, delta *btree
 					err = errors.New("rowcols: write conflict committing transaction")
 					return false
 				}
-				if !txri.deleted || !ri.deleted {
+				if txri.row != nil || ri.row != nil {
 					txri.ver = ver
 					tree.ReplaceOrInsert(txri)
 					buf = encodeRowItem(buf, txri)
@@ -269,34 +268,17 @@ func (rctx *transaction) forWrite() {
 	}
 }
 
-func (td *tableDef) toItem(row []sql.Value, ver uint64, deleted bool) btree.Item {
+func (td *tableDef) toItem(row []sql.Value, deleted bool) btree.Item {
 	ri := rowItem{
-		mid:        td.mid,
-		ver:        ver,
-		reverse:    td.reverse,
-		deleted:    deleted,
-		numKeyCols: uint8(len(td.primary)),
+		mid: td.mid,
 	}
-
 	if row != nil {
-		ri.row = make([]sql.Value, len(td.columns))
-		for rdx := range td.rowCols {
-			ri.row[rdx] = row[td.rowCols[rdx]]
+		ri.key = encode.MakeKey(td.primary, row)
+		if !deleted {
+			ri.row = append(make([]sql.Value, 0, len(td.columns)), row...)
 		}
 	}
-
 	return ri
-}
-
-func (td *tableDef) toRow(ri rowItem) []sql.Value {
-	if ri.row == nil {
-		return nil
-	}
-	row := make([]sql.Value, len(td.columns))
-	for rdx := range td.rowCols {
-		row[td.rowCols[rdx]] = ri.row[rdx]
-	}
-	return row
 }
 
 func (ri rowItem) compare(ri2 rowItem) int {
@@ -304,28 +286,9 @@ func (ri rowItem) compare(ri2 rowItem) int {
 		return -1
 	} else if ri.mid > ri2.mid {
 		return 1
-	} else if ri2.row == nil {
-		if ri.row == nil {
-			return 0
-		}
-		return -1
-	} else if ri.row == nil {
-		return -1
+	} else {
+		return bytes.Compare(ri.key, ri2.key)
 	}
-
-	for kdx := uint8(0); kdx < ri.numKeyCols; kdx += 1 {
-		cmp := sql.Compare(ri.row[kdx], ri2.row[kdx])
-		if cmp == 0 {
-			continue
-		}
-		if ri.reverse&(1<<kdx) != 0 {
-			return -1 * cmp
-		} else {
-			return cmp
-		}
-	}
-
-	return 0
 }
 
 func (ri rowItem) Less(item btree.Item) bool {
@@ -344,6 +307,13 @@ func (bt *table) PrimaryKey(ctx context.Context) []engine.ColumnKey {
 	return bt.td.primary
 }
 
+func toRow(ri rowItem) []sql.Value {
+	if ri.row == nil {
+		return nil
+	}
+	return append(make([]sql.Value, 0, len(ri.row)), ri.row...)
+}
+
 func (bt *table) Rows(ctx context.Context, minRow, maxRow []sql.Value) (engine.Rows, error) {
 	br := &rows{
 		tbl: bt,
@@ -352,11 +322,11 @@ func (bt *table) Rows(ctx context.Context, minRow, maxRow []sql.Value) (engine.R
 
 	var maxItem btree.Item
 	if maxRow != nil {
-		maxItem = bt.td.toItem(maxRow, 0, false)
+		maxItem = bt.td.toItem(maxRow, false)
 	}
 
 	if bt.tx.delta == nil {
-		bt.tx.tree.AscendGreaterOrEqual(bt.td.toItem(minRow, 0, false),
+		bt.tx.tree.AscendGreaterOrEqual(bt.td.toItem(minRow, false),
 			func(item btree.Item) bool {
 				if maxItem != nil && maxItem.Less(item) {
 					return false
@@ -365,8 +335,8 @@ func (bt *table) Rows(ctx context.Context, minRow, maxRow []sql.Value) (engine.R
 				if ri.mid != bt.td.mid {
 					return false
 				}
-				if !ri.deleted {
-					br.rows = append(br.rows, bt.td.toRow(ri))
+				if ri.row != nil {
+					br.rows = append(br.rows, toRow(ri))
 				}
 				return true
 			})
@@ -374,7 +344,7 @@ func (bt *table) Rows(ctx context.Context, minRow, maxRow []sql.Value) (engine.R
 	}
 
 	var deltaRows []rowItem
-	bt.tx.delta.AscendGreaterOrEqual(bt.td.toItem(minRow, 0, false),
+	bt.tx.delta.AscendGreaterOrEqual(bt.td.toItem(minRow, false),
 		func(item btree.Item) bool {
 			if maxItem != nil && maxItem.Less(item) {
 				return false
@@ -387,7 +357,7 @@ func (bt *table) Rows(ctx context.Context, minRow, maxRow []sql.Value) (engine.R
 			return true
 		})
 
-	bt.tx.tree.AscendGreaterOrEqual(bt.td.toItem(minRow, 0, false),
+	bt.tx.tree.AscendGreaterOrEqual(bt.td.toItem(minRow, false),
 		func(item btree.Item) bool {
 			if maxItem != nil && maxItem.Less(item) {
 				return false
@@ -402,29 +372,29 @@ func (bt *table) Rows(ctx context.Context, minRow, maxRow []sql.Value) (engine.R
 				if cmp < 0 {
 					break
 				} else if cmp > 0 {
-					if !deltaRows[0].deleted {
-						br.rows = append(br.rows, bt.td.toRow(deltaRows[0]))
+					if deltaRows[0].row != nil {
+						br.rows = append(br.rows, toRow(deltaRows[0]))
 					}
 					deltaRows = deltaRows[1:]
 				} else {
-					if !deltaRows[0].deleted {
+					if deltaRows[0].row != nil {
 						// Must be an update.
-						br.rows = append(br.rows, bt.td.toRow(deltaRows[0]))
+						br.rows = append(br.rows, toRow(deltaRows[0]))
 						deltaRows = deltaRows[1:]
 					}
 					return true
 				}
 			}
 
-			if !ri.deleted {
-				br.rows = append(br.rows, bt.td.toRow(ri))
+			if ri.row != nil {
+				br.rows = append(br.rows, toRow(ri))
 			}
 			return true
 		})
 
 	for _, ri := range deltaRows {
-		if !ri.deleted {
-			br.rows = append(br.rows, bt.td.toRow(ri))
+		if ri.row != nil {
+			br.rows = append(br.rows, toRow(ri))
 		}
 	}
 
@@ -434,12 +404,12 @@ func (bt *table) Rows(ctx context.Context, minRow, maxRow []sql.Value) (engine.R
 func (bt *table) Insert(ctx context.Context, row []sql.Value) error {
 	bt.tx.forWrite()
 
-	ri := bt.td.toItem(row, 0, false)
+	ri := bt.td.toItem(row, false)
 	if item := bt.tx.delta.Get(ri); item != nil {
-		if !(item.(rowItem)).deleted {
+		if (item.(rowItem)).row != nil {
 			return fmt.Errorf("rowcols: %s: existing row with duplicate primary key", bt.td.tn)
 		}
-	} else if item := bt.tx.tree.Get(ri); item != nil && !(item.(rowItem)).deleted {
+	} else if item := bt.tx.tree.Get(ri); item != nil && (item.(rowItem)).row != nil {
 		return fmt.Errorf("rowcols: %s: existing row with duplicate primary key", bt.td.tn)
 	}
 
@@ -475,7 +445,7 @@ func (br *rows) Delete(ctx context.Context) error {
 		panic(fmt.Sprintf("rowcols: table %s no row to delete", br.tbl.td.tn))
 	}
 
-	br.tbl.tx.delta.ReplaceOrInsert(br.tbl.td.toItem(br.rows[br.idx-1], 0, true))
+	br.tbl.tx.delta.ReplaceOrInsert(br.tbl.td.toItem(br.rows[br.idx-1], true))
 	return nil
 }
 
@@ -508,6 +478,6 @@ func (br *rows) Update(ctx context.Context, updates []sql.ColumnUpdate) error {
 	for _, update := range updates {
 		br.rows[br.idx-1][update.Index] = update.Value
 	}
-	br.tbl.tx.delta.ReplaceOrInsert(br.tbl.td.toItem(br.rows[br.idx-1], 0, false))
+	br.tbl.tx.delta.ReplaceOrInsert(br.tbl.td.toItem(br.rows[br.idx-1], false))
 	return nil
 }
