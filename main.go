@@ -15,6 +15,8 @@ To Do:
 
 - testeng.RunNextStmtTest: fix for basic and rowcols
 
+- basic, rowcols: toRow is unnecessary
+
 - keyval: use encode.MakeKey; finish it up
 
 - rowcols

@@ -37,19 +37,19 @@ func (bkv badgerKV) IterateAt(ver uint64, key []byte,
 
 	it.Seek(key)
 	for it.Valid() {
-		var done bool
+		var more bool
 
 		item := it.Item()
 		err := item.Value(
 			func(val []byte) error {
 				var err error
-				done, err = fn(item.Key(), val, item.Version())
+				more, err = fn(item.Key(), val, item.Version())
 				return err
 			})
 		if err != nil {
 			return err
 		}
-		if done {
+		if !more {
 			break
 		}
 

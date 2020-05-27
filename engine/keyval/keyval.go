@@ -11,6 +11,7 @@ import (
 	"github.com/google/btree"
 
 	"github.com/leftmike/maho/engine"
+	"github.com/leftmike/maho/engine/encode"
 	"github.com/leftmike/maho/engine/mideng"
 	"github.com/leftmike/maho/engine/virtual"
 	"github.com/leftmike/maho/sql"
@@ -47,20 +48,20 @@ type tableDef struct {
 }
 
 type transaction struct {
-	kvst  *keyValStore
+	st    *keyValStore
 	ver   uint64
 	delta *btree.BTree
 }
 
 type table struct {
-	kvst *keyValStore
-	tx   *transaction
-	td   *tableDef
+	st *keyValStore
+	tx *transaction
+	td *tableDef
 }
 
 type rowItem struct {
 	key []byte
-	val []byte
+	row []sql.Value
 }
 
 type rows struct {
@@ -90,9 +91,9 @@ func NewEngine(dataDir string) (engine.Engine, error) {
 func (td *tableDef) Table(ctx context.Context, tx engine.Transaction) (engine.Table, error) {
 	etx := tx.(*transaction)
 	return &table{
-		kvst: etx.kvst,
-		tx:   etx,
-		td:   td,
+		st: etx.st,
+		tx: etx,
+		td: td,
 	}, nil
 }
 
@@ -130,30 +131,30 @@ func (kvst *keyValStore) Begin(sesid uint64) engine.Transaction {
 	defer kvst.mutex.Unlock()
 
 	return &transaction{
-		kvst: kvst,
-		ver:  kvst.ver,
+		st:  kvst,
+		ver: kvst.ver,
 	}
 }
 
 func (kvtx *transaction) Commit(ctx context.Context) error {
-	if kvtx.kvst == nil {
+	if kvtx.st == nil {
 		return errTransactionComplete
 	}
 
 	// XXX
 
-	kvtx.kvst = nil
+	kvtx.st = nil
 	return nil
 }
 
 func (kvtx *transaction) Rollback() error {
-	if kvtx.kvst == nil {
+	if kvtx.st == nil {
 		return errTransactionComplete
 	}
 
 	// XXX
 
-	kvtx.kvst = nil
+	kvtx.st = nil
 	return nil
 }
 
@@ -165,19 +166,29 @@ func (kvtx *transaction) forWrite() {
 	}
 }
 
-func (td *tableDef) toItem(row []sql.Value, deleted bool) rowItem {
-	// XXX
-	return rowItem{}
+func makeKey(mid int64, primary []engine.ColumnKey, row []sql.Value) []byte {
+	buf := encode.EncodeUint64(make([]byte, 0, 8), uint64(mid))
+	if row != nil {
+		buf = append(buf, encode.MakeKey(primary, row)...)
+	}
+	return buf
 }
 
-func (td *tableDef) toRow(ri rowItem) []sql.Value {
-	if ri.key == nil {
-		panic("is this necessary?")
+func (td *tableDef) toItem(row []sql.Value, deleted bool) rowItem {
+	ri := rowItem{
+		key: makeKey(td.mid, td.primary, row),
+	}
+	if row != nil && !deleted {
+		ri.row = append(make([]sql.Value, 0, len(td.columns)), row...)
+	}
+	return ri
+}
+
+func toRow(ri rowItem) []sql.Value {
+	if ri.row == nil {
 		return nil
 	}
-
-	// XXX
-	return nil
+	return append(make([]sql.Value, 0, len(ri.row)), ri.row...)
 }
 
 func (ri rowItem) Less(item btree.Item) bool {
@@ -197,13 +208,119 @@ func (kvt *table) PrimaryKey(ctx context.Context) []engine.ColumnKey {
 }
 
 func (kvt *table) Rows(ctx context.Context, minRow, maxRow []sql.Value) (engine.Rows, error) {
-	return nil, errors.New("Rows: not implemented")
+	kvr := &rows{
+		tbl: kvt,
+		idx: 0,
+	}
+
+	var maxKey []byte
+	if maxRow == nil {
+		maxKey = makeKey(kvt.td.mid+1, nil, nil)
+	} else {
+		maxKey = makeKey(kvt.td.mid, kvt.td.primary, maxRow)
+	}
+
+	if kvt.tx.delta == nil {
+		err := kvt.st.kv.IterateAt(kvt.tx.ver, makeKey(kvt.td.mid, kvt.td.primary, minRow),
+			func(key, val []byte, ver uint64) (bool, error) {
+				// XXX: ver doesn't appear to be necessary?
+				if bytes.Compare(maxKey, key) <= 0 {
+					return false, nil
+				}
+				if len(val) > 0 {
+					row := encode.DecodeRowValue(val)
+					if row == nil {
+						return false, fmt.Errorf("keyval: unable to decode row: %v", val)
+					}
+					kvr.rows = append(kvr.rows, row)
+				}
+				return true, nil
+			})
+		if err != nil {
+			return nil, err
+		}
+		return kvr, nil
+	}
+
+	var deltaRows []rowItem
+	kvt.tx.delta.AscendGreaterOrEqual(kvt.td.toItem(minRow, false),
+		func(item btree.Item) bool {
+			ri := item.(rowItem)
+			if bytes.Compare(maxKey, ri.key) <= 0 {
+				return false
+			}
+			deltaRows = append(deltaRows, ri)
+			return true
+		})
+	_ = deltaRows
+
+	err := kvt.st.kv.IterateAt(kvt.tx.ver, makeKey(kvt.td.mid, kvt.td.primary, minRow),
+		func(key, val []byte, ver uint64) (bool, error) {
+			// XXX: ver doesn't appear to be necessary?
+			if bytes.Compare(maxKey, key) <= 0 {
+				return false, nil
+			}
+
+			for len(deltaRows) > 0 {
+				cmp := bytes.Compare(key, deltaRows[0].key)
+				if cmp < 0 {
+					break
+				} else if cmp > 0 {
+					if deltaRows[0].row != nil {
+						kvr.rows = append(kvr.rows, toRow(deltaRows[0]))
+					}
+					deltaRows = deltaRows[1:]
+				} else {
+					if deltaRows[0].row != nil {
+						// Must be an update.
+						kvr.rows = append(kvr.rows, toRow(deltaRows[0]))
+						deltaRows = deltaRows[1:]
+					}
+					return true, nil
+				}
+			}
+
+			if len(val) > 0 {
+				row := encode.DecodeRowValue(val)
+				if row == nil {
+					return false, fmt.Errorf("keyval: unable to decode row: %v", val)
+				}
+				kvr.rows = append(kvr.rows, row)
+			}
+			return true, nil
+		})
+	if err != nil {
+		return nil, err
+	}
+
+	for _, ri := range deltaRows {
+		if ri.row != nil {
+			kvr.rows = append(kvr.rows, toRow(ri))
+		}
+	}
+
+	return kvr, nil
 }
 
 func (kvt *table) Insert(ctx context.Context, row []sql.Value) error {
 	kvt.tx.forWrite()
 
-	return errors.New("Insert: not implemented")
+	ri := kvt.td.toItem(row, false)
+	if item := kvt.tx.delta.Get(ri); item != nil {
+		if (item.(rowItem)).row != nil {
+			return fmt.Errorf("keyval: %s: existing row with duplicate primary key", kvt.td.tn)
+		}
+	} else {
+		/*
+			XXX
+					if item := bt.tx.tree.Get(ri); item != nil && (item.(rowItem)).row != nil {
+						return fmt.Errorf("keyval: %s: existing row with duplicate primary key", bt.td.tn)
+					}
+		*/
+	}
+
+	kvt.tx.delta.ReplaceOrInsert(ri)
+	return nil
 }
 
 func (kvr *rows) Columns() []sql.Identifier {
@@ -234,7 +351,8 @@ func (kvr *rows) Delete(ctx context.Context) error {
 		panic(fmt.Sprintf("keyval: table %s no row to delete", kvr.tbl.td.tn))
 	}
 
-	return errors.New("Delete: not implemented")
+	kvr.tbl.tx.delta.ReplaceOrInsert(kvr.tbl.td.toItem(kvr.rows[kvr.idx-1], true))
+	return nil
 }
 
 func (kvr *rows) Update(ctx context.Context, updates []sql.ColumnUpdate) error {
@@ -244,5 +362,28 @@ func (kvr *rows) Update(ctx context.Context, updates []sql.ColumnUpdate) error {
 		panic(fmt.Sprintf("keyval: table %s no row to update", kvr.tbl.td.tn))
 	}
 
-	return errors.New("Update: not implemented")
+	var primaryUpdated bool
+	for _, update := range updates {
+		for _, ck := range kvr.tbl.td.primary {
+			if ck.Number() == update.Index {
+				primaryUpdated = true
+			}
+		}
+	}
+
+	if primaryUpdated {
+		kvr.Delete(ctx)
+
+		for _, update := range updates {
+			kvr.rows[kvr.idx-1][update.Index] = update.Value
+		}
+
+		return kvr.tbl.Insert(ctx, kvr.rows[kvr.idx-1])
+	}
+
+	for _, update := range updates {
+		kvr.rows[kvr.idx-1][update.Index] = update.Value
+	}
+	kvr.tbl.tx.delta.ReplaceOrInsert(kvr.tbl.td.toItem(kvr.rows[kvr.idx-1], false))
+	return nil
 }

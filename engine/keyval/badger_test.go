@@ -64,7 +64,7 @@ func runKVTest(t *testing.T, kv keyval.KV, cmds []kvCmd) {
 						return false, fmt.Errorf("ver: got %d want %d", ver, keyVals[0].ver)
 					}
 					keyVals = keyVals[1:]
-					return false, nil
+					return true, nil
 				})
 			if cmd.fail {
 				if err == nil {
