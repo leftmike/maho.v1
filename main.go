@@ -15,7 +15,9 @@ To Do:
 
 - testeng.RunNextStmtTest: fix for basic and rowcols
 
-- keyval: use encode.MakeKey; finish it up
+- keval: save ver as part of commit; reload ver at startup
+- keyval, rowcols, basic: make sure tested in maho/test
+- keyval: durable tests
 
 - rowcols
 -- snapshot store and truncate WAL

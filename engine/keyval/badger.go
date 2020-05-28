@@ -1,6 +1,7 @@
 package keyval
 
 import (
+	"io"
 	"os"
 
 	"github.com/dgraph-io/badger"
@@ -59,6 +60,13 @@ func (bkv badgerKV) IterateAt(ver uint64, key []byte,
 	return nil
 }
 
+func (bkv badgerKV) GetAt(ver uint64, key []byte, fn func(val []byte, ver uint64) error) error {
+	tx := bkv.db.NewTransactionAt(ver, false)
+	defer tx.Discard()
+
+	return get(tx, key, fn)
+}
+
 func (bkv badgerKV) Update(ver uint64) Updater {
 	return badgerUpdater{
 		tx: bkv.db.NewTransactionAt(ver, true),
@@ -66,8 +74,15 @@ func (bkv badgerKV) Update(ver uint64) Updater {
 }
 
 func (bu badgerUpdater) Get(key []byte, fn func(val []byte, ver uint64) error) error {
-	item, err := bu.tx.Get(key)
+	return get(bu.tx, key, fn)
+}
+
+func get(tx *badger.Txn, key []byte, fn func(val []byte, ver uint64) error) error {
+	item, err := tx.Get(key)
 	if err != nil {
+		if err == badger.ErrKeyNotFound {
+			return io.EOF
+		}
 		return err
 	}
 	return item.Value(

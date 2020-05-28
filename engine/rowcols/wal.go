@@ -29,22 +29,6 @@ type walHeader struct {
 	unused     [7]byte
 }
 
-// use routine from encode.go
-func WriteUint32(w io.Writer, u32 uint32) error {
-	buf := make([]byte, 4)
-	binary.BigEndian.PutUint32(buf, u32)
-	_, err := w.Write(buf)
-	return err
-}
-
-// use routine from encode.go
-func WriteUint64(w io.Writer, u64 uint64) error {
-	buf := make([]byte, 8)
-	binary.BigEndian.PutUint64(buf, u64)
-	_, err := w.Write(buf)
-	return err
-}
-
 type walFile interface {
 	io.Writer
 	io.Reader

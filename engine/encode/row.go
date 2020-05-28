@@ -18,6 +18,10 @@ const (
 )
 
 func EncodeRowValue(row []sql.Value) []byte {
+	if len(row) == 0 {
+		panic("encode row value called with zero length row")
+	}
+
 	buf := EncodeVarint(nil, uint64(len(row)))
 	for num := range row {
 		val := row[num]

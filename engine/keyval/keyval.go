@@ -3,6 +3,7 @@ package keyval
 import (
 	"bytes"
 	"context"
+	"encoding/binary"
 	"errors"
 	"fmt"
 	"io"
@@ -30,13 +31,15 @@ type Updater interface {
 
 type KV interface {
 	IterateAt(ver uint64, key []byte, fn func(key, val []byte, ver uint64) (bool, error)) error
+	GetAt(ver uint64, key []byte, fn func(val []byte, ver uint64) error) error
 	Update(ver uint64) Updater
 }
 
 type keyValStore struct {
-	mutex sync.Mutex
-	kv    KV
-	ver   uint64
+	mutex       sync.Mutex
+	kv          KV
+	ver         uint64
+	commitMutex sync.Mutex
 }
 
 type tableDef struct {
@@ -126,7 +129,7 @@ func (kvst *keyValStore) MakeTableDef(tn sql.TableName, mid int64, cols []sql.Id
 	return &td, nil
 }
 
-func (kvst *keyValStore) Begin(sesid uint64) engine.Transaction {
+func (kvst *keyValStore) Begin(sesid uint64) mideng.Transaction {
 	kvst.mutex.Lock()
 	defer kvst.mutex.Unlock()
 
@@ -136,15 +139,75 @@ func (kvst *keyValStore) Begin(sesid uint64) engine.Transaction {
 	}
 }
 
+func (kvst *keyValStore) commit(ctx context.Context, txVer uint64, delta *btree.BTree) error {
+	kvst.commitMutex.Lock()
+	defer kvst.commitMutex.Unlock()
+
+	ver := kvst.ver + 1
+	upd := kvst.kv.Update(kvst.ver)
+
+	var err error
+	delta.Ascend(
+		func(item btree.Item) bool {
+			txri := item.(rowItem)
+			err = upd.Get(txri.key,
+				func(val []byte, ver uint64) error {
+					if ver > txVer {
+						return errors.New("keyval: write conflict committing transaction")
+					}
+					if txri.row != nil || len(val) > 0 {
+						var newVal []byte
+						if txri.row != nil {
+							newVal = encode.EncodeRowValue(txri.row)
+						}
+						return upd.Set(txri.key, newVal)
+					}
+
+					return nil
+				})
+			if err == io.EOF {
+				if txri.row != nil {
+					err = upd.Set(txri.key, encode.EncodeRowValue(txri.row))
+				} else {
+					err = nil
+				}
+			}
+
+			if err != nil {
+				return false
+			}
+			return true
+		})
+	if err != nil {
+		upd.Rollback()
+		return err
+	}
+
+	err = upd.CommitAt(ver)
+	if err != nil {
+		return err
+	}
+
+	kvst.mutex.Lock()
+	kvst.ver = ver
+	kvst.mutex.Unlock()
+
+	return nil
+}
+
 func (kvtx *transaction) Commit(ctx context.Context) error {
 	if kvtx.st == nil {
 		return errTransactionComplete
 	}
 
-	// XXX
+	var err error
+	if kvtx.delta != nil {
+		err = kvtx.st.commit(ctx, kvtx.ver, kvtx.delta)
+	}
 
 	kvtx.st = nil
-	return nil
+	kvtx.delta = nil
+	return err
 }
 
 func (kvtx *transaction) Rollback() error {
@@ -152,13 +215,32 @@ func (kvtx *transaction) Rollback() error {
 		return errTransactionComplete
 	}
 
-	// XXX
-
 	kvtx.st = nil
+	kvtx.delta = nil
 	return nil
 }
 
 func (_ *transaction) NextStmt() {}
+
+func (kvtx *transaction) Changes(cfn func(mid int64, key string, row []sql.Value) bool) {
+	if kvtx.delta == nil {
+		return
+	}
+
+	kvtx.delta.Ascend(
+		func(item btree.Item) bool {
+			ri := item.(rowItem)
+			var key string
+			var mid int64
+			if len(ri.key) < 8 {
+				key = fmt.Sprintf("%v", ri.key)
+			} else {
+				mid = int64(binary.BigEndian.Uint64(ri.key))
+				key = fmt.Sprintf("%v", ri.key[8:])
+			}
+			return cfn(mid, key, ri.row)
+		})
+}
 
 func (kvtx *transaction) forWrite() {
 	if kvtx.delta == nil {
@@ -166,29 +248,22 @@ func (kvtx *transaction) forWrite() {
 	}
 }
 
-func makeKey(mid int64, primary []engine.ColumnKey, row []sql.Value) []byte {
-	buf := encode.EncodeUint64(make([]byte, 0, 8), uint64(mid))
+func (td *tableDef) makeKey(row []sql.Value) []byte {
+	buf := encode.EncodeUint64(make([]byte, 0, 8), uint64(td.mid))
 	if row != nil {
-		buf = append(buf, encode.MakeKey(primary, row)...)
+		buf = append(buf, encode.MakeKey(td.primary, row)...)
 	}
 	return buf
 }
 
 func (td *tableDef) toItem(row []sql.Value, deleted bool) rowItem {
 	ri := rowItem{
-		key: makeKey(td.mid, td.primary, row),
+		key: td.makeKey(row),
 	}
 	if row != nil && !deleted {
 		ri.row = append(make([]sql.Value, 0, len(td.columns)), row...)
 	}
 	return ri
-}
-
-func toRow(ri rowItem) []sql.Value {
-	if ri.row == nil {
-		return nil
-	}
-	return append(make([]sql.Value, 0, len(ri.row)), ri.row...)
 }
 
 func (ri rowItem) Less(item btree.Item) bool {
@@ -208,23 +283,45 @@ func (kvt *table) PrimaryKey(ctx context.Context) []engine.ColumnKey {
 }
 
 func (kvt *table) Rows(ctx context.Context, minRow, maxRow []sql.Value) (engine.Rows, error) {
+	rows, err := kvt.makeRows(ctx, minRow, maxRow)
+	if err != nil {
+		return nil, err
+	}
+
+	for _, row := range rows.rows {
+		if row == nil {
+			fmt.Printf("row == nil %d\n%v\n", kvt.td.mid, rows.rows)
+		} else if len(row) == 0 {
+			fmt.Printf("len(row) == 0 %d\n%v\n", kvt.td.mid, rows.rows)
+		}
+	}
+	return rows, nil
+}
+
+func (kvt *table) makeRows(ctx context.Context, minRow, maxRow []sql.Value) (*rows, error) {
 	kvr := &rows{
 		tbl: kvt,
 		idx: 0,
 	}
 
+	minKey := kvt.td.makeKey(minRow)
+
 	var maxKey []byte
-	if maxRow == nil {
-		maxKey = makeKey(kvt.td.mid+1, nil, nil)
-	} else {
-		maxKey = makeKey(kvt.td.mid, kvt.td.primary, maxRow)
+	if maxRow != nil {
+		maxKey = kvt.td.makeKey(maxRow)
 	}
 
 	if kvt.tx.delta == nil {
-		err := kvt.st.kv.IterateAt(kvt.tx.ver, makeKey(kvt.td.mid, kvt.td.primary, minRow),
+		err := kvt.st.kv.IterateAt(kvt.tx.ver, minKey,
 			func(key, val []byte, ver uint64) (bool, error) {
-				// XXX: ver doesn't appear to be necessary?
-				if bytes.Compare(maxKey, key) <= 0 {
+				if maxKey == nil {
+					if len(key) < 8 {
+						return false, fmt.Errorf("keyval: key too short: %v", key)
+					}
+					if !bytes.Equal(minKey[:8], key[:8]) {
+						return false, nil
+					}
+				} else if bytes.Compare(maxKey, key) < 0 {
 					return false, nil
 				}
 				if len(val) > 0 {
@@ -246,18 +343,30 @@ func (kvt *table) Rows(ctx context.Context, minRow, maxRow []sql.Value) (engine.
 	kvt.tx.delta.AscendGreaterOrEqual(kvt.td.toItem(minRow, false),
 		func(item btree.Item) bool {
 			ri := item.(rowItem)
-			if bytes.Compare(maxKey, ri.key) <= 0 {
+			if maxKey == nil {
+				if len(ri.key) < 8 {
+					panic(fmt.Sprintf("keyval: key too short: %v", ri.key))
+				}
+				if !bytes.Equal(minKey[:8], ri.key[:8]) {
+					return false
+				}
+			} else if bytes.Compare(maxKey, ri.key) < 0 {
 				return false
 			}
 			deltaRows = append(deltaRows, ri)
 			return true
 		})
-	_ = deltaRows
 
-	err := kvt.st.kv.IterateAt(kvt.tx.ver, makeKey(kvt.td.mid, kvt.td.primary, minRow),
+	err := kvt.st.kv.IterateAt(kvt.tx.ver, minKey,
 		func(key, val []byte, ver uint64) (bool, error) {
-			// XXX: ver doesn't appear to be necessary?
-			if bytes.Compare(maxKey, key) <= 0 {
+			if maxKey == nil {
+				if len(key) < 8 {
+					return false, fmt.Errorf("keyval: key too short: %v", key)
+				}
+				if !bytes.Equal(minKey[:8], key[:8]) {
+					return false, nil
+				}
+			} else if bytes.Compare(maxKey, key) < 0 {
 				return false, nil
 			}
 
@@ -267,13 +376,17 @@ func (kvt *table) Rows(ctx context.Context, minRow, maxRow []sql.Value) (engine.
 					break
 				} else if cmp > 0 {
 					if deltaRows[0].row != nil {
-						kvr.rows = append(kvr.rows, toRow(deltaRows[0]))
+						kvr.rows = append(kvr.rows,
+							append(make([]sql.Value, 0, len(deltaRows[0].row)),
+								deltaRows[0].row...))
 					}
 					deltaRows = deltaRows[1:]
 				} else {
 					if deltaRows[0].row != nil {
 						// Must be an update.
-						kvr.rows = append(kvr.rows, toRow(deltaRows[0]))
+						kvr.rows = append(kvr.rows,
+							append(make([]sql.Value, 0, len(deltaRows[0].row)),
+								deltaRows[0].row...))
 						deltaRows = deltaRows[1:]
 					}
 					return true, nil
@@ -295,7 +408,7 @@ func (kvt *table) Rows(ctx context.Context, minRow, maxRow []sql.Value) (engine.
 
 	for _, ri := range deltaRows {
 		if ri.row != nil {
-			kvr.rows = append(kvr.rows, toRow(ri))
+			kvr.rows = append(kvr.rows, append(make([]sql.Value, 0, len(ri.row)), ri.row...))
 		}
 	}
 
@@ -311,12 +424,17 @@ func (kvt *table) Insert(ctx context.Context, row []sql.Value) error {
 			return fmt.Errorf("keyval: %s: existing row with duplicate primary key", kvt.td.tn)
 		}
 	} else {
-		/*
-			XXX
-					if item := bt.tx.tree.Get(ri); item != nil && (item.(rowItem)).row != nil {
-						return fmt.Errorf("keyval: %s: existing row with duplicate primary key", bt.td.tn)
-					}
-		*/
+		err := kvt.st.kv.GetAt(kvt.tx.ver, ri.key,
+			func(val []byte, ver uint64) error {
+				if len(val) > 0 {
+					return fmt.Errorf("keyval: %s: existing row with duplicate primary key",
+						kvt.td.tn)
+				}
+				return nil
+			})
+		if err != nil && err != io.EOF {
+			return err
+		}
 	}
 
 	kvt.tx.delta.ReplaceOrInsert(ri)

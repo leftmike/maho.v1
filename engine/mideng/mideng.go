@@ -71,10 +71,15 @@ type TableDef interface {
 	PrimaryKey() []engine.ColumnKey
 }
 
+type Transaction interface {
+	engine.Transaction
+	Changes(cfn func(mid int64, key string, row []sql.Value) bool)
+}
+
 type store interface {
 	MakeTableDef(tn sql.TableName, mid int64, cols []sql.Identifier, colTypes []sql.ColumnType,
 		primary []engine.ColumnKey) (TableDef, error)
-	Begin(sesid uint64) engine.Transaction
+	Begin(sesid uint64) Transaction
 }
 
 type midEngine struct {
@@ -162,7 +167,7 @@ func (me *midEngine) CreateMetadataTable(tblname sql.Identifier, maker engine.Ma
 	panic(fmt.Sprintf("%s: use virtual engine with %s engine", me.name, me.name))
 }
 
-func (me *midEngine) init(ctx context.Context, tx engine.Transaction) error {
+func (me *midEngine) init(ctx context.Context, tx Transaction) error {
 	tbl, err := me.sequences.Table(ctx, tx)
 	if err != nil {
 		return err
@@ -204,6 +209,14 @@ func (me *midEngine) init(ctx context.Context, tx engine.Transaction) error {
 	if err != nil {
 		return err
 	}
+
+	/*
+		tx.Changes(
+			func(mid int64, key string, row []sql.Value) bool {
+				fmt.Printf("%d: %s: %v\n", mid, key, row)
+				return true
+			})
+	*/
 
 	err = me.createTable(ctx, tx, sequencesTableName, sequencesMID, me.sequences)
 	if err != nil {

@@ -33,7 +33,7 @@ type rowColsStore struct {
 }
 
 type transaction struct {
-	rcst  *rowColsStore
+	st    *rowColsStore
 	tree  *btree.BTree
 	ver   uint64
 	delta *btree.BTree
@@ -51,9 +51,9 @@ type tableDef struct {
 }
 
 type table struct {
-	rcst *rowColsStore
-	tx   *transaction
-	td   *tableDef
+	st *rowColsStore
+	tx *transaction
+	td *tableDef
 }
 
 type rowItem struct {
@@ -98,9 +98,9 @@ func NewEngine(dataDir string) (engine.Engine, error) {
 func (td *tableDef) Table(ctx context.Context, tx engine.Transaction) (engine.Table, error) {
 	etx := tx.(*transaction)
 	return &table{
-		rcst: etx.rcst,
-		tx:   etx,
-		td:   td,
+		st: etx.st,
+		tx: etx,
+		td: td,
 	}, nil
 
 }
@@ -161,12 +161,12 @@ func (_ *rowColsStore) MakeTableDef(tn sql.TableName, mid int64, cols []sql.Iden
 	return &td, nil
 }
 
-func (rcst *rowColsStore) Begin(sesid uint64) engine.Transaction {
+func (rcst *rowColsStore) Begin(sesid uint64) mideng.Transaction {
 	rcst.mutex.Lock()
 	defer rcst.mutex.Unlock()
 
 	return &transaction{
-		rcst: rcst,
+		st:   rcst,
 		tree: rcst.tree.Clone(),
 		ver:  rcst.ver,
 	}
@@ -234,33 +234,45 @@ func (rcst *rowColsStore) commit(ctx context.Context, txVer uint64, delta *btree
 }
 
 func (rctx *transaction) Commit(ctx context.Context) error {
-	if rctx.rcst == nil {
+	if rctx.st == nil {
 		return errTransactionComplete
 	}
 
 	var err error
 	if rctx.delta != nil {
-		err = rctx.rcst.commit(ctx, rctx.ver, rctx.delta)
+		err = rctx.st.commit(ctx, rctx.ver, rctx.delta)
 	}
 
-	rctx.rcst = nil
+	rctx.st = nil
 	rctx.tree = nil
 	rctx.delta = nil
 	return err
 }
 
 func (rctx *transaction) Rollback() error {
-	if rctx.rcst == nil {
+	if rctx.st == nil {
 		return errTransactionComplete
 	}
 
-	rctx.rcst = nil
+	rctx.st = nil
 	rctx.tree = nil
 	rctx.delta = nil
 	return nil
 }
 
 func (_ *transaction) NextStmt() {}
+
+func (rctx *transaction) Changes(cfn func(mid int64, key string, row []sql.Value) bool) {
+	if rctx.delta == nil {
+		return
+	}
+
+	rctx.delta.Ascend(
+		func(item btree.Item) bool {
+			ri := item.(rowItem)
+			return cfn(ri.mid, fmt.Sprintf("%v: %d", ri.key, ri.ver), ri.row)
+		})
+}
 
 func (rctx *transaction) forWrite() {
 	if rctx.delta == nil {

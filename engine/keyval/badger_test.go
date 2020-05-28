@@ -12,6 +12,7 @@ import (
 
 const (
 	iterateAtCmd = iota
+	getAtCmd
 	updateCmd
 	getCmd
 	setCmd
@@ -74,6 +75,24 @@ func runKVTest(t *testing.T, kv keyval.KV, cmds []kvCmd) {
 				t.Errorf("%sIterateAt() failed with %s", cmd.fln, err)
 			} else if len(keyVals) > 0 {
 				t.Errorf("%sIterateAt() not enough key vals: %d", cmd.fln, len(keyVals))
+			}
+		case getAtCmd:
+			err := kv.GetAt(cmd.ver, []byte(cmd.key),
+				func(val []byte, ver uint64) error {
+					if string(val) != cmd.val {
+						return fmt.Errorf("val: got %s want %s", string(val), cmd.val)
+					}
+					if ver != cmd.ver {
+						return fmt.Errorf("ver: got %d want %d", ver, cmd.ver)
+					}
+					return nil
+				})
+			if cmd.fail {
+				if err == nil {
+					t.Errorf("%sGetAt() did not fail", cmd.fln)
+				}
+			} else if err != nil {
+				t.Errorf("%sGetAt() failed with %s", cmd.fln, err)
 			}
 		case updateCmd:
 			updater = kv.Update(cmd.ver)
@@ -141,6 +160,7 @@ func testKV(t *testing.T, kv keyval.KV) {
 	runKVTest(t, kv,
 		[]kvCmd{
 			{fln: fln(), cmd: iterateAtCmd, ver: 1, key: "A"},
+			{fln: fln(), cmd: getAtCmd, ver: 1, key: "A", fail: true},
 			{fln: fln(), cmd: updateCmd, ver: 1},
 			{fln: fln(), cmd: getCmd, key: "Aaaa", fail: true},
 			{fln: fln(), cmd: setCmd, key: "Aaaa", val: "aaa@2"},
@@ -156,6 +176,7 @@ func testKV(t *testing.T, kv keyval.KV) {
 					{"Accc", "ccc@2", 2},
 				},
 			},
+			{fln: fln(), cmd: getAtCmd, ver: 2, key: "Aaaa", val: "aaa@2"},
 
 			{fln: fln(), cmd: updateCmd, ver: 2},
 			{fln: fln(), cmd: getCmd, key: "Abbb", val: "bbb@2", ver: 2},
@@ -171,6 +192,7 @@ func testKV(t *testing.T, kv keyval.KV) {
 					{"Accc", "ccc@2", 2},
 				},
 			},
+			{fln: fln(), cmd: getAtCmd, ver: 2, key: "Abbb", val: "bbb@2"},
 			{fln: fln(), cmd: iterateAtCmd, ver: 3, key: "A",
 				keyVals: []keyVal{
 					{"Aaaa", "aaa@2", 2},
@@ -179,6 +201,7 @@ func testKV(t *testing.T, kv keyval.KV) {
 					{"Addd", "ddd@3", 3},
 				},
 			},
+			{fln: fln(), cmd: getAtCmd, ver: 3, key: "Abbb", val: "bbb@3"},
 
 			{fln: fln(), cmd: updateCmd, ver: 3},
 			{fln: fln(), cmd: getCmd, key: "Aaaa", val: "aaa@2", ver: 2},
