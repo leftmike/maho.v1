@@ -13,6 +13,9 @@ To Do:
 - indexes: mideng (basic, rowcols, keyvals)
 - get rid of memrows and use basic instead; engine/service might no longer be necessary?
 
+- sql test: keyval(bbolt)
+- add keyval, badger and bbolt to main
+
 - rowcols
 -- snapshot store and truncate WAL
 

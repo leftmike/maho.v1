@@ -61,10 +61,9 @@ type engCmd struct {
 }
 
 type transactionState struct {
-	tdx  int
-	tx   engine.Transaction
-	tbl  engine.Table
-	rows engine.Rows
+	tdx int
+	tx  engine.Transaction
+	tbl engine.Table
 }
 
 var (
@@ -91,6 +90,11 @@ func allRows(t *testing.T, ctx context.Context, rows engine.Rows,
 		}
 		all = append(all, dest)
 	}
+
+	err := rows.Close()
+	if err != nil {
+		t.Errorf("%srows.Close(): failed with %s", fln, err)
+	}
 	return all
 }
 
@@ -100,6 +104,7 @@ func testDatabase(t *testing.T, e engine.Engine, dbname sql.Identifier, cmds []e
 	scname := sql.PUBLIC
 
 	for _, cmd := range cmds {
+		//fmt.Printf("%s%d\n", cmd.fln, cmd.cmd)
 		switch cmd.cmd {
 		case cmdNextStmt:
 		case cmdRows:
@@ -108,13 +113,6 @@ func testDatabase(t *testing.T, e engine.Engine, dbname sql.Identifier, cmds []e
 		case cmdDelete:
 		default:
 			state.tbl = nil
-			if state.rows != nil {
-				err := state.rows.Close()
-				if err != nil {
-					t.Errorf("%srows.Close() failed with %s", cmd.fln, err)
-				}
-				state.rows = nil
-			}
 		}
 
 		switch cmd.cmd {
@@ -262,12 +260,11 @@ func testDatabase(t *testing.T, e engine.Engine, dbname sql.Identifier, cmds []e
 				}
 			}
 		case cmdRows:
-			var err error
-			state.rows, err = state.tbl.Rows(ctx, nil, nil)
+			rows, err := state.tbl.Rows(ctx, nil, nil)
 			if err != nil {
 				t.Errorf("%stable.Rows() failed with %s", cmd.fln, err)
 			} else {
-				vals := allRows(t, ctx, state.rows, cmd.fln)
+				vals := allRows(t, ctx, rows, cmd.fln)
 				if vals != nil {
 					testutil.SortValues(vals)
 					if !reflect.DeepEqual(vals, cmd.values) {
@@ -306,6 +303,11 @@ func testDatabase(t *testing.T, e engine.Engine, dbname sql.Identifier, cmds []e
 						break
 					}
 				}
+
+				err := rows.Close()
+				if err != nil {
+					t.Errorf("%srows.Close() failed with %s", cmd.fln, err)
+				}
 			}
 		case cmdDelete:
 			rows, err := state.tbl.Rows(ctx, nil, nil)
@@ -332,6 +334,11 @@ func testDatabase(t *testing.T, e engine.Engine, dbname sql.Identifier, cmds []e
 						}
 						break
 					}
+				}
+
+				err := rows.Close()
+				if err != nil {
+					t.Errorf("%srows.Close() failed with %s", cmd.fln, err)
 				}
 			}
 		default:
@@ -1308,6 +1315,12 @@ func incColumn(t *testing.T, e engine.Engine, tx engine.Transaction, tdx uint64,
 	if err != nil {
 		t.Fatalf("table.Rows() failed with %s", err)
 	}
+	defer func() {
+		err := rows.Close()
+		if err != nil {
+			t.Errorf("rows.Close() failed with %s", err)
+		}
+	}()
 
 	dest := make([]sql.Value, len(rows.Columns()))
 	for {

@@ -1,7 +1,6 @@
 package keyval_test
 
 import (
-	"path/filepath"
 	"testing"
 
 	"github.com/leftmike/maho/engine"
@@ -10,14 +9,13 @@ import (
 	"github.com/leftmike/maho/testutil"
 )
 
-func TestKeyVal(t *testing.T) {
-	path := filepath.Join("testdata", "keyval")
-	err := testutil.CleanDir(path, nil)
+func TestBadgerKeyVal(t *testing.T) {
+	err := testutil.CleanDir("testdata", []string{".gitignore"})
 	if err != nil {
 		t.Fatal(err)
 	}
 
-	e, err := keyval.NewEngine(path)
+	e, err := keyval.NewBadgerEngine("testdata")
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -30,19 +28,59 @@ func TestKeyVal(t *testing.T) {
 	test.RunParallelTest(t, e)
 }
 
-func TestDurability(t *testing.T) {
-	err := testutil.CleanDir(filepath.Join("testdata", "keyval"), nil)
+func TestBadgerDurability(t *testing.T) {
+	err := testutil.CleanDir("testdata", []string{".gitignore"})
 	if err != nil {
 		t.Fatal(err)
 	}
 
-	test.DurableTableLifecycleTest(t)
+	test.DurableTests(t, "TestBadgerHelper")
 }
 
-func TestDurableHelper(t *testing.T) {
+func TestBadgerHelper(t *testing.T) {
 	test.DurableHelper(t,
 		func() (engine.Engine, error) {
-			e, err := keyval.NewEngine(filepath.Join("testdata", "keyval"))
+			e, err := keyval.NewBadgerEngine("testdata")
+			if err != nil {
+				return nil, err
+			}
+			return e, nil
+		})
+}
+
+func TestBBoltKeyVal(t *testing.T) {
+	err := testutil.CleanDir("testdata", []string{".gitignore"})
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	e, err := keyval.NewBBoltEngine("testdata")
+	if err != nil {
+		t.Fatal(err)
+	}
+	test.RunDatabaseTest(t, e)
+	test.RunTableTest(t, e)
+	test.RunSchemaTest(t, e)
+	test.RunTableLifecycleTest(t, e)
+	test.RunTableRowsTest(t, e)
+	// Work, but are very slow.
+	//test.RunStressTest(t, e)
+	//test.RunParallelTest(t, e)
+}
+
+func TestBBoltDurability(t *testing.T) {
+	err := testutil.CleanDir("testdata", []string{".gitignore"})
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	test.DurableTests(t, "TestBBoltHelper")
+}
+
+func TestBBoltHelper(t *testing.T) {
+	test.DurableHelper(t,
+		func() (engine.Engine, error) {
+			e, err := keyval.NewBBoltEngine("testdata")
 			if err != nil {
 				return nil, err
 			}

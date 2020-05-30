@@ -24,10 +24,10 @@ var (
 	}
 )
 
-func DurableTableLifecycleTest(t *testing.T) {
+func DurableTests(t *testing.T, helper string) {
 	for grp := range durableTests {
 		for num := range durableTests[grp].tests {
-			cmd := exec.Command(os.Args[0], "-test.run=TestDurableHelper")
+			cmd := exec.Command(os.Args[0], fmt.Sprintf("-test.run=%s", helper))
 			cmd.Env = append(
 				append(os.Environ(), fmt.Sprintf("MAHO_DURABLE_TEST=%d", num)),
 				fmt.Sprintf("MAHO_DURABLE_GROUP=%d", grp))

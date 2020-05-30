@@ -85,14 +85,27 @@ type rows struct {
 	curRow    []sql.Value
 }
 
-func NewEngine(dataDir string) (engine.Engine, error) {
+func NewBadgerEngine(dataDir string) (engine.Engine, error) {
 	kv, err := MakeBadgerKV(dataDir)
 	if err != nil {
 		return nil, err
 	}
 
+	return newEngine(kv)
+}
+
+func NewBBoltEngine(dataDir string) (engine.Engine, error) {
+	kv, err := MakeBBoltKV(dataDir)
+	if err != nil {
+		return nil, err
+	}
+
+	return newEngine(kv)
+}
+
+func newEngine(kv KV) (engine.Engine, error) {
 	var ver uint64
-	err = kv.GetAt(math.MaxUint64, versionKey,
+	err := kv.GetAt(math.MaxUint64, versionKey,
 		func(val []byte, keyVer uint64) error {
 			if len(val) != 8 {
 				return fmt.Errorf("keyval: versionKey: len(val) != 8: %d", len(val))

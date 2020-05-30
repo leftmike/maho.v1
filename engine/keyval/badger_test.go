@@ -1,7 +1,6 @@
 package keyval_test
 
 import (
-	"path/filepath"
 	"testing"
 
 	"github.com/leftmike/maho/engine/keyval"
@@ -9,13 +8,12 @@ import (
 )
 
 func TestBadgerKV(t *testing.T) {
-	path := filepath.Join("testdata", "badger")
-	err := testutil.CleanDir(path, []string{".gitignore"})
+	err := testutil.CleanDir("testdata", []string{".gitignore"})
 	if err != nil {
 		t.Fatal(err)
 	}
 
-	kv, err := keyval.MakeBadgerKV(path)
+	kv, err := keyval.MakeBadgerKV("testdata")
 	if err != nil {
 		t.Fatal(err)
 	}

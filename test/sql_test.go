@@ -66,7 +66,7 @@ func testSQL(t *testing.T, typ string, dbname sql.Identifier, testData, dataDir 
 	case "rowcols":
 		e, err = rowcols.NewEngine(dataDir)
 	case "keyval":
-		e, err = keyval.NewEngine(dataDir)
+		e, err = keyval.NewBadgerEngine(dataDir)
 	default:
 		panic(fmt.Sprintf("unexpected engine type: %s", typ))
 	}
