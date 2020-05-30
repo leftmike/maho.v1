@@ -7,6 +7,7 @@ import (
 	"errors"
 	"fmt"
 	"io"
+	"math"
 	"sync"
 
 	"github.com/google/btree"
@@ -20,6 +21,7 @@ import (
 
 var (
 	errTransactionComplete = errors.New("keyval: transaction already completed")
+	versionKey             = []byte{0, 0, 0, 0, 0, 0, 0, 0, 'v', 'e', 'r', 's', 'i', 'o', 'n'}
 )
 
 type Updater interface {
@@ -79,10 +81,30 @@ func NewEngine(dataDir string) (engine.Engine, error) {
 		return nil, err
 	}
 
-	kvst := &keyValStore{
-		kv: kv,
+	var ver uint64
+	err = kv.GetAt(math.MaxUint64, versionKey,
+		func(val []byte, keyVer uint64) error {
+			if len(val) != 8 {
+				return fmt.Errorf("keyval: versionKey: len(val) != 8: %d", len(val))
+			}
+			ver = binary.BigEndian.Uint64(val)
+			if ver != keyVer {
+				return fmt.Errorf("keyval: version mismatch: %d and %d", ver, keyVer)
+			}
+			return nil
+		})
+	var init bool
+	if err == io.EOF {
+		init = true
+	} else if err != nil {
+		return nil, err
 	}
-	me, err := mideng.NewEngine("keyval", kvst, true)
+
+	kvst := &keyValStore{
+		kv:  kv,
+		ver: ver,
+	}
+	me, err := mideng.NewEngine("keyval", kvst, init)
 	if err != nil {
 		return nil, err
 	}
@@ -178,6 +200,9 @@ func (kvst *keyValStore) commit(ctx context.Context, txVer uint64, delta *btree.
 			}
 			return true
 		})
+	if err == nil {
+		err = upd.Set(versionKey, encode.EncodeUint64(make([]byte, 0, 8), ver))
+	}
 	if err != nil {
 		upd.Rollback()
 		return err
@@ -283,22 +308,6 @@ func (kvt *table) PrimaryKey(ctx context.Context) []engine.ColumnKey {
 }
 
 func (kvt *table) Rows(ctx context.Context, minRow, maxRow []sql.Value) (engine.Rows, error) {
-	rows, err := kvt.makeRows(ctx, minRow, maxRow)
-	if err != nil {
-		return nil, err
-	}
-
-	for _, row := range rows.rows {
-		if row == nil {
-			fmt.Printf("row == nil %d\n%v\n", kvt.td.mid, rows.rows)
-		} else if len(row) == 0 {
-			fmt.Printf("len(row) == 0 %d\n%v\n", kvt.td.mid, rows.rows)
-		}
-	}
-	return rows, nil
-}
-
-func (kvt *table) makeRows(ctx context.Context, minRow, maxRow []sql.Value) (*rows, error) {
 	kvr := &rows{
 		tbl: kvt,
 		idx: 0,

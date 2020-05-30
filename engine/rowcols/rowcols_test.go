@@ -1,6 +1,7 @@
 package rowcols_test
 
 import (
+	"path/filepath"
 	"testing"
 
 	"github.com/leftmike/maho/engine"
@@ -10,12 +11,13 @@ import (
 )
 
 func TestRowCols(t *testing.T) {
-	err := testutil.CleanDir("testdata", []string{".gitignore"})
+	path := filepath.Join("testdata", "rowcols")
+	err := testutil.CleanDir(path, nil)
 	if err != nil {
 		t.Fatal(err)
 	}
 
-	e, err := rowcols.NewEngine("testdata")
+	e, err := rowcols.NewEngine(path)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -29,7 +31,7 @@ func TestRowCols(t *testing.T) {
 }
 
 func TestDurability(t *testing.T) {
-	err := testutil.CleanDir("testdata", []string{".gitignore"})
+	err := testutil.CleanDir(filepath.Join("testdata", "rowcols"), nil)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -40,7 +42,7 @@ func TestDurability(t *testing.T) {
 func TestDurableHelper(t *testing.T) {
 	test.DurableHelper(t,
 		func() (engine.Engine, error) {
-			e, err := rowcols.NewEngine("testdata")
+			e, err := rowcols.NewEngine(filepath.Join("testdata", "rowcols"))
 			if err != nil {
 				return nil, err
 			}

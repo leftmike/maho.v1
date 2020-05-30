@@ -18,7 +18,7 @@ type badgerUpdater struct {
 func MakeBadgerKV(dataDir string) (KV, error) {
 	os.MkdirAll(dataDir, 0755)
 
-	db, err := badger.OpenManaged(badger.DefaultOptions(dataDir))
+	db, err := badger.OpenManaged(badger.DefaultOptions(dataDir).WithBypassLockGuard(true))
 	if err != nil {
 		return nil, err
 	}
