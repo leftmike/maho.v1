@@ -13,9 +13,7 @@ To Do:
 - indexes: mideng (basic, rowcols, keyvals)
 - get rid of memrows and use basic instead; engine/service might no longer be necessary?
 
-- testeng.RunNextStmtTest: fix for basic and rowcols
-
-- keyval, rowcols, basic: make sure tested in maho/test
+- testeng.RunNextStmtTest: fix for basic, rowcols, keyval
 
 - rowcols
 -- snapshot store and truncate WAL

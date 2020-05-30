@@ -10,6 +10,7 @@ import (
 
 	"github.com/leftmike/maho/engine"
 	"github.com/leftmike/maho/engine/basic"
+	"github.com/leftmike/maho/engine/keyval"
 	"github.com/leftmike/maho/engine/memrows"
 	"github.com/leftmike/maho/engine/rowcols"
 	"github.com/leftmike/maho/sql"
@@ -64,6 +65,8 @@ func testSQL(t *testing.T, typ string, dbname sql.Identifier, testData, dataDir 
 		e, err = memrows.NewEngine(dataDir)
 	case "rowcols":
 		e, err = rowcols.NewEngine(dataDir)
+	case "keyval":
+		e, err = keyval.NewEngine(dataDir)
 	default:
 		panic(fmt.Sprintf("unexpected engine type: %s", typ))
 	}
@@ -116,4 +119,20 @@ func TestSQLRowCols(t *testing.T) {
 		t.Fatal(err)
 	}
 	testSQL(t, "rowcols", sql.ID("sqltest_rowcols"), *testData, dataDir)
+}
+
+func TestSQLKeyVal(t *testing.T) {
+	dataDir := filepath.Join("testdata", "keyval")
+
+	err := testutil.CleanDir(dataDir, []string{".gitignore", "expected", "output", "sql"})
+	if err != nil {
+		t.Fatal(err)
+	}
+	testSQL(t, "keyval", sql.ID("test_keyval"), "testdata", dataDir)
+
+	err = testutil.CleanDir(dataDir, []string{".gitignore", "expected", "output", "sql"})
+	if err != nil {
+		t.Fatal(err)
+	}
+	testSQL(t, "keyval", sql.ID("sqltest_keyval"), *testData, dataDir)
 }
