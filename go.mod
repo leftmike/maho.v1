@@ -13,6 +13,7 @@ require (
 	github.com/leftmike/sqltest v0.0.0-20191110173541-691faa9792a4
 	github.com/sergi/go-diff v1.1.0 // indirect
 	github.com/sirupsen/logrus v1.5.0
+	go.etcd.io/bbolt v1.3.4
 	golang.org/x/crypto v0.0.0-20200429183012-4b2356b1ed79
 	golang.org/x/sys v0.0.0-20200202164722-d101bd2416d5 // indirect
 	google.golang.org/appengine v1.6.6 // indirect

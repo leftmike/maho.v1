@@ -2,6 +2,7 @@ package keyval
 
 import (
 	"io"
+	"math"
 	"os"
 
 	"github.com/dgraph-io/badger"
@@ -17,7 +18,8 @@ type badgerIterator struct {
 }
 
 type badgerUpdater struct {
-	tx *badger.Txn
+	tx  *badger.Txn
+	ver uint64
 }
 
 func MakeBadgerKV(dataDir string) (KV, error) {
@@ -32,7 +34,7 @@ func MakeBadgerKV(dataDir string) (KV, error) {
 	}, nil
 }
 
-func (bkv badgerKV) Iterate(ver uint64, key []byte) Iterator {
+func (bkv badgerKV) Iterate(ver uint64, key []byte) (Iterator, error) {
 	tx := bkv.db.NewTransactionAt(ver, false)
 	it := tx.NewIterator(badger.DefaultIteratorOptions)
 	it.Seek(key)
@@ -40,7 +42,7 @@ func (bkv badgerKV) Iterate(ver uint64, key []byte) Iterator {
 	return badgerIterator{
 		tx: tx,
 		it: it,
-	}
+	}, nil
 }
 
 func (bit badgerIterator) Item(fn func(key, val []byte, ver uint64) error) error {
@@ -71,10 +73,11 @@ func (bkv badgerKV) GetAt(ver uint64, key []byte, fn func(val []byte, ver uint64
 	return get(tx, key, fn)
 }
 
-func (bkv badgerKV) Update(ver uint64) Updater {
+func (bkv badgerKV) Update(ver uint64) (Updater, error) {
 	return badgerUpdater{
-		tx: bkv.db.NewTransactionAt(ver, true),
-	}
+		tx:  bkv.db.NewTransactionAt(math.MaxUint64, true),
+		ver: ver,
+	}, nil
 }
 
 func (bu badgerUpdater) Get(key []byte, fn func(val []byte, ver uint64) error) error {
@@ -99,8 +102,8 @@ func (bu badgerUpdater) Set(key, val []byte) error {
 	return bu.tx.Set(key, val)
 }
 
-func (bu badgerUpdater) CommitAt(ver uint64) error {
-	return bu.tx.CommitAt(ver, nil)
+func (bu badgerUpdater) Commit() error {
+	return bu.tx.CommitAt(bu.ver, nil)
 }
 
 func (bu badgerUpdater) Rollback() {

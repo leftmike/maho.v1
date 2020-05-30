@@ -27,7 +27,7 @@ var (
 type Updater interface {
 	Get(key []byte, fn func(val []byte, ver uint64) error) error
 	Set(key, val []byte) error
-	CommitAt(ver uint64) error
+	Commit() error
 	Rollback()
 }
 
@@ -38,9 +38,9 @@ type Iterator interface {
 }
 
 type KV interface {
-	Iterate(ver uint64, key []byte) Iterator
+	Iterate(ver uint64, key []byte) (Iterator, error)
 	GetAt(ver uint64, key []byte, fn func(val []byte, ver uint64) error) error
-	Update(ver uint64) Updater
+	Update(ver uint64) (Updater, error)
 }
 
 type keyValStore struct {
@@ -177,9 +177,11 @@ func (kvst *keyValStore) commit(ctx context.Context, txVer uint64, delta *btree.
 	defer kvst.commitMutex.Unlock()
 
 	ver := kvst.ver + 1
-	upd := kvst.kv.Update(kvst.ver)
+	upd, err := kvst.kv.Update(ver)
+	if err != nil {
+		return err
+	}
 
-	var err error
 	delta.Ascend(
 		func(item btree.Item) bool {
 			txri := item.(rowItem)
@@ -219,7 +221,7 @@ func (kvst *keyValStore) commit(ctx context.Context, txVer uint64, delta *btree.
 		return err
 	}
 
-	err = upd.CommitAt(ver)
+	err = upd.Commit()
 	if err != nil {
 		return err
 	}
@@ -320,10 +322,15 @@ func (kvt *table) PrimaryKey(ctx context.Context) []engine.ColumnKey {
 
 func (kvt *table) Rows(ctx context.Context, minRow, maxRow []sql.Value) (engine.Rows, error) {
 	minKey := kvt.td.makeKey(minRow)
+	it, err := kvt.st.kv.Iterate(kvt.tx.ver, minKey)
+	if err != nil {
+		return nil, err
+	}
+
 	kvr := &rows{
 		tbl:    kvt,
 		minKey: minKey,
-		it:     kvt.st.kv.Iterate(kvt.tx.ver, minKey),
+		it:     it,
 	}
 
 	if maxRow != nil {
