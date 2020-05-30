@@ -11,6 +11,11 @@ type badgerKV struct {
 	db *badger.DB
 }
 
+type badgerIterator struct {
+	tx *badger.Txn
+	it *badger.Iterator
+}
+
 type badgerUpdater struct {
 	tx *badger.Txn
 }
@@ -27,37 +32,36 @@ func MakeBadgerKV(dataDir string) (KV, error) {
 	}, nil
 }
 
-func (bkv badgerKV) IterateAt(ver uint64, key []byte,
-	fn func(key, val []byte, ver uint64) (bool, error)) error {
-
+func (bkv badgerKV) Iterate(ver uint64, key []byte) Iterator {
 	tx := bkv.db.NewTransactionAt(ver, false)
-	defer tx.Discard()
-
 	it := tx.NewIterator(badger.DefaultIteratorOptions)
-	defer it.Close()
-
 	it.Seek(key)
-	for it.Valid() {
-		var more bool
 
-		item := it.Item()
-		err := item.Value(
-			func(val []byte) error {
-				var err error
-				more, err = fn(item.Key(), val, item.Version())
-				return err
-			})
-		if err != nil {
-			return err
-		}
-		if !more {
-			break
-		}
+	return badgerIterator{
+		tx: tx,
+		it: it,
+	}
+}
 
-		it.Next()
+func (bit badgerIterator) Item(fn func(key, val []byte, ver uint64) error) error {
+	if !bit.it.Valid() {
+		return io.EOF
 	}
 
-	return nil
+	item := bit.it.Item()
+	return item.Value(
+		func(val []byte) error {
+			return fn(item.Key(), val, item.Version())
+		})
+}
+
+func (bit badgerIterator) Next() {
+	bit.it.Next()
+}
+
+func (bit badgerIterator) Close() {
+	bit.it.Close()
+	bit.tx.Discard()
 }
 
 func (bkv badgerKV) GetAt(ver uint64, key []byte, fn func(val []byte, ver uint64) error) error {

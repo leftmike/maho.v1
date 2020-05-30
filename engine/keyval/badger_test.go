@@ -3,6 +3,7 @@ package keyval_test
 import (
 	"errors"
 	"fmt"
+	"io"
 	"path/filepath"
 	"testing"
 
@@ -11,7 +12,7 @@ import (
 )
 
 const (
-	iterateAtCmd = iota
+	iterateCmd = iota
 	getAtCmd
 	updateCmd
 	getCmd
@@ -46,35 +47,42 @@ func runKVTest(t *testing.T, kv keyval.KV, cmds []kvCmd) {
 	var updater keyval.Updater
 	for _, cmd := range cmds {
 		switch cmd.cmd {
-		case iterateAtCmd:
+		case iterateCmd:
 			keyVals := cmd.keyVals
-			err := kv.IterateAt(cmd.ver, []byte(cmd.key),
-				func(key, val []byte, ver uint64) (bool, error) {
-					if len(keyVals) == 0 {
-						return false, errors.New("too many key vals")
+			it := kv.Iterate(cmd.ver, []byte(cmd.key))
+			for {
+				err := it.Item(
+					func(key, val []byte, ver uint64) error {
+						if len(keyVals) == 0 {
+							return errors.New("too many key vals")
+						}
+						if string(key) != keyVals[0].key {
+							return fmt.Errorf("key: got %s want %s", string(key), keyVals[0].key)
+						}
+						if string(val) != keyVals[0].val {
+							return fmt.Errorf("val: got %s want %s", string(val), keyVals[0].val)
+						}
+						if ver != keyVals[0].ver {
+							return fmt.Errorf("ver: got %d want %d", ver, keyVals[0].ver)
+						}
+						keyVals = keyVals[1:]
+						return nil
+					})
+				if cmd.fail {
+					if err == nil {
+						t.Errorf("%sIterate() did not fail", cmd.fln)
 					}
-					if string(key) != keyVals[0].key {
-						return false, fmt.Errorf("key: got %s want %s", string(key),
-							keyVals[0].key)
+					break
+				} else if err != nil {
+					if err != io.EOF {
+						t.Errorf("%sIterate() failed with %s", cmd.fln, err)
 					}
-					if string(val) != keyVals[0].val {
-						return false, fmt.Errorf("val: got %s want %s", string(val),
-							keyVals[0].val)
-					}
-					if ver != keyVals[0].ver {
-						return false, fmt.Errorf("ver: got %d want %d", ver, keyVals[0].ver)
-					}
-					keyVals = keyVals[1:]
-					return true, nil
-				})
-			if cmd.fail {
-				if err == nil {
-					t.Errorf("%sIterateAt() did not fail", cmd.fln)
+					break
 				}
-			} else if err != nil {
-				t.Errorf("%sIterateAt() failed with %s", cmd.fln, err)
-			} else if len(keyVals) > 0 {
-				t.Errorf("%sIterateAt() not enough key vals: %d", cmd.fln, len(keyVals))
+				it.Next()
+			}
+			if len(keyVals) > 0 {
+				t.Errorf("%sIterate() not enough key vals: %d", cmd.fln, len(keyVals))
 			}
 		case getAtCmd:
 			err := kv.GetAt(cmd.ver, []byte(cmd.key),
@@ -159,7 +167,7 @@ func testKV(t *testing.T, kv keyval.KV) {
 
 	runKVTest(t, kv,
 		[]kvCmd{
-			{fln: fln(), cmd: iterateAtCmd, ver: 1, key: "A"},
+			{fln: fln(), cmd: iterateCmd, ver: 1, key: "A"},
 			{fln: fln(), cmd: getAtCmd, ver: 1, key: "A", fail: true},
 			{fln: fln(), cmd: updateCmd, ver: 1},
 			{fln: fln(), cmd: getCmd, key: "Aaaa", fail: true},
@@ -168,8 +176,8 @@ func testKV(t *testing.T, kv keyval.KV) {
 			{fln: fln(), cmd: setCmd, key: "Abbb", val: "bbb@2"},
 			{fln: fln(), cmd: commitAtCmd, ver: 2},
 
-			{fln: fln(), cmd: iterateAtCmd, ver: 1, key: "A"},
-			{fln: fln(), cmd: iterateAtCmd, ver: 2, key: "A",
+			{fln: fln(), cmd: iterateCmd, ver: 1, key: "A"},
+			{fln: fln(), cmd: iterateCmd, ver: 2, key: "A",
 				keyVals: []keyVal{
 					{"Aaaa", "aaa@2", 2},
 					{"Abbb", "bbb@2", 2},
@@ -184,16 +192,17 @@ func testKV(t *testing.T, kv keyval.KV) {
 			{fln: fln(), cmd: setCmd, key: "Addd", val: "ddd@3"},
 			{fln: fln(), cmd: commitAtCmd, ver: 3},
 
-			{fln: fln(), cmd: iterateAtCmd, ver: 1, key: "A"},
-			{fln: fln(), cmd: iterateAtCmd, ver: 2, key: "A",
+			{fln: fln(), cmd: getAtCmd, ver: 2, key: "Abbb", val: "bbb@2"},
+			{fln: fln(), cmd: getAtCmd, ver: 3, key: "Abbb", val: "bbb@3"},
+			{fln: fln(), cmd: iterateCmd, ver: 1, key: "A"},
+			{fln: fln(), cmd: iterateCmd, ver: 2, key: "A",
 				keyVals: []keyVal{
 					{"Aaaa", "aaa@2", 2},
 					{"Abbb", "bbb@2", 2},
 					{"Accc", "ccc@2", 2},
 				},
 			},
-			{fln: fln(), cmd: getAtCmd, ver: 2, key: "Abbb", val: "bbb@2"},
-			{fln: fln(), cmd: iterateAtCmd, ver: 3, key: "A",
+			{fln: fln(), cmd: iterateCmd, ver: 3, key: "A",
 				keyVals: []keyVal{
 					{"Aaaa", "aaa@2", 2},
 					{"Abbb", "bbb@3", 3},
@@ -201,7 +210,6 @@ func testKV(t *testing.T, kv keyval.KV) {
 					{"Addd", "ddd@3", 3},
 				},
 			},
-			{fln: fln(), cmd: getAtCmd, ver: 3, key: "Abbb", val: "bbb@3"},
 
 			{fln: fln(), cmd: updateCmd, ver: 3},
 			{fln: fln(), cmd: getCmd, key: "Aaaa", val: "aaa@2", ver: 2},
@@ -209,15 +217,15 @@ func testKV(t *testing.T, kv keyval.KV) {
 			{fln: fln(), cmd: setCmd, key: "Abbb", val: "bbb@4"},
 			{fln: fln(), cmd: rollbackCmd},
 
-			{fln: fln(), cmd: iterateAtCmd, ver: 1, key: "A"},
-			{fln: fln(), cmd: iterateAtCmd, ver: 2, key: "A",
+			{fln: fln(), cmd: iterateCmd, ver: 1, key: "A"},
+			{fln: fln(), cmd: iterateCmd, ver: 2, key: "A",
 				keyVals: []keyVal{
 					{"Aaaa", "aaa@2", 2},
 					{"Abbb", "bbb@2", 2},
 					{"Accc", "ccc@2", 2},
 				},
 			},
-			{fln: fln(), cmd: iterateAtCmd, ver: 3, key: "A",
+			{fln: fln(), cmd: iterateCmd, ver: 3, key: "A",
 				keyVals: []keyVal{
 					{"Aaaa", "aaa@2", 2},
 					{"Abbb", "bbb@3", 3},
