@@ -51,14 +51,16 @@ func (bit badgerIterator) Item(fn func(key, val []byte, ver uint64) error) error
 	}
 
 	item := bit.it.Item()
-	return item.Value(
+	err := item.Value(
 		func(val []byte) error {
 			return fn(item.Key(), val, item.Version())
 		})
-}
+	if err != nil {
+		return err
+	}
 
-func (bit badgerIterator) Next() {
 	bit.it.Next()
+	return nil
 }
 
 func (bit badgerIterator) Close() {

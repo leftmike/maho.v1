@@ -83,7 +83,6 @@ func runKVTest(t *testing.T, kv keyval.KV, cmds []kvCmd) {
 					}
 					break
 				}
-				it.Next()
 			}
 			if len(keyVals) > 0 {
 				t.Errorf("%sIterate() not enough key vals: %d", cmd.fln, len(keyVals))

@@ -33,7 +33,6 @@ type Updater interface {
 
 type Iterator interface {
 	Item(fn func(key, val []byte, ver uint64) error) error
-	Next()
 	Close()
 }
 
@@ -436,8 +435,6 @@ func (kvr *rows) Next(ctx context.Context, dest []sql.Value) error {
 					break
 				} else if err != nil {
 					return err
-				} else {
-					kvr.it.Next()
 				}
 			}
 		}
