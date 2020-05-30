@@ -13,9 +13,6 @@ To Do:
 - indexes: mideng (basic, rowcols, keyvals)
 - get rid of memrows and use basic instead; engine/service might no longer be necessary?
 
-- sql test: keyval(bbolt)
-- add keyval, badger and bbolt to main
-
 - rowcols
 -- snapshot store and truncate WAL
 
@@ -46,6 +43,7 @@ import (
 	"github.com/leftmike/maho/config"
 	"github.com/leftmike/maho/engine"
 	"github.com/leftmike/maho/engine/basic"
+	"github.com/leftmike/maho/engine/keyval"
 	"github.com/leftmike/maho/engine/memrows"
 	"github.com/leftmike/maho/engine/rowcols"
 	"github.com/leftmike/maho/evaluate"
@@ -191,9 +189,13 @@ func main() {
 		e, err = memrows.NewEngine(*dataDir)
 	case "rowcols":
 		e, err = rowcols.NewEngine(*dataDir)
+	case "badger":
+		e, err = keyval.NewBadgerEngine(*dataDir)
+	case "bbolt":
+		e, err = keyval.NewBBoltEngine(*dataDir)
 	default:
 		fmt.Fprintf(os.Stderr,
-			"maho: got %s for engine; want basic, memrows, or rowcols", *eng)
+			"maho: got %s for engine; want basic, memrows, rowcols, badger, or bbolt", *eng)
 		return
 	}
 	if err != nil {

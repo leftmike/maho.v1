@@ -65,8 +65,10 @@ func testSQL(t *testing.T, typ string, dbname sql.Identifier, testData, dataDir 
 		e, err = memrows.NewEngine(dataDir)
 	case "rowcols":
 		e, err = rowcols.NewEngine(dataDir)
-	case "keyval":
+	case "badger":
 		e, err = keyval.NewBadgerEngine(dataDir)
+	case "bbolt":
+		e, err = keyval.NewBBoltEngine(dataDir)
 	default:
 		panic(fmt.Sprintf("unexpected engine type: %s", typ))
 	}
@@ -121,18 +123,32 @@ func TestSQLRowCols(t *testing.T) {
 	testSQL(t, "rowcols", sql.ID("sqltest_rowcols"), *testData, dataDir)
 }
 
-func TestSQLKeyVal(t *testing.T) {
-	dataDir := filepath.Join("testdata", "keyval")
+func TestSQLBadger(t *testing.T) {
+	dataDir := filepath.Join("testdata", "badger")
 
 	err := testutil.CleanDir(dataDir, []string{".gitignore", "expected", "output", "sql"})
 	if err != nil {
 		t.Fatal(err)
 	}
-	testSQL(t, "keyval", sql.ID("test_keyval"), "testdata", dataDir)
+	testSQL(t, "badger", sql.ID("test_keyval"), "testdata", dataDir)
 
 	err = testutil.CleanDir(dataDir, []string{".gitignore", "expected", "output", "sql"})
 	if err != nil {
 		t.Fatal(err)
 	}
-	testSQL(t, "keyval", sql.ID("sqltest_keyval"), *testData, dataDir)
+	testSQL(t, "badger", sql.ID("sqltest_keyval"), *testData, dataDir)
+}
+
+func TestSQLBBolt(t *testing.T) {
+	err := testutil.CleanDir("testdata", []string{".gitignore", "expected", "output", "sql"})
+	if err != nil {
+		t.Fatal(err)
+	}
+	testSQL(t, "bbolt", sql.ID("test_keyval"), "testdata", "testdata")
+
+	err = testutil.CleanDir("testdata", []string{".gitignore", "expected", "output", "sql"})
+	if err != nil {
+		t.Fatal(err)
+	}
+	testSQL(t, "bbolt", sql.ID("sqltest_keyval"), *testData, "testdata")
 }

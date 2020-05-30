@@ -1,1 +1,7 @@
-rowcols/
+# ignore everything in this directory
+*
+# except for the following
+!.gitignore
+!expected/
+!output/
+!sql/
