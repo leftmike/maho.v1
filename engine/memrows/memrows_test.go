@@ -17,7 +17,6 @@ func TestMemRows(t *testing.T) {
 	test.RunTableLifecycleTest(t, e)
 	test.RunSchemaTest(t, e)
 	test.RunTableRowsTest(t, e)
-	test.RunNextStmtTest(t, e)
 	test.RunParallelTest(t, e)
 	test.RunStressTest(t, e)
 }

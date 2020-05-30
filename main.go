@@ -13,10 +13,11 @@ To Do:
 - indexes: mideng (basic, rowcols, keyvals)
 - get rid of memrows and use basic instead; engine/service might no longer be necessary?
 
-- testeng.RunNextStmtTest: fix for basic, rowcols, keyval
-
 - rowcols
 -- snapshot store and truncate WAL
+
+- subquery expressions: EXISTS, IN, NOT IN, ANY/SOME, ALL
+- conditional expressions: CASE, COALESCE, NULLIF, GREATEST, LEAST
 
 - [CONSTRAINT constraint]
 - CHECK '(' logical_expression ')'

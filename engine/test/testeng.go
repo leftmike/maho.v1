@@ -1247,57 +1247,6 @@ func RunTableRowsTest(t *testing.T, e engine.Engine) {
 	}
 }
 
-func RunNextStmtTest(t *testing.T, e engine.Engine) {
-	t.Helper()
-
-	dbname := sql.ID("next_stmt_test")
-	err := e.CreateDatabase(dbname, nil)
-	if err != nil {
-		t.Fatal(err)
-	}
-
-	testDatabase(t, e, dbname,
-		[]engCmd{
-			{fln: fln(), cmd: cmdBegin},
-			{fln: fln(), cmd: cmdCreateTable, name: sql.ID("tbl4")},
-			{fln: fln(), cmd: cmdLookupTable, name: sql.ID("tbl4")},
-			{fln: fln(), cmd: cmdInsert, row: []sql.Value{sql.Int64Value(1), sql.Int64Value(1),
-				sql.StringValue("first row")}},
-			{fln: fln(), cmd: cmdInsert, row: []sql.Value{sql.Int64Value(2), sql.Int64Value(4),
-				sql.StringValue("second row")}},
-			{fln: fln(), cmd: cmdNextStmt},
-			{fln: fln(), cmd: cmdRows,
-				values: [][]sql.Value{
-					{sql.Int64Value(1), sql.Int64Value(1), sql.StringValue("first row")},
-					{sql.Int64Value(2), sql.Int64Value(4), sql.StringValue("second row")},
-				},
-			},
-			{fln: fln(), cmd: cmdCommit},
-
-			{fln: fln(), cmd: cmdBegin},
-			{fln: fln(), cmd: cmdLookupTable, name: sql.ID("tbl4")},
-			{fln: fln(), cmd: cmdDelete, rowID: 1},
-			{fln: fln(), cmd: cmdRollback},
-
-			{fln: fln(), cmd: cmdBegin},
-			{fln: fln(), cmd: cmdLookupTable, name: sql.ID("tbl4")},
-			{fln: fln(), cmd: cmdUpdate, rowID: 1,
-				updates: []sql.ColumnUpdate{{Index: 1, Value: sql.Int64Value(40)}}},
-			{fln: fln(), cmd: cmdCommit},
-
-			{fln: fln(), cmd: cmdBegin},
-			{fln: fln(), cmd: cmdLookupTable, name: sql.ID("tbl4")},
-			{fln: fln(), cmd: cmdUpdate, rowID: 1,
-				updates: []sql.ColumnUpdate{{Index: 1, Value: sql.Int64Value(400)}}},
-			{fln: fln(), cmd: cmdUpdate, rowID: 1,
-				updates: []sql.ColumnUpdate{{Index: 1, Value: sql.Int64Value(-400)}}, fail: true},
-			{fln: fln(), cmd: cmdNextStmt},
-			{fln: fln(), cmd: cmdUpdate, rowID: 1,
-				updates: []sql.ColumnUpdate{{Index: 1, Value: sql.Int64Value(4000)}}},
-			{fln: fln(), cmd: cmdCommit},
-		})
-}
-
 func RunParallelTest(t *testing.T, e engine.Engine) {
 	t.Helper()
 
