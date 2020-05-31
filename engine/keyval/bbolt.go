@@ -39,6 +39,9 @@ func MakeBBoltKV(dataDir string) (KV, error) {
 	if err != nil {
 		return nil, err
 	}
+	// Dangerous, but about 100x faster.
+	db.NoFreelistSync = true
+	db.NoSync = true
 
 	tx, err := db.Begin(true)
 	if err != nil {

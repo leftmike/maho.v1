@@ -63,9 +63,9 @@ func TestBBoltKeyVal(t *testing.T) {
 	test.RunSchemaTest(t, e)
 	test.RunTableLifecycleTest(t, e)
 	test.RunTableRowsTest(t, e)
-	// Work, but are very slow.
-	//test.RunStressTest(t, e)
-	//test.RunParallelTest(t, e)
+	// Work, but are very slow without setting NoSync = true and NoFreelistSync = true
+	test.RunStressTest(t, e)
+	test.RunParallelTest(t, e)
 }
 
 func TestBBoltDurability(t *testing.T) {

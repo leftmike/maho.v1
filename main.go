@@ -13,6 +13,8 @@ To Do:
 - indexes: mideng (basic, rowcols, keyvals)
 - get rid of memrows and use basic instead; engine/service might no longer be necessary?
 
+- tests with 1000s to 100000s of rows
+
 - rowcols
 -- snapshot store and truncate WAL
 
