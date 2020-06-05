@@ -11,6 +11,7 @@ import (
 	"github.com/leftmike/maho/engine"
 	"github.com/leftmike/maho/engine/basic"
 	"github.com/leftmike/maho/engine/keyval"
+	"github.com/leftmike/maho/engine/kvrows"
 	"github.com/leftmike/maho/engine/memrows"
 	"github.com/leftmike/maho/engine/rowcols"
 	"github.com/leftmike/maho/sql"
@@ -69,6 +70,8 @@ func testSQL(t *testing.T, typ string, dbname sql.Identifier, testData, dataDir 
 		e, err = keyval.NewBadgerEngine(dataDir)
 	case "bbolt":
 		e, err = keyval.NewBBoltEngine(dataDir)
+	case "kvrows":
+		e, err = kvrows.NewBadgerEngine(dataDir)
 	default:
 		panic(fmt.Sprintf("unexpected engine type: %s", typ))
 	}
@@ -151,4 +154,20 @@ func TestSQLBBolt(t *testing.T) {
 		t.Fatal(err)
 	}
 	testSQL(t, "bbolt", sql.ID("sqltest_keyval"), *testData, "testdata")
+}
+
+func TestSQLKVRows(t *testing.T) {
+	dataDir := filepath.Join("testdata", "kvrows")
+
+	err := testutil.CleanDir(dataDir, []string{".gitignore", "expected", "output", "sql"})
+	if err != nil {
+		t.Fatal(err)
+	}
+	testSQL(t, "kvrows", sql.ID("test_keyval"), "testdata", dataDir)
+
+	err = testutil.CleanDir(dataDir, []string{".gitignore", "expected", "output", "sql"})
+	if err != nil {
+		t.Fatal(err)
+	}
+	testSQL(t, "kvrows", sql.ID("sqltest_keyval"), *testData, dataDir)
 }

@@ -104,6 +104,7 @@ func (stmt *CreateTable) Execute(ctx context.Context, eng engine.Engine,
 	if err != nil {
 		return -1, err
 	}
+	tx.NextStmt()
 
 	for i, ik := range stmt.Indexes {
 		err = eng.CreateIndex(ctx, tx, sql.ID(fmt.Sprintf("index-%d", i)), stmt.Table, ik.Unique,
@@ -111,6 +112,7 @@ func (stmt *CreateTable) Execute(ctx context.Context, eng engine.Engine,
 		if err != nil {
 			return -1, err
 		}
+		tx.NextStmt()
 	}
 
 	return -1, nil

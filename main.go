@@ -10,12 +10,18 @@ To Do:
 - specify a subset of columns to return: Table.Rows(cols []int, ...)
 - Rows.NextColumns(ctx context.Context, destCols []sql.ColumnValue) error
 
-- indexes: mideng (basic, rowcols, keyvals)
+- indexes: mideng (basic, rowcols, keyvals, kvrows)
 - get rid of memrows and use basic instead; engine/service might no longer be necessary?
 
 - tests with 1000s to 100000s of rows
 -- generate rows
 -- use sample databases
+
+- kvrows
+-- persist version as a key on commit
+-- get durable tests working
+-- cleanup proposals
+-- consider making rows incremental, maybe as blocks of rows
 
 - COPY <table> (<column> ...) FROM STDIN
 
