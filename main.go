@@ -14,6 +14,10 @@ To Do:
 - get rid of memrows and use basic instead; engine/service might no longer be necessary?
 
 - tests with 1000s to 100000s of rows
+-- generate rows
+-- use sample databases
+
+- COPY <table> (<column> ...) FROM STDIN
 
 - rowcols
 -- snapshot store and truncate WAL

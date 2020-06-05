@@ -218,25 +218,31 @@ func (me *midEngine) init(ctx context.Context, tx Transaction) error {
 			})
 	*/
 
+	tx.NextStmt()
 	err = me.createTable(ctx, tx, sequencesTableName, sequencesMID, me.sequences)
 	if err != nil {
 		return err
 	}
+
+	tx.NextStmt()
 	err = me.createTable(ctx, tx, databasesTableName, databasesMID, me.databases)
 	if err != nil {
 		return err
 	}
 
+	tx.NextStmt()
 	err = me.createTable(ctx, tx, schemasTableName, schemasMID, me.schemas)
 	if err != nil {
 		return err
 	}
 
+	tx.NextStmt()
 	err = me.createTable(ctx, tx, tablesTableName, tablesMID, me.tables)
 	if err != nil {
 		return err
 	}
 
+	tx.NextStmt()
 	err = me.createTable(ctx, tx, indexesTableName, indexesMID, me.indexes)
 	if err != nil {
 		return err
@@ -262,6 +268,7 @@ func (me *midEngine) createDatabase(ctx context.Context, tx engine.Transaction,
 		return err
 	}
 
+	tx.NextStmt()
 	return me.CreateSchema(ctx, tx, sql.SchemaName{dbname, sql.PUBLIC})
 }
 

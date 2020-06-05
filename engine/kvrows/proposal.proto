@@ -1,0 +1,13 @@
+syntax = "proto3";
+
+option go_package = "./kvrows";
+
+message Proposal {
+    uint64 TID = 1;
+    repeated ProposedUpdate Updates = 2;
+}
+
+message ProposedUpdate {
+    uint32 SID = 1; // Statement ID
+    bytes Value = 2;
+}
