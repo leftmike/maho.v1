@@ -1,6 +1,6 @@
 package kvrows
 
-//go:generate protoc --go_opt=paths=source_relative --go_out=. state.proto
+//go:generate protoc --go_opt=paths=source_relative --go_out=. data.proto
 
 import (
 	"bytes"
@@ -51,24 +51,10 @@ type KV interface {
 	Update() (Updater, error)
 }
 
-type state byte
-
-const (
-	activeState state = iota + 1
-	committedState
-	abortedState
-)
-
-type txState struct {
-	state state
-	ver   uint64
-}
-
 type kvStore struct {
 	kv           KV
 	mutex        sync.Mutex
-	transactions map[uint64]*Transaction
-	states       map[uint64]txState
+	transactions map[uint64]*TransactionData
 	lastTID      uint64
 	ver          uint64
 	epoch        uint64
@@ -137,24 +123,54 @@ func getUint64(kv KV, key []byte) (uint64, error) {
 	return u64, err
 }
 
-func set(kv KV, key, val []byte) error {
-	upd, err := kv.Update()
+func loadTransactions(kv KV) (map[uint64]*TransactionData, error) {
+	it, err := kv.Iterate(encode.EncodeUint64(make([]byte, 0, 8), transactionsMID))
 	if err != nil {
-		return err
+		return nil, err
+	}
+	defer it.Close()
+
+	transactions := map[uint64]*TransactionData{}
+	for {
+		err = it.Item(
+			func(key, val []byte) error {
+				if len(key) < 8 {
+					return fmt.Errorf("kvrows: key too short: %v", key)
+				}
+				if binary.BigEndian.Uint64(key[:8]) != transactionsMID {
+					return io.EOF
+				}
+				if len(key) != 16 {
+					return fmt.Errorf("kvrows: transaction key wrong length: %v", key)
+				}
+				tid := binary.BigEndian.Uint64(key[8:])
+
+				var td TransactionData
+				err := proto.Unmarshal(val, &td)
+				if err != nil {
+					return err
+				}
+
+				transactions[tid] = &td
+				return nil
+			})
+		if err == io.EOF {
+			break
+		} else if err != nil {
+			return nil, err
+		}
 	}
 
-	err = upd.Set(key, val)
-	if err != nil {
-		upd.Rollback()
-		return err
-	}
-
-	return upd.Commit()
+	return transactions, nil
 }
 
-func loadTransactions(kv KV) (map[uint64]*Transaction, error) {
-
-	return nil, nil
+func setTransactionData(upd Updater, tid uint64, td *TransactionData) error {
+	val, err := proto.Marshal(td)
+	if err != nil {
+		return err
+	}
+	return upd.Set(
+		encode.EncodeUint64(encode.EncodeUint64(make([]byte, 0, 16), transactionsMID), tid), val)
 }
 
 func makeEngine(kv KV) (*kvStore, bool, error) {
@@ -170,20 +186,57 @@ func makeEngine(kv KV) (*kvStore, bool, error) {
 	if err != nil && err != io.EOF {
 		return nil, false, err
 	}
-
 	epoch += 1
 
-	err = set(kv, epochKey, encode.EncodeUint64(make([]byte, 0, 8), epoch))
+	transactions, err := loadTransactions(kv)
 	if err != nil {
 		return nil, false, err
 	}
 
-	return &kvStore{
-		kv:     kv,
-		states: map[uint64]txState{},
-		ver:    ver,
-		epoch:  epoch,
-	}, init, nil
+	kvst := &kvStore{
+		kv:           kv,
+		transactions: transactions,
+		ver:          ver,
+		epoch:        epoch,
+	}
+
+	upd, err := kvst.kv.Update()
+	if err != nil {
+		return nil, false, err
+	}
+	err = kvst.startupStore(upd)
+	if err != nil {
+		upd.Rollback()
+		return nil, false, err
+	}
+	err = upd.Commit()
+	if err != nil {
+		return nil, false, err
+	}
+
+	return kvst, init, nil
+}
+
+func (kvst *kvStore) startupStore(upd Updater) error {
+	err := upd.Set(epochKey, encode.EncodeUint64(make([]byte, 0, 8), kvst.epoch))
+	if err != nil {
+		return err
+	}
+
+	for tid, td := range kvst.transactions {
+		if tid > kvst.lastTID {
+			kvst.lastTID = tid
+		}
+		if td.State == TransactionState_Active {
+			td.State = TransactionState_Aborted
+			err = setTransactionData(upd, tid, td)
+			if err != nil {
+				return err
+			}
+		}
+	}
+
+	return nil
 }
 
 func (td *tableDef) Table(ctx context.Context, tx engine.Transaction) (engine.Table, error) {
@@ -232,28 +285,52 @@ func (kvst *kvStore) MakeTableDef(tn sql.TableName, mid int64, cols []sql.Identi
 	return &td, nil
 }
 
+func (kvst *kvStore) setTransactionData(tid uint64, td *TransactionData) error {
+	upd, err := kvst.kv.Update()
+	if err != nil {
+		return err
+	}
+	err = setTransactionData(upd, tid, td)
+	if err != nil {
+		upd.Rollback()
+		return err
+	}
+	return upd.Commit()
+}
+
 func (kvst *kvStore) Begin(sesid uint64) mideng.Transaction {
 	kvst.mutex.Lock()
-	defer kvst.mutex.Unlock()
-
 	kvst.lastTID += 1
-	kvst.states[kvst.lastTID] = txState{state: activeState}
+	tid := kvst.lastTID
+	ver := kvst.ver
+
+	td := &TransactionData{
+		State: TransactionState_Active,
+		Epoch: kvst.epoch,
+	}
+	kvst.transactions[tid] = td
+	kvst.mutex.Unlock()
+
+	err := kvst.setTransactionData(tid, td)
+	if err != nil {
+		panic(fmt.Sprintf("kvrows: unable to set transaction data: %s", err))
+	}
 
 	return &transaction{
 		st:    kvst,
 		sesid: sesid,
-		tid:   kvst.lastTID,
-		ver:   kvst.ver,
+		tid:   tid,
+		ver:   ver,
 		sid:   1,
 	}
 }
 
-func (kvst *kvStore) getTxState(tid uint64) (state, uint64) {
+func (kvst *kvStore) getTxState(tid uint64) (TransactionState, uint64) {
 	kvst.mutex.Lock()
 	defer kvst.mutex.Unlock()
 
-	txst := kvst.states[tid]
-	return txst.state, txst.ver
+	txd := kvst.transactions[tid]
+	return txd.State, txd.Version
 }
 
 func (kvst *kvStore) commit(ctx context.Context, tid uint64) error {
@@ -261,38 +338,53 @@ func (kvst *kvStore) commit(ctx context.Context, tid uint64) error {
 	defer kvst.commitMutex.Unlock()
 
 	ver := kvst.ver + 1
+	td := &TransactionData{
+		State:   TransactionState_Committed,
+		Epoch:   kvst.epoch,
+		Version: ver,
+	}
 
 	upd, err := kvst.kv.Update()
 	if err != nil {
-		kvst.rollback(tid)
-		return err
+		return kvst.rollback(tid)
 	}
-	err = upd.Set(versionKey, encode.EncodeUint64(make([]byte, 0, 8), ver))
+	err = setTransactionData(upd, tid, td)
+	if err == nil {
+		err = upd.Set(versionKey, encode.EncodeUint64(make([]byte, 0, 8), ver))
+		if err == nil {
+			err = upd.Commit()
+		}
+	}
 	if err != nil {
-		kvst.rollback(tid)
 		upd.Rollback()
-		return err
-	}
-	err = upd.Commit()
-	if err != nil {
-		kvst.rollback(tid)
-		return err
+		return kvst.rollback(tid)
 	}
 
 	kvst.mutex.Lock()
-	kvst.states[tid] = txState{state: committedState, ver: ver}
+	kvst.transactions[tid] = td
 	kvst.ver = ver
 	kvst.mutex.Unlock()
 
-	return nil
+	return err
 }
 
 func (kvst *kvStore) rollback(tid uint64) error {
 	kvst.mutex.Lock()
-	defer kvst.mutex.Unlock()
+	td := kvst.transactions[tid]
+	td.State = TransactionState_Aborted
+	kvst.mutex.Unlock()
 
-	kvst.states[tid] = txState{state: abortedState}
-	return nil
+	upd, err := kvst.kv.Update()
+	if err == nil {
+		err = setTransactionData(upd, tid, td)
+		if err != nil {
+			upd.Rollback()
+		} else {
+			err = upd.Commit()
+		}
+	}
+
+	return err
 }
 
 func (kvtx *transaction) Commit(ctx context.Context) error {
@@ -300,9 +392,10 @@ func (kvtx *transaction) Commit(ctx context.Context) error {
 		return errTransactionComplete
 	}
 
-	// XXX: if commit is successful, cleanup proposals
-
-	return kvtx.st.commit(ctx, kvtx.tid)
+	err := kvtx.st.commit(ctx, kvtx.tid)
+	kvtx.st = nil
+	// XXX: cleanup proposals
+	return err
 }
 
 func (kvtx *transaction) Rollback() error {
@@ -310,9 +403,10 @@ func (kvtx *transaction) Rollback() error {
 		return errTransactionComplete
 	}
 
+	err := kvtx.st.rollback(kvtx.tid)
+	kvtx.st = nil
 	// XXX: cleanup proposals
-
-	return kvtx.st.rollback(kvtx.tid)
+	return err
 }
 
 func (kvtx *transaction) NextStmt() {
@@ -335,15 +429,15 @@ func (kvt *table) PrimaryKey(ctx context.Context) []engine.ColumnKey {
 	return kvt.td.primary
 }
 
-func (kvt *table) unmarshalProposal(key, val []byte) (*Proposal, error) {
-	var psl Proposal
-	err := proto.Unmarshal(val, &psl)
-	if err != nil || len(psl.Updates) == 0 {
+func (kvt *table) unmarshalProposal(key, val []byte) (*ProposalData, error) {
+	var pd ProposalData
+	err := proto.Unmarshal(val, &pd)
+	if err != nil || len(pd.Updates) == 0 {
 		return nil, fmt.Errorf("kvrows: %s: unable to unmarshal proposal at %v: %v",
 			kvt.td.tn, key, val)
 	}
 
-	return &psl, nil
+	return &pd, nil
 }
 
 func (kvt *table) decodeRow(key, val []byte) ([]sql.Value, error) {
@@ -358,13 +452,13 @@ func (kvt *table) decodeRow(key, val []byte) ([]sql.Value, error) {
 }
 
 func (kvt *table) getProposedRow(key, val []byte) ([]sql.Value, bool, error) {
-	psl, err := kvt.unmarshalProposal(key, val)
+	pd, err := kvt.unmarshalProposal(key, val)
 	if err != nil {
 		return nil, false, err
 	}
 
-	if psl.TID == kvt.tx.tid {
-		for _, pu := range psl.Updates {
+	if pd.TID == kvt.tx.tid {
+		for _, pu := range pd.Updates {
 			if pu.SID < kvt.tx.sid {
 				var row []sql.Value
 				if len(pu.Value) > 0 {
@@ -376,17 +470,18 @@ func (kvt *table) getProposedRow(key, val []byte) ([]sql.Value, bool, error) {
 				return row, true, nil
 			}
 		}
-	} else if state, commitVer := kvt.st.getTxState(psl.TID); state == committedState &&
-		commitVer <= kvt.tx.ver {
-
-		var row []sql.Value
-		if len(psl.Updates[0].Value) > 0 {
-			row, err = kvt.decodeRow(key, psl.Updates[0].Value)
-			if err != nil {
-				return nil, false, err
+	} else {
+		state, commitVer := kvt.st.getTxState(pd.TID)
+		if state == TransactionState_Committed && commitVer <= kvt.tx.ver {
+			var row []sql.Value
+			if len(pd.Updates[0].Value) > 0 {
+				row, err = kvt.decodeRow(key, pd.Updates[0].Value)
+				if err != nil {
+					return nil, false, err
+				}
 			}
+			return row, true, nil
 		}
-		return row, true, nil
 	}
 
 	return nil, false, nil
@@ -479,33 +574,33 @@ func makeKeyVersion(key []byte, ver uint64) []byte {
 	return encode.EncodeUint64(buf, ^ver)
 }
 
-func (kvt *table) prepareUpdate(upd Updater, updateKey []byte) (*Proposal, bool, error) {
-	var psl *Proposal
+func (kvt *table) prepareUpdate(upd Updater, updateKey []byte) (*ProposalData, bool, error) {
+	var pd *ProposalData
 	err := upd.Get(makeKeyVersion(updateKey, ProposalVersion),
 		func(val []byte) error {
 			var err error
-			psl, err = kvt.unmarshalProposal(updateKey, val)
+			pd, err = kvt.unmarshalProposal(updateKey, val)
 			return err
 		})
 	if err == io.EOF {
-		return &Proposal{TID: kvt.tx.tid}, false, nil
+		return &ProposalData{TID: kvt.tx.tid}, false, nil
 	} else if err != nil {
 		return nil, false, err
 	}
 
-	pu := psl.Updates[0]
-	if psl.TID == kvt.tx.tid {
+	pu := pd.Updates[0]
+	if pd.TID == kvt.tx.tid {
 		if pu.SID == kvt.tx.sid {
 			return nil, false, fmt.Errorf("kvrows: %s: multiple updates of %v",
 				kvt.td.tn, updateKey)
 		}
-		return psl, len(pu.Value) != 0, nil
+		return pd, len(pu.Value) != 0, nil
 	} else {
-		state, ver := kvt.st.getTxState(psl.TID)
-		if state == activeState {
+		state, ver := kvt.st.getTxState(pd.TID)
+		if state == TransactionState_Active {
 			return nil, false, fmt.Errorf("kvrows: %s: conflict with proposed version of %v",
 				kvt.td.tn, updateKey)
-		} else if state == committedState {
+		} else if state == TransactionState_Committed {
 			if ver > kvt.tx.ver {
 				return nil, false, fmt.Errorf("kvrows: %s: conflict with newer version of %v",
 					kvt.td.tn, updateKey)
@@ -514,7 +609,7 @@ func (kvt *table) prepareUpdate(upd Updater, updateKey []byte) (*Proposal, bool,
 			if err != nil {
 				return nil, false, err
 			}
-			return &Proposal{TID: kvt.tx.tid}, len(pu.Value) != 0, nil
+			return &ProposalData{TID: kvt.tx.tid}, len(pu.Value) != 0, nil
 		}
 
 		// Proposal was aborted; look for highest versioned value.
@@ -548,18 +643,18 @@ func (kvt *table) prepareUpdate(upd Updater, updateKey []byte) (*Proposal, bool,
 			return nil
 		})
 	if err == io.EOF {
-		return &Proposal{TID: kvt.tx.tid}, false, nil
+		return &ProposalData{TID: kvt.tx.tid}, false, nil
 	} else if err != nil {
 		return nil, false, err
 	}
 
-	return &Proposal{TID: kvt.tx.tid}, existing, nil
+	return &ProposalData{TID: kvt.tx.tid}, existing, nil
 }
 
 func (kvt *table) proposeUpdate(upd Updater, updateKey []byte, row []sql.Value,
 	mustExist bool) error {
 
-	psl, exists, err := kvt.prepareUpdate(upd, updateKey)
+	pd, exists, err := kvt.prepareUpdate(upd, updateKey)
 	if err != nil {
 		return err
 	}
@@ -580,14 +675,14 @@ func (kvt *table) proposeUpdate(upd Updater, updateKey []byte, row []sql.Value,
 	if len(row) > 0 {
 		rowValue = encode.EncodeRowValue(row)
 	}
-	psl.Updates = append([]*ProposedUpdate{
+	pd.Updates = append([]*ProposedUpdate{
 		&ProposedUpdate{
 			SID:   kvt.tx.sid,
 			Value: rowValue,
 		},
-	}, psl.Updates...)
+	}, pd.Updates...)
 
-	val, err := proto.Marshal(psl)
+	val, err := proto.Marshal(pd)
 	if err != nil {
 		return err
 	}

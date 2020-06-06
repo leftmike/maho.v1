@@ -18,8 +18,6 @@ To Do:
 -- use sample databases
 
 - kvrows
--- transaction state needs to be persisted on commit or rollback
--- get durable tests working
 -- cleanup proposals
 -- consider making Rows() incremental, maybe as blocks of rows
 

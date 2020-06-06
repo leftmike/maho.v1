@@ -3,6 +3,7 @@ package kvrows_test
 import (
 	"testing"
 
+	"github.com/leftmike/maho/engine"
 	"github.com/leftmike/maho/engine/kvrows"
 	"github.com/leftmike/maho/engine/test"
 	"github.com/leftmike/maho/testutil"
@@ -27,7 +28,6 @@ func TestBadgerKVRows(t *testing.T) {
 	test.RunParallelTest(t, e)
 }
 
-/*
 func TestBadgerDurability(t *testing.T) {
 	err := testutil.CleanDir("testdata", []string{".gitignore"})
 	if err != nil {
@@ -47,4 +47,3 @@ func TestBadgerHelper(t *testing.T) {
 			return e, nil
 		})
 }
-*/

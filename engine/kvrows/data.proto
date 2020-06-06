@@ -2,7 +2,7 @@ syntax = "proto3";
 
 option go_package = "./kvrows";
 
-message Proposal {
+message ProposalData {
     uint64 TID = 1;
     repeated ProposedUpdate Updates = 2;
 }
@@ -18,7 +18,7 @@ enum TransactionState {
     Aborted = 2;
 }
 
-message Transaction {
+message TransactionData {
     uint64 Epoch = 1;
     TransactionState State = 2;
     uint64 Version = 3;
