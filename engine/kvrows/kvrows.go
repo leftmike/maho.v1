@@ -1,6 +1,6 @@
 package kvrows
 
-//go:generate protoc --go_opt=paths=source_relative --go_out=. proposal.proto
+//go:generate protoc --go_opt=paths=source_relative --go_out=. state.proto
 
 import (
 	"bytes"
@@ -21,11 +21,15 @@ import (
 )
 
 const (
+	transactionsMID = 1
+
 	ProposalVersion = math.MaxUint64
 )
 
 var (
 	errTransactionComplete = errors.New("keyval: transaction already completed")
+	versionKey             = []byte{0, 0, 0, 0, 0, 0, 0, 0, 'v', 'e', 'r', 's', 'i', 'o', 'n'}
+	epochKey               = []byte{0, 0, 0, 0, 0, 0, 0, 0, 'e', 'p', 'o', 'c', 'h'}
 )
 
 type Updater interface {
@@ -61,11 +65,14 @@ type txState struct {
 }
 
 type kvStore struct {
-	kv      KV
-	mutex   sync.Mutex
-	states  map[uint64]txState
-	lastTID uint64
-	ver     uint64
+	kv           KV
+	mutex        sync.Mutex
+	transactions map[uint64]*Transaction
+	states       map[uint64]txState
+	lastTID      uint64
+	ver          uint64
+	epoch        uint64
+	commitMutex  sync.Mutex
 }
 
 type tableDef struct {
@@ -103,17 +110,80 @@ func NewBadgerEngine(dataDir string) (engine.Engine, error) {
 		return nil, err
 	}
 
-	kvst := &kvStore{
-		kv:     kv,
-		states: map[uint64]txState{},
+	kvst, init, err := makeEngine(kv)
+	if err != nil {
+		return nil, err
 	}
-	me, err := mideng.NewEngine("kvrows", kvst, true)
+
+	me, err := mideng.NewEngine("kvrows", kvst, init)
 	if err != nil {
 		return nil, err
 	}
 	ve := virtual.NewEngine(me)
 
 	return ve, nil
+}
+
+func getUint64(kv KV, key []byte) (uint64, error) {
+	var u64 uint64
+	err := kv.Get(key,
+		func(val []byte) error {
+			if len(val) != 8 {
+				return fmt.Errorf("keyval: key %v: len(val) != 8: %d", key, len(val))
+			}
+			u64 = binary.BigEndian.Uint64(val)
+			return nil
+		})
+	return u64, err
+}
+
+func set(kv KV, key, val []byte) error {
+	upd, err := kv.Update()
+	if err != nil {
+		return err
+	}
+
+	err = upd.Set(key, val)
+	if err != nil {
+		upd.Rollback()
+		return err
+	}
+
+	return upd.Commit()
+}
+
+func loadTransactions(kv KV) (map[uint64]*Transaction, error) {
+
+	return nil, nil
+}
+
+func makeEngine(kv KV) (*kvStore, bool, error) {
+	var init bool
+	ver, err := getUint64(kv, versionKey)
+	if err == io.EOF {
+		init = true
+	} else if err != nil {
+		return nil, false, err
+	}
+
+	epoch, err := getUint64(kv, epochKey)
+	if err != nil && err != io.EOF {
+		return nil, false, err
+	}
+
+	epoch += 1
+
+	err = set(kv, epochKey, encode.EncodeUint64(make([]byte, 0, 8), epoch))
+	if err != nil {
+		return nil, false, err
+	}
+
+	return &kvStore{
+		kv:     kv,
+		states: map[uint64]txState{},
+		ver:    ver,
+		epoch:  epoch,
+	}, init, nil
 }
 
 func (td *tableDef) Table(ctx context.Context, tx engine.Transaction) (engine.Table, error) {
@@ -187,11 +257,33 @@ func (kvst *kvStore) getTxState(tid uint64) (state, uint64) {
 }
 
 func (kvst *kvStore) commit(ctx context.Context, tid uint64) error {
-	kvst.mutex.Lock()
-	defer kvst.mutex.Unlock()
+	kvst.commitMutex.Lock()
+	defer kvst.commitMutex.Unlock()
 
-	kvst.ver += 1
-	kvst.states[tid] = txState{state: committedState, ver: kvst.ver}
+	ver := kvst.ver + 1
+
+	upd, err := kvst.kv.Update()
+	if err != nil {
+		kvst.rollback(tid)
+		return err
+	}
+	err = upd.Set(versionKey, encode.EncodeUint64(make([]byte, 0, 8), ver))
+	if err != nil {
+		kvst.rollback(tid)
+		upd.Rollback()
+		return err
+	}
+	err = upd.Commit()
+	if err != nil {
+		kvst.rollback(tid)
+		return err
+	}
+
+	kvst.mutex.Lock()
+	kvst.states[tid] = txState{state: committedState, ver: ver}
+	kvst.ver = ver
+	kvst.mutex.Unlock()
+
 	return nil
 }
 

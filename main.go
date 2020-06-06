@@ -18,10 +18,10 @@ To Do:
 -- use sample databases
 
 - kvrows
--- persist version as a key on commit
+-- transaction state needs to be persisted on commit or rollback
 -- get durable tests working
 -- cleanup proposals
--- consider making rows incremental, maybe as blocks of rows
+-- consider making Rows() incremental, maybe as blocks of rows
 
 - COPY <table> (<column> ...) FROM STDIN
 

@@ -17,11 +17,13 @@ import (
 )
 
 const (
-	sequencesMID = 1
-	databasesMID = 2
-	schemasMID   = 3
-	tablesMID    = 4
-	indexesMID   = 5
+	// MIDs 0 to 127 for use by stores.
+	sequencesMID   = 128
+	databasesMID   = 129
+	schemasMID     = 130
+	tablesMID      = 131
+	indexesMID     = 132
+	maxReservedMID = 2048
 
 	midSequence = "mid"
 )
@@ -176,7 +178,7 @@ func (me *midEngine) init(ctx context.Context, tx Transaction) error {
 	err = ttbl.Insert(ctx,
 		sequenceRow{
 			Sequence: midSequence,
-			Current:  2048,
+			Current:  maxReservedMID,
 		})
 	if err != nil {
 		return err

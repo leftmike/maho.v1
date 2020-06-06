@@ -26,3 +26,25 @@ func TestBadgerKVRows(t *testing.T) {
 	test.RunStressTest(t, e)
 	test.RunParallelTest(t, e)
 }
+
+/*
+func TestBadgerDurability(t *testing.T) {
+	err := testutil.CleanDir("testdata", []string{".gitignore"})
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	test.DurableTests(t, "TestBadgerHelper")
+}
+
+func TestBadgerHelper(t *testing.T) {
+	test.DurableHelper(t,
+		func() (engine.Engine, error) {
+			e, err := kvrows.NewBadgerEngine("testdata")
+			if err != nil {
+				return nil, err
+			}
+			return e, nil
+		})
+}
+*/

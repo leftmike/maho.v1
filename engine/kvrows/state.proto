@@ -11,3 +11,16 @@ message ProposedUpdate {
     uint32 SID = 1; // Statement ID
     bytes Value = 2;
 }
+
+enum TransactionState {
+    Active = 0;
+    Committed = 1;
+    Aborted = 2;
+}
+
+message Transaction {
+    uint64 Epoch = 1;
+    TransactionState State = 2;
+    uint64 Version = 3;
+    repeated bytes UpdatedKeys = 4;
+}
