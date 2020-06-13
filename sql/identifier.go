@@ -39,6 +39,7 @@ const (
 	SCHEMAS
 	SEQUENCES
 	SMALLINT
+	STDIN
 	SYSTEM
 	TABLES
 	TEXT
@@ -54,11 +55,13 @@ const (
 	BEGIN
 	BY
 	COMMIT
+	COPY
 	CREATE
 	CROSS
 	DATABASE
 	DEFAULT
 	DELETE
+	DELIMITER
 	DESC
 	DETACH
 	DROP
@@ -138,11 +141,13 @@ var knownKeywords = map[string]struct {
 	"BYTES":       {BYTES, false},
 	"CHAR":        {CHAR, false},
 	"COMMIT":      {COMMIT, true},
+	"COPY":        {COPY, true},
 	"CREATE":      {CREATE, true},
 	"CROSS":       {CROSS, true},
 	"DATABASE":    {DATABASE, true},
 	"DEFAULT":     {DEFAULT, true},
 	"DELETE":      {DELETE, true},
+	"DELIMITER":   {DELIMITER, true},
 	"DESC":        {DESC, true},
 	"DETACH":      {DETACH, true},
 	"DOUBLE":      {DOUBLE, false},
@@ -183,6 +188,7 @@ var knownKeywords = map[string]struct {
 	"SET":         {SET, true},
 	"SHOW":        {SHOW, true},
 	"SMALLINT":    {SMALLINT, false},
+	"STDIN":       {STDIN, false},
 	"START":       {START, true},
 	"TABLE":       {TABLE, true},
 	"TEXT":        {TEXT, false},

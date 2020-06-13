@@ -61,14 +61,51 @@ func (s *Scanner) Init(rr io.RuneReader, fn string) {
 
 	s.rr = rr
 	s.filename = fn
+	s.line = 1
+	s.column = 0
 }
 
 func (s *Scanner) Scan(sctx *ScanCtx) {
 	s.buffer.Reset()
 	sctx.Filename = s.filename
-	sctx.Line = 1
-	sctx.Column = 0
 	sctx.Token = s.scan(sctx)
+}
+
+type runeReader struct {
+	s *Scanner
+}
+
+func (s *Scanner) RuneReader() (io.RuneReader, int) {
+	for {
+		r, _, err := s.rr.ReadRune()
+		if err != nil {
+			break
+		}
+		if r == '\n' {
+			s.line += 1
+			s.column = 0
+			break
+		}
+	}
+
+	return runeReader{
+		s: s,
+	}, s.line
+}
+
+func (rr runeReader) ReadRune() (rune, int, error) {
+	r, size, err := rr.s.rr.ReadRune()
+	if err != nil {
+		return 0, 0, err
+	}
+
+	if r == '\n' {
+		rr.s.line += 1
+		rr.s.column = 0
+	} else {
+		rr.s.column += 1
+	}
+	return r, size, nil
 }
 
 func (s *Scanner) scan(sctx *ScanCtx) rune {

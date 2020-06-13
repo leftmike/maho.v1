@@ -42,7 +42,11 @@ func (stmt *InsertValues) String() string {
 			if j > 0 {
 				s += ", "
 			}
-			s += v.String()
+			if v == nil {
+				s += "NULL"
+			} else {
+				s += v.String()
+			}
 		}
 
 		s += ")"
@@ -144,7 +148,7 @@ func (plan *insertValuesPlan) Execute(ctx context.Context, eng engine.Engine,
 
 			row[i], err = c.ConvertValue(plan.cols[i], v)
 			if err != nil {
-				return -1, fmt.Errorf("engine: table %s: %s", plan.table, err.Error())
+				return -1, fmt.Errorf("engine: table %s: %s", plan.table, err)
 			}
 		}
 

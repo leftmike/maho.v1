@@ -15,11 +15,11 @@ type Reader struct {
 	column     int
 }
 
-func NewReader(filename string, rr io.RuneReader) *Reader {
+func NewReader(filename string, rr io.RuneReader, line int) *Reader {
 	return &Reader{
 		rr:       rr,
 		filename: filename,
-		line:     1,
+		line:     line,
 		column:   0,
 	}
 }

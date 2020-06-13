@@ -249,6 +249,7 @@ func (p *parser) parseStmt() evaluate.Stmt {
 		sql.ATTACH,
 		sql.BEGIN,
 		sql.COMMIT,
+		sql.COPY,
 		sql.CREATE,
 		sql.DELETE,
 		sql.DETACH,
@@ -265,10 +266,13 @@ func (p *parser) parseStmt() evaluate.Stmt {
 	) {
 	case sql.BEGIN:
 		// BEGIN
-		return &misc.Begin{}
+		return &evaluate.Begin{}
 	case sql.COMMIT:
 		// COMMIT
 		return &misc.Commit{}
+	case sql.COPY:
+		// COPY
+		return p.parseCopy()
 	case sql.CREATE:
 		switch p.expectReserved(sql.DATABASE, sql.INDEX, sql.SCHEMA, sql.TABLE, sql.UNIQUE) {
 		case sql.DATABASE:
@@ -326,7 +330,7 @@ func (p *parser) parseStmt() evaluate.Stmt {
 	case sql.START:
 		// START TRANSACTION
 		p.expectReserved(sql.TRANSACTION)
-		return &misc.Begin{}
+		return &evaluate.Begin{}
 	case sql.UPDATE:
 		// UPDATE ...
 		return p.parseUpdate()
@@ -911,6 +915,51 @@ func (p *parser) parseInsert() evaluate.Stmt {
 			break
 		}
 	}
+
+	return &s
+}
+
+func (p *parser) parseCopy() evaluate.Stmt {
+	/*
+		COPY [[database '.'] schema '.'] table '(' column [',' ...] ')' FROM STDIN
+			[DELIMITER delimiter]
+	*/
+
+	var s query.Copy
+	s.Table = p.parseTableName()
+
+	if p.maybeToken(token.LParen) {
+		for {
+			nam := p.expectIdentifier("expected a column name")
+			for _, c := range s.Columns {
+				if c == nam {
+					p.error(fmt.Sprintf("duplicate column name %s", nam))
+				}
+			}
+			s.Columns = append(s.Columns, nam)
+			r := p.expectTokens(token.Comma, token.RParen)
+			if r == token.RParen {
+				break
+			}
+		}
+	}
+
+	p.expectReserved(sql.FROM)
+	if p.expectIdentifier("expected STDIN") != sql.STDIN {
+		p.error("expected STDIN")
+	}
+
+	s.Delimiter = '\t'
+	if p.optionalReserved(sql.DELIMITER) {
+		if p.scan() != token.String || len(p.sctx.String) != 1 {
+			p.error("expected a one character string")
+		}
+		s.Delimiter = rune(p.sctx.String[0])
+	}
+
+	// Must be last because the scanner will skip to the end of the line before returning
+	// the reader.
+	s.From, s.FromLine = p.scanner.RuneReader()
 
 	return &s
 }

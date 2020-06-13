@@ -10,6 +10,8 @@ To Do:
 - specify a subset of columns to return: Table.Rows(cols []int, ...)
 - Rows.NextColumns(ctx context.Context, destCols []sql.ColumnValue) error
 
+- identifier.go: reserved field is not used
+
 - indexes: mideng (basic, rowcols, keyvals, kvrows)
 - get rid of memrows and use basic instead; engine/service might no longer be necessary?
 
@@ -21,7 +23,7 @@ To Do:
 -- cleanup proposals
 -- consider making Rows() incremental, maybe as blocks of rows
 
-- COPY <table> (<column> ...) FROM STDIN
+- COPY <table> (<column> ...) FROM STDIN [DELIMITER <string>]
 
 - rowcols
 -- snapshot store and truncate WAL

@@ -36,7 +36,7 @@ eeeee
 		{eof: true},
 	}
 
-	rdr := copy.NewReader("test", strings.NewReader(test))
+	rdr := copy.NewReader("test", strings.NewReader(test), 1)
 	for _, ret := range results {
 		r, err := rdr.ReadRune()
 		if err == io.EOF {

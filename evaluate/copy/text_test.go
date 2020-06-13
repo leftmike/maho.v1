@@ -33,7 +33,7 @@ func TestReadTextColumn(t *testing.T) {
 	}
 
 	for _, c := range cases {
-		rdr := NewReader("test", strings.NewReader(c.s))
+		rdr := NewReader("test", strings.NewReader(c.s), 1)
 		r, _, err := readTextColumn(rdr, c.d, c.last)
 		if err != nil {
 			if !c.fail {
@@ -79,7 +79,7 @@ func TestCopyFromText(t *testing.T) {
 abc|\N|def
 \N|xyz|\N
 \N|\N|\N
-`)),
+`), 1),
 		[][]sql.Value{
 			{sql.StringValue("123"), sql.StringValue("456"), sql.StringValue("789")},
 			{sql.StringValue("abc"), nil, sql.StringValue("def")},
@@ -89,7 +89,7 @@ abc|\N|def
 
 	err := CopyFromText(NewReader("test", strings.NewReader(
 		`123 \N 456|789
-`)),
+`), 1),
 		2, '|',
 		func(vals []sql.Value) error {
 			return errors.New("function should not be called")

@@ -61,10 +61,12 @@ func (ses *Session) Rollback() error {
 }
 
 func (ses *Session) Run(stmt Stmt, run func(tx engine.Transaction, stmt Stmt) error) error {
-
 	if ses.tx != nil {
 		ses.tx.NextStmt()
 		return run(ses.tx, stmt)
+	}
+	if _, ok := stmt.(*Begin); ok {
+		return ses.Begin()
 	}
 
 	tx := ses.Engine.Begin(ses.sesid)

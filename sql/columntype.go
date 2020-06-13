@@ -120,8 +120,7 @@ func (ct ColumnType) ConvertValue(n Identifier, v Value) (Value, error) {
 		} else if s, ok := v.(StringValue); ok {
 			d, err := strconv.ParseFloat(strings.Trim(string(s), " \t\n"), 64)
 			if err != nil {
-				return nil, fmt.Errorf("column \"%s\": expected a float: %v: %s", n, v,
-					err.Error())
+				return nil, fmt.Errorf("column \"%s\": expected a float: %v: %s", n, v, err)
 			}
 			return Float64Value(d), nil
 		} else if _, ok := v.(Float64Value); !ok {
@@ -133,8 +132,7 @@ func (ct ColumnType) ConvertValue(n Identifier, v Value) (Value, error) {
 		} else if s, ok := v.(StringValue); ok {
 			i, err := strconv.ParseInt(strings.Trim(string(s), " \t\n"), 10, 64)
 			if err != nil {
-				return nil, fmt.Errorf("column \"%s\": expected an integer: %v: %s", n, v,
-					err.Error())
+				return nil, fmt.Errorf("column \"%s\": expected an integer: %v: %s", n, v, err)
 			}
 			return Int64Value(i), nil
 		} else if _, ok := v.(Int64Value); !ok {
