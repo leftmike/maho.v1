@@ -509,6 +509,7 @@ var types = map[sql.Identifier]sql.ColumnType{
 	sql.BYTEA:     {Type: sql.BytesType, Fixed: false, Size: sql.MaxColumnSize},
 	sql.BYTES:     {Type: sql.BytesType, Fixed: false, Size: sql.MaxColumnSize},
 	sql.CHAR:      {Type: sql.StringType, Fixed: true, Size: 1},
+	sql.CHARACTER: {Type: sql.StringType, Fixed: true, Size: 1},
 	sql.VARCHAR:   {Type: sql.StringType, Fixed: false},
 	sql.TEXT:      {Type: sql.StringType, Fixed: false, Size: sql.MaxColumnSize},
 	sql.BOOL:      {Type: sql.BooleanType, Size: 1},

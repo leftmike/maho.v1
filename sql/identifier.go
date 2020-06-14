@@ -18,6 +18,7 @@ const (
 	BYTEA
 	BYTES
 	CHAR
+	CHARACTER
 	COLUMNS
 	COUNT
 	COUNT_ALL
@@ -140,6 +141,7 @@ var knownKeywords = map[string]struct {
 	"BYTEA":       {BYTEA, false},
 	"BYTES":       {BYTES, false},
 	"CHAR":        {CHAR, false},
+	"CHARACTER":   {CHARACTER, false},
 	"COMMIT":      {COMMIT, true},
 	"COPY":        {COPY, true},
 	"CREATE":      {CREATE, true},

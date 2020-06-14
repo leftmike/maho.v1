@@ -8,6 +8,7 @@ import (
 	"github.com/leftmike/maho/engine"
 	"github.com/leftmike/maho/evaluate"
 	"github.com/leftmike/maho/evaluate/copy"
+	"github.com/leftmike/maho/evaluate/expr"
 	"github.com/leftmike/maho/sql"
 )
 
@@ -44,15 +45,13 @@ func (stmt *Copy) Plan(ses *evaluate.Session, tx engine.Transaction) (interface{
 	}
 
 	cols := tbl.Columns(ses.Context())
+	colTypes := tbl.ColumnTypes(ses.Context())
 
-	if len(cols) != len(stmt.Columns) {
-		return nil, fmt.Errorf("engine: %s: all table columns must be specified for COPY",
-			stmt.Table)
-	}
-
+	defaultExprs := make([]sql.Expr, len(cols))
 	cmap := map[sql.Identifier]int{}
 	for cdx, cn := range cols {
 		cmap[cn] = cdx
+		defaultExprs[cdx] = colTypes[cdx].Default
 	}
 
 	fromToRow := make([]int, len(stmt.Columns))
@@ -62,27 +61,46 @@ func (stmt *Copy) Plan(ses *evaluate.Session, tx engine.Transaction) (interface{
 			return nil, fmt.Errorf("engine: %s: column not found: %s", stmt.Table, cn)
 		}
 		fromToRow[fdx] = cdx
+		defaultExprs[cdx] = nil
+	}
+
+	var defaultRow []expr.CExpr
+	for edx, e := range defaultExprs {
+		if e == nil {
+			continue
+		}
+
+		ce, err := expr.Compile(ses, tx, nil, e, false)
+		if err != nil {
+			return nil, err
+		}
+		if defaultRow == nil {
+			defaultRow = make([]expr.CExpr, len(cols))
+		}
+		defaultRow[edx] = ce
 	}
 
 	return &copyPlan{
-		table:     stmt.Table,
-		tbl:       tbl,
-		cols:      cols,
-		colTypes:  tbl.ColumnTypes(ses.Context()),
-		from:      copy.NewReader("stdin", stmt.From, stmt.FromLine),
-		fromToRow: fromToRow,
-		delimiter: stmt.Delimiter,
+		table:      stmt.Table,
+		tbl:        tbl,
+		cols:       cols,
+		colTypes:   colTypes,
+		from:       copy.NewReader("stdin", stmt.From, stmt.FromLine),
+		fromToRow:  fromToRow,
+		defaultRow: defaultRow,
+		delimiter:  stmt.Delimiter,
 	}, nil
 }
 
 type copyPlan struct {
-	table     sql.TableName
-	tbl       engine.Table
-	cols      []sql.Identifier
-	colTypes  []sql.ColumnType
-	from      *copy.Reader
-	fromToRow []int
-	delimiter rune
+	table      sql.TableName
+	tbl        engine.Table
+	cols       []sql.Identifier
+	colTypes   []sql.ColumnType
+	from       *copy.Reader
+	fromToRow  []int
+	defaultRow []expr.CExpr
+	delimiter  rune
 }
 
 func (plan *copyPlan) Execute(ctx context.Context, eng engine.Engine,
@@ -92,8 +110,18 @@ func (plan *copyPlan) Execute(ctx context.Context, eng engine.Engine,
 
 	err := copy.CopyFromText(plan.from, len(plan.fromToRow), plan.delimiter,
 		func(vals []sql.Value) error {
-			fmt.Printf("%d\n", cnt)
 			row := make([]sql.Value, len(plan.cols))
+			for cdx, ce := range plan.defaultRow {
+				if ce == nil {
+					continue
+				}
+
+				var err error
+				row[cdx], err = ce.Eval(ctx, nil)
+				if err != nil {
+					return err
+				}
+			}
 
 			for fdx, val := range vals {
 				cdx := plan.fromToRow[fdx]
