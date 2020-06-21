@@ -1,0 +1,40 @@
+--
+-- Test COPY
+--
+DROP TABLE IF EXISTS tbl1;
+CREATE TABLE tbl1 (c1 int primary key, c2 text, c3 int default 0);
+COPY tbl1 (c1, c2) FROM stdin DELIMITER '|';
+1|One
+2|Two
+3|Three
+4|\N
+5|Five
+\.
+SELECT * FROM tbl1;
+   c1    c2 c3
+   --    -- --
+ 1  1   One  0
+ 2  2   Two  0
+ 3  3 Three  0
+ 4  4        0
+ 5  5  Five  0
+(5 rows)
+COPY tbl1 (c1, c2, c3) FROM stdin;
+6	Six	6
+7	Seven	7
+8	\N	8
+9	\N	\N
+\.
+SELECT * FROM tbl1;
+   c1    c2 c3
+   --    -- --
+ 1  1   One  0
+ 2  2   Two  0
+ 3  3 Three  0
+ 4  4        0
+ 5  5  Five  0
+ 6  6   Six  6
+ 7  7 Seven  7
+ 8  8        8
+ 9  9         
+(9 rows)

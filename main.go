@@ -10,10 +10,22 @@ To Do:
 - specify a subset of columns to return: Table.Rows(cols []int, ...)
 - Rows.NextColumns(ctx context.Context, destCols []sql.ColumnValue) error
 
-- identifier.go: reserved field is not used
+- use cockroachdb/pebble as a storage engine with kvrows
+
+- use knz/go-libedit for readline
+- use spf13/cobra for command argument handling
+
+- use jackc/pgx or cockroach/pkg/sql/pgwire for client sql interface
 
 - indexes: mideng (basic, rowcols, keyvals, kvrows)
 - get rid of memrows and use basic instead; engine/service might no longer be necessary?
+
+- COPY tests
+--
+-- Test COPY
+--
+-- {{if eq Dialect "sqlite3"}}{{Skip}}{{end}}
+-- {{if eq Dialect "mysql"}}{{Skip}}{{end}}
 
 - tests with 1000s to 100000s of rows
 -- generate rows
@@ -22,11 +34,12 @@ To Do:
 - kvrows
 -- cleanup proposals
 -- consider making Rows() incremental, maybe as blocks of rows
-
-- COPY <table> (<column> ...) FROM STDIN [DELIMITER <string>]
+-- badger: iso-3166.sql: can't select from country
+-- badger: usda.sql: can't load largest table; can't select from tables
 
 - rowcols
 -- snapshot store and truncate WAL
+-- usda.sql: causes corrupt WAL
 
 - subquery expressions: EXISTS, IN, NOT IN, ANY/SOME, ALL
 - conditional expressions: CASE, COALESCE, NULLIF, GREATEST, LEAST
