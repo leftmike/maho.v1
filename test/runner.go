@@ -5,7 +5,7 @@ import (
 	"io"
 	"strings"
 
-	"github.com/leftmike/sqltest/pkg/sqltest"
+	"github.com/leftmike/sqltest/sqltestdb"
 
 	"github.com/leftmike/maho/engine"
 	"github.com/leftmike/maho/evaluate"
@@ -19,7 +19,7 @@ type Runner struct {
 	ses      *evaluate.Session
 }
 
-func (run *Runner) RunExec(tst *sqltest.Test) error {
+func (run *Runner) RunExec(tst *sqltestdb.Test) error {
 	if run.ses == nil {
 		run.ses = &evaluate.Session{
 			Engine:          run.Engine,
@@ -67,7 +67,7 @@ func (run *Runner) RunExec(tst *sqltest.Test) error {
 	return nil
 }
 
-func (run *Runner) RunQuery(tst *sqltest.Test) ([]string, [][]string, error) {
+func (run *Runner) RunQuery(tst *sqltestdb.Test) ([]string, [][]string, error) {
 	if run.ses == nil {
 		run.ses = &evaluate.Session{
 			Engine:          run.Engine,

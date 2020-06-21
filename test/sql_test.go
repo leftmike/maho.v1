@@ -6,7 +6,7 @@ import (
 	"path/filepath"
 	"testing"
 
-	"github.com/leftmike/sqltest/pkg/sqltest"
+	"github.com/leftmike/sqltest/sqltestdb"
 
 	"github.com/leftmike/maho/engine"
 	"github.com/leftmike/maho/engine/basic"
@@ -29,7 +29,7 @@ type reporter []report
 func (r *reporter) Report(test string, err error) error {
 	if err == nil {
 		fmt.Printf("%s: passed\n", test)
-	} else if err == sqltest.Skipped {
+	} else if err == sqltestdb.Skipped {
 		fmt.Printf("%s: skipped\n", test)
 	} else {
 		fmt.Printf("%s: failed: %s\n", test, err)
@@ -42,11 +42,11 @@ func (r *reporter) Report(test string, err error) error {
 var (
 	update   = flag.Bool("update", false, "update expected to output")
 	testData = flag.String("testdata",
-		filepath.Join("..", "..", "sqltest", "sql", "testdata"), "directory of testdata")
+		filepath.Join("..", "..", "sqltest", "testdata"), "directory of testdata")
 )
 
 type mahoDialect struct {
-	sqltest.DefaultDialect
+	sqltestdb.DefaultDialect
 	name string
 }
 
@@ -88,13 +88,13 @@ func testSQL(t *testing.T, typ string, dbname sql.Identifier, testData, dataDir 
 		Database: dbname,
 	}
 	var rptr reporter
-	err = sqltest.RunTests(testData, &run, &rptr, mahoDialect{name: "maho-" + typ}, *update)
+	err = sqltestdb.RunTests(testData, &run, &rptr, mahoDialect{name: "maho-" + typ}, *update)
 	if err != nil {
 		t.Errorf("RunTests(%q) failed with %s", testData, err)
 		return
 	}
 	for _, report := range rptr {
-		if report.err != nil && report.err != sqltest.Skipped {
+		if report.err != nil && report.err != sqltestdb.Skipped {
 			t.Errorf("%s: %s", report.test, report.err)
 		}
 	}
