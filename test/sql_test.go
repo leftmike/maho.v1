@@ -54,31 +54,10 @@ func (md mahoDialect) DriverName() string {
 	return md.name
 }
 
-func testSQL(t *testing.T, typ string, dbname sql.Identifier, testData, dataDir string) {
+func testSQL(t *testing.T, typ string, e engine.Engine, dbname sql.Identifier, testData string) {
 	t.Helper()
 
-	var e engine.Engine
-	var err error
-	switch typ {
-	case "basic":
-		e, err = basic.NewEngine(dataDir)
-	case "memrows":
-		e, err = memrows.NewEngine(dataDir)
-	case "rowcols":
-		e, err = rowcols.NewEngine(dataDir)
-	case "badger":
-		e, err = keyval.NewBadgerEngine(dataDir)
-	case "bbolt":
-		e, err = keyval.NewBBoltEngine(dataDir)
-	case "kvrows":
-		e, err = kvrows.NewBadgerEngine(dataDir)
-	default:
-		panic(fmt.Sprintf("unexpected engine type: %s", typ))
-	}
-	if err != nil {
-		t.Fatal(err)
-	}
-	err = e.CreateDatabase(dbname, nil)
+	err := e.CreateDatabase(dbname, nil)
 	if err != nil {
 		// If the test is run multiple times, then the database will already exist.
 	}
@@ -100,74 +79,86 @@ func testSQL(t *testing.T, typ string, dbname sql.Identifier, testData, dataDir 
 	}
 }
 
+func testAllSQL(t *testing.T, typ string, clean bool, makeEng func() engine.Engine) {
+	if clean {
+		err := testutil.CleanDir("testdata", []string{".gitignore", "expected", "output", "sql"})
+		if err != nil {
+			t.Fatal(err)
+		}
+	}
+	testSQL(t, typ, makeEng(), sql.ID("test_"+typ), "testdata")
+
+	if clean {
+		err := testutil.CleanDir("testdata", []string{".gitignore", "expected", "output", "sql"})
+		if err != nil {
+			t.Fatal(err)
+		}
+	}
+	testSQL(t, typ, makeEng(), sql.ID("sqltest_"+typ), *testData)
+}
+
 func TestSQLBasic(t *testing.T) {
-	testSQL(t, "basic", sql.ID("test_basic"), "testdata", "")
-	testSQL(t, "basic", sql.ID("sqltest_basic"), *testData, "")
+	testAllSQL(t, "basic", false,
+		func() engine.Engine {
+			e, err := basic.NewEngine("")
+			if err != nil {
+				t.Fatal(err)
+			}
+			return e
+		})
 }
 
 func TestSQLMemRows(t *testing.T) {
-	testSQL(t, "memrows", sql.ID("test_memrows"), "testdata", "")
-	testSQL(t, "memrows", sql.ID("sqltest_memrows"), *testData, "")
+	testAllSQL(t, "memrows", false,
+		func() engine.Engine {
+			e, err := memrows.NewEngine("")
+			if err != nil {
+				t.Fatal(err)
+			}
+			return e
+		})
 }
 
 func TestSQLRowCols(t *testing.T) {
-	dataDir := filepath.Join("testdata", "rowcols")
-
-	err := testutil.CleanDir(dataDir, []string{".gitignore", "expected", "output", "sql"})
-	if err != nil {
-		t.Fatal(err)
-	}
-	testSQL(t, "rowcols", sql.ID("test_rowcols"), "testdata", dataDir)
-
-	err = testutil.CleanDir(dataDir, []string{".gitignore", "expected", "output", "sql"})
-	if err != nil {
-		t.Fatal(err)
-	}
-	testSQL(t, "rowcols", sql.ID("sqltest_rowcols"), *testData, dataDir)
+	testAllSQL(t, "rowcols", true,
+		func() engine.Engine {
+			e, err := rowcols.NewEngine(filepath.Join("testdata", "rowcols"))
+			if err != nil {
+				t.Fatal(err)
+			}
+			return e
+		})
 }
 
 func TestSQLBadger(t *testing.T) {
-	dataDir := filepath.Join("testdata", "badger")
-
-	err := testutil.CleanDir(dataDir, []string{".gitignore", "expected", "output", "sql"})
-	if err != nil {
-		t.Fatal(err)
-	}
-	testSQL(t, "badger", sql.ID("test_keyval"), "testdata", dataDir)
-
-	err = testutil.CleanDir(dataDir, []string{".gitignore", "expected", "output", "sql"})
-	if err != nil {
-		t.Fatal(err)
-	}
-	testSQL(t, "badger", sql.ID("sqltest_keyval"), *testData, dataDir)
+	testAllSQL(t, "badger", true,
+		func() engine.Engine {
+			e, err := keyval.NewBadgerEngine(filepath.Join("testdata", "badger"))
+			if err != nil {
+				t.Fatal(err)
+			}
+			return e
+		})
 }
 
 func TestSQLBBolt(t *testing.T) {
-	err := testutil.CleanDir("testdata", []string{".gitignore", "expected", "output", "sql"})
-	if err != nil {
-		t.Fatal(err)
-	}
-	testSQL(t, "bbolt", sql.ID("test_keyval"), "testdata", "testdata")
-
-	err = testutil.CleanDir("testdata", []string{".gitignore", "expected", "output", "sql"})
-	if err != nil {
-		t.Fatal(err)
-	}
-	testSQL(t, "bbolt", sql.ID("sqltest_keyval"), *testData, "testdata")
+	testAllSQL(t, "bbolt", true,
+		func() engine.Engine {
+			e, err := keyval.NewBBoltEngine("testdata")
+			if err != nil {
+				t.Fatal(err)
+			}
+			return e
+		})
 }
 
 func TestSQLKVRows(t *testing.T) {
-	dataDir := filepath.Join("testdata", "kvrows")
-
-	err := testutil.CleanDir(dataDir, []string{".gitignore", "expected", "output", "sql"})
-	if err != nil {
-		t.Fatal(err)
-	}
-	testSQL(t, "kvrows", sql.ID("test_keyval"), "testdata", dataDir)
-
-	err = testutil.CleanDir(dataDir, []string{".gitignore", "expected", "output", "sql"})
-	if err != nil {
-		t.Fatal(err)
-	}
-	testSQL(t, "kvrows", sql.ID("sqltest_keyval"), *testData, dataDir)
+	testAllSQL(t, "kvrows", true,
+		func() engine.Engine {
+			e, err := kvrows.NewBadgerEngine(filepath.Join("testdata", "kvrows"))
+			if err != nil {
+				t.Fatal(err)
+			}
+			return e
+		})
 }
