@@ -19,7 +19,7 @@ type Runner struct {
 	ses      *evaluate.Session
 }
 
-func (run *Runner) RunExec(tst *sqltestdb.Test) error {
+func (run *Runner) RunExec(tst *sqltestdb.Test) (int64, error) {
 	if run.ses == nil {
 		run.ses = &evaluate.Session{
 			Engine:          run.Engine,
@@ -27,16 +27,19 @@ func (run *Runner) RunExec(tst *sqltestdb.Test) error {
 			DefaultSchema:   sql.PUBLIC,
 		}
 	}
+
 	p := parser.NewParser(strings.NewReader(tst.Test),
 		fmt.Sprintf("%s:%d", tst.Filename, tst.LineNumber))
+	n := int64(-1)
 	for {
 		stmt, err := p.Parse()
 		if err == io.EOF {
 			break
 		}
 		if err != nil {
-			return err
+			return -1, err
 		}
+
 		err = run.ses.Run(stmt,
 			func(tx engine.Transaction, stmt evaluate.Stmt) error {
 				ret, err2 := stmt.Plan(run.ses, tx)
@@ -44,7 +47,7 @@ func (run *Runner) RunExec(tst *sqltestdb.Test) error {
 					return err2
 				}
 				if exec, ok := ret.(evaluate.Executor); ok {
-					_, err2 = exec.Execute(run.ses.Context(), run.ses.Engine, tx)
+					n, err2 = exec.Execute(run.ses.Context(), run.ses.Engine, tx)
 					if err2 != nil {
 						return err2
 					}
@@ -59,12 +62,11 @@ func (run *Runner) RunExec(tst *sqltestdb.Test) error {
 
 				return nil
 			})
-
 		if err != nil {
-			return err
+			return -1, err
 		}
 	}
-	return nil
+	return n, nil
 }
 
 func (run *Runner) RunQuery(tst *sqltestdb.Test) ([]string, [][]string, error) {

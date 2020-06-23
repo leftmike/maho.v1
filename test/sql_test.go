@@ -54,7 +54,9 @@ func (md mahoDialect) DriverName() string {
 	return md.name
 }
 
-func testSQL(t *testing.T, typ string, e engine.Engine, dbname sql.Identifier, testData string) {
+func testSQL(t *testing.T, typ string, e engine.Engine, dbname sql.Identifier, testData string,
+	psql bool) {
+
 	t.Helper()
 
 	err := e.CreateDatabase(dbname, nil)
@@ -67,7 +69,8 @@ func testSQL(t *testing.T, typ string, e engine.Engine, dbname sql.Identifier, t
 		Database: dbname,
 	}
 	var rptr reporter
-	err = sqltestdb.RunTests(testData, &run, &rptr, mahoDialect{name: "maho-" + typ}, *update)
+	err = sqltestdb.RunTests(testData, &run, &rptr, mahoDialect{name: "maho-" + typ}, *update,
+		psql)
 	if err != nil {
 		t.Errorf("RunTests(%q) failed with %s", testData, err)
 		return
@@ -86,7 +89,7 @@ func testAllSQL(t *testing.T, typ string, clean bool, makeEng func() engine.Engi
 			t.Fatal(err)
 		}
 	}
-	testSQL(t, typ, makeEng(), sql.ID("test_"+typ), "testdata")
+	testSQL(t, typ, makeEng(), sql.ID("test_"+typ), "testdata", false)
 
 	if clean {
 		err := testutil.CleanDir("testdata", []string{".gitignore", "expected", "output", "sql"})
@@ -94,18 +97,21 @@ func testAllSQL(t *testing.T, typ string, clean bool, makeEng func() engine.Engi
 			t.Fatal(err)
 		}
 	}
-	testSQL(t, typ, makeEng(), sql.ID("sqltest_"+typ), *testData)
+	testSQL(t, typ, makeEng(), sql.ID("sqltest_"+typ), *testData, false)
 }
 
 func TestSQLBasic(t *testing.T) {
-	testAllSQL(t, "basic", false,
-		func() engine.Engine {
-			e, err := basic.NewEngine("")
-			if err != nil {
-				t.Fatal(err)
-			}
-			return e
-		})
+	makeEng := func() engine.Engine {
+		e, err := basic.NewEngine("")
+		if err != nil {
+			t.Fatal(err)
+		}
+		return e
+	}
+
+	testSQL(t, "basic", makeEng(), sql.ID("postgres_basic"), filepath.Join(*testData, "postgres"),
+		true)
+	testAllSQL(t, "basic", false, makeEng)
 }
 
 func TestSQLMemRows(t *testing.T) {
