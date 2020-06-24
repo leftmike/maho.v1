@@ -20,13 +20,6 @@ To Do:
 - indexes: mideng (basic, rowcols, keyvals, kvrows)
 - get rid of memrows and use basic instead; engine/service might no longer be necessary?
 
-- COPY tests
---
--- Test COPY
---
--- {{if eq Dialect "sqlite3"}}{{Skip}}{{end}}
--- {{if eq Dialect "mysql"}}{{Skip}}{{end}}
-
 - tests with 1000s to 100000s of rows
 -- generate rows
 -- use sample databases
