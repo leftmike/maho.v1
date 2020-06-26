@@ -7,8 +7,9 @@ To Do:
 - add test for not seeing modified rows within a single SQL statement
 
 - add type sql.ColumnValue interface{} and type BoolColumn []bool, type Int64Column []int64, etc
-- specify a subset of columns to return: Table.Rows(cols []int, ...)
 - Rows.NextColumns(ctx context.Context, destCols []sql.ColumnValue) error
+
+- specify a subset of columns to return: Table.Rows(cols []int, ...)
 
 - use cockroachdb/pebble as a storage engine with kvrows
 
@@ -18,6 +19,9 @@ To Do:
 - use jackc/pgx or cockroach/pkg/sql/pgwire for client sql interface
 
 - indexes: mideng (basic, rowcols, keyvals, kvrows)
+-- unique indexes: all NULL values are considered different from all other NULL values and
+   are thus unique (sqlite.org/lang_createindex.html)
+
 - get rid of memrows and use basic instead; engine/service might no longer be necessary?
 
 - tests with 1000s to 100000s of rows
@@ -37,12 +41,35 @@ To Do:
 - subquery expressions: EXISTS, IN, NOT IN, ANY/SOME, ALL
 - conditional expressions: CASE, COALESCE, NULLIF, GREATEST, LEAST
 
-- [CONSTRAINT constraint]
-- CHECK '(' logical_expression ')'
-- FOREIGN KEY
+- add storage layer under engine: evaluate -> engine -> storage
+-- keep virtual as part of engine
+-- type Engine becomes a struct *
+-- engine.NewEngine(st storage.Store)
+-- checks all constraints including unique and foreign key references
+-- does type checking and coercion on insert and update
+-- converts from engine metadata to evaluate metadata; eg. Default from string to Expr
+-- generated columns
+-- triggers
+-- row level security
+-- maybe change to a single TableDef which contains information about columns, indexes,
+   constraints: Table.Definition() *TableDef, TableDef.Columns, .ColumnTypes, .PrimaryKey
 
-- ALTER TABLE ...
-- memrows: tableImpl: add versioned metadata and use METADATA_MODIFY locking level
+- indexes
+-- based on column numbers
+-- engine.Table: return list of indexes?
+-- engine.Index: IndexRows(...) => engine.IndexRows {Columns, Close, Next, Delete, Update, Row}
+-- move Engine.CreateIndex, DropIndex to Table
+
+- column
+-- [CONSTRAINT constraint]
+-- UNIQUE
+-- CHECK '(' expression ')'
+-- REFERENCES foreign-table [ '(' column [',' ...] ')' ]
+
+- table
+-- [CONSTRAINT constraint]
+-- CHECK '(' expression ')'
+-- FOREIGN KEY '(' column  [',' ...] ')' REFERENCES foreign-table [ '(' column [',' ...] ')' ]
 */
 
 import (
