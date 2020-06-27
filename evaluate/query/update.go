@@ -43,7 +43,6 @@ type columnUpdate struct {
 
 type updatePlan struct {
 	columns []sql.Identifier
-	types   []sql.ColumnType
 	dest    []sql.Value
 	rows    sql.Rows
 	updates []columnUpdate
@@ -71,10 +70,6 @@ func (up *updatePlan) Execute(ctx context.Context, e *engine.Engine,
 			cdx := up.updates[idx].index
 			var val sql.Value
 			val, err = up.updates[idx].expr.Eval(ctx, up)
-			if err != nil {
-				return -1, err
-			}
-			val, err = up.types[cdx].ConvertValue(up.columns[cdx], val)
 			if err != nil {
 				return -1, err
 			}
@@ -109,7 +104,6 @@ func (stmt *Update) Plan(ses *evaluate.Session, tx engine.Transaction) (interfac
 
 	plan := updatePlan{
 		columns: tbl.Columns(ses.Context()),
-		types:   tbl.ColumnTypes(ses.Context()),
 		rows:    rows,
 		updates: make([]columnUpdate, 0, len(stmt.ColumnUpdates)),
 	}

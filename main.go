@@ -22,6 +22,8 @@ To Do:
 -- unique indexes: all NULL values are considered different from all other NULL values and
    are thus unique (sqlite.org/lang_createindex.html)
 
+- get rid of engine.ListDatabases: only used at startup in main.go
+
 - get rid of memrows and use basic instead; engine/service might no longer be necessary?
 
 - tests with 1000s to 100000s of rows
@@ -41,8 +43,6 @@ To Do:
 - subquery expressions: EXISTS, IN, NOT IN, ANY/SOME, ALL
 - conditional expressions: CASE, COALESCE, NULLIF, GREATEST, LEAST
 
--- move null check and type check to engine layer
--- does type checking and coercion on insert and update as part of engine
 -- checks all constraints including unique and foreign key references
 -- converts from engine metadata to evaluate metadata; eg. Default from string to Expr
 -- generated columns

@@ -15,10 +15,6 @@ type Transaction interface {
 	storage.Transaction
 }
 
-type Table interface {
-	storage.Table
-}
-
 type Engine struct {
 	mutex            sync.RWMutex
 	st               storage.Store
@@ -102,7 +98,9 @@ func (e *Engine) DropSchema(ctx context.Context, tx Transaction, sn sql.SchemaNa
 	return e.st.DropSchema(ctx, tx, sn, ifExists)
 }
 
-func (e *Engine) LookupTable(ctx context.Context, tx Transaction, tn sql.TableName) (Table, error) {
+func (e *Engine) LookupTable(ctx context.Context, tx Transaction, tn sql.TableName) (Table,
+	error) {
+
 	e.mutex.RLock()
 	defer e.mutex.RUnlock()
 
@@ -118,7 +116,11 @@ func (e *Engine) LookupTable(ctx context.Context, tx Transaction, tn sql.TableNa
 		return nil, fmt.Errorf("engine: table %s not found", tn)
 	}
 
-	return e.st.LookupTable(ctx, tx, tn)
+	stbl, err := e.st.LookupTable(ctx, tx, tn)
+	if err != nil {
+		return nil, err
+	}
+	return makeTable(ctx, tn, stbl)
 }
 
 func (e *Engine) CreateTable(ctx context.Context, tx Transaction, tn sql.TableName,
@@ -176,16 +178,4 @@ func (e *Engine) Begin(sesid uint64) Transaction {
 
 func (e *Engine) ListDatabases(ctx context.Context, tx Transaction) ([]sql.Identifier, error) {
 	return e.st.ListDatabases(ctx, tx)
-}
-
-func (e *Engine) ListSchemas(ctx context.Context, tx Transaction,
-	dbname sql.Identifier) ([]sql.Identifier, error) {
-
-	return e.st.ListSchemas(ctx, tx, dbname)
-}
-
-func (e *Engine) ListTables(ctx context.Context, tx Transaction,
-	sn sql.SchemaName) ([]sql.Identifier, error) {
-
-	return e.st.ListTables(ctx, tx, sn)
 }

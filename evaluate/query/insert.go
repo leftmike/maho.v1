@@ -116,15 +116,13 @@ func (stmt *InsertValues) Plan(ses *evaluate.Session, tx engine.Transaction) (in
 		rows = append(rows, row)
 	}
 
-	return &insertValuesPlan{stmt.Table, tbl, cols, colTypes, rows}, nil
+	return &insertValuesPlan{tbl, cols, rows}, nil
 }
 
 type insertValuesPlan struct {
-	table    sql.TableName
-	tbl      engine.Table
-	cols     []sql.Identifier
-	colTypes []sql.ColumnType
-	rows     [][]expr.CExpr
+	tbl  engine.Table
+	cols []sql.Identifier
+	rows [][]expr.CExpr
 }
 
 func (plan *insertValuesPlan) Execute(ctx context.Context, e *engine.Engine,
@@ -135,10 +133,9 @@ func (plan *insertValuesPlan) Execute(ctx context.Context, e *engine.Engine,
 	for _, r := range plan.rows {
 		row := make([]sql.Value, len(plan.cols))
 
-		for i, c := range plan.colTypes {
+		for i, ce := range r {
 			var v sql.Value
 
-			ce := r[i]
 			if ce != nil {
 				v, err = ce.Eval(ctx, nil)
 				if err != nil {
@@ -146,10 +143,7 @@ func (plan *insertValuesPlan) Execute(ctx context.Context, e *engine.Engine,
 				}
 			}
 
-			row[i], err = c.ConvertValue(plan.cols[i], v)
-			if err != nil {
-				return -1, fmt.Errorf("engine: table %s: %s", plan.table, err)
-			}
+			row[i] = v
 		}
 
 		err := plan.tbl.Insert(ctx, row)

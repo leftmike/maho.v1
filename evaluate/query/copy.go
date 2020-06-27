@@ -81,10 +81,8 @@ func (stmt *Copy) Plan(ses *evaluate.Session, tx engine.Transaction) (interface{
 	}
 
 	return &copyPlan{
-		table:      stmt.Table,
 		tbl:        tbl,
 		cols:       cols,
-		colTypes:   colTypes,
 		from:       copy.NewReader("stdin", stmt.From, stmt.FromLine),
 		fromToRow:  fromToRow,
 		defaultRow: defaultRow,
@@ -93,10 +91,8 @@ func (stmt *Copy) Plan(ses *evaluate.Session, tx engine.Transaction) (interface{
 }
 
 type copyPlan struct {
-	table      sql.TableName
 	tbl        engine.Table
 	cols       []sql.Identifier
-	colTypes   []sql.ColumnType
 	from       *copy.Reader
 	fromToRow  []int
 	defaultRow []expr.CExpr
@@ -124,16 +120,8 @@ func (plan *copyPlan) Execute(ctx context.Context, e *engine.Engine,
 			}
 
 			for fdx, val := range vals {
-				cdx := plan.fromToRow[fdx]
-				ct := plan.colTypes[cdx]
-
-				var err error
-				row[cdx], err = ct.ConvertValue(plan.cols[cdx], val)
-				if err != nil {
-					return fmt.Errorf("engine: %s: %s", plan.table, err)
-				}
+				row[plan.fromToRow[fdx]] = val
 			}
-
 			cnt += 1
 			return plan.tbl.Insert(ctx, row)
 		})
