@@ -16,7 +16,6 @@ import (
 	"github.com/leftmike/maho/sql"
 	"github.com/leftmike/maho/storage"
 	"github.com/leftmike/maho/storage/service"
-	"github.com/leftmike/maho/storage/virtual"
 )
 
 type memrowsStore struct {
@@ -90,20 +89,13 @@ func NewStore(dataDir string) (storage.Store, error) {
 	mst := &memrowsStore{
 		databases: map[sql.Identifier]*database{},
 	}
-	ve := virtual.NewStore(mst)
 	mst.txService.Init()
-	return ve, nil
+	return mst, nil
 }
 
-func (_ *memrowsStore) CreateSystemInfoTable(tblname sql.Identifier, maker storage.MakeVirtual) {
-	panic("memrows: use virtual engine with memrows engine")
-}
+func (mst *memrowsStore) CreateDatabase(dbname sql.Identifier,
+	options map[sql.Identifier]string) error {
 
-func (_ *memrowsStore) CreateMetadataTable(tblname sql.Identifier, maker storage.MakeVirtual) {
-	panic("memrows: use virtual engine with memrows engine")
-}
-
-func (mst *memrowsStore) CreateDatabase(dbname sql.Identifier, options storage.Options) error {
 	mst.mutex.Lock()
 	defer mst.mutex.Unlock()
 
@@ -121,7 +113,7 @@ func (mst *memrowsStore) CreateDatabase(dbname sql.Identifier, options storage.O
 }
 
 func (mst *memrowsStore) DropDatabase(dbname sql.Identifier, ifExists bool,
-	options storage.Options) error {
+	options map[sql.Identifier]string) error {
 
 	mst.mutex.Lock()
 	defer mst.mutex.Unlock()
@@ -177,7 +169,7 @@ func (mst *memrowsStore) LookupTable(ctx context.Context, tx storage.Transaction
 }
 
 func (mst *memrowsStore) CreateTable(ctx context.Context, tx storage.Transaction, tn sql.TableName,
-	cols []sql.Identifier, colTypes []sql.ColumnType, primary []storage.ColumnKey,
+	cols []sql.Identifier, colTypes []sql.ColumnType, primary []sql.ColumnKey,
 	ifNotExists bool) error {
 
 	mst.mutex.Lock()
@@ -204,7 +196,7 @@ func (mst *memrowsStore) DropTable(ctx context.Context, tx storage.Transaction, 
 }
 
 func (mst *memrowsStore) CreateIndex(ctx context.Context, tx storage.Transaction,
-	idxname sql.Identifier, tn sql.TableName, unique bool, keys []storage.ColumnKey,
+	idxname sql.Identifier, tn sql.TableName, unique bool, keys []sql.ColumnKey,
 	ifNotExists bool) error {
 
 	mst.mutex.Lock()
@@ -443,7 +435,7 @@ func (mdb *database) schemaVisible(tctx *tcontext, sn sql.SchemaName) bool {
 }
 
 func (mdb *database) createTable(ctx context.Context, tx storage.Transaction, tn sql.TableName,
-	cols []sql.Identifier, colTypes []sql.ColumnType, primary []storage.ColumnKey,
+	cols []sql.Identifier, colTypes []sql.ColumnType, primary []sql.ColumnKey,
 	ifNotExists bool) error {
 
 	tctx := service.GetTxContext(tx, mdb).(*tcontext)
@@ -575,7 +567,7 @@ func (mdb *database) dropTable(ctx context.Context, tx storage.Transaction, tn s
 }
 
 func (mdb *database) createIndex(ctx context.Context, tx storage.Transaction,
-	idxname sql.Identifier, tn sql.TableName, unique bool, keys []storage.ColumnKey,
+	idxname sql.Identifier, tn sql.TableName, unique bool, keys []sql.ColumnKey,
 	ifNotExists bool) error {
 
 	tbl, err := mdb.lookupTable(ctx, tx, tn, service.EXCLUSIVE)
@@ -755,7 +747,7 @@ func (mt *table) ColumnTypes(ctx context.Context) []sql.ColumnType {
 	return mt.table.getColumnTypes(mt.tctx)
 }
 
-func (mt *table) PrimaryKey(ctx context.Context) []storage.ColumnKey {
+func (mt *table) PrimaryKey(ctx context.Context) []sql.ColumnKey {
 	return nil
 }
 

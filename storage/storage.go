@@ -6,57 +6,26 @@ import (
 	"github.com/leftmike/maho/sql"
 )
 
-type Options map[sql.Identifier]string
-
 type Transaction interface {
 	Commit(ctx context.Context) error
 	Rollback() error
 	NextStmt()
 }
 
-type MakeVirtual func(ctx context.Context, tx Transaction, tn sql.TableName) (Table, error)
-
-type ColumnKey int
-
-func MakeColumnKey(num int, reverse bool) ColumnKey {
-	if num < 0 {
-		panic("column numbers must be non-negative")
-	}
-	num += 1
-	if reverse {
-		return ColumnKey(-num)
-	}
-	return ColumnKey(num)
-}
-
-func (ck ColumnKey) Reverse() bool {
-	return ck < 0
-}
-
-func (ck ColumnKey) Number() int {
-	if ck < 0 {
-		ck = -ck
-	}
-	return int(ck - 1)
-}
-
 type Store interface {
-	CreateSystemInfoTable(tblname sql.Identifier, maker MakeVirtual)
-	CreateMetadataTable(tblname sql.Identifier, maker MakeVirtual)
-
-	CreateDatabase(dbname sql.Identifier, options Options) error
-	DropDatabase(dbname sql.Identifier, ifExists bool, options Options) error
+	CreateDatabase(dbname sql.Identifier, options map[sql.Identifier]string) error
+	DropDatabase(dbname sql.Identifier, ifExists bool, options map[sql.Identifier]string) error
 
 	CreateSchema(ctx context.Context, tx Transaction, sn sql.SchemaName) error
 	DropSchema(ctx context.Context, tx Transaction, sn sql.SchemaName, ifExists bool) error
 
 	LookupTable(ctx context.Context, tx Transaction, tn sql.TableName) (Table, error)
 	CreateTable(ctx context.Context, tx Transaction, tn sql.TableName, cols []sql.Identifier,
-		colTypes []sql.ColumnType, primary []ColumnKey, ifNotExists bool) error
+		colTypes []sql.ColumnType, primary []sql.ColumnKey, ifNotExists bool) error
 	DropTable(ctx context.Context, tx Transaction, tn sql.TableName, ifExists bool) error
 
 	CreateIndex(ctx context.Context, tx Transaction, idxname sql.Identifier, tn sql.TableName,
-		unique bool, keys []ColumnKey, ifNotExists bool) error
+		unique bool, keys []sql.ColumnKey, ifNotExists bool) error
 	DropIndex(ctx context.Context, tx Transaction, idxname sql.Identifier, tn sql.TableName,
 		ifExists bool) error
 
@@ -79,7 +48,7 @@ type Rows interface {
 type Table interface {
 	Columns(ctx context.Context) []sql.Identifier
 	ColumnTypes(ctx context.Context) []sql.ColumnType
-	PrimaryKey(ctx context.Context) []ColumnKey
+	PrimaryKey(ctx context.Context) []sql.ColumnKey
 	Rows(ctx context.Context, minRow, maxRow []sql.Value) (Rows, error)
 	Insert(ctx context.Context, row []sql.Value) error
 }

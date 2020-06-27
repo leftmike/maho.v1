@@ -7,7 +7,6 @@ import (
 	"testing"
 
 	"github.com/leftmike/maho/sql"
-	"github.com/leftmike/maho/storage"
 	"github.com/leftmike/maho/storage/basic"
 	"github.com/leftmike/maho/storage/util"
 	"github.com/leftmike/maho/testutil"
@@ -60,9 +59,9 @@ func TestTypedTable(t *testing.T) {
 		sql.ColumnType{Type: sql.FloatType, Size: 8},
 		sql.ColumnType{Type: sql.BytesType, Size: sql.MaxColumnSize},
 	}
-	primaryKey := []storage.ColumnKey{storage.MakeColumnKey(0, false)}
+	primaryKey := []sql.ColumnKey{sql.MakeColumnKey(0, false)}
 
-	err = st.CreateDatabase(dn, storage.Options{})
+	err = st.CreateDatabase(dn, map[sql.Identifier]string{})
 	if err != nil {
 		t.Fatal(err)
 	}

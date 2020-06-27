@@ -5,7 +5,6 @@ import (
 	"math"
 
 	"github.com/leftmike/maho/sql"
-	"github.com/leftmike/maho/storage"
 )
 
 const (
@@ -43,7 +42,7 @@ func encodeKeyBytes(buf []byte, bytes []byte, reverse bool) []byte {
 	return buf
 }
 
-func MakeKey(key []storage.ColumnKey, row []sql.Value) []byte {
+func MakeKey(key []sql.ColumnKey, row []sql.Value) []byte {
 	var buf []byte
 
 	for _, ck := range key {

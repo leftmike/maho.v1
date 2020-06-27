@@ -41,12 +41,9 @@ To Do:
 - subquery expressions: EXISTS, IN, NOT IN, ANY/SOME, ALL
 - conditional expressions: CASE, COALESCE, NULLIF, GREATEST, LEAST
 
--- add storage layer under engine: evaluate -> engine -> storage
--- move virtual to engine
--- engine.ColumnKey vs storage.ColumnKey: maybe move to sql?
-
--- checks all constraints including unique and foreign key references
+-- move null check and type check to engine layer
 -- does type checking and coercion on insert and update as part of engine
+-- checks all constraints including unique and foreign key references
 -- converts from engine metadata to evaluate metadata; eg. Default from string to Expr
 -- generated columns
 -- triggers

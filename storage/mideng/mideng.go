@@ -70,7 +70,7 @@ type TableDef interface {
 	Table(ctx context.Context, tx storage.Transaction) (storage.Table, error)
 	Columns() []sql.Identifier
 	ColumnTypes() []sql.ColumnType
-	PrimaryKey() []storage.ColumnKey
+	PrimaryKey() []sql.ColumnKey
 }
 
 type Transaction interface {
@@ -80,7 +80,7 @@ type Transaction interface {
 
 type store interface {
 	MakeTableDef(tn sql.TableName, mid int64, cols []sql.Identifier, colTypes []sql.ColumnType,
-		primary []storage.ColumnKey) (TableDef, error)
+		primary []sql.ColumnKey) (TableDef, error)
 	Begin(sesid uint64) Transaction
 }
 
@@ -98,21 +98,21 @@ func NewStore(name string, st store, init bool) (storage.Store, error) {
 	sequences, err := st.MakeTableDef(sequencesTableName, sequencesMID,
 		[]sql.Identifier{sql.ID("sequence"), sql.ID("current")},
 		[]sql.ColumnType{sql.IdColType, sql.Int64ColType},
-		[]storage.ColumnKey{storage.MakeColumnKey(0, false)})
+		[]sql.ColumnKey{sql.MakeColumnKey(0, false)})
 	if err != nil {
 		return nil, err
 	}
 	databases, err := st.MakeTableDef(databasesTableName, databasesMID,
 		[]sql.Identifier{sql.ID("database")},
 		[]sql.ColumnType{sql.IdColType},
-		[]storage.ColumnKey{storage.MakeColumnKey(0, false)})
+		[]sql.ColumnKey{sql.MakeColumnKey(0, false)})
 	if err != nil {
 		return nil, err
 	}
 	schemas, err := st.MakeTableDef(schemasTableName, schemasMID,
 		[]sql.Identifier{sql.ID("database"), sql.ID("schema"), sql.ID("tables")},
 		[]sql.ColumnType{sql.IdColType, sql.IdColType, sql.Int64ColType},
-		[]storage.ColumnKey{storage.MakeColumnKey(0, false), storage.MakeColumnKey(1, false)})
+		[]sql.ColumnKey{sql.MakeColumnKey(0, false), sql.MakeColumnKey(1, false)})
 	if err != nil {
 		return nil, err
 	}
@@ -121,16 +121,16 @@ func NewStore(name string, st store, init bool) (storage.Store, error) {
 			sql.ID("metadata")},
 		[]sql.ColumnType{sql.IdColType, sql.IdColType, sql.IdColType, sql.Int64ColType,
 			{Type: sql.BytesType, Fixed: false, Size: sql.MaxColumnSize}},
-		[]storage.ColumnKey{storage.MakeColumnKey(0, false), storage.MakeColumnKey(1, false),
-			storage.MakeColumnKey(2, false)})
+		[]sql.ColumnKey{sql.MakeColumnKey(0, false), sql.MakeColumnKey(1, false),
+			sql.MakeColumnKey(2, false)})
 	if err != nil {
 		return nil, err
 	}
 	indexes, err := st.MakeTableDef(indexesTableName, indexesMID,
 		[]sql.Identifier{sql.ID("database"), sql.ID("schema"), sql.ID("table"), sql.ID("index")},
 		[]sql.ColumnType{sql.IdColType, sql.IdColType, sql.IdColType, sql.IdColType},
-		[]storage.ColumnKey{storage.MakeColumnKey(0, false), storage.MakeColumnKey(1, false),
-			storage.MakeColumnKey(2, false), storage.MakeColumnKey(3, false)})
+		[]sql.ColumnKey{sql.MakeColumnKey(0, false), sql.MakeColumnKey(1, false),
+			sql.MakeColumnKey(2, false), sql.MakeColumnKey(3, false)})
 	if err != nil {
 		return nil, err
 	}
@@ -159,14 +159,6 @@ func NewStore(name string, st store, init bool) (storage.Store, error) {
 	}
 
 	return mst, nil
-}
-
-func (mst *midStore) CreateSystemInfoTable(tblname sql.Identifier, maker storage.MakeVirtual) {
-	panic(fmt.Sprintf("%s: use virtual engine with %s engine", mst.name, mst.name))
-}
-
-func (mst *midStore) CreateMetadataTable(tblname sql.Identifier, maker storage.MakeVirtual) {
-	panic(fmt.Sprintf("%s: use virtual engine with %s engine", mst.name, mst.name))
 }
 
 func (mst *midStore) init(ctx context.Context, tx Transaction) error {
@@ -274,7 +266,9 @@ func (mst *midStore) createDatabase(ctx context.Context, tx storage.Transaction,
 	return mst.CreateSchema(ctx, tx, sql.SchemaName{dbname, sql.PUBLIC})
 }
 
-func (mst *midStore) CreateDatabase(dbname sql.Identifier, options storage.Options) error {
+func (mst *midStore) CreateDatabase(dbname sql.Identifier,
+	options map[sql.Identifier]string) error {
+
 	if len(options) != 0 {
 		return fmt.Errorf("%s: unexpected option to create database: %s", mst.name, dbname)
 	}
@@ -360,7 +354,7 @@ func (mst *midStore) dropDatabase(ctx context.Context, tx storage.Transaction,
 }
 
 func (mst *midStore) DropDatabase(dbname sql.Identifier, ifExists bool,
-	options storage.Options) error {
+	options map[sql.Identifier]string) error {
 
 	if len(options) != 0 {
 		return fmt.Errorf("%s: unexpected option to drop database: %s", mst.name, dbname)
@@ -544,9 +538,9 @@ func (mst *midStore) decodeTableMetadata(tn sql.TableName, mid int64, buf []byte
 			})
 	}
 
-	primary := make([]storage.ColumnKey, 0, len(md.Primary))
+	primary := make([]sql.ColumnKey, 0, len(md.Primary))
 	for _, pk := range md.Primary {
-		primary = append(primary, storage.MakeColumnKey(int(pk.Number), pk.Reverse))
+		primary = append(primary, sql.MakeColumnKey(int(pk.Number), pk.Reverse))
 	}
 
 	return mst.st.MakeTableDef(tn, mid, cols, colTypes, primary)
@@ -649,7 +643,7 @@ func (mst *midStore) createTable(ctx context.Context, tx storage.Transaction, tn
 }
 
 func (mst *midStore) CreateTable(ctx context.Context, tx storage.Transaction, tn sql.TableName,
-	cols []sql.Identifier, colTypes []sql.ColumnType, primary []storage.ColumnKey,
+	cols []sql.Identifier, colTypes []sql.ColumnType, primary []sql.ColumnKey,
 	ifNotExists bool) error {
 
 	if len(primary) == 0 {
@@ -662,8 +656,8 @@ func (mst *midStore) CreateTable(ctx context.Context, tx storage.Transaction, tn
 			}
 		}
 
-		primary = []storage.ColumnKey{
-			storage.MakeColumnKey(len(cols), false),
+		primary = []sql.ColumnKey{
+			sql.MakeColumnKey(len(cols), false),
 		}
 		cols = append(cols, rowID)
 		colTypes = append(colTypes, sql.ColumnType{
@@ -770,7 +764,7 @@ func (mst *midStore) lookupIndex(ctx context.Context, tx storage.Transaction, tn
 }
 
 func (mst *midStore) CreateIndex(ctx context.Context, tx storage.Transaction,
-	idxname sql.Identifier, tn sql.TableName, unique bool, keys []storage.ColumnKey,
+	idxname sql.Identifier, tn sql.TableName, unique bool, keys []sql.ColumnKey,
 	ifNotExists bool) error {
 
 	ok, err := mst.lookupIndex(ctx, tx, tn, idxname)

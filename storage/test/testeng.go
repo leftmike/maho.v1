@@ -69,7 +69,7 @@ type transactionState struct {
 var (
 	columns     = []sql.Identifier{sql.ID("ID"), sql.ID("intCol"), sql.ID("stringCol")}
 	columnTypes = []sql.ColumnType{int32ColType, int64ColType, stringColType}
-	primary     = []storage.ColumnKey{storage.MakeColumnKey(0, false)}
+	primary     = []sql.ColumnKey{sql.MakeColumnKey(0, false)}
 )
 
 func allRows(t *testing.T, ctx context.Context, rows storage.Rows,

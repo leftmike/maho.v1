@@ -16,7 +16,6 @@ import (
 	"github.com/leftmike/maho/storage"
 	"github.com/leftmike/maho/storage/encode"
 	"github.com/leftmike/maho/storage/mideng"
-	"github.com/leftmike/maho/storage/virtual"
 )
 
 var (
@@ -43,7 +42,7 @@ type tableDef struct {
 	tn          sql.TableName
 	columns     []sql.Identifier
 	columnTypes []sql.ColumnType
-	primary     []storage.ColumnKey
+	primary     []sql.ColumnKey
 	mid         int64
 
 	reverse uint32
@@ -86,13 +85,7 @@ func NewStore(dataDir string) (storage.Store, error) {
 		return nil, err
 	}
 
-	mst, err := mideng.NewStore("rowcols", rcst, init)
-	if err != nil {
-		return nil, err
-	}
-
-	vst := virtual.NewStore(mst)
-	return vst, nil
+	return mideng.NewStore("rowcols", rcst, init)
 }
 
 func (td *tableDef) Table(ctx context.Context, tx storage.Transaction) (storage.Table, error) {
@@ -113,12 +106,12 @@ func (td *tableDef) ColumnTypes() []sql.ColumnType {
 	return td.columnTypes
 }
 
-func (td *tableDef) PrimaryKey() []storage.ColumnKey {
+func (td *tableDef) PrimaryKey() []sql.ColumnKey {
 	return td.primary
 }
 
 func (_ *rowColsStore) MakeTableDef(tn sql.TableName, mid int64, cols []sql.Identifier,
-	colTypes []sql.ColumnType, primary []storage.ColumnKey) (mideng.TableDef, error) {
+	colTypes []sql.ColumnType, primary []sql.ColumnKey) (mideng.TableDef, error) {
 
 	if len(primary) == 0 {
 		panic(fmt.Sprintf("rowcols: table %s: missing required primary key", tn))
@@ -315,7 +308,7 @@ func (bt *table) ColumnTypes(ctx context.Context) []sql.ColumnType {
 	return bt.td.columnTypes
 }
 
-func (bt *table) PrimaryKey(ctx context.Context) []storage.ColumnKey {
+func (bt *table) PrimaryKey(ctx context.Context) []sql.ColumnKey {
 	return bt.td.primary
 }
 

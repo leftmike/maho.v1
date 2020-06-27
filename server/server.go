@@ -9,8 +9,6 @@ import (
 	"github.com/leftmike/maho/engine"
 	"github.com/leftmike/maho/evaluate"
 	"github.com/leftmike/maho/sql"
-	"github.com/leftmike/maho/storage"
-	"github.com/leftmike/maho/storage/virtual"
 )
 
 var ErrServerClosed = errors.New("server: closed")
@@ -117,8 +115,8 @@ func (svr *Server) Shutdown(ctx context.Context) error {
 		})
 }
 
-func (svr *Server) makeSessionsVirtual(ctx context.Context, tx storage.Transaction,
-	tn sql.TableName) (storage.Table, error) {
+func (svr *Server) makeSessionsVirtual(ctx context.Context, tx engine.Transaction,
+	tn sql.TableName) (engine.Table, error) {
 
 	svr.mutex.Lock()
 	defer svr.mutex.Unlock()
@@ -138,7 +136,7 @@ func (svr *Server) makeSessionsVirtual(ctx context.Context, tx storage.Transacti
 		})
 	}
 
-	return virtual.MakeTable(tn,
+	return engine.MakeVirtualTable(tn,
 		[]sql.Identifier{sql.ID("session"), sql.ID("user"), sql.ID("type"), sql.ID("address"),
 			sql.ID("interactive")},
 		[]sql.ColumnType{sql.StringColType, sql.IdColType, sql.IdColType,

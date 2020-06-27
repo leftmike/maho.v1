@@ -23,21 +23,15 @@ type testTransaction struct {
 	nextStmtAllowed int
 }
 
-func (st *testStore) CreateSystemInfoTable(tblname sql.Identifier, maker storage.MakeVirtual) {
-	st.t.Error("CreateSystemInfoTable should never be called")
-}
+func (st *testStore) CreateDatabase(dbname sql.Identifier,
+	options map[sql.Identifier]string) error {
 
-func (st *testStore) CreateMetadataTable(tblname sql.Identifier, maker storage.MakeVirtual) {
-	st.t.Error("CreateMetadataTable should never be called")
-}
-
-func (st *testStore) CreateDatabase(dbname sql.Identifier, options storage.Options) error {
 	st.t.Error("CreateDatabase should never be called")
 	return nil
 }
 
 func (st *testStore) DropDatabase(dbname sql.Identifier, ifExists bool,
-	options storage.Options) error {
+	options map[sql.Identifier]string) error {
 
 	st.t.Error("DropDatabase should never be called")
 	return nil
@@ -65,7 +59,7 @@ func (st *testStore) LookupTable(ctx context.Context, tx storage.Transaction,
 }
 
 func (st *testStore) CreateTable(ctx context.Context, tx storage.Transaction, tn sql.TableName,
-	cols []sql.Identifier, colTypes []sql.ColumnType, primary []storage.ColumnKey,
+	cols []sql.Identifier, colTypes []sql.ColumnType, primary []sql.ColumnKey,
 	ifNotExists bool) error {
 
 	st.t.Error("CreateTable should never be called")
@@ -80,7 +74,7 @@ func (st *testStore) DropTable(ctx context.Context, tx storage.Transaction, tn s
 }
 
 func (st *testStore) CreateIndex(ctx context.Context, tx storage.Transaction,
-	idxname sql.Identifier, tn sql.TableName, unique bool, keys []storage.ColumnKey,
+	idxname sql.Identifier, tn sql.TableName, unique bool, keys []sql.ColumnKey,
 	ifNotExists bool) error {
 
 	st.t.Error("CreateIndex should never be called")

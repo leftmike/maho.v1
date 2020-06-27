@@ -6,11 +6,10 @@ import (
 	"testing"
 
 	"github.com/leftmike/maho/sql"
-	"github.com/leftmike/maho/storage"
 	"github.com/leftmike/maho/storage/encode"
 )
 
-func testMakeKey(t *testing.T, key []storage.ColumnKey, values []sql.Value,
+func testMakeKey(t *testing.T, key []sql.ColumnKey, values []sql.Value,
 	makeRow func(val sql.Value) []sql.Value) {
 
 	var prev []byte
@@ -97,30 +96,30 @@ func TestMakeKey(t *testing.T) {
 		sql.BytesValue([]byte{0}),
 	}
 
-	testMakeKey(t, []storage.ColumnKey{storage.MakeColumnKey(0, false)}, values,
+	testMakeKey(t, []sql.ColumnKey{sql.MakeColumnKey(0, false)}, values,
 		func(val sql.Value) []sql.Value {
 			return []sql.Value{val}
 		})
 
 	for _, val0 := range values {
-		testMakeKey(t, []storage.ColumnKey{
-			storage.MakeColumnKey(1, false),
-			storage.MakeColumnKey(0, false),
+		testMakeKey(t, []sql.ColumnKey{
+			sql.MakeColumnKey(1, false),
+			sql.MakeColumnKey(0, false),
 		}, values,
 			func(val1 sql.Value) []sql.Value {
 				return []sql.Value{val0, val1}
 			})
 	}
 
-	testMakeKey(t, []storage.ColumnKey{storage.MakeColumnKey(0, true)}, reverseValues,
+	testMakeKey(t, []sql.ColumnKey{sql.MakeColumnKey(0, true)}, reverseValues,
 		func(val sql.Value) []sql.Value {
 			return []sql.Value{val}
 		})
 
 	for _, val0 := range reverseValues {
-		testMakeKey(t, []storage.ColumnKey{
-			storage.MakeColumnKey(1, false),
-			storage.MakeColumnKey(0, true),
+		testMakeKey(t, []sql.ColumnKey{
+			sql.MakeColumnKey(1, false),
+			sql.MakeColumnKey(0, true),
 		}, values,
 			func(val1 sql.Value) []sql.Value {
 				return []sql.Value{val0, val1}
@@ -128,9 +127,9 @@ func TestMakeKey(t *testing.T) {
 	}
 
 	for _, val0 := range values {
-		testMakeKey(t, []storage.ColumnKey{
-			storage.MakeColumnKey(0, false),
-			storage.MakeColumnKey(1, true),
+		testMakeKey(t, []sql.ColumnKey{
+			sql.MakeColumnKey(0, false),
+			sql.MakeColumnKey(1, true),
 		}, reverseValues,
 			func(val1 sql.Value) []sql.Value {
 				return []sql.Value{val0, val1}

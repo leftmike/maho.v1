@@ -18,15 +18,15 @@ func columnNumber(nam sql.Identifier, columns []sql.Identifier) (int, bool) {
 	return -1, false
 }
 
-func indexKeyToColumnKeys(ik sql.IndexKey, columns []sql.Identifier) ([]engine.ColumnKey, error) {
-	var colKeys []engine.ColumnKey
+func indexKeyToColumnKeys(ik sql.IndexKey, columns []sql.Identifier) ([]sql.ColumnKey, error) {
+	var colKeys []sql.ColumnKey
 
 	for cdx, col := range ik.Columns {
 		num, ok := columnNumber(col, columns)
 		if !ok {
 			return nil, fmt.Errorf("unknown column %s", col)
 		}
-		colKeys = append(colKeys, engine.MakeColumnKey(num, ik.Reverse[cdx]))
+		colKeys = append(colKeys, sql.MakeColumnKey(num, ik.Reverse[cdx]))
 	}
 
 	return colKeys, nil
@@ -37,9 +37,9 @@ type CreateTable struct {
 	Columns        []sql.Identifier
 	ColumnTypes    []sql.ColumnType
 	Primary        sql.IndexKey
-	primaryColKeys []engine.ColumnKey
+	primaryColKeys []sql.ColumnKey
 	Indexes        []sql.IndexKey
-	indexesColKeys [][]engine.ColumnKey
+	indexesColKeys [][]sql.ColumnKey
 	IfNotExists    bool
 }
 

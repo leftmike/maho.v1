@@ -6,11 +6,10 @@ import (
 	"sync"
 
 	"github.com/leftmike/maho/sql"
-	"github.com/leftmike/maho/storage"
 )
 
 type indexImpl struct {
-	keys   []storage.ColumnKey
+	keys   []sql.ColumnKey
 	unique bool
 }
 
@@ -34,7 +33,7 @@ type rowImpl struct {
 	previous *rowImpl
 }
 
-func (mt *tableImpl) createIndex(idxname sql.Identifier, unique bool, keys []storage.ColumnKey,
+func (mt *tableImpl) createIndex(idxname sql.Identifier, unique bool, keys []sql.ColumnKey,
 	ifNotExists bool) error {
 
 	if _, dup := mt.indexes[idxname]; dup {

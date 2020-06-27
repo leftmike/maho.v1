@@ -47,7 +47,7 @@ func (ttbl *TypedTable) ColumnTypes(ctx context.Context) []sql.ColumnType {
 	return ttbl.tbl.ColumnTypes(ctx)
 }
 
-func (ttbl *TypedTable) PrimaryKey(ctx context.Context) []storage.ColumnKey {
+func (ttbl *TypedTable) PrimaryKey(ctx context.Context) []sql.ColumnKey {
 	return ttbl.tbl.PrimaryKey(ctx)
 }
 
