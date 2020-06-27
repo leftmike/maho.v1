@@ -53,7 +53,7 @@ func (up *updatePlan) EvalRef(idx int) sql.Value {
 	return up.dest[idx]
 }
 
-func (up *updatePlan) Execute(ctx context.Context, eng *engine.Engine,
+func (up *updatePlan) Execute(ctx context.Context, e *engine.Engine,
 	tx engine.Transaction) (int64, error) {
 
 	up.dest = make([]sql.Value, len(up.rows.Columns()))

@@ -7,5 +7,5 @@ import (
 )
 
 type Executor interface {
-	Execute(ctx context.Context, eng *engine.Engine, tx engine.Transaction) (int64, error)
+	Execute(ctx context.Context, e *engine.Engine, tx engine.Transaction) (int64, error)
 }

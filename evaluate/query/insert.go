@@ -127,7 +127,7 @@ type insertValuesPlan struct {
 	rows     [][]expr.CExpr
 }
 
-func (plan *insertValuesPlan) Execute(ctx context.Context, eng *engine.Engine,
+func (plan *insertValuesPlan) Execute(ctx context.Context, e *engine.Engine,
 	tx engine.Transaction) (int64, error) {
 
 	var err error

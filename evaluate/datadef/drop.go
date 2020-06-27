@@ -35,11 +35,11 @@ func (stmt *DropTable) Plan(ses *evaluate.Session, tx engine.Transaction) (inter
 	return stmt, nil
 }
 
-func (stmt *DropTable) Execute(ctx context.Context, eng *engine.Engine,
+func (stmt *DropTable) Execute(ctx context.Context, e *engine.Engine,
 	tx engine.Transaction) (int64, error) {
 
 	for _, tn := range stmt.Tables {
-		err := eng.DropTable(ctx, tx, tn, stmt.IfExists)
+		err := e.DropTable(ctx, tx, tn, stmt.IfExists)
 		if err != nil {
 			return -1, err
 		}
@@ -67,10 +67,10 @@ func (stmt *DropIndex) Plan(ses *evaluate.Session, tx engine.Transaction) (inter
 	return stmt, nil
 }
 
-func (stmt *DropIndex) Execute(ctx context.Context, eng *engine.Engine,
+func (stmt *DropIndex) Execute(ctx context.Context, e *engine.Engine,
 	tx engine.Transaction) (int64, error) {
 
-	return -1, eng.DropIndex(ctx, tx, stmt.Index, stmt.Table, stmt.IfExists)
+	return -1, e.DropIndex(ctx, tx, stmt.Index, stmt.Table, stmt.IfExists)
 }
 
 type DropDatabase struct {
@@ -120,8 +120,8 @@ func (stmt *DropSchema) Plan(ses *evaluate.Session, tx engine.Transaction) (inte
 	return stmt, nil
 }
 
-func (stmt *DropSchema) Execute(ctx context.Context, eng *engine.Engine,
+func (stmt *DropSchema) Execute(ctx context.Context, e *engine.Engine,
 	tx engine.Transaction) (int64, error) {
 
-	return -1, eng.DropSchema(ctx, tx, stmt.Schema, stmt.IfExists)
+	return -1, e.DropSchema(ctx, tx, stmt.Schema, stmt.IfExists)
 }

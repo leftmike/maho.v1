@@ -28,7 +28,7 @@ type deletePlan struct {
 	rows sql.Rows
 }
 
-func (dp *deletePlan) Execute(ctx context.Context, eng *engine.Engine,
+func (dp *deletePlan) Execute(ctx context.Context, e *engine.Engine,
 	tx engine.Transaction) (int64, error) {
 
 	dest := make([]sql.Value, len(dp.rows.Columns()))

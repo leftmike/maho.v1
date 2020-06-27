@@ -96,10 +96,10 @@ func (stmt *CreateTable) Plan(ses *evaluate.Session, tx engine.Transaction) (int
 	return stmt, nil
 }
 
-func (stmt *CreateTable) Execute(ctx context.Context, eng *engine.Engine,
+func (stmt *CreateTable) Execute(ctx context.Context, e *engine.Engine,
 	tx engine.Transaction) (int64, error) {
 
-	err := eng.CreateTable(ctx, tx, stmt.Table, stmt.Columns, stmt.ColumnTypes, stmt.primaryColKeys,
+	err := e.CreateTable(ctx, tx, stmt.Table, stmt.Columns, stmt.ColumnTypes, stmt.primaryColKeys,
 		stmt.IfNotExists)
 	if err != nil {
 		return -1, err
@@ -107,7 +107,7 @@ func (stmt *CreateTable) Execute(ctx context.Context, eng *engine.Engine,
 	tx.NextStmt()
 
 	for i, ik := range stmt.Indexes {
-		err = eng.CreateIndex(ctx, tx, sql.ID(fmt.Sprintf("index-%d", i)), stmt.Table, ik.Unique,
+		err = e.CreateIndex(ctx, tx, sql.ID(fmt.Sprintf("index-%d", i)), stmt.Table, ik.Unique,
 			stmt.indexesColKeys[i], false)
 		if err != nil {
 			return -1, err
@@ -143,10 +143,10 @@ func (stmt *CreateIndex) Plan(ses *evaluate.Session, tx engine.Transaction) (int
 	return stmt, nil
 }
 
-func (stmt *CreateIndex) Execute(ctx context.Context, eng *engine.Engine,
+func (stmt *CreateIndex) Execute(ctx context.Context, e *engine.Engine,
 	tx engine.Transaction) (int64, error) {
 
-	tbl, err := eng.LookupTable(ctx, tx, stmt.Table)
+	tbl, err := e.LookupTable(ctx, tx, stmt.Table)
 	if err != nil {
 		return -1, err
 	}
@@ -156,7 +156,7 @@ func (stmt *CreateIndex) Execute(ctx context.Context, eng *engine.Engine,
 		return -1, fmt.Errorf("engine: %s in unique key for table %s", err, stmt.Table)
 	}
 
-	return -1, eng.CreateIndex(ctx, tx, stmt.Index, stmt.Table, stmt.Key.Unique, colKeys,
+	return -1, e.CreateIndex(ctx, tx, stmt.Index, stmt.Table, stmt.Key.Unique, colKeys,
 		stmt.IfNotExists)
 }
 
@@ -201,8 +201,8 @@ func (stmt *CreateSchema) Plan(ses *evaluate.Session, tx engine.Transaction) (in
 	return stmt, nil
 }
 
-func (stmt *CreateSchema) Execute(ctx context.Context, eng *engine.Engine,
+func (stmt *CreateSchema) Execute(ctx context.Context, e *engine.Engine,
 	tx engine.Transaction) (int64, error) {
 
-	return -1, eng.CreateSchema(ctx, tx, stmt.Schema)
+	return -1, e.CreateSchema(ctx, tx, stmt.Schema)
 }
