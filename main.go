@@ -41,12 +41,12 @@ To Do:
 - subquery expressions: EXISTS, IN, NOT IN, ANY/SOME, ALL
 - conditional expressions: CASE, COALESCE, NULLIF, GREATEST, LEAST
 
-- add storage layer under engine: evaluate -> engine -> storage
--- keep virtual as part of engine
--- type Engine becomes a struct *
--- engine.NewEngine(st storage.Store)
+-- add storage layer under engine: evaluate -> engine -> storage
+-- move virtual to engine
+-- engine.ColumnKey vs storage.ColumnKey: maybe move to sql?
+
 -- checks all constraints including unique and foreign key references
--- does type checking and coercion on insert and update
+-- does type checking and coercion on insert and update as part of engine
 -- converts from engine metadata to evaluate metadata; eg. Default from string to Expr
 -- generated columns
 -- triggers
@@ -87,19 +87,20 @@ import (
 
 	"github.com/leftmike/maho/config"
 	"github.com/leftmike/maho/engine"
-	"github.com/leftmike/maho/engine/basic"
-	"github.com/leftmike/maho/engine/keyval"
-	"github.com/leftmike/maho/engine/memrows"
-	"github.com/leftmike/maho/engine/rowcols"
 	"github.com/leftmike/maho/evaluate"
 	"github.com/leftmike/maho/parser"
 	"github.com/leftmike/maho/server"
 	"github.com/leftmike/maho/sql"
+	"github.com/leftmike/maho/storage"
+	"github.com/leftmike/maho/storage/basic"
+	"github.com/leftmike/maho/storage/keyval"
+	"github.com/leftmike/maho/storage/memrows"
+	"github.com/leftmike/maho/storage/rowcols"
 )
 
 var (
 	database = config.Var(new(string), "database").Usage("default `database` (maho)").String("maho")
-	eng      = config.Var(new(string), "engine").Usage("`engine` (basic)").String("basic")
+	store    = config.Var(new(string), "store").Usage("`store` (basic)").String("basic")
 	dataDir  = config.Var(new(string), "data-directory").
 			Flag("data", "`directory` containing databases (testdata)").String("testdata")
 	sshServer = config.Var(new(bool), "ssh").
@@ -225,28 +226,29 @@ func main() {
 
 	log.WithField("pid", os.Getpid()).Info("maho starting")
 
-	var e engine.Engine
+	var st storage.Store
 	var err error
-	switch *eng {
+	switch *store {
 	case "basic":
-		e, err = basic.NewEngine(*dataDir)
+		st, err = basic.NewStore(*dataDir)
 	case "memrows":
-		e, err = memrows.NewEngine(*dataDir)
+		st, err = memrows.NewStore(*dataDir)
 	case "rowcols":
-		e, err = rowcols.NewEngine(*dataDir)
+		st, err = rowcols.NewStore(*dataDir)
 	case "badger":
-		e, err = keyval.NewBadgerEngine(*dataDir)
+		st, err = keyval.NewBadgerStore(*dataDir)
 	case "bbolt":
-		e, err = keyval.NewBBoltEngine(*dataDir)
+		st, err = keyval.NewBBoltStore(*dataDir)
 	default:
 		fmt.Fprintf(os.Stderr,
-			"maho: got %s for engine; want basic, memrows, rowcols, badger, or bbolt", *eng)
+			"maho: got %s for store; want basic, memrows, rowcols, badger, or bbolt", *store)
 		return
 	}
 	if err != nil {
 		fmt.Fprintf(os.Stderr, "maho: %s", err)
 		return
 	}
+	e := engine.NewEngine(st)
 
 	svr := server.Server{
 		Handler: func(ses *evaluate.Session, rr io.RuneReader, w io.Writer) {

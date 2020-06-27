@@ -9,12 +9,12 @@ import (
 	"github.com/leftmike/sqltest/sqltestdb"
 
 	"github.com/leftmike/maho/engine"
-	"github.com/leftmike/maho/engine/basic"
-	"github.com/leftmike/maho/engine/keyval"
-	"github.com/leftmike/maho/engine/kvrows"
-	"github.com/leftmike/maho/engine/memrows"
-	"github.com/leftmike/maho/engine/rowcols"
 	"github.com/leftmike/maho/sql"
+	"github.com/leftmike/maho/storage/basic"
+	"github.com/leftmike/maho/storage/keyval"
+	"github.com/leftmike/maho/storage/kvrows"
+	"github.com/leftmike/maho/storage/memrows"
+	"github.com/leftmike/maho/storage/rowcols"
 	"github.com/leftmike/maho/test"
 	"github.com/leftmike/maho/testutil"
 )
@@ -121,65 +121,65 @@ func testAllSQL(t *testing.T, typ string, clean bool, makeEng func() engine.Engi
 
 func TestSQLBasic(t *testing.T) {
 	testAllSQL(t, "basic", false, func() engine.Engine {
-		e, err := basic.NewEngine("")
+		st, err := basic.NewStore("")
 		if err != nil {
 			t.Fatal(err)
 		}
-		return e
+		return engine.NewEngine(st)
 	})
 }
 
 func TestSQLMemRows(t *testing.T) {
 	testAllSQL(t, "memrows", false,
 		func() engine.Engine {
-			e, err := memrows.NewEngine("")
+			st, err := memrows.NewStore("")
 			if err != nil {
 				t.Fatal(err)
 			}
-			return e
+			return engine.NewEngine(st)
 		})
 }
 
 func TestSQLRowCols(t *testing.T) {
 	testAllSQL(t, "rowcols", true,
 		func() engine.Engine {
-			e, err := rowcols.NewEngine(filepath.Join("testdata", "rowcols"))
+			st, err := rowcols.NewStore(filepath.Join("testdata", "rowcols"))
 			if err != nil {
 				t.Fatal(err)
 			}
-			return e
+			return engine.NewEngine(st)
 		})
 }
 
 func TestSQLBadger(t *testing.T) {
 	testAllSQL(t, "badger", true,
 		func() engine.Engine {
-			e, err := keyval.NewBadgerEngine(filepath.Join("testdata", "badger"))
+			st, err := keyval.NewBadgerStore(filepath.Join("testdata", "badger"))
 			if err != nil {
 				t.Fatal(err)
 			}
-			return e
+			return engine.NewEngine(st)
 		})
 }
 
 func TestSQLBBolt(t *testing.T) {
 	testAllSQL(t, "bbolt", true,
 		func() engine.Engine {
-			e, err := keyval.NewBBoltEngine("testdata")
+			st, err := keyval.NewBBoltStore("testdata")
 			if err != nil {
 				t.Fatal(err)
 			}
-			return e
+			return engine.NewEngine(st)
 		})
 }
 
 func TestSQLKVRows(t *testing.T) {
 	testAllSQL(t, "kvrows", true,
 		func() engine.Engine {
-			e, err := kvrows.NewBadgerEngine(filepath.Join("testdata", "kvrows"))
+			st, err := kvrows.NewBadgerStore(filepath.Join("testdata", "kvrows"))
 			if err != nil {
 				t.Fatal(err)
 			}
-			return e
+			return engine.NewEngine(st)
 		})
 }

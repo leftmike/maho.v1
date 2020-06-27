@@ -4,21 +4,23 @@ import (
 	"testing"
 
 	"github.com/leftmike/maho/engine"
-	"github.com/leftmike/maho/engine/basic"
 	"github.com/leftmike/maho/evaluate"
 	"github.com/leftmike/maho/evaluate/expr"
 	"github.com/leftmike/maho/evaluate/query"
 	"github.com/leftmike/maho/sql"
+	"github.com/leftmike/maho/storage/basic"
 	"github.com/leftmike/maho/testutil"
 )
 
 func startEngine(t *testing.T) engine.Engine {
 	t.Helper()
 
-	e, err := basic.NewEngine("testdata")
+	st, err := basic.NewStore("testdata")
 	if err != nil {
 		t.Fatal(err)
 	}
+	e := engine.NewEngine(st)
+
 	err = e.CreateDatabase(sql.ID("test"), nil)
 	if err != nil {
 		t.Fatal(err)

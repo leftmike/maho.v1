@@ -7,9 +7,10 @@ import (
 
 	"github.com/leftmike/maho/engine"
 	"github.com/leftmike/maho/sql"
+	"github.com/leftmike/maho/storage"
 )
 
-type testEngine struct {
+type testStore struct {
 	t            *testing.T
 	transactions []testTransaction
 }
@@ -22,106 +23,106 @@ type testTransaction struct {
 	nextStmtAllowed int
 }
 
-func (te *testEngine) CreateSystemInfoTable(tblname sql.Identifier, maker engine.MakeVirtual) {
-	te.t.Error("CreateSystemInfoTable should never be called")
+func (st *testStore) CreateSystemInfoTable(tblname sql.Identifier, maker storage.MakeVirtual) {
+	st.t.Error("CreateSystemInfoTable should never be called")
 }
 
-func (te *testEngine) CreateMetadataTable(tblname sql.Identifier, maker engine.MakeVirtual) {
-	te.t.Error("CreateMetadataTable should never be called")
+func (st *testStore) CreateMetadataTable(tblname sql.Identifier, maker storage.MakeVirtual) {
+	st.t.Error("CreateMetadataTable should never be called")
 }
 
-func (te *testEngine) CreateDatabase(dbname sql.Identifier, options engine.Options) error {
-	te.t.Error("CreateDatabase should never be called")
+func (st *testStore) CreateDatabase(dbname sql.Identifier, options storage.Options) error {
+	st.t.Error("CreateDatabase should never be called")
 	return nil
 }
 
-func (te *testEngine) DropDatabase(dbname sql.Identifier, ifExists bool,
-	options engine.Options) error {
+func (st *testStore) DropDatabase(dbname sql.Identifier, ifExists bool,
+	options storage.Options) error {
 
-	te.t.Error("DropDatabase should never be called")
+	st.t.Error("DropDatabase should never be called")
 	return nil
 }
 
-func (te *testEngine) CreateSchema(ctx context.Context, tx engine.Transaction,
+func (st *testStore) CreateSchema(ctx context.Context, tx storage.Transaction,
 	sn sql.SchemaName) error {
 
-	te.t.Error("CreateSchema should never be called")
+	st.t.Error("CreateSchema should never be called")
 	return nil
 }
 
-func (te *testEngine) DropSchema(ctx context.Context, tx engine.Transaction, sn sql.SchemaName,
+func (st *testStore) DropSchema(ctx context.Context, tx storage.Transaction, sn sql.SchemaName,
 	ifExists bool) error {
 
-	te.t.Error("DropSchema should never be called")
+	st.t.Error("DropSchema should never be called")
 	return nil
 }
 
-func (te *testEngine) LookupTable(ctx context.Context, tx engine.Transaction,
-	tn sql.TableName) (engine.Table, error) {
+func (st *testStore) LookupTable(ctx context.Context, tx storage.Transaction,
+	tn sql.TableName) (storage.Table, error) {
 
-	te.t.Error("LookupTable should never be called")
+	st.t.Error("LookupTable should never be called")
 	return nil, nil
 }
 
-func (te *testEngine) CreateTable(ctx context.Context, tx engine.Transaction, tn sql.TableName,
-	cols []sql.Identifier, colTypes []sql.ColumnType, primary []engine.ColumnKey,
+func (st *testStore) CreateTable(ctx context.Context, tx storage.Transaction, tn sql.TableName,
+	cols []sql.Identifier, colTypes []sql.ColumnType, primary []storage.ColumnKey,
 	ifNotExists bool) error {
 
-	te.t.Error("CreateTable should never be called")
+	st.t.Error("CreateTable should never be called")
 	return nil
 }
 
-func (te *testEngine) DropTable(ctx context.Context, tx engine.Transaction, tn sql.TableName,
+func (st *testStore) DropTable(ctx context.Context, tx storage.Transaction, tn sql.TableName,
 	ifExists bool) error {
 
-	te.t.Error("DropTable should never be called")
+	st.t.Error("DropTable should never be called")
 	return nil
 }
 
-func (te *testEngine) CreateIndex(ctx context.Context, tx engine.Transaction,
-	idxname sql.Identifier, tn sql.TableName, unique bool, keys []engine.ColumnKey,
+func (st *testStore) CreateIndex(ctx context.Context, tx storage.Transaction,
+	idxname sql.Identifier, tn sql.TableName, unique bool, keys []storage.ColumnKey,
 	ifNotExists bool) error {
 
-	te.t.Error("CreateIndex should never be called")
+	st.t.Error("CreateIndex should never be called")
 	return nil
 }
 
-func (te *testEngine) DropIndex(ctx context.Context, tx engine.Transaction, idxname sql.Identifier,
+func (st *testStore) DropIndex(ctx context.Context, tx storage.Transaction, idxname sql.Identifier,
 	tn sql.TableName, ifExists bool) error {
 
-	te.t.Error("DropIndex should never be called")
+	st.t.Error("DropIndex should never be called")
 	return nil
 }
 
-func (te *testEngine) Begin(sesid uint64) engine.Transaction {
-	if len(te.transactions) == 0 {
-		te.t.Error("Begin called too many times on engine")
+func (st *testStore) Begin(sesid uint64) storage.Transaction {
+	if len(st.transactions) == 0 {
+		st.t.Error("Begin called too many times on engine")
 	}
-	tx := te.transactions[0]
-	te.transactions = te.transactions[1:]
-	tx.t = te.t
+	tx := st.transactions[0]
+	st.transactions = st.transactions[1:]
+	tx.t = st.t
 	tx.sesid = sesid
 	return &tx
 }
 
-func (te *testEngine) ListDatabases(ctx context.Context,
-	tx engine.Transaction) ([]sql.Identifier, error) {
+func (st *testStore) ListDatabases(ctx context.Context,
+	tx storage.Transaction) ([]sql.Identifier, error) {
 
-	te.t.Error("ListDatabases should never be called")
+	st.t.Error("ListDatabases should never be called")
 	return nil, nil
 }
 
-func (te *testEngine) ListSchemas(ctx context.Context, tx engine.Transaction,
+func (st *testStore) ListSchemas(ctx context.Context, tx storage.Transaction,
 	dbname sql.Identifier) ([]sql.Identifier, error) {
 
-	te.t.Error("ListSchemas should never be called")
+	st.t.Error("ListSchemas should never be called")
 	return nil, nil
 }
 
-func (te *testEngine) ListTables(ctx context.Context, tx engine.Transaction,
+func (st *testStore) ListTables(ctx context.Context, tx storage.Transaction,
 	sn sql.SchemaName) ([]sql.Identifier, error) {
 
-	te.t.Error("ListTables should never be called")
+	st.t.Error("ListTables should never be called")
 	return nil, nil
 }
 
@@ -152,14 +153,14 @@ func (ttx *testTransaction) NextStmt() {
 }
 
 func TestSessionCommit(t *testing.T) {
-	te := &testEngine{
+	st := &testStore{
 		t: t,
 		transactions: []testTransaction{
 			{wantCommit: true},
 		},
 	}
 
-	ses := Session{Engine: te}
+	ses := Session{Engine: engine.NewEngine(st)}
 	ses.SetSessionID(123)
 	if ses.String() != "session-123" || ses.sesid != 123 {
 		t.Errorf("SetSessionID: got %s want session-123", ses.String())
@@ -187,14 +188,14 @@ func TestSessionCommit(t *testing.T) {
 }
 
 func TestSessionRollback(t *testing.T) {
-	te := &testEngine{
+	st := &testStore{
 		t: t,
 		transactions: []testTransaction{
 			{wantRollback: true},
 		},
 	}
 
-	ses := Session{Engine: te}
+	ses := Session{Engine: engine.NewEngine(st)}
 	err := ses.Begin()
 	if err != nil {
 		t.Errorf("Begin failed with %s", err)
@@ -214,14 +215,14 @@ func TestSessionRollback(t *testing.T) {
 }
 
 func TestSessionRunExplicit(t *testing.T) {
-	te := &testEngine{
+	st := &testStore{
 		t: t,
 		transactions: []testTransaction{
 			{wantCommit: true, nextStmtAllowed: 2},
 		},
 	}
 
-	ses := Session{Engine: te}
+	ses := Session{Engine: engine.NewEngine(st)}
 	err := ses.Begin()
 	if err != nil {
 		t.Errorf("Begin failed with %s", err)
@@ -261,7 +262,7 @@ func TestSessionRunExplicit(t *testing.T) {
 }
 
 func TestSessionRunImplicit(t *testing.T) {
-	te := &testEngine{
+	st := &testStore{
 		t: t,
 		transactions: []testTransaction{
 			{wantCommit: true},
@@ -269,7 +270,7 @@ func TestSessionRunImplicit(t *testing.T) {
 		},
 	}
 
-	ses := Session{Engine: te}
+	ses := Session{Engine: engine.NewEngine(st)}
 
 	var ran bool
 	err := ses.Run(nil,

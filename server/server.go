@@ -7,9 +7,10 @@ import (
 	"sync"
 
 	"github.com/leftmike/maho/engine"
-	"github.com/leftmike/maho/engine/virtual"
 	"github.com/leftmike/maho/evaluate"
 	"github.com/leftmike/maho/sql"
+	"github.com/leftmike/maho/storage"
+	"github.com/leftmike/maho/storage/virtual"
 )
 
 var ErrServerClosed = errors.New("server: closed")
@@ -116,8 +117,8 @@ func (svr *Server) Shutdown(ctx context.Context) error {
 		})
 }
 
-func (svr *Server) makeSessionsVirtual(ctx context.Context, tx engine.Transaction,
-	tn sql.TableName) (engine.Table, error) {
+func (svr *Server) makeSessionsVirtual(ctx context.Context, tx storage.Transaction,
+	tn sql.TableName) (storage.Table, error) {
 
 	svr.mutex.Lock()
 	defer svr.mutex.Unlock()

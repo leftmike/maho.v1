@@ -7,12 +7,13 @@ import (
 	"testing"
 
 	"github.com/leftmike/maho/engine"
-	"github.com/leftmike/maho/engine/basic"
-	"github.com/leftmike/maho/engine/memrows"
-	"github.com/leftmike/maho/engine/rowcols"
 	"github.com/leftmike/maho/evaluate"
 	"github.com/leftmike/maho/parser"
 	"github.com/leftmike/maho/sql"
+	"github.com/leftmike/maho/storage"
+	"github.com/leftmike/maho/storage/basic"
+	"github.com/leftmike/maho/storage/memrows"
+	"github.com/leftmike/maho/storage/rowcols"
 	"github.com/leftmike/maho/testutil"
 )
 
@@ -82,17 +83,15 @@ select * from metadata.tables
 (2 rows)
 `},
 		{"select * from metadata.tables order by table_name",
-			`   database_name schema_name     table_name
-   ------------- -----------     ----------
- 1      'system'  'metadata'      'columns'
- 2      'system'      'info'       'config'
- 3      'system'      'info'    'databases'
- 4      'system'      'info'  'identifiers'
- 5      'system'      'info'        'locks'
- 6      'system'  'metadata'      'schemas'
- 7      'system'  'metadata'       'tables'
- 8      'system'      'info' 'transactions'
-(8 rows)
+			`   database_name schema_name    table_name
+   ------------- -----------    ----------
+ 1      'system'  'metadata'     'columns'
+ 2      'system'      'info'      'config'
+ 3      'system'      'info'   'databases'
+ 4      'system'      'info' 'identifiers'
+ 5      'system'  'metadata'     'schemas'
+ 6      'system'  'metadata'      'tables'
+(6 rows)
 `},
 	}
 
@@ -124,7 +123,8 @@ select * from metadata.tables
 	}
 )
 
-func testEngine(t *testing.T, e engine.Engine, cases []testCase) {
+func testStore(t *testing.T, st storage.Store, cases []testCase) {
+	e := engine.NewEngine(st)
 	for i, c := range cases {
 		var b bytes.Buffer
 		ses := &evaluate.Session{
@@ -140,28 +140,28 @@ func testEngine(t *testing.T, e engine.Engine, cases []testCase) {
 }
 
 func TestMain(t *testing.T) {
-	e, err := basic.NewEngine("testdata")
+	st, err := basic.NewStore("testdata")
 	if err != nil {
 		t.Fatal(err)
 	}
-	testEngine(t, e, commonCases)
-	testEngine(t, e, midCases)
+	testStore(t, st, commonCases)
+	testStore(t, st, midCases)
 
-	e, err = memrows.NewEngine("testdata")
+	st, err = memrows.NewStore("testdata")
 	if err != nil {
 		t.Fatal(err)
 	}
-	testEngine(t, e, commonCases)
-	testEngine(t, e, memrowsCases)
+	testStore(t, st, commonCases)
+	testStore(t, st, memrowsCases)
 
 	err = testutil.CleanDir("testdata", []string{".gitignore"})
 	if err != nil {
 		t.Fatal(err)
 	}
-	e, err = rowcols.NewEngine("testdata")
+	st, err = rowcols.NewStore("testdata")
 	if err != nil {
 		t.Fatal(err)
 	}
-	testEngine(t, e, commonCases)
-	testEngine(t, e, midCases)
+	testStore(t, st, commonCases)
+	testStore(t, st, midCases)
 }

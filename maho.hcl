@@ -1,6 +1,6 @@
 // maho config
 database = "maho"
-engine = "rowcols"
+store = "rowcols"
 accounts = [
     {user = "michael", password = "password"},
     {user = "test", password = "secret"},

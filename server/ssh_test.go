@@ -8,9 +8,10 @@ import (
 
 	"golang.org/x/crypto/ssh"
 
-	"github.com/leftmike/maho/engine/basic"
+	"github.com/leftmike/maho/engine"
 	"github.com/leftmike/maho/evaluate"
 	"github.com/leftmike/maho/server"
+	"github.com/leftmike/maho/storage/basic"
 )
 
 const (
@@ -84,7 +85,7 @@ func testSSHServer(t *testing.T, fail bool, cfg *ssh.ClientConfig, port int, aut
 	addr := fmt.Sprintf("localhost:%d", port)
 
 	served := make(chan struct{}, 1)
-	e, err := basic.NewEngine("testdata")
+	st, err := basic.NewStore("testdata")
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -92,7 +93,7 @@ func testSSHServer(t *testing.T, fail bool, cfg *ssh.ClientConfig, port int, aut
 		Handler: func(ses *evaluate.Session, rr io.RuneReader, w io.Writer) {
 			served <- struct{}{}
 		},
-		Engine: e,
+		Engine: engine.NewEngine(st),
 	}
 
 	go func() {
