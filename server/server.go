@@ -17,7 +17,7 @@ type Handler func(ses *evaluate.Session, rr io.RuneReader, w io.Writer)
 
 type Server struct {
 	Handler         Handler
-	Engine          engine.Engine
+	Engine          *engine.Engine
 	DefaultDatabase sql.Identifier
 
 	mutex         sync.Mutex

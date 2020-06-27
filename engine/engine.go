@@ -15,50 +15,19 @@ type Transaction interface {
 	storage.Transaction
 }
 
-type Rows interface {
-	storage.Rows
-}
-
 type Table interface {
 	storage.Table
 }
 
-type Engine interface {
-	CreateSystemInfoTable(tblname sql.Identifier, maker MakeVirtual)
-	CreateMetadataTable(tblname sql.Identifier, maker MakeVirtual)
-
-	CreateDatabase(dbname sql.Identifier, options map[sql.Identifier]string) error
-	DropDatabase(dbname sql.Identifier, ifExists bool, options map[sql.Identifier]string) error
-
-	CreateSchema(ctx context.Context, tx Transaction, sn sql.SchemaName) error
-	DropSchema(ctx context.Context, tx Transaction, sn sql.SchemaName, ifExists bool) error
-
-	LookupTable(ctx context.Context, tx Transaction, tn sql.TableName) (Table, error)
-	CreateTable(ctx context.Context, tx Transaction, tn sql.TableName, cols []sql.Identifier,
-		colTypes []sql.ColumnType, primary []sql.ColumnKey, ifNotExists bool) error
-	DropTable(ctx context.Context, tx Transaction, tn sql.TableName, ifExists bool) error
-
-	CreateIndex(ctx context.Context, tx Transaction, idxname sql.Identifier, tn sql.TableName,
-		unique bool, keys []sql.ColumnKey, ifNotExists bool) error
-	DropIndex(ctx context.Context, tx Transaction, idxname sql.Identifier, tn sql.TableName,
-		ifExists bool) error
-
-	Begin(sesid uint64) Transaction
-
-	ListDatabases(ctx context.Context, tx Transaction) ([]sql.Identifier, error)
-	ListSchemas(ctx context.Context, tx Transaction, dbname sql.Identifier) ([]sql.Identifier, error)
-	ListTables(ctx context.Context, tx Transaction, sn sql.SchemaName) ([]sql.Identifier, error)
-}
-
-type engine struct {
+type Engine struct {
 	mutex            sync.RWMutex
 	st               storage.Store
 	systemInfoTables map[sql.Identifier]MakeVirtual
 	metadataTables   map[sql.Identifier]MakeVirtual
 }
 
-func NewEngine(st storage.Store) Engine {
-	e := &engine{
+func NewEngine(st storage.Store) *Engine {
+	e := &Engine{
 		st:               st,
 		systemInfoTables: map[sql.Identifier]MakeVirtual{},
 		metadataTables:   map[sql.Identifier]MakeVirtual{},
@@ -75,7 +44,7 @@ func NewEngine(st storage.Store) Engine {
 	return e
 }
 
-func (e *engine) CreateSystemInfoTable(tblname sql.Identifier, maker MakeVirtual) {
+func (e *Engine) CreateSystemInfoTable(tblname sql.Identifier, maker MakeVirtual) {
 	e.mutex.Lock()
 	defer e.mutex.Unlock()
 
@@ -85,7 +54,7 @@ func (e *engine) CreateSystemInfoTable(tblname sql.Identifier, maker MakeVirtual
 	e.systemInfoTables[tblname] = maker
 }
 
-func (e *engine) CreateMetadataTable(tblname sql.Identifier, maker MakeVirtual) {
+func (e *Engine) CreateMetadataTable(tblname sql.Identifier, maker MakeVirtual) {
 	e.mutex.Lock()
 	defer e.mutex.Unlock()
 
@@ -95,14 +64,14 @@ func (e *engine) CreateMetadataTable(tblname sql.Identifier, maker MakeVirtual) 
 	e.metadataTables[tblname] = maker
 }
 
-func (e *engine) CreateDatabase(dbname sql.Identifier, options map[sql.Identifier]string) error {
+func (e *Engine) CreateDatabase(dbname sql.Identifier, options map[sql.Identifier]string) error {
 	if dbname == sql.SYSTEM {
 		return fmt.Errorf("engine: database %s already exists", dbname)
 	}
 	return e.st.CreateDatabase(dbname, options)
 }
 
-func (e *engine) DropDatabase(dbname sql.Identifier, ifExists bool,
+func (e *Engine) DropDatabase(dbname sql.Identifier, ifExists bool,
 	options map[sql.Identifier]string) error {
 
 	if dbname == sql.SYSTEM {
@@ -111,7 +80,7 @@ func (e *engine) DropDatabase(dbname sql.Identifier, ifExists bool,
 	return e.st.DropDatabase(dbname, ifExists, options)
 }
 
-func (e *engine) CreateSchema(ctx context.Context, tx Transaction, sn sql.SchemaName) error {
+func (e *Engine) CreateSchema(ctx context.Context, tx Transaction, sn sql.SchemaName) error {
 	if sn.Database == sql.SYSTEM {
 		return fmt.Errorf("engine: database %s may not be modified", sn.Database)
 	}
@@ -121,7 +90,7 @@ func (e *engine) CreateSchema(ctx context.Context, tx Transaction, sn sql.Schema
 	return e.st.CreateSchema(ctx, tx, sn)
 }
 
-func (e *engine) DropSchema(ctx context.Context, tx Transaction, sn sql.SchemaName,
+func (e *Engine) DropSchema(ctx context.Context, tx Transaction, sn sql.SchemaName,
 	ifExists bool) error {
 
 	if sn.Database == sql.SYSTEM {
@@ -133,7 +102,7 @@ func (e *engine) DropSchema(ctx context.Context, tx Transaction, sn sql.SchemaNa
 	return e.st.DropSchema(ctx, tx, sn, ifExists)
 }
 
-func (e *engine) LookupTable(ctx context.Context, tx Transaction, tn sql.TableName) (Table, error) {
+func (e *Engine) LookupTable(ctx context.Context, tx Transaction, tn sql.TableName) (Table, error) {
 	e.mutex.RLock()
 	defer e.mutex.RUnlock()
 
@@ -152,7 +121,7 @@ func (e *engine) LookupTable(ctx context.Context, tx Transaction, tn sql.TableNa
 	return e.st.LookupTable(ctx, tx, tn)
 }
 
-func (e *engine) CreateTable(ctx context.Context, tx Transaction, tn sql.TableName,
+func (e *Engine) CreateTable(ctx context.Context, tx Transaction, tn sql.TableName,
 	cols []sql.Identifier, colTypes []sql.ColumnType, primary []sql.ColumnKey,
 	ifNotExists bool) error {
 
@@ -165,7 +134,7 @@ func (e *engine) CreateTable(ctx context.Context, tx Transaction, tn sql.TableNa
 	return e.st.CreateTable(ctx, tx, tn, cols, colTypes, primary, ifNotExists)
 }
 
-func (e *engine) DropTable(ctx context.Context, tx Transaction, tn sql.TableName,
+func (e *Engine) DropTable(ctx context.Context, tx Transaction, tn sql.TableName,
 	ifExists bool) error {
 
 	if tn.Database == sql.SYSTEM {
@@ -177,7 +146,7 @@ func (e *engine) DropTable(ctx context.Context, tx Transaction, tn sql.TableName
 	return e.st.DropTable(ctx, tx, tn, ifExists)
 }
 
-func (e *engine) CreateIndex(ctx context.Context, tx Transaction, idxname sql.Identifier,
+func (e *Engine) CreateIndex(ctx context.Context, tx Transaction, idxname sql.Identifier,
 	tn sql.TableName, unique bool, keys []sql.ColumnKey, ifNotExists bool) error {
 
 	if tn.Database == sql.SYSTEM {
@@ -189,7 +158,7 @@ func (e *engine) CreateIndex(ctx context.Context, tx Transaction, idxname sql.Id
 	return e.st.CreateIndex(ctx, tx, idxname, tn, unique, keys, ifNotExists)
 }
 
-func (e *engine) DropIndex(ctx context.Context, tx Transaction, idxname sql.Identifier,
+func (e *Engine) DropIndex(ctx context.Context, tx Transaction, idxname sql.Identifier,
 	tn sql.TableName, ifExists bool) error {
 
 	if tn.Database == sql.SYSTEM {
@@ -201,21 +170,21 @@ func (e *engine) DropIndex(ctx context.Context, tx Transaction, idxname sql.Iden
 	return e.st.DropIndex(ctx, tx, idxname, tn, ifExists)
 }
 
-func (e *engine) Begin(sesid uint64) Transaction {
+func (e *Engine) Begin(sesid uint64) Transaction {
 	return e.st.Begin(sesid)
 }
 
-func (e *engine) ListDatabases(ctx context.Context, tx Transaction) ([]sql.Identifier, error) {
+func (e *Engine) ListDatabases(ctx context.Context, tx Transaction) ([]sql.Identifier, error) {
 	return e.st.ListDatabases(ctx, tx)
 }
 
-func (e *engine) ListSchemas(ctx context.Context, tx Transaction,
+func (e *Engine) ListSchemas(ctx context.Context, tx Transaction,
 	dbname sql.Identifier) ([]sql.Identifier, error) {
 
 	return e.st.ListSchemas(ctx, tx, dbname)
 }
 
-func (e *engine) ListTables(ctx context.Context, tx Transaction,
+func (e *Engine) ListTables(ctx context.Context, tx Transaction,
 	sn sql.SchemaName) ([]sql.Identifier, error) {
 
 	return e.st.ListTables(ctx, tx, sn)

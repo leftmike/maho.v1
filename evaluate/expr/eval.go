@@ -7,7 +7,6 @@ import (
 	"io"
 	"sync/atomic"
 
-	"github.com/leftmike/maho/engine"
 	"github.com/leftmike/maho/sql"
 )
 
@@ -42,7 +41,7 @@ func ColumnIndex(ce CExpr) (int, bool) {
 }
 
 type rowsExpr struct {
-	rows  engine.Rows
+	rows  sql.Rows
 	value sql.Value
 	err   error
 	done  bool

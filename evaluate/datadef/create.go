@@ -96,7 +96,7 @@ func (stmt *CreateTable) Plan(ses *evaluate.Session, tx engine.Transaction) (int
 	return stmt, nil
 }
 
-func (stmt *CreateTable) Execute(ctx context.Context, eng engine.Engine,
+func (stmt *CreateTable) Execute(ctx context.Context, eng *engine.Engine,
 	tx engine.Transaction) (int64, error) {
 
 	err := eng.CreateTable(ctx, tx, stmt.Table, stmt.Columns, stmt.ColumnTypes, stmt.primaryColKeys,
@@ -143,7 +143,7 @@ func (stmt *CreateIndex) Plan(ses *evaluate.Session, tx engine.Transaction) (int
 	return stmt, nil
 }
 
-func (stmt *CreateIndex) Execute(ctx context.Context, eng engine.Engine,
+func (stmt *CreateIndex) Execute(ctx context.Context, eng *engine.Engine,
 	tx engine.Transaction) (int64, error) {
 
 	tbl, err := eng.LookupTable(ctx, tx, stmt.Table)
@@ -201,7 +201,7 @@ func (stmt *CreateSchema) Plan(ses *evaluate.Session, tx engine.Transaction) (in
 	return stmt, nil
 }
 
-func (stmt *CreateSchema) Execute(ctx context.Context, eng engine.Engine,
+func (stmt *CreateSchema) Execute(ctx context.Context, eng *engine.Engine,
 	tx engine.Transaction) (int64, error) {
 
 	return -1, eng.CreateSchema(ctx, tx, stmt.Schema)

@@ -14,7 +14,7 @@ import (
 )
 
 type Runner struct {
-	Engine   engine.Engine
+	Engine   *engine.Engine
 	Database sql.Identifier
 	ses      *evaluate.Session
 }
@@ -92,7 +92,7 @@ func (run *Runner) RunQuery(tst *sqltestdb.Test) ([]string, [][]string, error) {
 			if err2 != nil {
 				return err2
 			}
-			rows, ok := ret.(engine.Rows)
+			rows, ok := ret.(sql.Rows)
 			if !ok {
 				return fmt.Errorf("%s:%d: expected a query", tst.Filename, tst.LineNumber)
 			}

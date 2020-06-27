@@ -67,9 +67,9 @@ func TestValuesSimple(t *testing.T) {
 			t.Errorf("Plan(%q) failed with %s", c.sql, err)
 			continue
 		}
-		rows, ok := ret.(engine.Rows)
+		rows, ok := ret.(sql.Rows)
 		if !ok {
-			t.Errorf("Plan(%q).(engine.Rows) failed", c.sql)
+			t.Errorf("Plan(%q).(sql.Rows) failed", c.sql)
 			continue
 		}
 		dest := make([]sql.Value, len(rows.Columns()))

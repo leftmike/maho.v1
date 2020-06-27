@@ -29,7 +29,7 @@ type TypedTable struct {
 
 type Rows struct {
 	ttbl *TypedTable
-	rows storage.Rows
+	rows sql.Rows
 }
 
 func MakeTypedTable(tn sql.TableName, tbl storage.Table) *TypedTable {

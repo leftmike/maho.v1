@@ -219,7 +219,7 @@ func statement(ses *evaluate.Session, tx engine.Transaction, s string) error {
 	return err
 }
 
-func allRows(ses *evaluate.Session, rows engine.Rows, numCols int) ([][]sql.Value, error) {
+func allRows(ses *evaluate.Session, rows sql.Rows, numCols int) ([][]sql.Value, error) {
 	all := [][]sql.Value{}
 	l := len(rows.Columns())
 	for {
@@ -235,7 +235,7 @@ func allRows(ses *evaluate.Session, rows engine.Rows, numCols int) ([][]sql.Valu
 	return all, nil
 }
 
-func testInsert(t *testing.T, e engine.Engine, ses *evaluate.Session, tn sql.TableName,
+func testInsert(t *testing.T, e *engine.Engine, ses *evaluate.Session, tn sql.TableName,
 	cols []sql.Identifier, colTypes []sql.ColumnType, cases []insertCase) {
 
 	for _, c := range cases {
@@ -260,7 +260,7 @@ func testInsert(t *testing.T, e engine.Engine, ses *evaluate.Session, tn sql.Tab
 				t.Error(err)
 				continue
 			}
-			var rows engine.Rows
+			var rows sql.Rows
 			rows, err = tbl.Rows(ses.Context(), nil, nil)
 			if err != nil {
 				t.Errorf("(%s).Rows() failed with %s", tn, err)

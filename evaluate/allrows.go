@@ -3,12 +3,11 @@ package evaluate
 import (
 	"io"
 
-	"github.com/leftmike/maho/engine"
 	"github.com/leftmike/maho/sql"
 )
 
 // AllRows returns all of the rows from a Rows as slices of values.
-func AllRows(ses *Session, rows engine.Rows) ([][]sql.Value, error) {
+func AllRows(ses *Session, rows sql.Rows) ([][]sql.Value, error) {
 	all := [][]sql.Value{}
 	l := len(rows.Columns())
 	for {

@@ -11,7 +11,7 @@ import (
 
 type FromItem interface {
 	fmt.Stringer
-	rows(ses *evaluate.Session, tx engine.Transaction) (engine.Rows, *fromContext, error)
+	rows(ses *evaluate.Session, tx engine.Transaction) (sql.Rows, *fromContext, error)
 }
 
 type FromTableAlias struct {
@@ -27,8 +27,7 @@ func (fta FromTableAlias) String() string {
 	return s
 }
 
-func lookupRows(ses *evaluate.Session, tx engine.Transaction, tn sql.TableName) (engine.Rows,
-	error) {
+func lookupRows(ses *evaluate.Session, tx engine.Transaction, tn sql.TableName) (sql.Rows, error) {
 
 	tbl, err := ses.Engine.LookupTable(ses.Context(), tx, ses.ResolveTableName(tn))
 	if err != nil {
@@ -37,7 +36,7 @@ func lookupRows(ses *evaluate.Session, tx engine.Transaction, tn sql.TableName) 
 	return tbl.Rows(ses.Context(), nil, nil)
 }
 
-func (fta FromTableAlias) rows(ses *evaluate.Session, tx engine.Transaction) (engine.Rows,
+func (fta FromTableAlias) rows(ses *evaluate.Session, tx engine.Transaction) (sql.Rows,
 	*fromContext, error) {
 
 	rows, err := lookupRows(ses, tx, fta.TableName)
@@ -72,14 +71,14 @@ func (fs FromStmt) String() string {
 	return s
 }
 
-func (fs FromStmt) rows(ses *evaluate.Session, tx engine.Transaction) (engine.Rows,
+func (fs FromStmt) rows(ses *evaluate.Session, tx engine.Transaction) (sql.Rows,
 	*fromContext, error) {
 
 	ret, err := fs.Stmt.Plan(ses, tx)
 	if err != nil {
 		return nil, nil, err
 	}
-	rows := ret.(engine.Rows)
+	rows := ret.(sql.Rows)
 	cols := rows.Columns()
 	if fs.ColumnAliases != nil {
 		if len(fs.ColumnAliases) != len(cols) {

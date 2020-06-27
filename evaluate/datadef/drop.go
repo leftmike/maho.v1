@@ -35,7 +35,7 @@ func (stmt *DropTable) Plan(ses *evaluate.Session, tx engine.Transaction) (inter
 	return stmt, nil
 }
 
-func (stmt *DropTable) Execute(ctx context.Context, eng engine.Engine,
+func (stmt *DropTable) Execute(ctx context.Context, eng *engine.Engine,
 	tx engine.Transaction) (int64, error) {
 
 	for _, tn := range stmt.Tables {
@@ -67,7 +67,7 @@ func (stmt *DropIndex) Plan(ses *evaluate.Session, tx engine.Transaction) (inter
 	return stmt, nil
 }
 
-func (stmt *DropIndex) Execute(ctx context.Context, eng engine.Engine,
+func (stmt *DropIndex) Execute(ctx context.Context, eng *engine.Engine,
 	tx engine.Transaction) (int64, error) {
 
 	return -1, eng.DropIndex(ctx, tx, stmt.Index, stmt.Table, stmt.IfExists)
@@ -120,7 +120,7 @@ func (stmt *DropSchema) Plan(ses *evaluate.Session, tx engine.Transaction) (inte
 	return stmt, nil
 }
 
-func (stmt *DropSchema) Execute(ctx context.Context, eng engine.Engine,
+func (stmt *DropSchema) Execute(ctx context.Context, eng *engine.Engine,
 	tx engine.Transaction) (int64, error) {
 
 	return -1, eng.DropSchema(ctx, tx, stmt.Schema, stmt.IfExists)

@@ -12,7 +12,7 @@ import (
 	"github.com/leftmike/maho/testutil"
 )
 
-func startEngine(t *testing.T) engine.Engine {
+func startEngine(t *testing.T) *engine.Engine {
 	t.Helper()
 
 	st, err := basic.NewStore("testdata")
@@ -86,7 +86,7 @@ func TestValues(t *testing.T) {
 			t.Errorf("(%v).Plan() failed with %s", c.values, err)
 			continue
 		}
-		rows, ok := ret.(engine.Rows)
+		rows, ok := ret.(sql.Rows)
 		if !ok {
 			t.Errorf("(%v).Plan() did not return Rows", c.values)
 			continue

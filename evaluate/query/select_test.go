@@ -3,7 +3,6 @@ package query_test
 import (
 	"testing"
 
-	"github.com/leftmike/maho/engine"
 	"github.com/leftmike/maho/evaluate"
 	"github.com/leftmike/maho/evaluate/expr"
 	"github.com/leftmike/maho/evaluate/query"
@@ -111,7 +110,7 @@ func TestSelect(t *testing.T) {
 			t.Errorf("(%v).Plan() failed with %s", c.stmt, err)
 			continue
 		}
-		rows, ok := ret.(engine.Rows)
+		rows, ok := ret.(sql.Rows)
 		if !ok {
 			t.Errorf("(%v).Plan() did not return Rows", c.stmt)
 			continue

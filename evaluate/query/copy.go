@@ -103,7 +103,7 @@ type copyPlan struct {
 	delimiter  rune
 }
 
-func (plan *copyPlan) Execute(ctx context.Context, eng engine.Engine,
+func (plan *copyPlan) Execute(ctx context.Context, eng *engine.Engine,
 	tx engine.Transaction) (int64, error) {
 
 	var cnt int64

@@ -751,7 +751,7 @@ func (mt *table) PrimaryKey(ctx context.Context) []sql.ColumnKey {
 	return nil
 }
 
-func (mt *table) Rows(ctx context.Context, minRow, maxRow []sql.Value) (storage.Rows, error) {
+func (mt *table) Rows(ctx context.Context, minRow, maxRow []sql.Value) (sql.Rows, error) {
 	if minRow != nil || maxRow != nil {
 		panic("memrows: not implemented: minRow != nil || maxRow != nil")
 	}

@@ -25,10 +25,10 @@ func (stmt *Delete) String() string {
 }
 
 type deletePlan struct {
-	rows engine.Rows
+	rows sql.Rows
 }
 
-func (dp *deletePlan) Execute(ctx context.Context, eng engine.Engine,
+func (dp *deletePlan) Execute(ctx context.Context, eng *engine.Engine,
 	tx engine.Transaction) (int64, error) {
 
 	dest := make([]sql.Value, len(dp.rows.Columns()))

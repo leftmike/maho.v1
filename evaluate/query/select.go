@@ -116,7 +116,7 @@ func (stmt *Select) String() string {
 }
 
 func (stmt *Select) Plan(ses *evaluate.Session, tx engine.Transaction) (interface{}, error) {
-	var rows engine.Rows
+	var rows sql.Rows
 	var fctx *fromContext
 	var err error
 
@@ -151,7 +151,7 @@ type orderBy struct {
 }
 
 type sortRows struct {
-	rows    engine.Rows
+	rows    sql.Rows
 	orderBy []orderBy
 	values  [][]sql.Value
 	index   int
@@ -267,7 +267,7 @@ func orderByInput(order []OrderBy, fctx *fromContext) []orderBy {
 	return byInput
 }
 
-func order(rows engine.Rows, fctx *fromContext, order []OrderBy) (engine.Rows, error) {
+func order(rows sql.Rows, fctx *fromContext, order []OrderBy) (sql.Rows, error) {
 	if order == nil {
 		return rows, nil
 	}
@@ -297,7 +297,7 @@ func order(rows engine.Rows, fctx *fromContext, order []OrderBy) (engine.Rows, e
 }
 
 type filterRows struct {
-	rows engine.Rows
+	rows sql.Rows
 	cond expr.CExpr
 	dest []sql.Value
 }
@@ -348,8 +348,8 @@ func (fr *filterRows) Update(ctx context.Context, updates []sql.ColumnUpdate) er
 	return fr.rows.Update(ctx, updates)
 }
 
-func where(ses *evaluate.Session, tx engine.Transaction, rows engine.Rows, fctx *fromContext,
-	cond sql.Expr) (engine.Rows, error) {
+func where(ses *evaluate.Session, tx engine.Transaction, rows sql.Rows, fctx *fromContext,
+	cond sql.Expr) (sql.Rows, error) {
 
 	if cond == nil {
 		return rows, nil
@@ -391,7 +391,7 @@ func (_ *oneEmptyRow) Update(ctx context.Context, updates []sql.ColumnUpdate) er
 }
 
 type allResultRows struct {
-	rows    engine.Rows
+	rows    sql.Rows
 	columns []sql.Identifier
 }
 
@@ -426,7 +426,7 @@ type expr2dest struct {
 }
 
 type resultRows struct {
-	rows      engine.Rows
+	rows      sql.Rows
 	dest      []sql.Value
 	columns   []sql.Identifier
 	destCols  []src2dest
@@ -474,8 +474,8 @@ func (_ *resultRows) Update(ctx context.Context, updates []sql.ColumnUpdate) err
 	return fmt.Errorf("result rows may not be updated")
 }
 
-func results(ses *evaluate.Session, tx engine.Transaction, rows engine.Rows, fctx *fromContext,
-	results []SelectResult) (engine.Rows, error) {
+func results(ses *evaluate.Session, tx engine.Transaction, rows sql.Rows, fctx *fromContext,
+	results []SelectResult) (sql.Rows, error) {
 
 	if results == nil {
 		return &allResultRows{rows: rows, columns: fctx.columns()}, nil
@@ -511,9 +511,7 @@ func results(ses *evaluate.Session, tx engine.Transaction, rows engine.Rows, fct
 	return makeResultRows(rows, cols, destExprs), nil
 }
 
-func makeResultRows(rows engine.Rows, cols []sql.Identifier,
-	destExprs []expr2dest) engine.Rows {
-
+func makeResultRows(rows sql.Rows, cols []sql.Identifier, destExprs []expr2dest) sql.Rows {
 	rr := resultRows{rows: rows, columns: cols}
 	for _, de := range destExprs {
 		if ci, ok := expr.ColumnIndex(de.expr); ok {

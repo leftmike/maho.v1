@@ -105,7 +105,7 @@ func Compile(ses *evaluate.Session, tx engine.Transaction, ctx CompileContext, e
 		if err != nil {
 			return nil, err
 		}
-		rows, ok := ret.(engine.Rows)
+		rows, ok := ret.(sql.Rows)
 		if !ok {
 			return nil, fmt.Errorf("engine: expected rows: %s", e.Stmt)
 		}

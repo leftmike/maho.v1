@@ -174,7 +174,7 @@ func (bt *table) PrimaryKey(ctx context.Context) []sql.ColumnKey {
 	return bt.td.primary
 }
 
-func (bt *table) Rows(ctx context.Context, minRow, maxRow []sql.Value) (storage.Rows, error) {
+func (bt *table) Rows(ctx context.Context, minRow, maxRow []sql.Value) (sql.Rows, error) {
 	br := &rows{
 		tbl: bt,
 		idx: 0,

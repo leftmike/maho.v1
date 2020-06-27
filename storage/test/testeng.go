@@ -72,7 +72,7 @@ var (
 	primary     = []sql.ColumnKey{sql.MakeColumnKey(0, false)}
 )
 
-func allRows(t *testing.T, ctx context.Context, rows storage.Rows,
+func allRows(t *testing.T, ctx context.Context, rows sql.Rows,
 	fln testutil.FileLineNumber) [][]sql.Value {
 
 	t.Helper()

@@ -54,7 +54,7 @@ func (md mahoDialect) DriverName() string {
 	return md.name
 }
 
-func testSQL(t *testing.T, typ string, e engine.Engine, testData string, psql bool) {
+func testSQL(t *testing.T, typ string, e *engine.Engine, testData string, psql bool) {
 	t.Helper()
 
 	dbname := sql.ID("test")
@@ -81,7 +81,7 @@ func testSQL(t *testing.T, typ string, e engine.Engine, testData string, psql bo
 	}
 }
 
-func testAllSQL(t *testing.T, typ string, clean bool, makeEng func() engine.Engine) {
+func testAllSQL(t *testing.T, typ string, clean bool, makeEng func() *engine.Engine) {
 	if clean {
 		err := testutil.CleanDir("testdata", []string{".gitignore", "expected", "output", "sql"})
 		if err != nil {
@@ -120,7 +120,7 @@ func testAllSQL(t *testing.T, typ string, clean bool, makeEng func() engine.Engi
 }
 
 func TestSQLBasic(t *testing.T) {
-	testAllSQL(t, "basic", false, func() engine.Engine {
+	testAllSQL(t, "basic", false, func() *engine.Engine {
 		st, err := basic.NewStore("")
 		if err != nil {
 			t.Fatal(err)
@@ -131,7 +131,7 @@ func TestSQLBasic(t *testing.T) {
 
 func TestSQLMemRows(t *testing.T) {
 	testAllSQL(t, "memrows", false,
-		func() engine.Engine {
+		func() *engine.Engine {
 			st, err := memrows.NewStore("")
 			if err != nil {
 				t.Fatal(err)
@@ -142,7 +142,7 @@ func TestSQLMemRows(t *testing.T) {
 
 func TestSQLRowCols(t *testing.T) {
 	testAllSQL(t, "rowcols", true,
-		func() engine.Engine {
+		func() *engine.Engine {
 			st, err := rowcols.NewStore(filepath.Join("testdata", "rowcols"))
 			if err != nil {
 				t.Fatal(err)
@@ -153,7 +153,7 @@ func TestSQLRowCols(t *testing.T) {
 
 func TestSQLBadger(t *testing.T) {
 	testAllSQL(t, "badger", true,
-		func() engine.Engine {
+		func() *engine.Engine {
 			st, err := keyval.NewBadgerStore(filepath.Join("testdata", "badger"))
 			if err != nil {
 				t.Fatal(err)
@@ -164,7 +164,7 @@ func TestSQLBadger(t *testing.T) {
 
 func TestSQLBBolt(t *testing.T) {
 	testAllSQL(t, "bbolt", true,
-		func() engine.Engine {
+		func() *engine.Engine {
 			st, err := keyval.NewBBoltStore("testdata")
 			if err != nil {
 				t.Fatal(err)
@@ -175,7 +175,7 @@ func TestSQLBBolt(t *testing.T) {
 
 func TestSQLKVRows(t *testing.T) {
 	testAllSQL(t, "kvrows", true,
-		func() engine.Engine {
+		func() *engine.Engine {
 			st, err := kvrows.NewBadgerStore(filepath.Join("testdata", "kvrows"))
 			if err != nil {
 				t.Fatal(err)

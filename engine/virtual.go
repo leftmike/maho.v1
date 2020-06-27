@@ -7,7 +7,6 @@ import (
 
 	"github.com/leftmike/maho/config"
 	"github.com/leftmike/maho/sql"
-	"github.com/leftmike/maho/storage"
 )
 
 func MakeVirtualTable(tn sql.TableName, cols []sql.Identifier, colTypes []sql.ColumnType,
@@ -47,9 +46,7 @@ func (vt *virtualTable) PrimaryKey(ctx context.Context) []sql.ColumnKey {
 	return nil
 }
 
-func (vt *virtualTable) Rows(ctx context.Context, minRow, maxRow []sql.Value) (storage.Rows,
-	error) {
-
+func (vt *virtualTable) Rows(ctx context.Context, minRow, maxRow []sql.Value) (sql.Rows, error) {
 	if minRow != nil || maxRow != nil {
 		panic("virtual: not implemented: minRow != nil || maxRow != nil")
 	}
@@ -90,7 +87,7 @@ func (vr *virtualRows) Update(ctx context.Context, updates []sql.ColumnUpdate) e
 	return fmt.Errorf("virtual: table %s can not be modified", vr.tn)
 }
 
-func (e *engine) listSchemas(ctx context.Context, tx Transaction,
+func (e *Engine) listSchemas(ctx context.Context, tx Transaction,
 	dbname sql.Identifier) ([]sql.Identifier, error) {
 
 	if dbname == sql.SYSTEM {
@@ -121,7 +118,7 @@ func (e *engine) listSchemas(ctx context.Context, tx Transaction,
 	return scnames, nil
 }
 
-func (e *engine) makeSchemasTable(ctx context.Context, tx Transaction, tn sql.TableName) (Table,
+func (e *Engine) makeSchemasTable(ctx context.Context, tx Transaction, tn sql.TableName) (Table,
 	error) {
 
 	e.mutex.RLock()
@@ -146,7 +143,7 @@ func (e *engine) makeSchemasTable(ctx context.Context, tx Transaction, tn sql.Ta
 		[]sql.ColumnType{sql.IdColType, sql.IdColType}, values), nil
 }
 
-func (e *engine) listTables(ctx context.Context, tx Transaction,
+func (e *Engine) listTables(ctx context.Context, tx Transaction,
 	sn sql.SchemaName) ([]sql.Identifier, error) {
 
 	if sn.Schema == sql.METADATA {
@@ -165,7 +162,7 @@ func (e *engine) listTables(ctx context.Context, tx Transaction,
 	return e.st.ListTables(ctx, tx, sn)
 }
 
-func (e *engine) makeTablesTable(ctx context.Context, tx Transaction, tn sql.TableName) (Table,
+func (e *Engine) makeTablesTable(ctx context.Context, tx Transaction, tn sql.TableName) (Table,
 	error) {
 
 	e.mutex.RLock()
@@ -236,7 +233,7 @@ func appendColumns(values [][]sql.Value, tn sql.TableName, cols []sql.Identifier
 	return values
 }
 
-func (e *engine) makeColumnsTable(ctx context.Context, tx Transaction, tn sql.TableName) (Table,
+func (e *Engine) makeColumnsTable(ctx context.Context, tx Transaction, tn sql.TableName) (Table,
 	error) {
 
 	e.mutex.RLock()
@@ -272,7 +269,7 @@ func (e *engine) makeColumnsTable(ctx context.Context, tx Transaction, tn sql.Ta
 	return MakeVirtualTable(tn, columnsColumns, columnsColumnTypes, values), nil
 }
 
-func (e *engine) makeDatabasesTable(ctx context.Context, tx Transaction, tn sql.TableName) (Table,
+func (e *Engine) makeDatabasesTable(ctx context.Context, tx Transaction, tn sql.TableName) (Table,
 	error) {
 
 	dbnames, err := e.st.ListDatabases(ctx, tx)

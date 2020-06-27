@@ -11,7 +11,7 @@ import (
 )
 
 type Session struct {
-	Engine          engine.Engine
+	Engine          *engine.Engine
 	DefaultDatabase sql.Identifier
 	DefaultSchema   sql.Identifier
 	User            string
@@ -125,7 +125,7 @@ func (_ *values) Update(ctx context.Context, updates []sql.ColumnUpdate) error {
 	return fmt.Errorf("values: rows may not be updated")
 }
 
-func (ses *Session) Show(v sql.Identifier) (engine.Rows, error) {
+func (ses *Session) Show(v sql.Identifier) (sql.Rows, error) {
 	if v == sql.DATABASE {
 		return &values{
 			columns: []sql.Identifier{sql.DATABASE},

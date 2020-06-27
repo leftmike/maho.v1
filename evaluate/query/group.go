@@ -17,7 +17,7 @@ type aggregator struct {
 }
 
 type groupRows struct {
-	rows        engine.Rows
+	rows        sql.Rows
 	dest        []sql.Value
 	columns     []sql.Identifier
 	groupExprs  []expr2dest
@@ -165,7 +165,7 @@ func (gctx *groupContext) CompileAggregator(c *expr.Call, maker expr.MakeAggrega
 }
 
 func (gctx *groupContext) makeGroupRows(ses *evaluate.Session, tx engine.Transaction,
-	rows engine.Rows, fctx *fromContext) (engine.Rows, error) {
+	rows sql.Rows, fctx *fromContext) (sql.Rows, error) {
 
 	gr := &groupRows{rows: rows, columns: gctx.groupCols, groupExprs: gctx.groupExprs}
 	for idx := range gctx.aggregators {
@@ -210,8 +210,8 @@ func makeGroupContext(ses *evaluate.Session, tx engine.Transaction, fctx *fromCo
 
 }
 
-func group(ses *evaluate.Session, tx engine.Transaction, rows engine.Rows, fctx *fromContext,
-	results []SelectResult, group []sql.Expr, having sql.Expr, orderBy []OrderBy) (engine.Rows,
+func group(ses *evaluate.Session, tx engine.Transaction, rows sql.Rows, fctx *fromContext,
+	results []SelectResult, group []sql.Expr, having sql.Expr, orderBy []OrderBy) (sql.Rows,
 	error) {
 
 	gctx, err := makeGroupContext(ses, tx, fctx, group)

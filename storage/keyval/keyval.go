@@ -325,7 +325,7 @@ func (kvt *table) PrimaryKey(ctx context.Context) []sql.ColumnKey {
 	return kvt.td.primary
 }
 
-func (kvt *table) Rows(ctx context.Context, minRow, maxRow []sql.Value) (storage.Rows, error) {
+func (kvt *table) Rows(ctx context.Context, minRow, maxRow []sql.Value) (sql.Rows, error) {
 	minKey := kvt.td.makeKey(minRow)
 	it, err := kvt.st.kv.Iterate(kvt.tx.ver, minKey)
 	if err != nil {

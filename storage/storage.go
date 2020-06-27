@@ -37,18 +37,10 @@ type Store interface {
 	ListTables(ctx context.Context, tx Transaction, sn sql.SchemaName) ([]sql.Identifier, error)
 }
 
-type Rows interface {
-	Columns() []sql.Identifier
-	Close() error
-	Next(ctx context.Context, dest []sql.Value) error
-	Delete(ctx context.Context) error
-	Update(ctx context.Context, updates []sql.ColumnUpdate) error
-}
-
 type Table interface {
 	Columns(ctx context.Context) []sql.Identifier
 	ColumnTypes(ctx context.Context) []sql.ColumnType
 	PrimaryKey(ctx context.Context) []sql.ColumnKey
-	Rows(ctx context.Context, minRow, maxRow []sql.Value) (Rows, error)
+	Rows(ctx context.Context, minRow, maxRow []sql.Value) (sql.Rows, error)
 	Insert(ctx context.Context, row []sql.Value) error
 }

@@ -480,7 +480,7 @@ func (kvt *table) getProposedRow(key, val []byte) ([]sql.Value, bool, error) {
 	return nil, false, nil
 }
 
-func (kvt *table) Rows(ctx context.Context, minRow, maxRow []sql.Value) (storage.Rows, error) {
+func (kvt *table) Rows(ctx context.Context, minRow, maxRow []sql.Value) (sql.Rows, error) {
 	minKey := kvt.td.makeKey(minRow)
 	var maxKey []byte
 	if maxRow != nil {

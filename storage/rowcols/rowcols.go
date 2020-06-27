@@ -316,7 +316,7 @@ func copyRow(row []sql.Value) []sql.Value {
 	return append(make([]sql.Value, 0, len(row)), row...)
 }
 
-func (bt *table) Rows(ctx context.Context, minRow, maxRow []sql.Value) (storage.Rows, error) {
+func (bt *table) Rows(ctx context.Context, minRow, maxRow []sql.Value) (sql.Rows, error) {
 	br := &rows{
 		tbl: bt,
 		idx: 0,

@@ -76,7 +76,7 @@ type usingMatch struct {
 type joinRows struct {
 	state joinState
 
-	leftRows engine.Rows
+	leftRows sql.Rows
 	haveLeft bool
 	leftDest []sql.Value
 	leftLen  int
@@ -248,7 +248,7 @@ func (_ *joinRows) Update(ctx context.Context, updates []sql.ColumnUpdate) error
 	return fmt.Errorf("join rows may not be updated")
 }
 
-func (fj FromJoin) rows(ses *evaluate.Session, tx engine.Transaction) (engine.Rows, *fromContext,
+func (fj FromJoin) rows(ses *evaluate.Session, tx engine.Transaction) (sql.Rows, *fromContext,
 	error) {
 
 	leftRows, leftCtx, err := fj.Left.rows(ses, tx)
