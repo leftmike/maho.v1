@@ -13,7 +13,7 @@ import (
 	"github.com/leftmike/maho/sql"
 	"github.com/leftmike/maho/storage"
 	"github.com/leftmike/maho/storage/encode"
-	"github.com/leftmike/maho/storage/mideng"
+	"github.com/leftmike/maho/storage/tblstore"
 )
 
 var (
@@ -60,7 +60,7 @@ func NewStore(dataDir string) (storage.Store, error) {
 	bst := &basicStore{
 		tree: btree.New(16),
 	}
-	return mideng.NewStore("basic", bst, true)
+	return tblstore.NewStore("basic", bst, true)
 }
 
 func (td *tableDef) Table(ctx context.Context, tx storage.Transaction) (storage.Table, error) {
@@ -85,7 +85,7 @@ func (td *tableDef) PrimaryKey() []sql.ColumnKey {
 }
 
 func (_ *basicStore) MakeTableDef(tn sql.TableName, mid int64, cols []sql.Identifier,
-	colTypes []sql.ColumnType, primary []sql.ColumnKey) (mideng.TableDef, error) {
+	colTypes []sql.ColumnType, primary []sql.ColumnKey) (tblstore.TableDef, error) {
 
 	if len(primary) == 0 {
 		panic(fmt.Sprintf("basic: table %s: missing required primary key", tn))
@@ -100,7 +100,7 @@ func (_ *basicStore) MakeTableDef(tn sql.TableName, mid int64, cols []sql.Identi
 	}, nil
 }
 
-func (bst *basicStore) Begin(sesid uint64) mideng.Transaction {
+func (bst *basicStore) Begin(sesid uint64) tblstore.Transaction {
 	bst.mutex.Lock()
 	return &transaction{
 		bst:  bst,

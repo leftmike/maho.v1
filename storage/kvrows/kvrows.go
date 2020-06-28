@@ -16,7 +16,7 @@ import (
 	"github.com/leftmike/maho/sql"
 	"github.com/leftmike/maho/storage"
 	"github.com/leftmike/maho/storage/encode"
-	"github.com/leftmike/maho/storage/mideng"
+	"github.com/leftmike/maho/storage/tblstore"
 )
 
 const (
@@ -100,7 +100,7 @@ func NewBadgerStore(dataDir string) (storage.Store, error) {
 		return nil, err
 	}
 
-	return mideng.NewStore("kvrows", kvst, init)
+	return tblstore.NewStore("kvrows", kvst, init)
 }
 
 func getUint64(kv KV, key []byte) (uint64, error) {
@@ -262,7 +262,7 @@ func (td *tableDef) makeKey(row []sql.Value) []byte {
 }
 
 func (kvst *kvStore) MakeTableDef(tn sql.TableName, mid int64, cols []sql.Identifier,
-	colTypes []sql.ColumnType, primary []sql.ColumnKey) (mideng.TableDef, error) {
+	colTypes []sql.ColumnType, primary []sql.ColumnKey) (tblstore.TableDef, error) {
 
 	if len(primary) == 0 {
 		panic(fmt.Sprintf("kvrows: table %s: missing required primary key", tn))
@@ -291,7 +291,7 @@ func (kvst *kvStore) setTransactionData(tid uint64, td *TransactionData) error {
 	return upd.Commit()
 }
 
-func (kvst *kvStore) Begin(sesid uint64) mideng.Transaction {
+func (kvst *kvStore) Begin(sesid uint64) tblstore.Transaction {
 	kvst.mutex.Lock()
 	kvst.lastTID += 1
 	tid := kvst.lastTID

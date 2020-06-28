@@ -15,7 +15,7 @@ import (
 	"github.com/leftmike/maho/sql"
 	"github.com/leftmike/maho/storage"
 	"github.com/leftmike/maho/storage/encode"
-	"github.com/leftmike/maho/storage/mideng"
+	"github.com/leftmike/maho/storage/tblstore"
 )
 
 var (
@@ -126,7 +126,7 @@ func newStore(kv KV) (storage.Store, error) {
 		kv:  kv,
 		ver: ver,
 	}
-	return mideng.NewStore("keyval", kvst, init)
+	return tblstore.NewStore("keyval", kvst, init)
 }
 
 func (td *tableDef) Table(ctx context.Context, tx storage.Transaction) (storage.Table, error) {
@@ -151,7 +151,7 @@ func (td *tableDef) PrimaryKey() []sql.ColumnKey {
 }
 
 func (kvst *keyValStore) MakeTableDef(tn sql.TableName, mid int64, cols []sql.Identifier,
-	colTypes []sql.ColumnType, primary []sql.ColumnKey) (mideng.TableDef, error) {
+	colTypes []sql.ColumnType, primary []sql.ColumnKey) (tblstore.TableDef, error) {
 
 	if len(primary) == 0 {
 		panic(fmt.Sprintf("keyval: table %s: missing required primary key", tn))
@@ -167,7 +167,7 @@ func (kvst *keyValStore) MakeTableDef(tn sql.TableName, mid int64, cols []sql.Id
 	return &td, nil
 }
 
-func (kvst *keyValStore) Begin(sesid uint64) mideng.Transaction {
+func (kvst *keyValStore) Begin(sesid uint64) tblstore.Transaction {
 	kvst.mutex.Lock()
 	defer kvst.mutex.Unlock()
 

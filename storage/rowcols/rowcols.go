@@ -15,7 +15,7 @@ import (
 	"github.com/leftmike/maho/sql"
 	"github.com/leftmike/maho/storage"
 	"github.com/leftmike/maho/storage/encode"
-	"github.com/leftmike/maho/storage/mideng"
+	"github.com/leftmike/maho/storage/tblstore"
 )
 
 var (
@@ -85,7 +85,7 @@ func NewStore(dataDir string) (storage.Store, error) {
 		return nil, err
 	}
 
-	return mideng.NewStore("rowcols", rcst, init)
+	return tblstore.NewStore("rowcols", rcst, init)
 }
 
 func (td *tableDef) Table(ctx context.Context, tx storage.Transaction) (storage.Table, error) {
@@ -111,7 +111,7 @@ func (td *tableDef) PrimaryKey() []sql.ColumnKey {
 }
 
 func (_ *rowColsStore) MakeTableDef(tn sql.TableName, mid int64, cols []sql.Identifier,
-	colTypes []sql.ColumnType, primary []sql.ColumnKey) (mideng.TableDef, error) {
+	colTypes []sql.ColumnType, primary []sql.ColumnKey) (tblstore.TableDef, error) {
 
 	if len(primary) == 0 {
 		panic(fmt.Sprintf("rowcols: table %s: missing required primary key", tn))
@@ -154,7 +154,7 @@ func (_ *rowColsStore) MakeTableDef(tn sql.TableName, mid int64, cols []sql.Iden
 	return &td, nil
 }
 
-func (rcst *rowColsStore) Begin(sesid uint64) mideng.Transaction {
+func (rcst *rowColsStore) Begin(sesid uint64) tblstore.Transaction {
 	rcst.mutex.Lock()
 	defer rcst.mutex.Unlock()
 

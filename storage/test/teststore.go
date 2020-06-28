@@ -46,7 +46,7 @@ func fln() testutil.FileLineNumber {
 	return testutil.MakeFileLineNumber()
 }
 
-type engCmd struct {
+type storeCmd struct {
 	fln      testutil.FileLineNumber
 	cmd      int
 	tdx      int                // Which transaction to use
@@ -98,7 +98,7 @@ func allRows(t *testing.T, ctx context.Context, rows sql.Rows,
 	return all
 }
 
-func testDatabase(t *testing.T, st storage.Store, dbname sql.Identifier, cmds []engCmd) {
+func testDatabase(t *testing.T, st storage.Store, dbname sql.Identifier, cmds []storeCmd) {
 	var state transactionState
 	var ctx context.Context
 	scname := sql.PUBLIC
@@ -347,7 +347,7 @@ func testDatabase(t *testing.T, st storage.Store, dbname sql.Identifier, cmds []
 	}
 }
 
-type dbCmd engCmd
+type dbCmd storeCmd
 
 func testStore(t *testing.T, st storage.Store, cmds []dbCmd) {
 	for _, cmd := range cmds {
@@ -388,7 +388,7 @@ func runTest(t *testing.T, st storage.Store, dbname sql.Identifier, test interfa
 		default:
 			panic(fmt.Sprintf("unexpected test: %s", tst))
 		}
-	case []engCmd:
+	case []storeCmd:
 		testDatabase(t, st, dbname, tst)
 	case []dbCmd:
 		testStore(t, st, tst)
@@ -432,14 +432,14 @@ func RunDatabaseTest(t *testing.T, st storage.Store) {
 var (
 	tableTests = []interface{}{
 		"createDatabase",
-		[]engCmd{
+		[]storeCmd{
 			{fln: fln(), cmd: cmdBegin},
 			{fln: fln(), cmd: cmdLookupSchema, name: sql.ID("sc-a"), fail: true},
 			{fln: fln(), cmd: cmdCreateSchema, name: sql.ID("sc-a")},
 			{fln: fln(), cmd: cmdLookupSchema, name: sql.ID("sc-a")},
 			{fln: fln(), cmd: cmdCommit},
 		},
-		[]engCmd{
+		[]storeCmd{
 			{fln: fln(), cmd: cmdBegin},
 			{fln: fln(), cmd: cmdLookupTable, name: sql.ID("tbl-a"), fail: true},
 			{fln: fln(), cmd: cmdCreateTable, name: sql.ID("tbl-a")},
@@ -459,7 +459,7 @@ func RunTableTest(t *testing.T, st storage.Store) {
 }
 
 var (
-	tableLifecycleSubtests1 = []engCmd{
+	tableLifecycleSubtests1 = []storeCmd{
 		{fln: fln(), cmd: cmdBegin},
 		{fln: fln(), cmd: cmdLookupTable, name: sql.ID("tbl1"), fail: true},
 		{fln: fln(), cmd: cmdCreateTable, name: sql.ID("tbl1")},
@@ -471,7 +471,7 @@ var (
 		{fln: fln(), cmd: cmdLookupTable, name: sql.ID("tbl1"), fail: true},
 		{fln: fln(), cmd: cmdCommit},
 	}
-	tableLifecycleSubtests2 = []engCmd{
+	tableLifecycleSubtests2 = []storeCmd{
 		{fln: fln(), cmd: cmdBegin},
 		{fln: fln(), cmd: cmdCreateTable, name: sql.ID("tbl4")},
 		{fln: fln(), cmd: cmdLookupTable, name: sql.ID("tbl4")},
@@ -483,7 +483,7 @@ var (
 		{fln: fln(), cmd: cmdLookupTable, name: sql.ID("tbl4"), fail: true},
 		{fln: fln(), cmd: cmdCommit},
 	}
-	tableLifecycleSubtests3 = []engCmd{
+	tableLifecycleSubtests3 = []storeCmd{
 		{fln: fln(), cmd: cmdBegin},
 		{fln: fln(), cmd: cmdLookupTable, name: sql.ID("tbl7")},
 		{fln: fln(), cmd: cmdDropTable, name: sql.ID("tbl7")},
@@ -495,21 +495,21 @@ var (
 
 	tableLifecycleTests = []interface{}{
 		"createDatabase",
-		[]engCmd{
+		[]storeCmd{
 			{fln: fln(), cmd: cmdBegin},
 			{fln: fln(), cmd: cmdLookupTable, name: sql.ID("tbl-a"), fail: true},
 			{fln: fln(), cmd: cmdCreateTable, name: sql.ID("tbl-a")},
 			{fln: fln(), cmd: cmdLookupTable, name: sql.ID("tbl-a")},
 			{fln: fln(), cmd: cmdCommit},
 		},
-		[]engCmd{
+		[]storeCmd{
 			{fln: fln(), cmd: cmdBegin},
 			{fln: fln(), cmd: cmdLookupTable, name: sql.ID("tbl-a")},
 			{fln: fln(), cmd: cmdCreateTable, name: sql.ID("tbl-a"), fail: true},
 			{fln: fln(), cmd: cmdLookupTable, name: sql.ID("tbl-a")},
 			{fln: fln(), cmd: cmdCommit},
 		},
-		[]engCmd{
+		[]storeCmd{
 			{fln: fln(), cmd: cmdBegin},
 			{fln: fln(), cmd: cmdListTables, list: []string{"tbl-a"}},
 			{fln: fln(), cmd: cmdCommit},
@@ -520,111 +520,111 @@ var (
 			{fln: fln(), cmd: cmdListTables, list: []string{"tbl-a", "tbl-b", "tbl-c", "tbl-d"}},
 			{fln: fln(), cmd: cmdCommit},
 		},
-		[]engCmd{
+		[]storeCmd{
 			{fln: fln(), cmd: cmdBegin},
 			{fln: fln(), cmd: cmdListTables, list: []string{"tbl-a", "tbl-b", "tbl-c", "tbl-d"}},
 			{fln: fln(), cmd: cmdCommit},
 		},
-		[]engCmd{
+		[]storeCmd{
 			{fln: fln(), cmd: cmdBegin},
 			{fln: fln(), cmd: cmdDropTable, name: sql.ID("tbl-a")},
 			{fln: fln(), cmd: cmdListTables, list: []string{"tbl-b", "tbl-c", "tbl-d"}},
 			{fln: fln(), cmd: cmdCommit},
 		},
-		[]engCmd{
+		[]storeCmd{
 			{fln: fln(), cmd: cmdBegin},
 			{fln: fln(), cmd: cmdListTables, list: []string{"tbl-b", "tbl-c", "tbl-d"}},
 			{fln: fln(), cmd: cmdCommit},
 		},
-		[]engCmd{
+		[]storeCmd{
 			{fln: fln(), cmd: cmdBegin},
 			{fln: fln(), cmd: cmdCreateTable, name: sql.ID("tbl-e")},
 			{fln: fln(), cmd: cmdListTables, list: []string{"tbl-b", "tbl-c", "tbl-d", "tbl-e"}},
 			{fln: fln(), cmd: cmdRollback},
 		},
-		[]engCmd{
+		[]storeCmd{
 			{fln: fln(), cmd: cmdBegin},
 			{fln: fln(), cmd: cmdListTables, list: []string{"tbl-b", "tbl-c", "tbl-d"}},
 			{fln: fln(), cmd: cmdCommit},
 		},
-		[]engCmd{
+		[]storeCmd{
 			{fln: fln(), cmd: cmdBegin},
 			{fln: fln(), cmd: cmdDropTable, name: sql.ID("tbl-c")},
 			{fln: fln(), cmd: cmdListTables, list: []string{"tbl-b", "tbl-d"}},
 			{fln: fln(), cmd: cmdRollback},
 		},
-		[]engCmd{
+		[]storeCmd{
 			{fln: fln(), cmd: cmdBegin},
 			{fln: fln(), cmd: cmdListTables, list: []string{"tbl-b", "tbl-c", "tbl-d"}},
 			{fln: fln(), cmd: cmdCommit},
 		},
 		tableLifecycleSubtests1,
 		tableLifecycleSubtests1,
-		[]engCmd{
+		[]storeCmd{
 			{fln: fln(), cmd: cmdBegin},
 			{fln: fln(), cmd: cmdLookupTable, name: sql.ID("tbl2"), fail: true},
 			{fln: fln(), cmd: cmdDropTable, name: sql.ID("tbl2"), ifExists: true},
 			{fln: fln(), cmd: cmdLookupTable, name: sql.ID("tbl2"), fail: true},
 			{fln: fln(), cmd: cmdCommit},
 		},
-		[]engCmd{
+		[]storeCmd{
 			{fln: fln(), cmd: cmdBegin},
 			{fln: fln(), cmd: cmdLookupTable, name: sql.ID("tbl2"), fail: true},
 			{fln: fln(), cmd: cmdDropTable, name: sql.ID("tbl2"), fail: true},
 			{fln: fln(), cmd: cmdLookupTable, name: sql.ID("tbl2"), fail: true},
 			{fln: fln(), cmd: cmdCommit},
 		},
-		[]engCmd{
+		[]storeCmd{
 			{fln: fln(), cmd: cmdBegin},
 			{fln: fln(), cmd: cmdCreateTable, name: sql.ID("tbl3")},
 			{fln: fln(), cmd: cmdLookupTable, name: sql.ID("tbl3")},
 			{fln: fln(), cmd: cmdCommit},
 		},
-		[]engCmd{
+		[]storeCmd{
 			{fln: fln(), cmd: cmdBegin},
 			{fln: fln(), cmd: cmdDropTable, name: sql.ID("tbl3")},
 			{fln: fln(), cmd: cmdCreateTable, name: sql.ID("tbl3")},
 			{fln: fln(), cmd: cmdLookupTable, name: sql.ID("tbl3")},
 			{fln: fln(), cmd: cmdCommit},
 		},
-		[]engCmd{
+		[]storeCmd{
 			{fln: fln(), cmd: cmdBegin},
 			{fln: fln(), cmd: cmdLookupTable, name: sql.ID("tbl3")},
 			{fln: fln(), cmd: cmdCommit},
 		},
 		tableLifecycleSubtests2,
 		tableLifecycleSubtests2,
-		[]engCmd{
+		[]storeCmd{
 			{fln: fln(), cmd: cmdBegin},
 			{fln: fln(), cmd: cmdCreateTable, name: sql.ID("tbl5")},
 			{fln: fln(), cmd: cmdLookupTable, name: sql.ID("tbl5")},
 			{fln: fln(), cmd: cmdCommit},
 		},
-		[]engCmd{
+		[]storeCmd{
 			{fln: fln(), cmd: cmdBegin},
 			{fln: fln(), cmd: cmdDropTable, name: sql.ID("tbl5")},
 			{fln: fln(), cmd: cmdCreateTable, name: sql.ID("tbl5")},
 			{fln: fln(), cmd: cmdLookupTable, name: sql.ID("tbl5")},
 			{fln: fln(), cmd: cmdRollback},
 		},
-		[]engCmd{
+		[]storeCmd{
 			{fln: fln(), cmd: cmdBegin},
 			{fln: fln(), cmd: cmdLookupTable, name: sql.ID("tbl5")},
 			{fln: fln(), cmd: cmdCommit},
 		},
-		[]engCmd{
+		[]storeCmd{
 			{fln: fln(), cmd: cmdBegin},
 			{fln: fln(), cmd: cmdCreateTable, name: sql.ID("tbl6")},
 			{fln: fln(), cmd: cmdLookupTable, name: sql.ID("tbl6")},
 			{fln: fln(), cmd: cmdDropTable, name: sql.ID("tbl6")},
 			{fln: fln(), cmd: cmdRollback},
 		},
-		[]engCmd{
+		[]storeCmd{
 			{fln: fln(), cmd: cmdBegin},
 			{fln: fln(), cmd: cmdLookupTable, name: sql.ID("tbl6"), fail: true},
 			{fln: fln(), cmd: cmdCommit},
 		},
-		[]engCmd{
+		[]storeCmd{
 			{fln: fln(), cmd: cmdBegin},
 			{fln: fln(), cmd: cmdCreateTable, name: sql.ID("tbl7")},
 			{fln: fln(), cmd: cmdLookupTable, name: sql.ID("tbl7")},
@@ -638,29 +638,29 @@ var (
 		tableLifecycleSubtests3,
 		tableLifecycleSubtests3,
 		tableLifecycleSubtests3,
-		[]engCmd{
+		[]storeCmd{
 			{fln: fln(), cmd: cmdBegin},
 			{fln: fln(), cmd: cmdLookupTable, name: sql.ID("tbl7")},
 			{fln: fln(), cmd: cmdCommit},
 		},
-		[]engCmd{
+		[]storeCmd{
 			{fln: fln(), cmd: cmdBegin},
 			{fln: fln(), cmd: cmdCreateTable, name: sql.ID("tbl8")},
 			{fln: fln(), cmd: cmdCommit},
 		},
-		[]engCmd{
+		[]storeCmd{
 			{fln: fln(), cmd: cmdBegin},
 			{fln: fln(), cmd: cmdCreateTable, name: sql.ID("tbl8"), fail: true},
 			{fln: fln(), cmd: cmdCommit},
 		},
-		[]engCmd{
+		[]storeCmd{
 			{fln: fln(), cmd: cmdBegin},
 			{fln: fln(), cmd: cmdCreateTable, name: sql.ID("tbl8"), fail: true},
 			{fln: fln(), cmd: cmdDropTable, name: sql.ID("tbl8")},
 			{fln: fln(), cmd: cmdDropTable, name: sql.ID("tbl8"), fail: true},
 			{fln: fln(), cmd: cmdCommit},
 		},
-		[]engCmd{
+		[]storeCmd{
 			{fln: fln(), cmd: cmdBegin},
 			{fln: fln(), cmd: cmdDropTable, name: sql.ID("tbl8"), fail: true},
 			{fln: fln(), cmd: cmdCommit},
@@ -678,7 +678,7 @@ func RunTableLifecycleTest(t *testing.T, st storage.Store) {
 }
 
 var (
-	schemaSubtests1 = []engCmd{
+	schemaSubtests1 = []storeCmd{
 		{fln: fln(), cmd: cmdBegin},
 		{fln: fln(), cmd: cmdLookupSchema, name: sql.ID("sc1"), fail: true},
 		{fln: fln(), cmd: cmdCreateSchema, name: sql.ID("sc1")},
@@ -691,7 +691,7 @@ var (
 		{fln: fln(), cmd: cmdCommit},
 	}
 
-	schemaSubtests2 = []engCmd{
+	schemaSubtests2 = []storeCmd{
 		{fln: fln(), cmd: cmdBegin},
 		{fln: fln(), cmd: cmdCreateSchema, name: sql.ID("sc4")},
 		{fln: fln(), cmd: cmdLookupSchema, name: sql.ID("sc4")},
@@ -704,7 +704,7 @@ var (
 		{fln: fln(), cmd: cmdCommit},
 	}
 
-	schemaSubtests3 = []engCmd{
+	schemaSubtests3 = []storeCmd{
 		{fln: fln(), cmd: cmdBegin},
 		{fln: fln(), cmd: cmdLookupSchema, name: sql.ID("sc7")},
 		{fln: fln(), cmd: cmdDropSchema, name: sql.ID("sc7")},
@@ -716,21 +716,21 @@ var (
 
 	schemaTests = []interface{}{
 		"createDatabase",
-		[]engCmd{
+		[]storeCmd{
 			{fln: fln(), cmd: cmdBegin},
 			{fln: fln(), cmd: cmdLookupSchema, name: sql.ID("sc-a"), fail: true},
 			{fln: fln(), cmd: cmdCreateSchema, name: sql.ID("sc-a")},
 			{fln: fln(), cmd: cmdLookupSchema, name: sql.ID("sc-a")},
 			{fln: fln(), cmd: cmdCommit},
 		},
-		[]engCmd{
+		[]storeCmd{
 			{fln: fln(), cmd: cmdBegin},
 			{fln: fln(), cmd: cmdLookupSchema, name: sql.ID("sc-a")},
 			{fln: fln(), cmd: cmdCreateSchema, name: sql.ID("sc-a"), fail: true},
 			{fln: fln(), cmd: cmdLookupSchema, name: sql.ID("sc-a")},
 			{fln: fln(), cmd: cmdCommit},
 		},
-		[]engCmd{
+		[]storeCmd{
 			{fln: fln(), cmd: cmdBegin},
 			{fln: fln(), cmd: cmdListSchemas, list: []string{"public", "sc-a"}},
 			{fln: fln(), cmd: cmdCommit},
@@ -742,47 +742,47 @@ var (
 				list: []string{"public", "sc-a", "sc-b", "sc-c", "sc-d"}},
 			{fln: fln(), cmd: cmdCommit},
 		},
-		[]engCmd{
+		[]storeCmd{
 			{fln: fln(), cmd: cmdBegin},
 			{fln: fln(), cmd: cmdListSchemas,
 				list: []string{"public", "sc-a", "sc-b", "sc-c", "sc-d"}},
 			{fln: fln(), cmd: cmdCommit},
 		},
-		[]engCmd{
+		[]storeCmd{
 			{fln: fln(), cmd: cmdBegin},
 			{fln: fln(), cmd: cmdDropSchema, name: sql.ID("sc-a")},
 			{fln: fln(), cmd: cmdListSchemas, list: []string{"public", "sc-b", "sc-c", "sc-d"}},
 			{fln: fln(), cmd: cmdCommit},
 		},
-		[]engCmd{
+		[]storeCmd{
 			{fln: fln(), cmd: cmdBegin},
 			{fln: fln(), cmd: cmdListSchemas, list: []string{"public", "sc-b", "sc-c", "sc-d"}},
 			{fln: fln(), cmd: cmdCommit},
 		},
-		[]engCmd{
+		[]storeCmd{
 			{fln: fln(), cmd: cmdBegin},
 			{fln: fln(), cmd: cmdCreateSchema, name: sql.ID("sc-e")},
 			{fln: fln(), cmd: cmdListSchemas,
 				list: []string{"public", "sc-b", "sc-c", "sc-d", "sc-e"}},
 			{fln: fln(), cmd: cmdRollback},
 		},
-		[]engCmd{
+		[]storeCmd{
 			{fln: fln(), cmd: cmdBegin},
 			{fln: fln(), cmd: cmdListSchemas, list: []string{"public", "sc-b", "sc-c", "sc-d"}},
 			{fln: fln(), cmd: cmdCommit},
 		},
-		[]engCmd{
+		[]storeCmd{
 			{fln: fln(), cmd: cmdBegin},
 			{fln: fln(), cmd: cmdDropSchema, name: sql.ID("sc-c")},
 			{fln: fln(), cmd: cmdListSchemas, list: []string{"public", "sc-b", "sc-d"}},
 			{fln: fln(), cmd: cmdRollback},
 		},
-		[]engCmd{
+		[]storeCmd{
 			{fln: fln(), cmd: cmdBegin},
 			{fln: fln(), cmd: cmdListSchemas, list: []string{"public", "sc-b", "sc-c", "sc-d"}},
 			{fln: fln(), cmd: cmdCommit},
 		},
-		[]engCmd{
+		[]storeCmd{
 			{fln: fln(), cmd: cmdBegin},
 			{fln: fln(), cmd: cmdSetSchema, name: sql.ID("sc-z")},
 			{fln: fln(), cmd: cmdLookupTable, name: sql.ID("tbl"), fail: true},
@@ -791,71 +791,71 @@ var (
 		},
 		schemaSubtests1,
 		schemaSubtests1,
-		[]engCmd{
+		[]storeCmd{
 			{fln: fln(), cmd: cmdBegin},
 			{fln: fln(), cmd: cmdLookupSchema, name: sql.ID("sc2"), fail: true},
 			{fln: fln(), cmd: cmdDropSchema, name: sql.ID("sc2"), ifExists: true},
 			{fln: fln(), cmd: cmdLookupSchema, name: sql.ID("sc2"), fail: true},
 			{fln: fln(), cmd: cmdCommit},
 		},
-		[]engCmd{
+		[]storeCmd{
 			{fln: fln(), cmd: cmdBegin},
 			{fln: fln(), cmd: cmdLookupSchema, name: sql.ID("sc2"), fail: true},
 			{fln: fln(), cmd: cmdDropSchema, name: sql.ID("sc2"), fail: true},
 			{fln: fln(), cmd: cmdLookupSchema, name: sql.ID("sc2"), fail: true},
 			{fln: fln(), cmd: cmdCommit},
 		},
-		[]engCmd{
+		[]storeCmd{
 			{fln: fln(), cmd: cmdBegin},
 			{fln: fln(), cmd: cmdCreateSchema, name: sql.ID("sc3")},
 			{fln: fln(), cmd: cmdLookupSchema, name: sql.ID("sc3")},
 			{fln: fln(), cmd: cmdCommit},
 		},
-		[]engCmd{
+		[]storeCmd{
 			{fln: fln(), cmd: cmdBegin},
 			{fln: fln(), cmd: cmdDropSchema, name: sql.ID("sc3")},
 			{fln: fln(), cmd: cmdCreateSchema, name: sql.ID("sc3")},
 			{fln: fln(), cmd: cmdLookupSchema, name: sql.ID("sc3")},
 			{fln: fln(), cmd: cmdCommit},
 		},
-		[]engCmd{
+		[]storeCmd{
 			{fln: fln(), cmd: cmdBegin},
 			{fln: fln(), cmd: cmdLookupSchema, name: sql.ID("sc3")},
 			{fln: fln(), cmd: cmdCommit},
 		},
 		schemaSubtests2,
 		schemaSubtests2,
-		[]engCmd{
+		[]storeCmd{
 			{fln: fln(), cmd: cmdBegin},
 			{fln: fln(), cmd: cmdCreateSchema, name: sql.ID("sc5")},
 			{fln: fln(), cmd: cmdLookupSchema, name: sql.ID("sc5")},
 			{fln: fln(), cmd: cmdCommit},
 		},
-		[]engCmd{
+		[]storeCmd{
 			{fln: fln(), cmd: cmdBegin},
 			{fln: fln(), cmd: cmdDropSchema, name: sql.ID("sc5")},
 			{fln: fln(), cmd: cmdCreateSchema, name: sql.ID("sc5")},
 			{fln: fln(), cmd: cmdLookupSchema, name: sql.ID("sc5")},
 			{fln: fln(), cmd: cmdRollback},
 		},
-		[]engCmd{
+		[]storeCmd{
 			{fln: fln(), cmd: cmdBegin},
 			{fln: fln(), cmd: cmdLookupSchema, name: sql.ID("sc5")},
 			{fln: fln(), cmd: cmdCommit},
 		},
-		[]engCmd{
+		[]storeCmd{
 			{fln: fln(), cmd: cmdBegin},
 			{fln: fln(), cmd: cmdCreateSchema, name: sql.ID("sc6")},
 			{fln: fln(), cmd: cmdLookupSchema, name: sql.ID("sc6")},
 			{fln: fln(), cmd: cmdDropSchema, name: sql.ID("sc6")},
 			{fln: fln(), cmd: cmdRollback},
 		},
-		[]engCmd{
+		[]storeCmd{
 			{fln: fln(), cmd: cmdBegin},
 			{fln: fln(), cmd: cmdLookupSchema, name: sql.ID("sc6"), fail: true},
 			{fln: fln(), cmd: cmdCommit},
 		},
-		[]engCmd{
+		[]storeCmd{
 			{fln: fln(), cmd: cmdBegin},
 			{fln: fln(), cmd: cmdCreateSchema, name: sql.ID("sc7")},
 			{fln: fln(), cmd: cmdLookupSchema, name: sql.ID("sc7")},
@@ -869,34 +869,34 @@ var (
 		schemaSubtests3,
 		schemaSubtests3,
 		schemaSubtests3,
-		[]engCmd{
+		[]storeCmd{
 			{fln: fln(), cmd: cmdBegin},
 			{fln: fln(), cmd: cmdLookupSchema, name: sql.ID("sc7")},
 			{fln: fln(), cmd: cmdCommit},
 		},
-		[]engCmd{
+		[]storeCmd{
 			{fln: fln(), cmd: cmdBegin},
 			{fln: fln(), cmd: cmdCreateSchema, name: sql.ID("sc8")},
 			{fln: fln(), cmd: cmdCommit},
 		},
-		[]engCmd{
+		[]storeCmd{
 			{fln: fln(), cmd: cmdBegin},
 			{fln: fln(), cmd: cmdCreateSchema, name: sql.ID("sc8"), fail: true},
 			{fln: fln(), cmd: cmdCommit},
 		},
-		[]engCmd{
+		[]storeCmd{
 			{fln: fln(), cmd: cmdBegin},
 			{fln: fln(), cmd: cmdCreateSchema, name: sql.ID("sc8"), fail: true},
 			{fln: fln(), cmd: cmdDropSchema, name: sql.ID("sc8")},
 			{fln: fln(), cmd: cmdDropSchema, name: sql.ID("sc8"), fail: true},
 			{fln: fln(), cmd: cmdCommit},
 		},
-		[]engCmd{
+		[]storeCmd{
 			{fln: fln(), cmd: cmdBegin},
 			{fln: fln(), cmd: cmdDropSchema, name: sql.ID("sc8"), fail: true},
 			{fln: fln(), cmd: cmdCommit},
 		},
-		[]engCmd{
+		[]storeCmd{
 			{fln: fln(), cmd: cmdBegin},
 			{fln: fln(), cmd: cmdCreateSchema, name: sql.ID("sc9")},
 			{fln: fln(), cmd: cmdCreateSchema, name: sql.ID("sc10")},
@@ -905,7 +905,7 @@ var (
 			{fln: fln(), cmd: cmdCreateTable, name: sql.ID("tbl2")},
 			{fln: fln(), cmd: cmdCommit},
 		},
-		[]engCmd{
+		[]storeCmd{
 			{fln: fln(), cmd: cmdBegin},
 			{fln: fln(), cmd: cmdLookupSchema, name: sql.ID("sc9")},
 			{fln: fln(), cmd: cmdLookupSchema, name: sql.ID("sc10")},
@@ -913,25 +913,25 @@ var (
 			{fln: fln(), cmd: cmdDropSchema, name: sql.ID("sc10"), fail: true},
 			{fln: fln(), cmd: cmdCommit},
 		},
-		[]engCmd{
+		[]storeCmd{
 			{fln: fln(), cmd: cmdBegin},
 			{fln: fln(), cmd: cmdLookupSchema, name: sql.ID("sc9"), fail: true},
 			{fln: fln(), cmd: cmdLookupSchema, name: sql.ID("sc10")},
 			{fln: fln(), cmd: cmdCommit},
 		},
-		[]engCmd{
+		[]storeCmd{
 			{fln: fln(), cmd: cmdBegin},
 			{fln: fln(), cmd: cmdSetSchema, name: sql.ID("sc10")},
 			{fln: fln(), cmd: cmdDropTable, name: sql.ID("tbl1")},
 			{fln: fln(), cmd: cmdDropTable, name: sql.ID("tbl2")},
 			{fln: fln(), cmd: cmdCommit},
 		},
-		[]engCmd{
+		[]storeCmd{
 			{fln: fln(), cmd: cmdBegin},
 			{fln: fln(), cmd: cmdDropSchema, name: sql.ID("sc10")},
 			{fln: fln(), cmd: cmdCommit},
 		},
-		[]engCmd{
+		[]storeCmd{
 			{fln: fln(), cmd: cmdBegin},
 			{fln: fln(), cmd: cmdLookupSchema, name: sql.ID("sc9"), fail: true},
 			{fln: fln(), cmd: cmdLookupSchema, name: sql.ID("sc10"), fail: true},
@@ -952,14 +952,14 @@ func RunSchemaTest(t *testing.T, st storage.Store) {
 var (
 	tableRowsTests = []interface{}{
 		"createDatabase",
-		[]engCmd{
+		[]storeCmd{
 			{fln: fln(), cmd: cmdBegin},
 			{fln: fln(), cmd: cmdCreateTable, name: sql.ID("tbl1")},
 			{fln: fln(), cmd: cmdLookupTable, name: sql.ID("tbl1")},
 			{fln: fln(), cmd: cmdRows, values: [][]sql.Value{}},
 			{fln: fln(), cmd: cmdCommit},
 		},
-		[]engCmd{
+		[]storeCmd{
 			{fln: fln(), cmd: cmdBegin},
 			{fln: fln(), cmd: cmdLookupTable, name: sql.ID("tbl1")},
 			{fln: fln(), cmd: cmdRows, values: [][]sql.Value{}},
@@ -976,7 +976,7 @@ var (
 			},
 			{fln: fln(), cmd: cmdCommit},
 		},
-		[]engCmd{
+		[]storeCmd{
 			{fln: fln(), cmd: cmdBegin},
 			{fln: fln(), cmd: cmdLookupTable, name: sql.ID("tbl1")},
 			{fln: fln(), cmd: cmdRows,
@@ -987,7 +987,7 @@ var (
 			},
 			{fln: fln(), cmd: cmdCommit},
 		},
-		[]engCmd{
+		[]storeCmd{
 			{fln: fln(), cmd: cmdBegin},
 			{fln: fln(), cmd: cmdLookupTable, name: sql.ID("tbl1")},
 			{fln: fln(), cmd: cmdInsert, row: []sql.Value{sql.Int64Value(3), sql.Int64Value(9),
@@ -1005,7 +1005,7 @@ var (
 			},
 			{fln: fln(), cmd: cmdRollback},
 		},
-		[]engCmd{
+		[]storeCmd{
 			{fln: fln(), cmd: cmdBegin},
 			{fln: fln(), cmd: cmdLookupTable, name: sql.ID("tbl1")},
 			{fln: fln(), cmd: cmdRows,
@@ -1016,7 +1016,7 @@ var (
 			},
 			{fln: fln(), cmd: cmdCommit},
 		},
-		[]engCmd{
+		[]storeCmd{
 			{fln: fln(), cmd: cmdBegin},
 			{fln: fln(), cmd: cmdLookupTable, name: sql.ID("tbl1")},
 			{fln: fln(), cmd: cmdInsert, row: []sql.Value{sql.Int64Value(3), sql.Int64Value(9),
@@ -1034,7 +1034,7 @@ var (
 			},
 			{fln: fln(), cmd: cmdCommit},
 		},
-		[]engCmd{
+		[]storeCmd{
 			{fln: fln(), cmd: cmdBegin},
 			{fln: fln(), cmd: cmdLookupTable, name: sql.ID("tbl1")},
 			{fln: fln(), cmd: cmdRows,
@@ -1047,7 +1047,7 @@ var (
 			},
 			{fln: fln(), cmd: cmdCommit},
 		},
-		[]engCmd{
+		[]storeCmd{
 			{fln: fln(), cmd: cmdBegin},
 			{fln: fln(), cmd: cmdCreateTable, name: sql.ID("tbl2")},
 			{fln: fln(), cmd: cmdLookupTable, name: sql.ID("tbl2")},
@@ -1070,7 +1070,7 @@ var (
 			},
 			{fln: fln(), cmd: cmdCommit},
 		},
-		[]engCmd{
+		[]storeCmd{
 			{fln: fln(), cmd: cmdBegin},
 			{fln: fln(), cmd: cmdLookupTable, name: sql.ID("tbl2")},
 			{fln: fln(), cmd: cmdDelete, rowID: 4},
@@ -1084,7 +1084,7 @@ var (
 			},
 			{fln: fln(), cmd: cmdCommit},
 		},
-		[]engCmd{
+		[]storeCmd{
 			{fln: fln(), cmd: cmdBegin},
 			{fln: fln(), cmd: cmdLookupTable, name: sql.ID("tbl2")},
 			{fln: fln(), cmd: cmdDelete, rowID: 1},
@@ -1097,7 +1097,7 @@ var (
 			},
 			{fln: fln(), cmd: cmdCommit},
 		},
-		[]engCmd{
+		[]storeCmd{
 			{fln: fln(), cmd: cmdBegin},
 			{fln: fln(), cmd: cmdLookupTable, name: sql.ID("tbl2")},
 			{fln: fln(), cmd: cmdDelete, rowID: 2},
@@ -1109,7 +1109,7 @@ var (
 			},
 			{fln: fln(), cmd: cmdRollback},
 		},
-		[]engCmd{
+		[]storeCmd{
 			{fln: fln(), cmd: cmdBegin},
 			{fln: fln(), cmd: cmdLookupTable, name: sql.ID("tbl2")},
 			{fln: fln(), cmd: cmdRows,
@@ -1120,7 +1120,7 @@ var (
 			},
 			{fln: fln(), cmd: cmdCommit},
 		},
-		[]engCmd{
+		[]storeCmd{
 			{fln: fln(), cmd: cmdBegin},
 			{fln: fln(), cmd: cmdCreateTable, name: sql.ID("tbl3")},
 			{fln: fln(), cmd: cmdLookupTable, name: sql.ID("tbl3")},
@@ -1143,7 +1143,7 @@ var (
 			},
 			{fln: fln(), cmd: cmdCommit},
 		},
-		[]engCmd{
+		[]storeCmd{
 			{fln: fln(), cmd: cmdBegin},
 			{fln: fln(), cmd: cmdLookupTable, name: sql.ID("tbl3")},
 			{fln: fln(), cmd: cmdUpdate, rowID: 1,
@@ -1159,7 +1159,7 @@ var (
 			},
 			{fln: fln(), cmd: cmdCommit},
 		},
-		[]engCmd{
+		[]storeCmd{
 			{fln: fln(), cmd: cmdBegin},
 			{fln: fln(), cmd: cmdLookupTable, name: sql.ID("tbl3")},
 			{fln: fln(), cmd: cmdUpdate, rowID: 2,
@@ -1175,7 +1175,7 @@ var (
 			},
 			{fln: fln(), cmd: cmdRollback},
 		},
-		[]engCmd{
+		[]storeCmd{
 			{fln: fln(), cmd: cmdBegin},
 			{fln: fln(), cmd: cmdLookupTable, name: sql.ID("tbl3")},
 			{fln: fln(), cmd: cmdRows,
@@ -1188,7 +1188,7 @@ var (
 			},
 			{fln: fln(), cmd: cmdCommit},
 		},
-		[]engCmd{
+		[]storeCmd{
 			{fln: fln(), cmd: cmdBegin},
 			{fln: fln(), cmd: cmdLookupTable, name: sql.ID("tbl3")},
 			{fln: fln(), cmd: cmdUpdate, rowID: 3,
@@ -1199,7 +1199,7 @@ var (
 			},
 			{fln: fln(), cmd: cmdCommit},
 		},
-		[]engCmd{
+		[]storeCmd{
 			{fln: fln(), cmd: cmdBegin},
 			{fln: fln(), cmd: cmdLookupTable, name: sql.ID("tbl3")},
 			{fln: fln(), cmd: cmdRows,
@@ -1212,7 +1212,7 @@ var (
 			},
 			{fln: fln(), cmd: cmdCommit},
 		},
-		[]engCmd{
+		[]storeCmd{
 			{fln: fln(), cmd: cmdBegin},
 			{fln: fln(), cmd: cmdCreateTable, name: sql.ID("tbl4")},
 			{fln: fln(), cmd: cmdLookupTable, name: sql.ID("tbl4")},
@@ -1229,13 +1229,13 @@ var (
 			},
 			{fln: fln(), cmd: cmdCommit},
 		},
-		[]engCmd{
+		[]storeCmd{
 			{fln: fln(), cmd: cmdBegin},
 			{fln: fln(), cmd: cmdLookupTable, name: sql.ID("tbl4")},
 			{fln: fln(), cmd: cmdDelete, rowID: 1},
 			{fln: fln(), cmd: cmdRollback},
 		},
-		[]engCmd{
+		[]storeCmd{
 			{fln: fln(), cmd: cmdBegin},
 			{fln: fln(), cmd: cmdLookupTable, name: sql.ID("tbl4")},
 			{fln: fln(), cmd: cmdUpdate, rowID: 1,
@@ -1264,7 +1264,7 @@ func RunParallelTest(t *testing.T, st storage.Store) {
 	}
 
 	testDatabase(t, st, dbname,
-		[]engCmd{
+		[]storeCmd{
 			{fln: fln(), cmd: cmdBegin},
 			{fln: fln(), cmd: cmdCreateTable, name: sql.ID("tbl")},
 			{fln: fln(), cmd: cmdCommit},
@@ -1278,7 +1278,7 @@ func RunParallelTest(t *testing.T, st storage.Store) {
 
 			for j := 0; j < r; j++ {
 				testDatabase(t, st, dbname,
-					[]engCmd{
+					[]storeCmd{
 						{fln: fln(), cmd: cmdBegin},
 						{fln: fln(), cmd: cmdLookupTable, name: sql.ID("tbl")},
 						{fln: fln(), cmd: cmdInsert, row: []sql.Value{sql.Int64Value(i*r + j),
@@ -1289,7 +1289,7 @@ func RunParallelTest(t *testing.T, st storage.Store) {
 
 			for j := 0; j < r; j++ {
 				testDatabase(t, st, dbname,
-					[]engCmd{
+					[]storeCmd{
 						{fln: fln(), cmd: cmdBegin},
 						{fln: fln(), cmd: cmdLookupTable, name: sql.ID("tbl")},
 						{fln: fln(), cmd: cmdUpdate, rowID: i*r + j,
@@ -1356,7 +1356,7 @@ func RunStressTest(t *testing.T, st storage.Store) {
 	}
 
 	testDatabase(t, st, dbname,
-		[]engCmd{
+		[]storeCmd{
 			{fln: fln(), cmd: cmdBegin},
 			{fln: fln(), cmd: cmdCreateTable, name: sql.ID("tbl")},
 			{fln: fln(), cmd: cmdCommit},
@@ -1366,7 +1366,7 @@ func RunStressTest(t *testing.T, st storage.Store) {
 
 	for i := 0; i < rcnt; i++ {
 		testDatabase(t, st, dbname,
-			[]engCmd{
+			[]storeCmd{
 				{fln: fln(), cmd: cmdBegin},
 				{fln: fln(), cmd: cmdLookupTable, name: sql.ID("tbl")},
 				{fln: fln(), cmd: cmdInsert, row: []sql.Value{sql.Int64Value(i),
@@ -1414,7 +1414,7 @@ func RunStressTest(t *testing.T, st storage.Store) {
 	}
 
 	testDatabase(t, st, dbname,
-		[]engCmd{
+		[]storeCmd{
 			{fln: fln(), cmd: cmdBegin},
 			{fln: fln(), cmd: cmdLookupTable, name: sql.ID("tbl")},
 			{fln: fln(), cmd: cmdRows, values: values},
