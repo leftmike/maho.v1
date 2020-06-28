@@ -94,8 +94,9 @@ func NewStore(dataDir string) (storage.Store, error) {
 	return mst, nil
 }
 
-func (mst *memrowsStore) SetEngine(e storage.Engine) {
+func (mst *memrowsStore) Init(e storage.Engine) error {
 	mst.e = e
+	return nil
 }
 
 func (mst *memrowsStore) CreateDatabase(dbname sql.Identifier,

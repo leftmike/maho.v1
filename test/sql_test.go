@@ -3,6 +3,7 @@ package test_test
 import (
 	"flag"
 	"fmt"
+	"os"
 	"path/filepath"
 	"testing"
 
@@ -10,6 +11,7 @@ import (
 
 	"github.com/leftmike/maho/engine"
 	"github.com/leftmike/maho/sql"
+	"github.com/leftmike/maho/storage"
 	"github.com/leftmike/maho/storage/basic"
 	"github.com/leftmike/maho/storage/keyval"
 	"github.com/leftmike/maho/storage/kvrows"
@@ -40,9 +42,11 @@ func (r *reporter) Report(test string, err error) error {
 }
 
 var (
-	update   = flag.Bool("update", false, "update expected to output")
-	testData = flag.String("testdata",
-		filepath.Join("..", "..", "sqltest", "testdata"), "directory of testdata")
+	update      = flag.Bool("update", false, "update expected to output")
+	sqltestData = flag.String("sqltest",
+		filepath.Join("..", "..", "sqltest", "testdata"), "directory of sqltest data")
+	postgresData = flag.String("postgres",
+		filepath.Join("..", "..", "postgres-tests"), "directory of postgres test data")
 )
 
 type mahoDialect struct {
@@ -81,105 +85,81 @@ func testSQL(t *testing.T, typ string, e *engine.Engine, testData string, psql b
 	}
 }
 
-func testAllSQL(t *testing.T, typ string, clean bool, makeEng func() *engine.Engine) {
-	if clean {
-		err := testutil.CleanDir("testdata", []string{".gitignore", "expected", "output", "sql"})
-		if err != nil {
-			t.Fatal(err)
+func TestSQL(t *testing.T) {
+	configs := []struct {
+		name     string
+		persist  bool
+		newStore func(dataDir string) (storage.Store, error)
+	}{
+		{
+			name:     "basic",
+			newStore: basic.NewStore,
+		},
+		{
+			name:     "memrows",
+			newStore: memrows.NewStore,
+		},
+		{
+			name:     "rowcols",
+			newStore: rowcols.NewStore,
+		},
+		{
+			name:     "badger",
+			newStore: keyval.NewBadgerStore,
+		},
+		{
+			name:     "bbolt",
+			newStore: keyval.NewBBoltStore,
+		},
+		{
+			name:     "kvrows",
+			newStore: kvrows.NewBadgerStore,
+		},
+	}
+
+	tests := []struct {
+		name     string
+		testData string
+		psql     bool
+	}{
+		{
+			name:     "maho",
+			testData: "testdata",
+		},
+		{
+			name:     "sqltest",
+			testData: *sqltestData,
+		},
+		{
+			name:     "sqltest-postgres",
+			testData: filepath.Join(*sqltestData, "postgres"),
+			psql:     true,
+		},
+		{
+			name:     "postgres",
+			testData: *postgresData,
+			psql:     true,
+		},
+	}
+
+	err := testutil.CleanDir("testdata", []string{".gitignore", "expected", "output", "sql"})
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	for _, tst := range tests {
+		for _, cfg := range configs {
+			dataDir := filepath.Join("testdata", tst.name, cfg.name)
+			os.MkdirAll(dataDir, 0755)
+			st, err := cfg.newStore(dataDir)
+			if err != nil {
+				t.Fatal(err)
+			}
+			e, err := engine.NewEngine(st)
+			if err != nil {
+				t.Fatal(err)
+			}
+			testSQL(t, cfg.name, e, tst.testData, tst.psql)
 		}
 	}
-	testSQL(t, typ, makeEng(), "testdata", false)
-
-	if clean {
-		err := testutil.CleanDir("testdata", []string{".gitignore", "expected", "output", "sql"})
-		if err != nil {
-			t.Fatal(err)
-		}
-	}
-	testSQL(t, typ, makeEng(), *testData, false)
-
-	if clean {
-		err := testutil.CleanDir("testdata", []string{".gitignore", "expected", "output", "sql"})
-		if err != nil {
-			t.Fatal(err)
-		}
-	}
-	testSQL(t, typ, makeEng(), filepath.Join(*testData, "postgres"), true)
-
-	//	if typ == "basic" || typ == "memrows" || typ == "rowcols" || typ == "badger" ||
-	//		typ == "bbolt" || typ == "kvrows" {
-
-	if clean {
-		err := testutil.CleanDir("testdata", []string{".gitignore", "expected", "output", "sql"})
-		if err != nil {
-			t.Fatal(err)
-		}
-	}
-	testSQL(t, typ, makeEng(), "../../postgres-tests", true)
-	//	}
-}
-
-func TestSQLBasic(t *testing.T) {
-	testAllSQL(t, "basic", false, func() *engine.Engine {
-		st, err := basic.NewStore("")
-		if err != nil {
-			t.Fatal(err)
-		}
-		return engine.NewEngine(st)
-	})
-}
-
-func TestSQLMemRows(t *testing.T) {
-	testAllSQL(t, "memrows", false,
-		func() *engine.Engine {
-			st, err := memrows.NewStore("")
-			if err != nil {
-				t.Fatal(err)
-			}
-			return engine.NewEngine(st)
-		})
-}
-
-func TestSQLRowCols(t *testing.T) {
-	testAllSQL(t, "rowcols", true,
-		func() *engine.Engine {
-			st, err := rowcols.NewStore(filepath.Join("testdata", "rowcols"))
-			if err != nil {
-				t.Fatal(err)
-			}
-			return engine.NewEngine(st)
-		})
-}
-
-func TestSQLBadger(t *testing.T) {
-	testAllSQL(t, "badger", true,
-		func() *engine.Engine {
-			st, err := keyval.NewBadgerStore(filepath.Join("testdata", "badger"))
-			if err != nil {
-				t.Fatal(err)
-			}
-			return engine.NewEngine(st)
-		})
-}
-
-func TestSQLBBolt(t *testing.T) {
-	testAllSQL(t, "bbolt", true,
-		func() *engine.Engine {
-			st, err := keyval.NewBBoltStore("testdata")
-			if err != nil {
-				t.Fatal(err)
-			}
-			return engine.NewEngine(st)
-		})
-}
-
-func TestSQLKVRows(t *testing.T) {
-	testAllSQL(t, "kvrows", true,
-		func() *engine.Engine {
-			st, err := kvrows.NewBadgerStore(filepath.Join("testdata", "kvrows"))
-			if err != nil {
-				t.Fatal(err)
-			}
-			return engine.NewEngine(st)
-		})
 }

@@ -248,8 +248,10 @@ func (tblst *tableStore) init(ctx context.Context, tx Transaction) error {
 	return nil
 }
 
-func (tblst *tableStore) SetEngine(e storage.Engine) {
+func (tblst *tableStore) Init(e storage.Engine) error {
 	tblst.e = e
+	// XXX
+	return nil
 }
 
 func (tblst *tableStore) createDatabase(ctx context.Context, tx storage.Transaction,

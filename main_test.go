@@ -124,7 +124,11 @@ select * from metadata.tables
 )
 
 func testStore(t *testing.T, st storage.Store, cases []testCase) {
-	e := engine.NewEngine(st)
+	e, err := engine.NewEngine(st)
+	if err != nil {
+		t.Fatal(err)
+	}
+
 	for i, c := range cases {
 		var b bytes.Buffer
 		ses := &evaluate.Session{

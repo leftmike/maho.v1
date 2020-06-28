@@ -19,7 +19,10 @@ func startEngine(t *testing.T) *engine.Engine {
 	if err != nil {
 		t.Fatal(err)
 	}
-	e := engine.NewEngine(st)
+	e, err := engine.NewEngine(st)
+	if err != nil {
+		t.Fatal(err)
+	}
 
 	err = e.CreateDatabase(sql.ID("test"), nil)
 	if err != nil {

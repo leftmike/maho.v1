@@ -245,7 +245,12 @@ func main() {
 		fmt.Fprintf(os.Stderr, "maho: %s", err)
 		return
 	}
-	e := engine.NewEngine(st)
+
+	e, err := engine.NewEngine(st)
+	if err != nil {
+		fmt.Fprintf(os.Stderr, "maho: %s", err)
+		return
+	}
 
 	svr := server.Server{
 		Handler: func(ses *evaluate.Session, rr io.RuneReader, w io.Writer) {

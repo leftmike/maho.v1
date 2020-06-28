@@ -20,7 +20,7 @@ type Engine interface {
 }
 
 type Store interface {
-	SetEngine(e Engine)
+	Init(e Engine) error
 	CreateDatabase(dbname sql.Identifier, options map[sql.Identifier]string) error
 	DropDatabase(dbname sql.Identifier, ifExists bool, options map[sql.Identifier]string) error
 
