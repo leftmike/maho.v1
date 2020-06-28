@@ -30,7 +30,7 @@ type transaction struct {
 	tree *btree.BTree
 }
 
-type tableStructure struct {
+type tableStruct struct {
 	mid         int64
 	tn          sql.TableName
 	columns     []sql.Identifier
@@ -41,7 +41,7 @@ type tableStructure struct {
 type table struct {
 	bst *basicStore
 	tx  *transaction
-	ts  *tableStructure
+	ts  *tableStruct
 }
 
 type rowItem struct {
@@ -63,7 +63,7 @@ func NewStore(dataDir string) (storage.Store, error) {
 	return tblstore.NewStore("basic", bst, true)
 }
 
-func (ts *tableStructure) Table(ctx context.Context, tx storage.Transaction) (storage.Table,
+func (ts *tableStruct) Table(ctx context.Context, tx storage.Transaction) (storage.Table,
 	error) {
 
 	etx := tx.(*transaction)
@@ -74,26 +74,26 @@ func (ts *tableStructure) Table(ctx context.Context, tx storage.Transaction) (st
 	}, nil
 }
 
-func (ts *tableStructure) Columns() []sql.Identifier {
+func (ts *tableStruct) Columns() []sql.Identifier {
 	return ts.columns
 }
 
-func (ts *tableStructure) ColumnTypes() []sql.ColumnType {
+func (ts *tableStruct) ColumnTypes() []sql.ColumnType {
 	return ts.columnTypes
 }
 
-func (ts *tableStructure) PrimaryKey() []sql.ColumnKey {
+func (ts *tableStruct) PrimaryKey() []sql.ColumnKey {
 	return ts.primary
 }
 
-func (_ *basicStore) MakeTableStructure(tn sql.TableName, mid int64, cols []sql.Identifier,
-	colTypes []sql.ColumnType, primary []sql.ColumnKey) (tblstore.TableStructure, error) {
+func (_ *basicStore) MakeTableStruct(tn sql.TableName, mid int64, cols []sql.Identifier,
+	colTypes []sql.ColumnType, primary []sql.ColumnKey) (tblstore.TableStruct, error) {
 
 	if len(primary) == 0 {
 		panic(fmt.Sprintf("basic: table %s: missing required primary key", tn))
 	}
 
-	return &tableStructure{
+	return &tableStruct{
 		mid:         mid,
 		tn:          tn,
 		columns:     cols,
@@ -145,7 +145,7 @@ func (btx *transaction) forWrite() {
 	}
 }
 
-func (ts *tableStructure) toItem(row []sql.Value) btree.Item {
+func (ts *tableStruct) toItem(row []sql.Value) btree.Item {
 	ri := rowItem{
 		mid: ts.mid,
 	}

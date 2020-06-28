@@ -6,25 +6,21 @@ import (
 	"github.com/leftmike/maho/sql"
 )
 
-// TableStructure --> tblstore.TableStructure: TableDef to TableStructure
-// TableMetadata --> save for encoded layout
-// TableDefinition --> interface defined here
-
-type TableDefinition interface {
+type TableDef interface {
 	Columns() []sql.Identifier
 	ColumnTypes() []sql.ColumnType
 	PrimaryKey() []sql.ColumnKey
 }
 
 type Engine interface {
-	EncodeTableDefinition(td TableDefinition) ([]byte, error)
-	DecodeTableDefinition(buf []byte) (TableDefinition, error)
-	MakeTableDefinition(cols []sql.Identifier, colTypes []sql.ColumnType,
-		primary []sql.ColumnKey) (TableDefinition, error)
+	EncodeTableDef(td TableDef) ([]byte, error)
+	DecodeTableDef(buf []byte) (TableDef, error)
+	MakeTableDef(cols []sql.Identifier, colTypes []sql.ColumnType,
+		primary []sql.ColumnKey) (TableDef, error)
 }
 
 type Store interface {
-	//SetEngine(e Engine)
+	SetEngine(e Engine)
 	CreateDatabase(dbname sql.Identifier, options map[sql.Identifier]string) error
 	DropDatabase(dbname sql.Identifier, ifExists bool, options map[sql.Identifier]string) error
 

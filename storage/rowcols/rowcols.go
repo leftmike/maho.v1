@@ -38,7 +38,7 @@ type transaction struct {
 	delta *btree.BTree
 }
 
-type tableStructure struct {
+type tableStruct struct {
 	tn          sql.TableName
 	columns     []sql.Identifier
 	columnTypes []sql.ColumnType
@@ -52,7 +52,7 @@ type tableStructure struct {
 type table struct {
 	st *rowColsStore
 	tx *transaction
-	ts *tableStructure
+	ts *tableStruct
 }
 
 type rowItem struct {
@@ -88,7 +88,7 @@ func NewStore(dataDir string) (storage.Store, error) {
 	return tblstore.NewStore("rowcols", rcst, init)
 }
 
-func (ts *tableStructure) Table(ctx context.Context, tx storage.Transaction) (storage.Table,
+func (ts *tableStruct) Table(ctx context.Context, tx storage.Transaction) (storage.Table,
 	error) {
 
 	etx := tx.(*transaction)
@@ -100,20 +100,20 @@ func (ts *tableStructure) Table(ctx context.Context, tx storage.Transaction) (st
 
 }
 
-func (ts *tableStructure) Columns() []sql.Identifier {
+func (ts *tableStruct) Columns() []sql.Identifier {
 	return ts.columns
 }
 
-func (ts *tableStructure) ColumnTypes() []sql.ColumnType {
+func (ts *tableStruct) ColumnTypes() []sql.ColumnType {
 	return ts.columnTypes
 }
 
-func (ts *tableStructure) PrimaryKey() []sql.ColumnKey {
+func (ts *tableStruct) PrimaryKey() []sql.ColumnKey {
 	return ts.primary
 }
 
-func (_ *rowColsStore) MakeTableStructure(tn sql.TableName, mid int64, cols []sql.Identifier,
-	colTypes []sql.ColumnType, primary []sql.ColumnKey) (tblstore.TableStructure, error) {
+func (_ *rowColsStore) MakeTableStruct(tn sql.TableName, mid int64, cols []sql.Identifier,
+	colTypes []sql.ColumnType, primary []sql.ColumnKey) (tblstore.TableStruct, error) {
 
 	if len(primary) == 0 {
 		panic(fmt.Sprintf("rowcols: table %s: missing required primary key", tn))
@@ -122,7 +122,7 @@ func (_ *rowColsStore) MakeTableStructure(tn sql.TableName, mid int64, cols []sq
 		panic(fmt.Sprintf("rowcols: table %s: primary key with too many columns", tn))
 	}
 
-	ts := tableStructure{
+	ts := tableStruct{
 		tn:          tn,
 		columns:     cols,
 		columnTypes: colTypes,
@@ -275,7 +275,7 @@ func (rctx *transaction) forWrite() {
 	}
 }
 
-func (ts *tableStructure) toItem(row []sql.Value, deleted bool) btree.Item {
+func (ts *tableStruct) toItem(row []sql.Value, deleted bool) btree.Item {
 	ri := rowItem{
 		mid: ts.mid,
 	}

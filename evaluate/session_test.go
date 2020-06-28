@@ -23,6 +23,8 @@ type testTransaction struct {
 	nextStmtAllowed int
 }
 
+func (st *testStore) SetEngine(e storage.Engine) {}
+
 func (st *testStore) CreateDatabase(dbname sql.Identifier,
 	options map[sql.Identifier]string) error {
 

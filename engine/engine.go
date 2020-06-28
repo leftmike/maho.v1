@@ -37,6 +37,7 @@ func NewEngine(st storage.Store) *Engine {
 	e.CreateMetadataTable(sql.SCHEMAS, e.makeSchemasTable)
 	e.CreateMetadataTable(sql.TABLES, e.makeTablesTable)
 
+	st.SetEngine(e)
 	return e
 }
 

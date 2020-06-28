@@ -19,6 +19,7 @@ import (
 )
 
 type memrowsStore struct {
+	e         storage.Engine
 	txService service.TransactionService
 	mutex     sync.RWMutex
 	databases map[sql.Identifier]*database
@@ -91,6 +92,10 @@ func NewStore(dataDir string) (storage.Store, error) {
 	}
 	mst.txService.Init()
 	return mst, nil
+}
+
+func (mst *memrowsStore) SetEngine(e storage.Engine) {
+	mst.e = e
 }
 
 func (mst *memrowsStore) CreateDatabase(dbname sql.Identifier,

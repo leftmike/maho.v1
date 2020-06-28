@@ -60,7 +60,7 @@ type kvStore struct {
 	commitMutex  sync.Mutex
 }
 
-type tableStructure struct {
+type tableStruct struct {
 	tn          sql.TableName
 	columns     []sql.Identifier
 	columnTypes []sql.ColumnType
@@ -80,7 +80,7 @@ type transaction struct {
 type table struct {
 	st *kvStore
 	tx *transaction
-	ts *tableStructure
+	ts *tableStruct
 }
 
 type rows struct {
@@ -232,7 +232,7 @@ func (kvst *kvStore) startupStore(upd Updater) error {
 	return nil
 }
 
-func (ts *tableStructure) Table(ctx context.Context, tx storage.Transaction) (storage.Table,
+func (ts *tableStruct) Table(ctx context.Context, tx storage.Transaction) (storage.Table,
 	error) {
 
 	etx := tx.(*transaction)
@@ -243,19 +243,19 @@ func (ts *tableStructure) Table(ctx context.Context, tx storage.Transaction) (st
 	}, nil
 }
 
-func (ts *tableStructure) Columns() []sql.Identifier {
+func (ts *tableStruct) Columns() []sql.Identifier {
 	return ts.columns
 }
 
-func (ts *tableStructure) ColumnTypes() []sql.ColumnType {
+func (ts *tableStruct) ColumnTypes() []sql.ColumnType {
 	return ts.columnTypes
 }
 
-func (ts *tableStructure) PrimaryKey() []sql.ColumnKey {
+func (ts *tableStruct) PrimaryKey() []sql.ColumnKey {
 	return ts.primary
 }
 
-func (ts *tableStructure) makeKey(row []sql.Value) []byte {
+func (ts *tableStruct) makeKey(row []sql.Value) []byte {
 	buf := encode.EncodeUint64(make([]byte, 0, 8), uint64(ts.mid))
 	if row != nil {
 		buf = append(buf, encode.MakeKey(ts.primary, row)...)
@@ -263,14 +263,14 @@ func (ts *tableStructure) makeKey(row []sql.Value) []byte {
 	return buf
 }
 
-func (kvst *kvStore) MakeTableStructure(tn sql.TableName, mid int64, cols []sql.Identifier,
-	colTypes []sql.ColumnType, primary []sql.ColumnKey) (tblstore.TableStructure, error) {
+func (kvst *kvStore) MakeTableStruct(tn sql.TableName, mid int64, cols []sql.Identifier,
+	colTypes []sql.ColumnType, primary []sql.ColumnKey) (tblstore.TableStruct, error) {
 
 	if len(primary) == 0 {
 		panic(fmt.Sprintf("kvrows: table %s: missing required primary key", tn))
 	}
 
-	ts := tableStructure{
+	ts := tableStruct{
 		tn:          tn,
 		columns:     cols,
 		columnTypes: colTypes,
