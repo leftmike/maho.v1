@@ -66,8 +66,9 @@ type indexRow struct {
 	Index    string
 }
 
-type TableDef interface {
+type TableStructure interface {
 	Table(ctx context.Context, tx storage.Transaction) (storage.Table, error)
+	//TableDefinition() storage.TableDefinition
 	Columns() []sql.Identifier
 	ColumnTypes() []sql.ColumnType
 	PrimaryKey() []sql.ColumnKey
@@ -79,44 +80,45 @@ type Transaction interface {
 }
 
 type store interface {
-	MakeTableDef(tn sql.TableName, mid int64, cols []sql.Identifier, colTypes []sql.ColumnType,
-		primary []sql.ColumnKey) (TableDef, error)
+	//MakeTableStructure(tn sql.TableName, mid int64, td TableDefinition) (TableStructure, error)
+	MakeTableStructure(tn sql.TableName, mid int64, cols []sql.Identifier,
+		colTypes []sql.ColumnType, primary []sql.ColumnKey) (TableStructure, error)
 	Begin(sesid uint64) Transaction
 }
 
 type tableStore struct {
 	name      string
 	st        store
-	sequences TableDef
-	databases TableDef
-	schemas   TableDef
-	tables    TableDef
-	indexes   TableDef
+	sequences TableStructure
+	databases TableStructure
+	schemas   TableStructure
+	tables    TableStructure
+	indexes   TableStructure
 }
 
 func NewStore(name string, st store, init bool) (storage.Store, error) {
-	sequences, err := st.MakeTableDef(sequencesTableName, sequencesMID,
+	sequences, err := st.MakeTableStructure(sequencesTableName, sequencesMID,
 		[]sql.Identifier{sql.ID("sequence"), sql.ID("current")},
 		[]sql.ColumnType{sql.IdColType, sql.Int64ColType},
 		[]sql.ColumnKey{sql.MakeColumnKey(0, false)})
 	if err != nil {
 		return nil, err
 	}
-	databases, err := st.MakeTableDef(databasesTableName, databasesMID,
+	databases, err := st.MakeTableStructure(databasesTableName, databasesMID,
 		[]sql.Identifier{sql.ID("database")},
 		[]sql.ColumnType{sql.IdColType},
 		[]sql.ColumnKey{sql.MakeColumnKey(0, false)})
 	if err != nil {
 		return nil, err
 	}
-	schemas, err := st.MakeTableDef(schemasTableName, schemasMID,
+	schemas, err := st.MakeTableStructure(schemasTableName, schemasMID,
 		[]sql.Identifier{sql.ID("database"), sql.ID("schema"), sql.ID("tables")},
 		[]sql.ColumnType{sql.IdColType, sql.IdColType, sql.Int64ColType},
 		[]sql.ColumnKey{sql.MakeColumnKey(0, false), sql.MakeColumnKey(1, false)})
 	if err != nil {
 		return nil, err
 	}
-	tables, err := st.MakeTableDef(tablesTableName, tablesMID,
+	tables, err := st.MakeTableStructure(tablesTableName, tablesMID,
 		[]sql.Identifier{sql.ID("database"), sql.ID("schema"), sql.ID("table"), sql.ID("mid"),
 			sql.ID("metadata")},
 		[]sql.ColumnType{sql.IdColType, sql.IdColType, sql.IdColType, sql.Int64ColType,
@@ -126,7 +128,7 @@ func NewStore(name string, st store, init bool) (storage.Store, error) {
 	if err != nil {
 		return nil, err
 	}
-	indexes, err := st.MakeTableDef(indexesTableName, indexesMID,
+	indexes, err := st.MakeTableStructure(indexesTableName, indexesMID,
 		[]sql.Identifier{sql.ID("database"), sql.ID("schema"), sql.ID("table"), sql.ID("index")},
 		[]sql.ColumnType{sql.IdColType, sql.IdColType, sql.IdColType, sql.IdColType},
 		[]sql.ColumnKey{sql.MakeColumnKey(0, false), sql.MakeColumnKey(1, false),
@@ -505,8 +507,8 @@ func (tblst *tableStore) validTable(ctx context.Context, tx storage.Transaction,
 	return true, nil
 }
 
-func (tblst *tableStore) decodeTableMetadata(tn sql.TableName, mid int64, buf []byte) (TableDef,
-	error) {
+func (tblst *tableStore) decodeTableMetadata(tn sql.TableName, mid int64,
+	buf []byte) (TableStructure, error) {
 
 	var md TableMetadata
 	err := proto.Unmarshal(buf, &md)
@@ -543,7 +545,7 @@ func (tblst *tableStore) decodeTableMetadata(tn sql.TableName, mid int64, buf []
 		primary = append(primary, sql.MakeColumnKey(int(pk.Number), pk.Reverse))
 	}
 
-	return tblst.st.MakeTableDef(tn, mid, cols, colTypes, primary)
+	return tblst.st.MakeTableStructure(tn, mid, cols, colTypes, primary)
 }
 
 func (tblst *tableStore) LookupTable(ctx context.Context, tx storage.Transaction,
@@ -565,17 +567,17 @@ func (tblst *tableStore) LookupTable(ctx context.Context, tx storage.Transaction
 	}
 	mid := tr.MID
 
-	td, err := tblst.decodeTableMetadata(tn, mid, tr.Metadata)
+	ts, err := tblst.decodeTableMetadata(tn, mid, tr.Metadata)
 	if err != nil {
 		return nil, err
 	}
 
-	return td.Table(ctx, tx)
+	return ts.Table(ctx, tx)
 }
 
-func encodeTableMetadata(td TableDef) ([]byte, error) {
-	cols := td.Columns()
-	colTypes := td.ColumnTypes()
+func encodeTableMetadata(ts TableStructure) ([]byte, error) {
+	cols := ts.Columns()
+	colTypes := ts.ColumnTypes()
 
 	var md TableMetadata
 	md.Columns = make([]*ColumnMetadata, 0, len(cols))
@@ -595,7 +597,7 @@ func encodeTableMetadata(td TableDef) ([]byte, error) {
 			})
 	}
 
-	primary := td.PrimaryKey()
+	primary := ts.PrimaryKey()
 	md.Primary = make([]*ColumnKey, 0, len(primary))
 	for _, pk := range primary {
 		md.Primary = append(md.Primary,
@@ -609,14 +611,14 @@ func encodeTableMetadata(td TableDef) ([]byte, error) {
 }
 
 func (tblst *tableStore) createTable(ctx context.Context, tx storage.Transaction, tn sql.TableName,
-	mid int64, td TableDef) error {
+	mid int64, ts TableStructure) error {
 
 	err := tblst.updateSchema(ctx, tx, tn.SchemaName(), 1)
 	if err != nil {
 		return err
 	}
 
-	md, err := encodeTableMetadata(td)
+	md, err := encodeTableMetadata(ts)
 	if err != nil {
 		return err
 	}
@@ -684,12 +686,12 @@ func (tblst *tableStore) CreateTable(ctx context.Context, tx storage.Transaction
 		return err
 	}
 
-	td, err := tblst.st.MakeTableDef(tn, mid, cols, colTypes, primary)
+	ts, err := tblst.st.MakeTableStructure(tn, mid, cols, colTypes, primary)
 	if err != nil {
 		return err
 	}
 
-	return tblst.createTable(ctx, tx, tn, mid, td)
+	return tblst.createTable(ctx, tx, tn, mid, ts)
 }
 
 func (tblst *tableStore) DropTable(ctx context.Context, tx storage.Transaction, tn sql.TableName,

@@ -48,7 +48,7 @@ type keyValStore struct {
 	commitMutex sync.Mutex
 }
 
-type tableDef struct {
+type tableStructure struct {
 	tn          sql.TableName
 	columns     []sql.Identifier
 	columnTypes []sql.ColumnType
@@ -65,7 +65,7 @@ type transaction struct {
 type table struct {
 	st *keyValStore
 	tx *transaction
-	td *tableDef
+	ts *tableStructure
 }
 
 type rowItem struct {
@@ -129,42 +129,44 @@ func newStore(kv KV) (storage.Store, error) {
 	return tblstore.NewStore("keyval", kvst, init)
 }
 
-func (td *tableDef) Table(ctx context.Context, tx storage.Transaction) (storage.Table, error) {
+func (ts *tableStructure) Table(ctx context.Context, tx storage.Transaction) (storage.Table,
+	error) {
+
 	etx := tx.(*transaction)
 	return &table{
 		st: etx.st,
 		tx: etx,
-		td: td,
+		ts: ts,
 	}, nil
 }
 
-func (td *tableDef) Columns() []sql.Identifier {
-	return td.columns
+func (ts *tableStructure) Columns() []sql.Identifier {
+	return ts.columns
 }
 
-func (td *tableDef) ColumnTypes() []sql.ColumnType {
-	return td.columnTypes
+func (ts *tableStructure) ColumnTypes() []sql.ColumnType {
+	return ts.columnTypes
 }
 
-func (td *tableDef) PrimaryKey() []sql.ColumnKey {
-	return td.primary
+func (ts *tableStructure) PrimaryKey() []sql.ColumnKey {
+	return ts.primary
 }
 
-func (kvst *keyValStore) MakeTableDef(tn sql.TableName, mid int64, cols []sql.Identifier,
-	colTypes []sql.ColumnType, primary []sql.ColumnKey) (tblstore.TableDef, error) {
+func (kvst *keyValStore) MakeTableStructure(tn sql.TableName, mid int64, cols []sql.Identifier,
+	colTypes []sql.ColumnType, primary []sql.ColumnKey) (tblstore.TableStructure, error) {
 
 	if len(primary) == 0 {
 		panic(fmt.Sprintf("keyval: table %s: missing required primary key", tn))
 	}
 
-	td := tableDef{
+	ts := tableStructure{
 		tn:          tn,
 		columns:     cols,
 		columnTypes: colTypes,
 		primary:     primary,
 		mid:         mid,
 	}
-	return &td, nil
+	return &ts, nil
 }
 
 func (kvst *keyValStore) Begin(sesid uint64) tblstore.Transaction {
@@ -291,20 +293,20 @@ func (kvtx *transaction) forWrite() {
 	}
 }
 
-func (td *tableDef) makeKey(row []sql.Value) []byte {
-	buf := encode.EncodeUint64(make([]byte, 0, 8), uint64(td.mid))
+func (ts *tableStructure) makeKey(row []sql.Value) []byte {
+	buf := encode.EncodeUint64(make([]byte, 0, 8), uint64(ts.mid))
 	if row != nil {
-		buf = append(buf, encode.MakeKey(td.primary, row)...)
+		buf = append(buf, encode.MakeKey(ts.primary, row)...)
 	}
 	return buf
 }
 
-func (td *tableDef) toItem(row []sql.Value, deleted bool) rowItem {
+func (ts *tableStructure) toItem(row []sql.Value, deleted bool) rowItem {
 	ri := rowItem{
-		key: td.makeKey(row),
+		key: ts.makeKey(row),
 	}
 	if row != nil && !deleted {
-		ri.row = append(make([]sql.Value, 0, len(td.columns)), row...)
+		ri.row = append(make([]sql.Value, 0, len(ts.columns)), row...)
 	}
 	return ri
 }
@@ -314,19 +316,19 @@ func (ri rowItem) Less(item btree.Item) bool {
 }
 
 func (kvt *table) Columns(ctx context.Context) []sql.Identifier {
-	return kvt.td.columns
+	return kvt.ts.columns
 }
 
 func (kvt *table) ColumnTypes(ctx context.Context) []sql.ColumnType {
-	return kvt.td.columnTypes
+	return kvt.ts.columnTypes
 }
 
 func (kvt *table) PrimaryKey(ctx context.Context) []sql.ColumnKey {
-	return kvt.td.primary
+	return kvt.ts.primary
 }
 
 func (kvt *table) Rows(ctx context.Context, minRow, maxRow []sql.Value) (sql.Rows, error) {
-	minKey := kvt.td.makeKey(minRow)
+	minKey := kvt.ts.makeKey(minRow)
 	it, err := kvt.st.kv.Iterate(kvt.tx.ver, minKey)
 	if err != nil {
 		return nil, err
@@ -339,11 +341,11 @@ func (kvt *table) Rows(ctx context.Context, minRow, maxRow []sql.Value) (sql.Row
 	}
 
 	if maxRow != nil {
-		kvr.maxKey = kvt.td.makeKey(maxRow)
+		kvr.maxKey = kvt.ts.makeKey(maxRow)
 	}
 
 	if kvt.tx.delta != nil {
-		kvt.tx.delta.AscendGreaterOrEqual(kvt.td.toItem(minRow, false),
+		kvt.tx.delta.AscendGreaterOrEqual(kvt.ts.toItem(minRow, false),
 			func(item btree.Item) bool {
 				ri := item.(rowItem)
 				if kvr.maxKey == nil {
@@ -367,17 +369,17 @@ func (kvt *table) Rows(ctx context.Context, minRow, maxRow []sql.Value) (sql.Row
 func (kvt *table) Insert(ctx context.Context, row []sql.Value) error {
 	kvt.tx.forWrite()
 
-	ri := kvt.td.toItem(row, false)
+	ri := kvt.ts.toItem(row, false)
 	if item := kvt.tx.delta.Get(ri); item != nil {
 		if (item.(rowItem)).row != nil {
-			return fmt.Errorf("keyval: %s: existing row with duplicate primary key", kvt.td.tn)
+			return fmt.Errorf("keyval: %s: existing row with duplicate primary key", kvt.ts.tn)
 		}
 	} else {
 		err := kvt.st.kv.GetAt(kvt.tx.ver, ri.key,
 			func(val []byte, ver uint64) error {
 				if len(val) > 0 {
 					return fmt.Errorf("keyval: %s: existing row with duplicate primary key",
-						kvt.td.tn)
+						kvt.ts.tn)
 				}
 				return nil
 			})
@@ -391,7 +393,7 @@ func (kvt *table) Insert(ctx context.Context, row []sql.Value) error {
 }
 
 func (kvr *rows) Columns() []sql.Identifier {
-	return kvr.tbl.td.columns
+	return kvr.tbl.ts.columns
 }
 
 func (kvr *rows) Close() error {
@@ -489,10 +491,10 @@ func (kvr *rows) Delete(ctx context.Context) error {
 	kvr.tbl.tx.forWrite()
 
 	if kvr.curRow == nil {
-		panic(fmt.Sprintf("keyval: table %s no row to delete", kvr.tbl.td.tn))
+		panic(fmt.Sprintf("keyval: table %s no row to delete", kvr.tbl.ts.tn))
 	}
 
-	kvr.tbl.tx.delta.ReplaceOrInsert(kvr.tbl.td.toItem(kvr.curRow, true))
+	kvr.tbl.tx.delta.ReplaceOrInsert(kvr.tbl.ts.toItem(kvr.curRow, true))
 	return nil
 }
 
@@ -500,12 +502,12 @@ func (kvr *rows) Update(ctx context.Context, updates []sql.ColumnUpdate) error {
 	kvr.tbl.tx.forWrite()
 
 	if kvr.curRow == nil {
-		panic(fmt.Sprintf("keyval: table %s no row to update", kvr.tbl.td.tn))
+		panic(fmt.Sprintf("keyval: table %s no row to update", kvr.tbl.ts.tn))
 	}
 
 	var primaryUpdated bool
 	for _, update := range updates {
-		for _, ck := range kvr.tbl.td.primary {
+		for _, ck := range kvr.tbl.ts.primary {
 			if ck.Number() == update.Index {
 				primaryUpdated = true
 			}
@@ -522,6 +524,6 @@ func (kvr *rows) Update(ctx context.Context, updates []sql.ColumnUpdate) error {
 		return kvr.tbl.Insert(ctx, updateRow)
 	}
 
-	kvr.tbl.tx.delta.ReplaceOrInsert(kvr.tbl.td.toItem(updateRow, false))
+	kvr.tbl.tx.delta.ReplaceOrInsert(kvr.tbl.ts.toItem(updateRow, false))
 	return nil
 }

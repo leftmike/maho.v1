@@ -6,13 +6,25 @@ import (
 	"github.com/leftmike/maho/sql"
 )
 
-type Transaction interface {
-	Commit(ctx context.Context) error
-	Rollback() error
-	NextStmt()
+// TableStructure --> tblstore.TableStructure: TableDef to TableStructure
+// TableMetadata --> save for encoded layout
+// TableDefinition --> interface defined here
+
+type TableDefinition interface {
+	Columns() []sql.Identifier
+	ColumnTypes() []sql.ColumnType
+	PrimaryKey() []sql.ColumnKey
+}
+
+type Engine interface {
+	EncodeTableDefinition(td TableDefinition) ([]byte, error)
+	DecodeTableDefinition(buf []byte) (TableDefinition, error)
+	MakeTableDefinition(cols []sql.Identifier, colTypes []sql.ColumnType,
+		primary []sql.ColumnKey) (TableDefinition, error)
 }
 
 type Store interface {
+	//SetEngine(e Engine)
 	CreateDatabase(dbname sql.Identifier, options map[sql.Identifier]string) error
 	DropDatabase(dbname sql.Identifier, ifExists bool, options map[sql.Identifier]string) error
 
@@ -35,6 +47,12 @@ type Store interface {
 	ListSchemas(ctx context.Context, tx Transaction, dbname sql.Identifier) ([]sql.Identifier,
 		error)
 	ListTables(ctx context.Context, tx Transaction, sn sql.SchemaName) ([]sql.Identifier, error)
+}
+
+type Transaction interface {
+	Commit(ctx context.Context) error
+	Rollback() error
+	NextStmt()
 }
 
 type Table interface {
