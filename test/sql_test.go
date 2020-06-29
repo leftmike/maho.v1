@@ -155,11 +155,7 @@ func TestSQL(t *testing.T) {
 			if err != nil {
 				t.Fatal(err)
 			}
-			e, err := engine.NewEngine(st)
-			if err != nil {
-				t.Fatal(err)
-			}
-			testSQL(t, cfg.name, e, tst.testData, tst.psql)
+			testSQL(t, cfg.name, engine.NewEngine(st), tst.testData, tst.psql)
 		}
 	}
 }

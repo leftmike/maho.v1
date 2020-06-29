@@ -6,21 +6,7 @@ import (
 	"github.com/leftmike/maho/sql"
 )
 
-type TableDef interface {
-	Columns() []sql.Identifier
-	ColumnTypes() []sql.ColumnType
-	PrimaryKey() []sql.ColumnKey
-}
-
-type Engine interface {
-	EncodeTableDef(td TableDef) ([]byte, error)
-	DecodeTableDef(buf []byte) (TableDef, error)
-	MakeTableDef(cols []sql.Identifier, colTypes []sql.ColumnType,
-		primary []sql.ColumnKey) (TableDef, error)
-}
-
 type Store interface {
-	Init(e Engine) error
 	CreateDatabase(dbname sql.Identifier, options map[sql.Identifier]string) error
 	DropDatabase(dbname sql.Identifier, ifExists bool, options map[sql.Identifier]string) error
 

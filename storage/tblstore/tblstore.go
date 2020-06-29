@@ -68,7 +68,7 @@ type indexRow struct {
 
 type TableStruct interface {
 	Table(ctx context.Context, tx storage.Transaction) (storage.Table, error)
-	//TableDef() storage.TableDef
+	// XXX: these are not needed
 	Columns() []sql.Identifier
 	ColumnTypes() []sql.ColumnType
 	PrimaryKey() []sql.ColumnKey
@@ -89,7 +89,6 @@ type store interface {
 type tableStore struct {
 	name      string
 	st        store
-	e         storage.Engine
 	sequences TableStruct
 	databases TableStruct
 	schemas   TableStruct
@@ -245,12 +244,6 @@ func (tblst *tableStore) init(ctx context.Context, tx Transaction) error {
 		return err
 	}
 
-	return nil
-}
-
-func (tblst *tableStore) Init(e storage.Engine) error {
-	tblst.e = e
-	// XXX
 	return nil
 }
 

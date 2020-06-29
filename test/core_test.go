@@ -37,10 +37,8 @@ func TestValuesSimple(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	e, err := engine.NewEngine(st)
-	if err != nil {
-		t.Fatal(err)
-	}
+	e := engine.NewEngine(st)
+
 	err = e.CreateDatabase(sql.ID("core_test"), nil)
 	if err != nil {
 		// If the test is run multiple times, then the database will already exist.

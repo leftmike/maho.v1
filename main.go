@@ -43,13 +43,19 @@ To Do:
 - subquery expressions: EXISTS, IN, NOT IN, ANY/SOME, ALL
 - conditional expressions: CASE, COALESCE, NULLIF, GREATEST, LEAST
 
+-- change to a single TableDef which contains information about columns, indexes,
+-- TableDef.Columns, .ColumnTypes, .PrimaryKey
+-- engine.Table.TableDef() *metadata.TableDef
+-- metadata/tabledef.go
+-- MakeTypedTable(tn, storage.Table, *metadata.TableDef)
+-- storage.Table: remove Columns, ColumnTypes, and PrimaryKey
+-- store.LookupTable(...) (Table, *metadata.TableDef, error)
+
 -- checks all constraints including unique and foreign key references
 -- converts from engine metadata to evaluate metadata; eg. Default from string to Expr
 -- generated columns
 -- triggers
 -- row level security
--- maybe change to a single TableDef which contains information about columns, indexes,
-   constraints: Table.Definition() *TableDef, TableDef.Columns, .ColumnTypes, .PrimaryKey
 
 - indexes
 -- based on column numbers
@@ -246,12 +252,7 @@ func main() {
 		return
 	}
 
-	e, err := engine.NewEngine(st)
-	if err != nil {
-		fmt.Fprintf(os.Stderr, "maho: %s", err)
-		return
-	}
-
+	e := engine.NewEngine(st)
 	svr := server.Server{
 		Handler: func(ses *evaluate.Session, rr io.RuneReader, w io.Writer) {
 			src := fmt.Sprintf("%s@%s", ses.User, ses.Type)
