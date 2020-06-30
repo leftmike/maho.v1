@@ -169,7 +169,7 @@ func (kvst *keyValStore) MakeTableStruct(tn sql.TableName, mid int64, cols []sql
 	return &ts, nil
 }
 
-func (kvst *keyValStore) Begin(sesid uint64) tblstore.Transaction {
+func (kvst *keyValStore) Begin(sesid uint64) storage.Transaction {
 	kvst.mutex.Lock()
 	defer kvst.mutex.Unlock()
 
@@ -266,26 +266,6 @@ func (kvtx *transaction) Rollback() error {
 }
 
 func (_ *transaction) NextStmt() {}
-
-func (kvtx *transaction) Changes(cfn func(mid int64, key string, row []sql.Value) bool) {
-	if kvtx.delta == nil {
-		return
-	}
-
-	kvtx.delta.Ascend(
-		func(item btree.Item) bool {
-			ri := item.(rowItem)
-			var key string
-			var mid int64
-			if len(ri.key) < 8 {
-				key = fmt.Sprintf("%v", ri.key)
-			} else {
-				mid = int64(binary.BigEndian.Uint64(ri.key))
-				key = fmt.Sprintf("%v", ri.key[8:])
-			}
-			return cfn(mid, key, ri.row)
-		})
-}
 
 func (kvtx *transaction) forWrite() {
 	if kvtx.delta == nil {

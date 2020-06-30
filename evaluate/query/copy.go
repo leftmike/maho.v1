@@ -39,13 +39,13 @@ func (stmt *Copy) String() string {
 }
 
 func (stmt *Copy) Plan(ses *evaluate.Session, tx engine.Transaction) (interface{}, error) {
-	tbl, err := ses.Engine.LookupTable(ses.Context(), tx, ses.ResolveTableName(stmt.Table))
+	tbl, tt, err := ses.Engine.LookupTable(ses.Context(), tx, ses.ResolveTableName(stmt.Table))
 	if err != nil {
 		return nil, err
 	}
 
-	cols := tbl.Columns(ses.Context())
-	colTypes := tbl.ColumnTypes(ses.Context())
+	cols := tt.Columns()
+	colTypes := tt.ColumnTypes()
 
 	defaultExprs := make([]sql.Expr, len(cols))
 	cmap := map[sql.Identifier]int{}

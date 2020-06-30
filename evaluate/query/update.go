@@ -84,7 +84,7 @@ func (up *updatePlan) Execute(ctx context.Context, e *engine.Engine,
 }
 
 func (stmt *Update) Plan(ses *evaluate.Session, tx engine.Transaction) (interface{}, error) {
-	tbl, err := ses.Engine.LookupTable(ses.Context(), tx, ses.ResolveTableName(stmt.Table))
+	tbl, tt, err := ses.Engine.LookupTable(ses.Context(), tx, ses.ResolveTableName(stmt.Table))
 	if err != nil {
 		return nil, err
 	}
@@ -103,7 +103,7 @@ func (stmt *Update) Plan(ses *evaluate.Session, tx engine.Transaction) (interfac
 	}
 
 	plan := updatePlan{
-		columns: tbl.Columns(ses.Context()),
+		columns: tt.Columns(),
 		rows:    rows,
 		updates: make([]columnUpdate, 0, len(stmt.ColumnUpdates)),
 	}

@@ -9,7 +9,8 @@ import (
 	"github.com/leftmike/maho/storage"
 )
 
-type MakeVirtual func(ctx context.Context, tx Transaction, tn sql.TableName) (Table, error)
+type MakeVirtual func(ctx context.Context, tx Transaction, tn sql.TableName) (Table, *TableType,
+	error)
 
 type Transaction interface {
 	storage.Transaction
@@ -99,7 +100,7 @@ func (e *Engine) DropSchema(ctx context.Context, tx Transaction, sn sql.SchemaNa
 }
 
 func (e *Engine) LookupTable(ctx context.Context, tx Transaction, tn sql.TableName) (Table,
-	error) {
+	*TableType, error) {
 
 	e.mutex.RLock()
 	defer e.mutex.RUnlock()
@@ -108,19 +109,20 @@ func (e *Engine) LookupTable(ctx context.Context, tx Transaction, tn sql.TableNa
 		if maker, ok := e.metadataTables[tn.Table]; ok {
 			return maker(ctx, tx, tn)
 		}
-		return nil, fmt.Errorf("engine: table %s not found", tn)
+		return nil, nil, fmt.Errorf("engine: table %s not found", tn)
 	} else if tn.Database == sql.SYSTEM && tn.Schema == sql.INFO {
 		if maker, ok := e.systemInfoTables[tn.Table]; ok {
 			return maker(ctx, tx, tn)
 		}
-		return nil, fmt.Errorf("engine: table %s not found", tn)
+		return nil, nil, fmt.Errorf("engine: table %s not found", tn)
 	}
 
-	stbl, err := e.st.LookupTable(ctx, tx, tn)
+	st, err := e.st.LookupTable(ctx, tx, tn)
 	if err != nil {
-		return nil, err
+		return nil, nil, err
 	}
-	return makeTable(ctx, tn, stbl)
+	tt := MakeTableType(st.Columns(ctx), st.ColumnTypes(ctx), st.PrimaryKey(ctx))
+	return makeTable(tn, st, tt)
 }
 
 func (e *Engine) CreateTable(ctx context.Context, tx Transaction, tn sql.TableName,

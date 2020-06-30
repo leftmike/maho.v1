@@ -28,8 +28,7 @@ func (fta FromTableAlias) String() string {
 }
 
 func lookupRows(ses *evaluate.Session, tx engine.Transaction, tn sql.TableName) (sql.Rows, error) {
-
-	tbl, err := ses.Engine.LookupTable(ses.Context(), tx, ses.ResolveTableName(tn))
+	tbl, _, err := ses.Engine.LookupTable(ses.Context(), tx, ses.ResolveTableName(tn))
 	if err != nil {
 		return nil, err
 	}

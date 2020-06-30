@@ -116,7 +116,7 @@ func (svr *Server) Shutdown(ctx context.Context) error {
 }
 
 func (svr *Server) makeSessionsVirtual(ctx context.Context, tx engine.Transaction,
-	tn sql.TableName) (engine.Table, error) {
+	tn sql.TableName) (engine.Table, *engine.TableType, error) {
 
 	svr.mutex.Lock()
 	defer svr.mutex.Unlock()
@@ -140,5 +140,5 @@ func (svr *Server) makeSessionsVirtual(ctx context.Context, tx engine.Transactio
 		[]sql.Identifier{sql.ID("session"), sql.ID("user"), sql.ID("type"), sql.ID("address"),
 			sql.ID("interactive")},
 		[]sql.ColumnType{sql.StringColType, sql.IdColType, sql.IdColType,
-			sql.NullStringColType, sql.BoolColType}, values), nil
+			sql.NullStringColType, sql.BoolColType}, values)
 }

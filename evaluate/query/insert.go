@@ -56,13 +56,13 @@ func (stmt *InsertValues) String() string {
 }
 
 func (stmt *InsertValues) Plan(ses *evaluate.Session, tx engine.Transaction) (interface{}, error) {
-	tbl, err := ses.Engine.LookupTable(ses.Context(), tx, ses.ResolveTableName(stmt.Table))
+	tbl, tt, err := ses.Engine.LookupTable(ses.Context(), tx, ses.ResolveTableName(stmt.Table))
 	if err != nil {
 		return nil, err
 	}
 
-	cols := tbl.Columns(ses.Context())
-	colTypes := tbl.ColumnTypes(ses.Context())
+	cols := tt.Columns()
+	colTypes := tt.ColumnTypes()
 	mv := len(cols)
 	c2v := make([]int, mv) // column number to value number
 	if stmt.Columns == nil {

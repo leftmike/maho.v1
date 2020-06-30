@@ -146,12 +146,12 @@ func (stmt *CreateIndex) Plan(ses *evaluate.Session, tx engine.Transaction) (int
 func (stmt *CreateIndex) Execute(ctx context.Context, e *engine.Engine,
 	tx engine.Transaction) (int64, error) {
 
-	tbl, err := e.LookupTable(ctx, tx, stmt.Table)
+	_, tt, err := e.LookupTable(ctx, tx, stmt.Table)
 	if err != nil {
 		return -1, err
 	}
 
-	colKeys, err := indexKeyToColumnKeys(stmt.Key, tbl.Columns(ctx))
+	colKeys, err := indexKeyToColumnKeys(stmt.Key, tt.Columns())
 	if err != nil {
 		return -1, fmt.Errorf("engine: %s in unique key for table %s", err, stmt.Table)
 	}

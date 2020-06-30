@@ -24,7 +24,6 @@ To Do:
 
 - get rid of engine.ListDatabases: only used at startup in main.go
 
-- get rid of memrows and use basic instead; engine/service might no longer be necessary?
 
 - tests with 1000s to 100000s of rows
 -- generate rows
@@ -43,13 +42,13 @@ To Do:
 - subquery expressions: EXISTS, IN, NOT IN, ANY/SOME, ALL
 - conditional expressions: CASE, COALESCE, NULLIF, GREATEST, LEAST
 
--- change to a single TableDef which contains information about columns, indexes,
--- TableDef.Columns, .ColumnTypes, .PrimaryKey
--- engine.Table.TableDef() *metadata.TableDef
--- metadata/tabledef.go
--- MakeTypedTable(tn, storage.Table, *metadata.TableDef)
--- storage.Table: remove Columns, ColumnTypes, and PrimaryKey
--- store.LookupTable(...) (Table, *metadata.TableDef, error)
+-- get rid of memrows and use basic instead; engine/service might no longer be necessary?
+-- move storage/tblstore into engine
+-- engine.CreateTable(..., tt *TableType)
+-- engine.Table: remove Type()
+-- MakeTypedTable(tn, storage.Table, *engine.TableType)
+-- storage.Table: remove Columns, ColumnTypes, and PrimaryKey; don't need Type()
+-- move metadata.proto to engine/
 
 -- checks all constraints including unique and foreign key references
 -- converts from engine metadata to evaluate metadata; eg. Default from string to Expr

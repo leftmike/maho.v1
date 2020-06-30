@@ -10,21 +10,20 @@ import (
 )
 
 func MakeVirtualTable(tn sql.TableName, cols []sql.Identifier, colTypes []sql.ColumnType,
-	values [][]sql.Value) Table {
+	values [][]sql.Value) (Table, *TableType, error) {
 
+	tt := MakeTableType(cols, colTypes, nil)
 	return &virtualTable{
-		tn:       tn,
-		cols:     cols,
-		colTypes: colTypes,
-		values:   values,
-	}
+		tn:     tn,
+		tt:     tt, // XXX: just need cols
+		values: values,
+	}, tt, nil
 }
 
 type virtualTable struct {
-	tn       sql.TableName
-	cols     []sql.Identifier
-	colTypes []sql.ColumnType
-	values   [][]sql.Value
+	tn     sql.TableName
+	tt     *TableType
+	values [][]sql.Value
 }
 
 type virtualRows struct {
@@ -34,23 +33,15 @@ type virtualRows struct {
 	index   int
 }
 
-func (vt *virtualTable) Columns(ctx context.Context) []sql.Identifier {
-	return vt.cols
-}
-
-func (vt *virtualTable) ColumnTypes(ctx context.Context) []sql.ColumnType {
-	return vt.colTypes
-}
-
-func (vt *virtualTable) PrimaryKey(ctx context.Context) []sql.ColumnKey {
-	return nil
+func (vt *virtualTable) Type() *TableType {
+	return vt.tt
 }
 
 func (vt *virtualTable) Rows(ctx context.Context, minRow, maxRow []sql.Value) (sql.Rows, error) {
 	if minRow != nil || maxRow != nil {
 		panic("virtual: not implemented: minRow != nil || maxRow != nil")
 	}
-	return &virtualRows{tn: vt.tn, columns: vt.cols, rows: vt.values}, nil
+	return &virtualRows{tn: vt.tn, columns: vt.tt.Columns(), rows: vt.values}, nil
 }
 
 func (vt *virtualTable) Insert(ctx context.Context, row []sql.Value) error {
@@ -119,7 +110,7 @@ func (e *Engine) listSchemas(ctx context.Context, tx Transaction,
 }
 
 func (e *Engine) makeSchemasTable(ctx context.Context, tx Transaction, tn sql.TableName) (Table,
-	error) {
+	*TableType, error) {
 
 	e.mutex.RLock()
 	defer e.mutex.RUnlock()
@@ -128,7 +119,7 @@ func (e *Engine) makeSchemasTable(ctx context.Context, tx Transaction, tn sql.Ta
 
 	scnames, err := e.listSchemas(ctx, tx, tn.Database)
 	if err != nil {
-		return nil, err
+		return nil, nil, err
 	}
 
 	for _, scname := range scnames {
@@ -140,7 +131,7 @@ func (e *Engine) makeSchemasTable(ctx context.Context, tx Transaction, tn sql.Ta
 
 	return MakeVirtualTable(tn,
 		[]sql.Identifier{sql.ID("database_name"), sql.ID("schema_name")},
-		[]sql.ColumnType{sql.IdColType, sql.IdColType}, values), nil
+		[]sql.ColumnType{sql.IdColType, sql.IdColType}, values)
 }
 
 func (e *Engine) listTables(ctx context.Context, tx Transaction,
@@ -163,7 +154,7 @@ func (e *Engine) listTables(ctx context.Context, tx Transaction,
 }
 
 func (e *Engine) makeTablesTable(ctx context.Context, tx Transaction, tn sql.TableName) (Table,
-	error) {
+	*TableType, error) {
 
 	e.mutex.RLock()
 	defer e.mutex.RUnlock()
@@ -172,13 +163,13 @@ func (e *Engine) makeTablesTable(ctx context.Context, tx Transaction, tn sql.Tab
 
 	scnames, err := e.listSchemas(ctx, tx, tn.Database)
 	if err != nil {
-		return nil, err
+		return nil, nil, err
 	}
 
 	for _, scname := range scnames {
 		tblnames, err := e.listTables(ctx, tx, sql.SchemaName{tn.Database, scname})
 		if err != nil {
-			return nil, err
+			return nil, nil, err
 		}
 
 		for _, tblname := range tblnames {
@@ -192,7 +183,7 @@ func (e *Engine) makeTablesTable(ctx context.Context, tx Transaction, tn sql.Tab
 
 	return MakeVirtualTable(tn,
 		[]sql.Identifier{sql.ID("database_name"), sql.ID("schema_name"), sql.ID("table_name")},
-		[]sql.ColumnType{sql.IdColType, sql.IdColType}, values), nil
+		[]sql.ColumnType{sql.IdColType, sql.IdColType}, values)
 }
 
 var (
@@ -234,7 +225,7 @@ func appendColumns(values [][]sql.Value, tn sql.TableName, cols []sql.Identifier
 }
 
 func (e *Engine) makeColumnsTable(ctx context.Context, tx Transaction, tn sql.TableName) (Table,
-	error) {
+	*TableType, error) {
 
 	e.mutex.RLock()
 	defer e.mutex.RUnlock()
@@ -243,13 +234,13 @@ func (e *Engine) makeColumnsTable(ctx context.Context, tx Transaction, tn sql.Ta
 
 	scnames, err := e.listSchemas(ctx, tx, tn.Database)
 	if err != nil {
-		return nil, err
+		return nil, nil, err
 	}
 
 	for _, scname := range scnames {
 		tblnames, err := e.listTables(ctx, tx, sql.SchemaName{tn.Database, scname})
 		if err != nil {
-			return nil, err
+			return nil, nil, err
 		}
 
 		for _, tblname := range tblnames {
@@ -257,24 +248,24 @@ func (e *Engine) makeColumnsTable(ctx context.Context, tx Transaction, tn sql.Ta
 			if scname == sql.METADATA && tblname == sql.ID("columns") {
 				values = appendColumns(values, ttn, columnsColumns, columnsColumnTypes)
 			} else {
-				tbl, err := e.LookupTable(ctx, tx, ttn)
+				_, tt, err := e.LookupTable(ctx, tx, ttn)
 				if err != nil {
-					return nil, err
+					return nil, nil, err
 				}
-				values = appendColumns(values, ttn, tbl.Columns(ctx), tbl.ColumnTypes(ctx))
+				values = appendColumns(values, ttn, tt.Columns(), tt.ColumnTypes())
 			}
 		}
 	}
 
-	return MakeVirtualTable(tn, columnsColumns, columnsColumnTypes, values), nil
+	return MakeVirtualTable(tn, columnsColumns, columnsColumnTypes, values)
 }
 
 func (e *Engine) makeDatabasesTable(ctx context.Context, tx Transaction, tn sql.TableName) (Table,
-	error) {
+	*TableType, error) {
 
 	dbnames, err := e.st.ListDatabases(ctx, tx)
 	if err != nil {
-		return nil, err
+		return nil, nil, err
 	}
 
 	var found bool
@@ -295,11 +286,13 @@ func (e *Engine) makeDatabasesTable(ctx context.Context, tx Transaction, tn sql.
 	}
 
 	return MakeVirtualTable(tn, []sql.Identifier{sql.ID("database")},
-		[]sql.ColumnType{sql.IdColType}, values), nil
+		[]sql.ColumnType{sql.IdColType}, values)
 
 }
 
-func makeIdentifiersTable(ctx context.Context, tx Transaction, tn sql.TableName) (Table, error) {
+func makeIdentifiersTable(ctx context.Context, tx Transaction, tn sql.TableName) (Table,
+	*TableType, error) {
+
 	values := [][]sql.Value{}
 
 	for id, n := range sql.Names {
@@ -313,10 +306,12 @@ func makeIdentifiersTable(ctx context.Context, tx Transaction, tn sql.TableName)
 
 	return MakeVirtualTable(tn,
 		[]sql.Identifier{sql.ID("name"), sql.ID("id"), sql.ID("reserved")},
-		[]sql.ColumnType{sql.IdColType, sql.Int32ColType, sql.BoolColType}, values), nil
+		[]sql.ColumnType{sql.IdColType, sql.Int32ColType, sql.BoolColType}, values)
 }
 
-func makeConfigTable(ctx context.Context, tx Transaction, tn sql.TableName) (Table, error) {
+func makeConfigTable(ctx context.Context, tx Transaction, tn sql.TableName) (Table,
+	*TableType, error) {
+
 	values := [][]sql.Value{}
 
 	for _, v := range config.Vars() {
@@ -330,5 +325,5 @@ func makeConfigTable(ctx context.Context, tx Transaction, tn sql.TableName) (Tab
 
 	return MakeVirtualTable(tn,
 		[]sql.Identifier{sql.ID("name"), sql.ID("by"), sql.ID("value")},
-		[]sql.ColumnType{sql.IdColType, sql.IdColType, sql.StringColType}, values), nil
+		[]sql.ColumnType{sql.IdColType, sql.IdColType, sql.StringColType}, values)
 }

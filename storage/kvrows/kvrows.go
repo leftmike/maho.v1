@@ -293,7 +293,7 @@ func (kvst *kvStore) setTransactionData(tid uint64, td *TransactionData) error {
 	return upd.Commit()
 }
 
-func (kvst *kvStore) Begin(sesid uint64) tblstore.Transaction {
+func (kvst *kvStore) Begin(sesid uint64) storage.Transaction {
 	kvst.mutex.Lock()
 	kvst.lastTID += 1
 	tid := kvst.lastTID
@@ -406,10 +406,6 @@ func (kvtx *transaction) Rollback() error {
 
 func (kvtx *transaction) NextStmt() {
 	kvtx.sid += 1
-}
-
-func (kvtx *transaction) Changes(cfn func(mid int64, key string, row []sql.Value) bool) {
-	panic("changes not implemented")
 }
 
 func (kvt *table) Columns(ctx context.Context) []sql.Identifier {

@@ -74,16 +74,11 @@ type TableStruct interface {
 	PrimaryKey() []sql.ColumnKey
 }
 
-type Transaction interface {
-	storage.Transaction
-	Changes(cfn func(mid int64, key string, row []sql.Value) bool)
-}
-
 type store interface {
 	//MakeTableStruct(tn sql.TableName, mid int64, td TableDef) (TableStruct, error)
 	MakeTableStruct(tn sql.TableName, mid int64, cols []sql.Identifier,
 		colTypes []sql.ColumnType, primary []sql.ColumnKey) (TableStruct, error)
-	Begin(sesid uint64) Transaction
+	Begin(sesid uint64) storage.Transaction
 }
 
 type tableStore struct {
@@ -163,7 +158,7 @@ func NewStore(name string, st store, init bool) (storage.Store, error) {
 	return tblst, nil
 }
 
-func (tblst *tableStore) init(ctx context.Context, tx Transaction) error {
+func (tblst *tableStore) init(ctx context.Context, tx storage.Transaction) error {
 	tbl, err := tblst.sequences.Table(ctx, tx)
 	if err != nil {
 		return err
@@ -205,14 +200,6 @@ func (tblst *tableStore) init(ctx context.Context, tx Transaction) error {
 	if err != nil {
 		return err
 	}
-
-	/*
-		tx.Changes(
-			func(mid int64, key string, row []sql.Value) bool {
-				fmt.Printf("%d: %s: %v\n", mid, key, row)
-				return true
-			})
-	*/
 
 	tx.NextStmt()
 	err = tblst.createTable(ctx, tx, sequencesTableName, sequencesMID, tblst.sequences)

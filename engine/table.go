@@ -9,19 +9,15 @@ import (
 )
 
 type Table interface {
-	Columns(ctx context.Context) []sql.Identifier
-	ColumnTypes(ctx context.Context) []sql.ColumnType
-	PrimaryKey(ctx context.Context) []sql.ColumnKey
+	Type() *TableType
 	Rows(ctx context.Context, minRow, maxRow []sql.Value) (sql.Rows, error)
 	Insert(ctx context.Context, row []sql.Value) error
 }
 
 type table struct {
-	tn       sql.TableName
-	stbl     storage.Table
-	cols     []sql.Identifier
-	colTypes []sql.ColumnType
-	primary  []sql.ColumnKey
+	tn sql.TableName
+	st storage.Table
+	tt *TableType
 }
 
 type rows struct {
@@ -29,30 +25,20 @@ type rows struct {
 	rows sql.Rows
 }
 
-func makeTable(ctx context.Context, tn sql.TableName, stbl storage.Table) (*table, error) {
+func makeTable(tn sql.TableName, st storage.Table, tt *TableType) (*table, *TableType, error) {
 	return &table{
-		tn:       tn,
-		stbl:     stbl,
-		cols:     stbl.Columns(ctx),
-		colTypes: stbl.ColumnTypes(ctx),
-		primary:  stbl.PrimaryKey(ctx),
-	}, nil
+		tn: tn,
+		st: st,
+		tt: tt,
+	}, tt, nil
 }
 
-func (tbl *table) Columns(ctx context.Context) []sql.Identifier {
-	return tbl.cols
-}
-
-func (tbl *table) ColumnTypes(ctx context.Context) []sql.ColumnType {
-	return tbl.colTypes
-}
-
-func (tbl *table) PrimaryKey(ctx context.Context) []sql.ColumnKey {
-	return tbl.primary
+func (tbl *table) Type() *TableType {
+	return tbl.tt
 }
 
 func (tbl *table) Rows(ctx context.Context, minRow, maxRow []sql.Value) (sql.Rows, error) {
-	r, err := tbl.stbl.Rows(ctx, minRow, maxRow)
+	r, err := tbl.st.Rows(ctx, minRow, maxRow)
 	if err != nil {
 		return nil, err
 	}
@@ -63,22 +49,25 @@ func (tbl *table) Rows(ctx context.Context, minRow, maxRow []sql.Value) (sql.Row
 }
 
 func (tbl *table) Insert(ctx context.Context, row []sql.Value) error {
-	for rdx, ct := range tbl.colTypes {
+	cols := tbl.tt.Columns()
+	for rdx, ct := range tbl.tt.ColumnTypes() {
 		var err error
-		row[rdx], err = ct.ConvertValue(tbl.cols[rdx], row[rdx])
+		row[rdx], err = ct.ConvertValue(cols[rdx], row[rdx])
 		if err != nil {
 			return fmt.Errorf("engine: table %s: %s", tbl.tn, err)
 		}
 	}
-	return tbl.stbl.Insert(ctx, row)
+	return tbl.st.Insert(ctx, row)
 }
 
 func (tbl *table) update(ctx context.Context, r sql.Rows, updates []sql.ColumnUpdate) error {
+	cols := tbl.tt.Columns()
+	colTypes := tbl.tt.ColumnTypes()
 	for _, up := range updates {
-		ct := tbl.colTypes[up.Index]
+		ct := colTypes[up.Index]
 
 		var err error
-		up.Value, err = ct.ConvertValue(tbl.cols[up.Index], up.Value)
+		up.Value, err = ct.ConvertValue(cols[up.Index], up.Value)
 		if err != nil {
 			return fmt.Errorf("engine: table %s: %s", tbl.tn, err)
 		}

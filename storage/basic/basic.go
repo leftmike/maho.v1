@@ -102,7 +102,7 @@ func (_ *basicStore) MakeTableStruct(tn sql.TableName, mid int64, cols []sql.Ide
 	}, nil
 }
 
-func (bst *basicStore) Begin(sesid uint64) tblstore.Transaction {
+func (bst *basicStore) Begin(sesid uint64) storage.Transaction {
 	bst.mutex.Lock()
 	return &transaction{
 		bst:  bst,
@@ -134,10 +134,6 @@ func (btx *transaction) Rollback() error {
 }
 
 func (_ *transaction) NextStmt() {}
-
-func (btx *transaction) Changes(cfn func(mid int64, key string, row []sql.Value) bool) {
-	// XXX
-}
 
 func (btx *transaction) forWrite() {
 	if btx.tree == btx.bst.tree {

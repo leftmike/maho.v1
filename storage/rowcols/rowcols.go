@@ -156,7 +156,7 @@ func (_ *rowColsStore) MakeTableStruct(tn sql.TableName, mid int64, cols []sql.I
 	return &ts, nil
 }
 
-func (rcst *rowColsStore) Begin(sesid uint64) tblstore.Transaction {
+func (rcst *rowColsStore) Begin(sesid uint64) storage.Transaction {
 	rcst.mutex.Lock()
 	defer rcst.mutex.Unlock()
 
@@ -256,18 +256,6 @@ func (rctx *transaction) Rollback() error {
 }
 
 func (_ *transaction) NextStmt() {}
-
-func (rctx *transaction) Changes(cfn func(mid int64, key string, row []sql.Value) bool) {
-	if rctx.delta == nil {
-		return
-	}
-
-	rctx.delta.Ascend(
-		func(item btree.Item) bool {
-			ri := item.(rowItem)
-			return cfn(ri.mid, fmt.Sprintf("%v: %d", ri.key, ri.ver), ri.row)
-		})
-}
 
 func (rctx *transaction) forWrite() {
 	if rctx.delta == nil {

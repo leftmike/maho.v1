@@ -255,7 +255,7 @@ func testInsert(t *testing.T, e *engine.Engine, ses *evaluate.Session, tn sql.Ta
 			t.Errorf("Parse(\"%s\").Execute() failed with %s", c.stmt, err.Error())
 		} else {
 			var tbl engine.Table
-			tbl, err = e.LookupTable(ses.Context(), tx, tn)
+			tbl, _, err = e.LookupTable(ses.Context(), tx, tn)
 			if err != nil {
 				t.Error(err)
 				continue
