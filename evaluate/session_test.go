@@ -153,13 +153,17 @@ func TestSessionCommit(t *testing.T) {
 			{wantCommit: true},
 		},
 	}
+	e, err := engine.NewEngine(st)
+	if err != nil {
+		t.Fatal(err)
+	}
 
-	ses := Session{Engine: engine.NewEngine(st)}
+	ses := Session{Engine: e}
 	ses.SetSessionID(123)
 	if ses.String() != "session-123" || ses.sesid != 123 {
 		t.Errorf("SetSessionID: got %s want session-123", ses.String())
 	}
-	err := ses.Begin()
+	err = ses.Begin()
 	if err != nil {
 		t.Errorf("Begin failed with %s", err)
 	}
@@ -188,9 +192,13 @@ func TestSessionRollback(t *testing.T) {
 			{wantRollback: true},
 		},
 	}
+	e, err := engine.NewEngine(st)
+	if err != nil {
+		t.Fatal(err)
+	}
 
-	ses := Session{Engine: engine.NewEngine(st)}
-	err := ses.Begin()
+	ses := Session{Engine: e}
+	err = ses.Begin()
 	if err != nil {
 		t.Errorf("Begin failed with %s", err)
 	}
@@ -215,9 +223,13 @@ func TestSessionRunExplicit(t *testing.T) {
 			{wantCommit: true, nextStmtAllowed: 2},
 		},
 	}
+	e, err := engine.NewEngine(st)
+	if err != nil {
+		t.Fatal(err)
+	}
 
-	ses := Session{Engine: engine.NewEngine(st)}
-	err := ses.Begin()
+	ses := Session{Engine: e}
+	err = ses.Begin()
 	if err != nil {
 		t.Errorf("Begin failed with %s", err)
 	}
@@ -263,11 +275,15 @@ func TestSessionRunImplicit(t *testing.T) {
 			{wantRollback: true},
 		},
 	}
+	e, err := engine.NewEngine(st)
+	if err != nil {
+		t.Fatal(err)
+	}
 
-	ses := Session{Engine: engine.NewEngine(st)}
+	ses := Session{Engine: e}
 
 	var ran bool
-	err := ses.Run(nil,
+	err = ses.Run(nil,
 		func(tx engine.Transaction, stmt Stmt) error {
 			ran = true
 			return nil

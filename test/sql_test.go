@@ -146,11 +146,17 @@ func TestSQL(t *testing.T) {
 		for _, cfg := range configs {
 			dataDir := filepath.Join("testdata", tst.name, cfg.name)
 			os.MkdirAll(dataDir, 0755)
+
 			st, err := cfg.newStore(dataDir)
 			if err != nil {
 				t.Fatal(err)
 			}
-			testSQL(t, cfg.name, engine.NewEngine(st), tst.testData, tst.psql)
+			e, err := engine.NewEngine(st)
+			if err != nil {
+				t.Fatal(err)
+			}
+
+			testSQL(t, cfg.name, e, tst.testData, tst.psql)
 		}
 	}
 }

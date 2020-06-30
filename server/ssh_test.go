@@ -89,11 +89,15 @@ func testSSHServer(t *testing.T, fail bool, cfg *ssh.ClientConfig, port int, aut
 	if err != nil {
 		t.Fatal(err)
 	}
+	e, err := engine.NewEngine(st)
+	if err != nil {
+		t.Fatal(err)
+	}
 	s := server.Server{
 		Handler: func(ses *evaluate.Session, rr io.RuneReader, w io.Writer) {
 			served <- struct{}{}
 		},
-		Engine: engine.NewEngine(st),
+		Engine: e,
 	}
 
 	go func() {
