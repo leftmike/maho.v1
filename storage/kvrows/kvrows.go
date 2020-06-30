@@ -58,6 +58,7 @@ type kvStore struct {
 	ver          uint64
 	epoch        uint64
 	commitMutex  sync.Mutex
+	init         bool
 }
 
 type tableStruct struct {
@@ -95,12 +96,12 @@ func NewBadgerStore(dataDir string) (storage.Store, error) {
 		return nil, err
 	}
 
-	kvst, init, err := makeStore(kv)
+	kvst, err := makeStore(kv)
 	if err != nil {
 		return nil, err
 	}
 
-	return tblstore.NewStore("kvrows", kvst, init)
+	return tblstore.NewStore("kvrows", kvst)
 }
 
 func getUint64(kv KV, key []byte) (uint64, error) {
@@ -166,24 +167,24 @@ func setTransactionData(upd Updater, tid uint64, td *TransactionData) error {
 		encode.EncodeUint64(encode.EncodeUint64(make([]byte, 0, 16), transactionsMID), tid), val)
 }
 
-func makeStore(kv KV) (*kvStore, bool, error) {
+func makeStore(kv KV) (*kvStore, error) {
 	var init bool
 	ver, err := getUint64(kv, versionKey)
 	if err == io.EOF {
 		init = true
 	} else if err != nil {
-		return nil, false, err
+		return nil, err
 	}
 
 	epoch, err := getUint64(kv, epochKey)
 	if err != nil && err != io.EOF {
-		return nil, false, err
+		return nil, err
 	}
 	epoch += 1
 
 	transactions, err := loadTransactions(kv)
 	if err != nil {
-		return nil, false, err
+		return nil, err
 	}
 
 	kvst := &kvStore{
@@ -191,23 +192,24 @@ func makeStore(kv KV) (*kvStore, bool, error) {
 		transactions: transactions,
 		ver:          ver,
 		epoch:        epoch,
+		init:         init,
 	}
 
 	upd, err := kvst.kv.Update()
 	if err != nil {
-		return nil, false, err
+		return nil, err
 	}
 	err = kvst.startupStore(upd)
 	if err != nil {
 		upd.Rollback()
-		return nil, false, err
+		return nil, err
 	}
 	err = upd.Commit()
 	if err != nil {
-		return nil, false, err
+		return nil, err
 	}
 
-	return kvst, init, nil
+	return kvst, nil
 }
 
 func (kvst *kvStore) startupStore(upd Updater) error {
@@ -261,6 +263,10 @@ func (ts *tableStruct) makeKey(row []sql.Value) []byte {
 		buf = append(buf, encode.MakeKey(ts.primary, row)...)
 	}
 	return buf
+}
+
+func (kvst *kvStore) NeedsInit() bool {
+	return kvst.init
 }
 
 func (kvst *kvStore) MakeTableStruct(tn sql.TableName, mid int64, cols []sql.Identifier,

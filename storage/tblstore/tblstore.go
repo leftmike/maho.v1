@@ -75,6 +75,7 @@ type TableStruct interface {
 }
 
 type store interface {
+	NeedsInit() bool
 	//MakeTableStruct(tn sql.TableName, mid int64, td TableDef) (TableStruct, error)
 	MakeTableStruct(tn sql.TableName, mid int64, cols []sql.Identifier,
 		colTypes []sql.ColumnType, primary []sql.ColumnKey) (TableStruct, error)
@@ -91,7 +92,7 @@ type tableStore struct {
 	indexes   TableStruct
 }
 
-func NewStore(name string, st store, init bool) (storage.Store, error) {
+func NewStore(name string, st store) (storage.Store, error) {
 	sequences, err := st.MakeTableStruct(sequencesTableName, sequencesMID,
 		[]sql.Identifier{sql.ID("sequence"), sql.ID("current")},
 		[]sql.ColumnType{sql.IdColType, sql.Int64ColType},
@@ -141,7 +142,7 @@ func NewStore(name string, st store, init bool) (storage.Store, error) {
 		tables:    tables,
 		indexes:   indexes,
 	}
-	if init {
+	if st.NeedsInit() {
 		ctx := context.Background()
 		tx := tblst.st.Begin(0)
 		err = tblst.init(ctx, tx)

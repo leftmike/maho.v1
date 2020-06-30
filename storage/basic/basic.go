@@ -60,7 +60,7 @@ func NewStore(dataDir string) (storage.Store, error) {
 	bst := &basicStore{
 		tree: btree.New(16),
 	}
-	return tblstore.NewStore("basic", bst, true)
+	return tblstore.NewStore("basic", bst)
 }
 
 func (ts *tableStruct) Table(ctx context.Context, tx storage.Transaction) (storage.Table,
@@ -84,6 +84,10 @@ func (ts *tableStruct) ColumnTypes() []sql.ColumnType {
 
 func (ts *tableStruct) PrimaryKey() []sql.ColumnKey {
 	return ts.primary
+}
+
+func (_ *basicStore) NeedsInit() bool {
+	return true
 }
 
 func (_ *basicStore) MakeTableStruct(tn sql.TableName, mid int64, cols []sql.Identifier,

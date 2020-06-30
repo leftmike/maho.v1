@@ -29,6 +29,7 @@ type rowColsStore struct {
 	tree        *btree.BTree
 	ver         uint64
 	commitMutex sync.Mutex
+	init        bool
 }
 
 type transaction struct {
@@ -80,12 +81,13 @@ func NewStore(dataDir string) (storage.Store, error) {
 		wal:     &WAL{f: f},
 		tree:    btree.New(16),
 	}
-	init, err := rcst.wal.ReadWAL(rcst)
+
+	rcst.init, err = rcst.wal.ReadWAL(rcst)
 	if err != nil {
 		return nil, err
 	}
 
-	return tblstore.NewStore("rowcols", rcst, init)
+	return tblstore.NewStore("rowcols", rcst)
 }
 
 func (ts *tableStruct) Table(ctx context.Context, tx storage.Transaction) (storage.Table,
@@ -110,6 +112,10 @@ func (ts *tableStruct) ColumnTypes() []sql.ColumnType {
 
 func (ts *tableStruct) PrimaryKey() []sql.ColumnKey {
 	return ts.primary
+}
+
+func (rcst *rowColsStore) NeedsInit() bool {
+	return rcst.init
 }
 
 func (_ *rowColsStore) MakeTableStruct(tn sql.TableName, mid int64, cols []sql.Identifier,

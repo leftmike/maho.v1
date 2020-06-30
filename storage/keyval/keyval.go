@@ -46,6 +46,7 @@ type keyValStore struct {
 	kv          KV
 	ver         uint64
 	commitMutex sync.Mutex
+	init        bool
 }
 
 type tableStruct struct {
@@ -123,10 +124,11 @@ func newStore(kv KV) (storage.Store, error) {
 	}
 
 	kvst := &keyValStore{
-		kv:  kv,
-		ver: ver,
+		kv:   kv,
+		ver:  ver,
+		init: init,
 	}
-	return tblstore.NewStore("keyval", kvst, init)
+	return tblstore.NewStore("keyval", kvst)
 }
 
 func (ts *tableStruct) Table(ctx context.Context, tx storage.Transaction) (storage.Table,
@@ -150,6 +152,10 @@ func (ts *tableStruct) ColumnTypes() []sql.ColumnType {
 
 func (ts *tableStruct) PrimaryKey() []sql.ColumnKey {
 	return ts.primary
+}
+
+func (kvst *keyValStore) NeedsInit() bool {
+	return kvst.init
 }
 
 func (kvst *keyValStore) MakeTableStruct(tn sql.TableName, mid int64, cols []sql.Identifier,
