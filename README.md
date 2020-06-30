@@ -31,7 +31,7 @@ the default is `maho.hcl` in the current directory.
 ```
 // maho config
 database = maho
-engine = memrows
+engine = basic
 accounts = [
     {user: "michael", password: "password"}
     {user: "test", password: "secret"}

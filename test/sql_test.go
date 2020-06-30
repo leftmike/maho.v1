@@ -15,7 +15,6 @@ import (
 	"github.com/leftmike/maho/storage/basic"
 	"github.com/leftmike/maho/storage/keyval"
 	"github.com/leftmike/maho/storage/kvrows"
-	"github.com/leftmike/maho/storage/memrows"
 	"github.com/leftmike/maho/storage/rowcols"
 	"github.com/leftmike/maho/test"
 	"github.com/leftmike/maho/testutil"
@@ -94,10 +93,6 @@ func TestSQL(t *testing.T) {
 		{
 			name:     "basic",
 			newStore: basic.NewStore,
-		},
-		{
-			name:     "memrows",
-			newStore: memrows.NewStore,
 		},
 		{
 			name:     "rowcols",

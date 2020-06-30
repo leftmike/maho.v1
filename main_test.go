@@ -12,7 +12,6 @@ import (
 	"github.com/leftmike/maho/sql"
 	"github.com/leftmike/maho/storage"
 	"github.com/leftmike/maho/storage/basic"
-	"github.com/leftmike/maho/storage/memrows"
 	"github.com/leftmike/maho/storage/rowcols"
 	"github.com/leftmike/maho/testutil"
 )
@@ -22,7 +21,7 @@ type testCase struct {
 }
 
 var (
-	commonCases = []testCase{
+	cases = []testCase{
 		{`
 select * from metadata.tables
     where table_name != 'locks' and table_name != 'transactions' and schema_name != 'private'
@@ -72,30 +71,6 @@ select * from metadata.tables
  3      'system'  'metadata'   'tables'
 (3 rows)
 `},
-	}
-
-	memrowsCases = []testCase{
-		{"show schemas",
-			`   database_name schema_name
-   ------------- -----------
- 1      'system'  'metadata'
- 2      'system'      'info'
-(2 rows)
-`},
-		{"select * from metadata.tables order by table_name",
-			`   database_name schema_name    table_name
-   ------------- -----------    ----------
- 1      'system'  'metadata'     'columns'
- 2      'system'      'info'      'config'
- 3      'system'      'info'   'databases'
- 4      'system'      'info' 'identifiers'
- 5      'system'  'metadata'     'schemas'
- 6      'system'  'metadata'      'tables'
-(6 rows)
-`},
-	}
-
-	midCases = []testCase{
 		{"show schemas",
 			`   database_name schema_name
    ------------- -----------
@@ -143,15 +118,7 @@ func TestMain(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	testStore(t, st, commonCases)
-	testStore(t, st, midCases)
-
-	st, err = memrows.NewStore("testdata")
-	if err != nil {
-		t.Fatal(err)
-	}
-	testStore(t, st, commonCases)
-	testStore(t, st, memrowsCases)
+	testStore(t, st, cases)
 
 	err = testutil.CleanDir("testdata", []string{".gitignore"})
 	if err != nil {
@@ -161,6 +128,5 @@ func TestMain(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	testStore(t, st, commonCases)
-	testStore(t, st, midCases)
+	testStore(t, st, cases)
 }

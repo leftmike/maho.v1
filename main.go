@@ -24,6 +24,7 @@ To Do:
 
 - get rid of engine.ListDatabases: only used at startup in main.go
 
+- storage/service might no longer be necessary?
 
 - tests with 1000s to 100000s of rows
 -- generate rows
@@ -42,7 +43,6 @@ To Do:
 - subquery expressions: EXISTS, IN, NOT IN, ANY/SOME, ALL
 - conditional expressions: CASE, COALESCE, NULLIF, GREATEST, LEAST
 
--- get rid of memrows and use basic instead; engine/service might no longer be necessary?
 -- move storage/tblstore into engine
 -- engine.CreateTable(..., tt *TableType)
 -- engine.Table: remove Type()
@@ -96,7 +96,6 @@ import (
 	"github.com/leftmike/maho/storage"
 	"github.com/leftmike/maho/storage/basic"
 	"github.com/leftmike/maho/storage/keyval"
-	"github.com/leftmike/maho/storage/memrows"
 	"github.com/leftmike/maho/storage/rowcols"
 )
 
@@ -233,8 +232,6 @@ func main() {
 	switch *store {
 	case "basic":
 		st, err = basic.NewStore(*dataDir)
-	case "memrows":
-		st, err = memrows.NewStore(*dataDir)
 	case "rowcols":
 		st, err = rowcols.NewStore(*dataDir)
 	case "badger":
@@ -243,7 +240,7 @@ func main() {
 		st, err = keyval.NewBBoltStore(*dataDir)
 	default:
 		fmt.Fprintf(os.Stderr,
-			"maho: got %s for store; want basic, memrows, rowcols, badger, or bbolt", *store)
+			"maho: got %s for store; want basic, rowcols, badger, or bbolt", *store)
 		return
 	}
 	if err != nil {
