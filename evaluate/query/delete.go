@@ -5,7 +5,6 @@ import (
 	"fmt"
 	"io"
 
-	"github.com/leftmike/maho/engine"
 	"github.com/leftmike/maho/evaluate"
 	"github.com/leftmike/maho/evaluate/expr"
 	"github.com/leftmike/maho/sql"
@@ -28,8 +27,8 @@ type deletePlan struct {
 	rows sql.Rows
 }
 
-func (dp *deletePlan) Execute(ctx context.Context, e *engine.Engine,
-	tx engine.Transaction) (int64, error) {
+func (dp *deletePlan) Execute(ctx context.Context, e sql.Engine, tx sql.Transaction) (int64,
+	error) {
 
 	dest := make([]sql.Value, len(dp.rows.Columns()))
 	cnt := int64(0)
@@ -48,7 +47,7 @@ func (dp *deletePlan) Execute(ctx context.Context, e *engine.Engine,
 	}
 }
 
-func (stmt *Delete) Plan(ses *evaluate.Session, tx engine.Transaction) (interface{}, error) {
+func (stmt *Delete) Plan(ses *evaluate.Session, tx sql.Transaction) (interface{}, error) {
 	rows, err := lookupRows(ses, tx, stmt.Table)
 	if err != nil {
 		return nil, err

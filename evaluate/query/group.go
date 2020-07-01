@@ -5,7 +5,6 @@ import (
 	"fmt"
 	"io"
 
-	"github.com/leftmike/maho/engine"
 	"github.com/leftmike/maho/evaluate"
 	"github.com/leftmike/maho/evaluate/expr"
 	"github.com/leftmike/maho/sql"
@@ -164,7 +163,7 @@ func (gctx *groupContext) CompileAggregator(c *expr.Call, maker expr.MakeAggrega
 	return len(gctx.group) + len(gctx.aggregators) - 1
 }
 
-func (gctx *groupContext) makeGroupRows(ses *evaluate.Session, tx engine.Transaction,
+func (gctx *groupContext) makeGroupRows(ses *evaluate.Session, tx sql.Transaction,
 	rows sql.Rows, fctx *fromContext) (sql.Rows, error) {
 
 	gr := &groupRows{rows: rows, columns: gctx.groupCols, groupExprs: gctx.groupExprs}
@@ -183,7 +182,7 @@ func (gctx *groupContext) makeGroupRows(ses *evaluate.Session, tx engine.Transac
 	return gr, nil
 }
 
-func makeGroupContext(ses *evaluate.Session, tx engine.Transaction, fctx *fromContext,
+func makeGroupContext(ses *evaluate.Session, tx sql.Transaction, fctx *fromContext,
 	group []sql.Expr) (*groupContext, error) {
 
 	var groupExprs []expr2dest
@@ -210,7 +209,7 @@ func makeGroupContext(ses *evaluate.Session, tx engine.Transaction, fctx *fromCo
 
 }
 
-func group(ses *evaluate.Session, tx engine.Transaction, rows sql.Rows, fctx *fromContext,
+func group(ses *evaluate.Session, tx sql.Transaction, rows sql.Rows, fctx *fromContext,
 	results []SelectResult, group []sql.Expr, having sql.Expr, orderBy []OrderBy) (sql.Rows,
 	error) {
 

@@ -43,12 +43,12 @@ To Do:
 - subquery expressions: EXISTS, IN, NOT IN, ANY/SOME, ALL
 - conditional expressions: CASE, COALESCE, NULLIF, GREATEST, LEAST
 
--- move storage/tblstore into engine
+-- engine.NewEngine doesn't need to return an error
+-- fix session_test.go (or delete)
 -- engine.CreateTable(..., tt *TableType)
--- engine.Table: remove Type()
 -- MakeTypedTable(tn, storage.Table, *engine.TableType)
--- storage.Table: remove Columns, ColumnTypes, and PrimaryKey; don't need Type()
--- move metadata.proto to engine/
+-- sql.Table: remove Columns, ColumnTypes, and PrimaryKey; don't need Type()
+-- move tableType (type.go) to catalog; metadata.proto as well
 
 -- checks all constraints including unique and foreign key references
 -- converts from engine metadata to evaluate metadata; eg. Default from string to Expr
@@ -227,7 +227,7 @@ func main() {
 
 	log.WithField("pid", os.Getpid()).Info("maho starting")
 
-	var st storage.Store
+	var st *storage.Store
 	var err error
 	switch *store {
 	case "basic":

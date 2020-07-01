@@ -15,7 +15,6 @@ import (
 	"github.com/leftmike/maho/sql"
 	"github.com/leftmike/maho/storage"
 	"github.com/leftmike/maho/storage/encode"
-	"github.com/leftmike/maho/storage/tblstore"
 )
 
 var (
@@ -46,7 +45,6 @@ type keyValStore struct {
 	kv          KV
 	ver         uint64
 	commitMutex sync.Mutex
-	init        bool
 }
 
 type tableStruct struct {
@@ -85,7 +83,7 @@ type rows struct {
 	curRow    []sql.Value
 }
 
-func NewBadgerStore(dataDir string) (storage.Store, error) {
+func NewBadgerStore(dataDir string) (*storage.Store, error) {
 	kv, err := MakeBadgerKV(dataDir)
 	if err != nil {
 		return nil, err
@@ -94,7 +92,7 @@ func NewBadgerStore(dataDir string) (storage.Store, error) {
 	return newStore(kv)
 }
 
-func NewBBoltStore(dataDir string) (storage.Store, error) {
+func NewBBoltStore(dataDir string) (*storage.Store, error) {
 	kv, err := MakeBBoltKV(dataDir)
 	if err != nil {
 		return nil, err
@@ -103,7 +101,7 @@ func NewBBoltStore(dataDir string) (storage.Store, error) {
 	return newStore(kv)
 }
 
-func newStore(kv KV) (storage.Store, error) {
+func newStore(kv KV) (*storage.Store, error) {
 	var ver uint64
 	err := kv.GetAt(math.MaxUint64, versionKey,
 		func(val []byte, keyVer uint64) error {
@@ -124,16 +122,13 @@ func newStore(kv KV) (storage.Store, error) {
 	}
 
 	kvst := &keyValStore{
-		kv:   kv,
-		ver:  ver,
-		init: init,
+		kv:  kv,
+		ver: ver,
 	}
-	return tblstore.NewStore("keyval", kvst)
+	return storage.NewStore("keyval", kvst, init)
 }
 
-func (ts *tableStruct) Table(ctx context.Context, tx storage.Transaction) (storage.Table,
-	error) {
-
+func (ts *tableStruct) Table(ctx context.Context, tx sql.Transaction) (sql.Table, error) {
 	etx := tx.(*transaction)
 	return &table{
 		st: etx.st,
@@ -154,12 +149,8 @@ func (ts *tableStruct) PrimaryKey() []sql.ColumnKey {
 	return ts.primary
 }
 
-func (kvst *keyValStore) NeedsInit() bool {
-	return kvst.init
-}
-
 func (kvst *keyValStore) MakeTableStruct(tn sql.TableName, mid int64, cols []sql.Identifier,
-	colTypes []sql.ColumnType, primary []sql.ColumnKey) (tblstore.TableStruct, error) {
+	colTypes []sql.ColumnType, primary []sql.ColumnKey) (storage.TableStruct, error) {
 
 	if len(primary) == 0 {
 		panic(fmt.Sprintf("keyval: table %s: missing required primary key", tn))
@@ -175,7 +166,7 @@ func (kvst *keyValStore) MakeTableStruct(tn sql.TableName, mid int64, cols []sql
 	return &ts, nil
 }
 
-func (kvst *keyValStore) Begin(sesid uint64) storage.Transaction {
+func (kvst *keyValStore) Begin(sesid uint64) sql.Transaction {
 	kvst.mutex.Lock()
 	defer kvst.mutex.Unlock()
 

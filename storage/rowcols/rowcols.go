@@ -15,7 +15,6 @@ import (
 	"github.com/leftmike/maho/sql"
 	"github.com/leftmike/maho/storage"
 	"github.com/leftmike/maho/storage/encode"
-	"github.com/leftmike/maho/storage/tblstore"
 )
 
 var (
@@ -29,7 +28,6 @@ type rowColsStore struct {
 	tree        *btree.BTree
 	ver         uint64
 	commitMutex sync.Mutex
-	init        bool
 }
 
 type transaction struct {
@@ -69,7 +67,7 @@ type rows struct {
 	rows [][]sql.Value
 }
 
-func NewStore(dataDir string) (storage.Store, error) {
+func NewStore(dataDir string) (*storage.Store, error) {
 	os.MkdirAll(dataDir, 0755)
 	f, err := os.OpenFile(filepath.Join(dataDir, "maho-rowcols.wal"), os.O_RDWR|os.O_CREATE, 0755)
 	if err != nil {
@@ -82,15 +80,15 @@ func NewStore(dataDir string) (storage.Store, error) {
 		tree:    btree.New(16),
 	}
 
-	rcst.init, err = rcst.wal.ReadWAL(rcst)
+	init, err := rcst.wal.ReadWAL(rcst)
 	if err != nil {
 		return nil, err
 	}
 
-	return tblstore.NewStore("rowcols", rcst)
+	return storage.NewStore("rowcols", rcst, init)
 }
 
-func (ts *tableStruct) Table(ctx context.Context, tx storage.Transaction) (storage.Table,
+func (ts *tableStruct) Table(ctx context.Context, tx sql.Transaction) (sql.Table,
 	error) {
 
 	etx := tx.(*transaction)
@@ -114,12 +112,8 @@ func (ts *tableStruct) PrimaryKey() []sql.ColumnKey {
 	return ts.primary
 }
 
-func (rcst *rowColsStore) NeedsInit() bool {
-	return rcst.init
-}
-
 func (_ *rowColsStore) MakeTableStruct(tn sql.TableName, mid int64, cols []sql.Identifier,
-	colTypes []sql.ColumnType, primary []sql.ColumnKey) (tblstore.TableStruct, error) {
+	colTypes []sql.ColumnType, primary []sql.ColumnKey) (storage.TableStruct, error) {
 
 	if len(primary) == 0 {
 		panic(fmt.Sprintf("rowcols: table %s: missing required primary key", tn))
@@ -162,7 +156,7 @@ func (_ *rowColsStore) MakeTableStruct(tn sql.TableName, mid int64, cols []sql.I
 	return &ts, nil
 }
 
-func (rcst *rowColsStore) Begin(sesid uint64) storage.Transaction {
+func (rcst *rowColsStore) Begin(sesid uint64) sql.Transaction {
 	rcst.mutex.Lock()
 	defer rcst.mutex.Unlock()
 

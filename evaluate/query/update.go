@@ -5,7 +5,6 @@ import (
 	"fmt"
 	"io"
 
-	"github.com/leftmike/maho/engine"
 	"github.com/leftmike/maho/evaluate"
 	"github.com/leftmike/maho/evaluate/expr"
 	"github.com/leftmike/maho/sql"
@@ -52,8 +51,8 @@ func (up *updatePlan) EvalRef(idx int) sql.Value {
 	return up.dest[idx]
 }
 
-func (up *updatePlan) Execute(ctx context.Context, e *engine.Engine,
-	tx engine.Transaction) (int64, error) {
+func (up *updatePlan) Execute(ctx context.Context, e sql.Engine, tx sql.Transaction) (int64,
+	error) {
 
 	up.dest = make([]sql.Value, len(up.rows.Columns()))
 	cnt := int64(0)
@@ -83,7 +82,7 @@ func (up *updatePlan) Execute(ctx context.Context, e *engine.Engine,
 	}
 }
 
-func (stmt *Update) Plan(ses *evaluate.Session, tx engine.Transaction) (interface{}, error) {
+func (stmt *Update) Plan(ses *evaluate.Session, tx sql.Transaction) (interface{}, error) {
 	tbl, tt, err := ses.Engine.LookupTable(ses.Context(), tx, ses.ResolveTableName(stmt.Table))
 	if err != nil {
 		return nil, err

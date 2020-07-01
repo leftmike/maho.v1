@@ -16,7 +16,6 @@ import (
 	"github.com/leftmike/maho/sql"
 	"github.com/leftmike/maho/storage"
 	"github.com/leftmike/maho/storage/encode"
-	"github.com/leftmike/maho/storage/tblstore"
 )
 
 const (
@@ -58,7 +57,6 @@ type kvStore struct {
 	ver          uint64
 	epoch        uint64
 	commitMutex  sync.Mutex
-	init         bool
 }
 
 type tableStruct struct {
@@ -90,18 +88,18 @@ type rows struct {
 	rows [][]sql.Value
 }
 
-func NewBadgerStore(dataDir string) (storage.Store, error) {
+func NewBadgerStore(dataDir string) (*storage.Store, error) {
 	kv, err := MakeBadgerKV(dataDir)
 	if err != nil {
 		return nil, err
 	}
 
-	kvst, err := makeStore(kv)
+	kvst, init, err := makeStore(kv)
 	if err != nil {
 		return nil, err
 	}
 
-	return tblstore.NewStore("kvrows", kvst)
+	return storage.NewStore("kvrows", kvst, init)
 }
 
 func getUint64(kv KV, key []byte) (uint64, error) {
@@ -167,24 +165,24 @@ func setTransactionData(upd Updater, tid uint64, td *TransactionData) error {
 		encode.EncodeUint64(encode.EncodeUint64(make([]byte, 0, 16), transactionsMID), tid), val)
 }
 
-func makeStore(kv KV) (*kvStore, error) {
+func makeStore(kv KV) (*kvStore, bool, error) {
 	var init bool
 	ver, err := getUint64(kv, versionKey)
 	if err == io.EOF {
 		init = true
 	} else if err != nil {
-		return nil, err
+		return nil, false, err
 	}
 
 	epoch, err := getUint64(kv, epochKey)
 	if err != nil && err != io.EOF {
-		return nil, err
+		return nil, false, err
 	}
 	epoch += 1
 
 	transactions, err := loadTransactions(kv)
 	if err != nil {
-		return nil, err
+		return nil, false, err
 	}
 
 	kvst := &kvStore{
@@ -192,24 +190,23 @@ func makeStore(kv KV) (*kvStore, error) {
 		transactions: transactions,
 		ver:          ver,
 		epoch:        epoch,
-		init:         init,
 	}
 
 	upd, err := kvst.kv.Update()
 	if err != nil {
-		return nil, err
+		return nil, false, err
 	}
 	err = kvst.startupStore(upd)
 	if err != nil {
 		upd.Rollback()
-		return nil, err
+		return nil, false, err
 	}
 	err = upd.Commit()
 	if err != nil {
-		return nil, err
+		return nil, false, err
 	}
 
-	return kvst, nil
+	return kvst, init, nil
 }
 
 func (kvst *kvStore) startupStore(upd Updater) error {
@@ -234,9 +231,7 @@ func (kvst *kvStore) startupStore(upd Updater) error {
 	return nil
 }
 
-func (ts *tableStruct) Table(ctx context.Context, tx storage.Transaction) (storage.Table,
-	error) {
-
+func (ts *tableStruct) Table(ctx context.Context, tx sql.Transaction) (sql.Table, error) {
 	etx := tx.(*transaction)
 	return &table{
 		st: etx.st,
@@ -265,12 +260,8 @@ func (ts *tableStruct) makeKey(row []sql.Value) []byte {
 	return buf
 }
 
-func (kvst *kvStore) NeedsInit() bool {
-	return kvst.init
-}
-
 func (kvst *kvStore) MakeTableStruct(tn sql.TableName, mid int64, cols []sql.Identifier,
-	colTypes []sql.ColumnType, primary []sql.ColumnKey) (tblstore.TableStruct, error) {
+	colTypes []sql.ColumnType, primary []sql.ColumnKey) (storage.TableStruct, error) {
 
 	if len(primary) == 0 {
 		panic(fmt.Sprintf("kvrows: table %s: missing required primary key", tn))
@@ -299,7 +290,7 @@ func (kvst *kvStore) setTransactionData(tid uint64, td *TransactionData) error {
 	return upd.Commit()
 }
 
-func (kvst *kvStore) Begin(sesid uint64) storage.Transaction {
+func (kvst *kvStore) Begin(sesid uint64) sql.Transaction {
 	kvst.mutex.Lock()
 	kvst.lastTID += 1
 	tid := kvst.lastTID

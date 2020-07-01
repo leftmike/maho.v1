@@ -4,7 +4,6 @@ import (
 	"context"
 	"fmt"
 
-	"github.com/leftmike/maho/engine"
 	"github.com/leftmike/maho/evaluate"
 	"github.com/leftmike/maho/evaluate/expr"
 	"github.com/leftmike/maho/sql"
@@ -55,7 +54,7 @@ func (stmt *InsertValues) String() string {
 	return s
 }
 
-func (stmt *InsertValues) Plan(ses *evaluate.Session, tx engine.Transaction) (interface{}, error) {
+func (stmt *InsertValues) Plan(ses *evaluate.Session, tx sql.Transaction) (interface{}, error) {
 	tbl, tt, err := ses.Engine.LookupTable(ses.Context(), tx, ses.ResolveTableName(stmt.Table))
 	if err != nil {
 		return nil, err
@@ -120,13 +119,13 @@ func (stmt *InsertValues) Plan(ses *evaluate.Session, tx engine.Transaction) (in
 }
 
 type insertValuesPlan struct {
-	tbl  engine.Table
+	tbl  sql.Table
 	cols []sql.Identifier
 	rows [][]expr.CExpr
 }
 
-func (plan *insertValuesPlan) Execute(ctx context.Context, e *engine.Engine,
-	tx engine.Transaction) (int64, error) {
+func (plan *insertValuesPlan) Execute(ctx context.Context, e sql.Engine,
+	tx sql.Transaction) (int64, error) {
 
 	var err error
 

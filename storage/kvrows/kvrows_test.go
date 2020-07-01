@@ -39,7 +39,7 @@ func TestBadgerDurability(t *testing.T) {
 
 func TestBadgerHelper(t *testing.T) {
 	test.DurableHelper(t,
-		func() (storage.Store, error) {
+		func() (*storage.Store, error) {
 			st, err := kvrows.NewBadgerStore("testdata")
 			if err != nil {
 				return nil, err

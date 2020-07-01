@@ -7,7 +7,7 @@ import (
 	"github.com/leftmike/maho/sql"
 )
 
-type TableType struct {
+type tableType struct {
 	ver      uint
 	cols     []sql.Identifier
 	colTypes []sql.ColumnType
@@ -15,9 +15,9 @@ type TableType struct {
 }
 
 func MakeTableType(cols []sql.Identifier, colTypes []sql.ColumnType,
-	primary []sql.ColumnKey) *TableType {
+	primary []sql.ColumnKey) sql.TableType {
 
-	return &TableType{
+	return &tableType{
 		ver:      1,
 		cols:     cols,
 		colTypes: colTypes,
@@ -25,24 +25,24 @@ func MakeTableType(cols []sql.Identifier, colTypes []sql.ColumnType,
 	}
 }
 
-func (tt *TableType) Columns() []sql.Identifier {
+func (tt *tableType) Columns() []sql.Identifier {
 	return tt.cols
 }
 
-func (tt *TableType) ColumnTypes() []sql.ColumnType {
+func (tt *tableType) ColumnTypes() []sql.ColumnType {
 	return tt.colTypes
 }
 
-func (tt *TableType) PrimaryKey() []sql.ColumnKey {
+func (tt *tableType) PrimaryKey() []sql.ColumnKey {
 	return tt.primary
 }
 
-func (tt *TableType) Version() uint {
+func (tt *tableType) Version() uint {
 	return tt.ver
 }
 
-func (tt *TableType) AddColumns(cols []sql.Identifier, colTypes []sql.ColumnType) *TableType {
-	return &TableType{
+func (tt *tableType) AddColumns(cols []sql.Identifier, colTypes []sql.ColumnType) sql.TableType {
+	return &tableType{
 		ver:      tt.ver + 1,
 		cols:     append(tt.cols, cols...),
 		colTypes: append(tt.colTypes, colTypes...),
@@ -50,12 +50,12 @@ func (tt *TableType) AddColumns(cols []sql.Identifier, colTypes []sql.ColumnType
 	}
 }
 
-func (tt *TableType) SetPrimaryKey(primary []sql.ColumnKey) *TableType {
+func (tt *tableType) SetPrimaryKey(primary []sql.ColumnKey) sql.TableType {
 	if len(tt.primary) > 0 {
 		panic("metadata: primary key may not be changed")
 	}
 
-	return &TableType{
+	return &tableType{
 		ver:      tt.ver + 1,
 		cols:     tt.cols,
 		colTypes: tt.colTypes,
@@ -69,7 +69,7 @@ type tableMetadata struct {
 	Primary     []sql.ColumnKey
 }
 
-func (tt *TableType) Encode() ([]byte, error) {
+func (tt *tableType) Encode() ([]byte, error) {
 	var buf bytes.Buffer
 	enc := gob.NewEncoder(&buf)
 	err := enc.Encode(&tableMetadata{
@@ -83,14 +83,14 @@ func (tt *TableType) Encode() ([]byte, error) {
 	return buf.Bytes(), nil
 }
 
-func DecodeTableType(buf []byte) (*TableType, error) {
+func DecodeTableType(buf []byte) (sql.TableType, error) {
 	dec := gob.NewDecoder(bytes.NewBuffer(buf))
 	var tm tableMetadata
 	err := dec.Decode(&tm)
 	if err != nil {
 		return nil, err
 	}
-	return &TableType{
+	return &tableType{
 		cols:     tm.Columns,
 		colTypes: tm.ColumnTypes,
 		primary:  tm.Primary,

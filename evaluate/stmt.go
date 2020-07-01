@@ -3,10 +3,10 @@ package evaluate
 import (
 	"fmt"
 
-	"github.com/leftmike/maho/engine"
+	"github.com/leftmike/maho/sql"
 )
 
 type Stmt interface {
 	fmt.Stringer
-	Plan(ses *Session, tx engine.Transaction) (interface{}, error)
+	Plan(ses *Session, tx sql.Transaction) (interface{}, error)
 }

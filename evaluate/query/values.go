@@ -5,7 +5,6 @@ import (
 	"fmt"
 	"io"
 
-	"github.com/leftmike/maho/engine"
 	"github.com/leftmike/maho/evaluate"
 	"github.com/leftmike/maho/evaluate/expr"
 	"github.com/leftmike/maho/sql"
@@ -81,7 +80,7 @@ func (_ *exprValues) Update(ctx context.Context, updates []sql.ColumnUpdate) err
 	return fmt.Errorf("values: rows may not be updated")
 }
 
-func (stmt *Values) Plan(ses *evaluate.Session, tx engine.Transaction) (interface{}, error) {
+func (stmt *Values) Plan(ses *evaluate.Session, tx sql.Transaction) (interface{}, error) {
 	columns := make([]sql.Identifier, len(stmt.Expressions[0]))
 	for i := 0; i < len(columns); i++ {
 		columns[i] = sql.ID(fmt.Sprintf("column%d", i+1))

@@ -5,7 +5,6 @@ import (
 	"fmt"
 	"io"
 
-	"github.com/leftmike/maho/engine"
 	"github.com/leftmike/maho/evaluate"
 	"github.com/leftmike/maho/evaluate/expr"
 	"github.com/leftmike/maho/sql"
@@ -248,7 +247,7 @@ func (_ *joinRows) Update(ctx context.Context, updates []sql.ColumnUpdate) error
 	return fmt.Errorf("join rows may not be updated")
 }
 
-func (fj FromJoin) rows(ses *evaluate.Session, tx engine.Transaction) (sql.Rows, *fromContext,
+func (fj FromJoin) rows(ses *evaluate.Session, tx sql.Transaction) (sql.Rows, *fromContext,
 	error) {
 
 	leftRows, leftCtx, err := fj.Left.rows(ses, tx)

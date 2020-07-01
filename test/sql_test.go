@@ -57,7 +57,7 @@ func (md mahoDialect) DriverName() string {
 	return md.name
 }
 
-func testSQL(t *testing.T, typ string, e *engine.Engine, testData string, psql bool) {
+func testSQL(t *testing.T, typ string, e sql.Engine, testData string, psql bool) {
 	t.Helper()
 
 	dbname := sql.ID("test")
@@ -88,7 +88,7 @@ func TestSQL(t *testing.T) {
 	configs := []struct {
 		name     string
 		persist  bool
-		newStore func(dataDir string) (storage.Store, error)
+		newStore func(dataDir string) (*storage.Store, error)
 	}{
 		{
 			name:     "basic",

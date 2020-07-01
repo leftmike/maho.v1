@@ -1,4 +1,4 @@
-package tblstore
+package storage
 
 //go:generate protoc --go_opt=paths=source_relative --go_out=. metadata.proto
 
@@ -12,8 +12,6 @@ import (
 	"github.com/leftmike/maho/evaluate/expr"
 	"github.com/leftmike/maho/parser"
 	"github.com/leftmike/maho/sql"
-	"github.com/leftmike/maho/storage"
-	"github.com/leftmike/maho/storage/util"
 )
 
 const (
@@ -67,24 +65,23 @@ type indexRow struct {
 }
 
 type TableStruct interface {
-	Table(ctx context.Context, tx storage.Transaction) (storage.Table, error)
+	Table(ctx context.Context, tx sql.Transaction) (sql.Table, error)
 	// XXX: these are not needed
 	Columns() []sql.Identifier
 	ColumnTypes() []sql.ColumnType
 	PrimaryKey() []sql.ColumnKey
 }
 
-type store interface {
-	NeedsInit() bool
+type PersistentStore interface {
 	//MakeTableStruct(tn sql.TableName, mid int64, td TableDef) (TableStruct, error)
 	MakeTableStruct(tn sql.TableName, mid int64, cols []sql.Identifier,
 		colTypes []sql.ColumnType, primary []sql.ColumnKey) (TableStruct, error)
-	Begin(sesid uint64) storage.Transaction
+	Begin(sesid uint64) sql.Transaction
 }
 
-type tableStore struct {
+type Store struct {
 	name      string
-	st        store
+	ps        PersistentStore
 	sequences TableStruct
 	databases TableStruct
 	schemas   TableStruct
@@ -92,29 +89,29 @@ type tableStore struct {
 	indexes   TableStruct
 }
 
-func NewStore(name string, st store) (storage.Store, error) {
-	sequences, err := st.MakeTableStruct(sequencesTableName, sequencesMID,
+func NewStore(name string, ps PersistentStore, init bool) (*Store, error) {
+	sequences, err := ps.MakeTableStruct(sequencesTableName, sequencesMID,
 		[]sql.Identifier{sql.ID("sequence"), sql.ID("current")},
 		[]sql.ColumnType{sql.IdColType, sql.Int64ColType},
 		[]sql.ColumnKey{sql.MakeColumnKey(0, false)})
 	if err != nil {
 		return nil, err
 	}
-	databases, err := st.MakeTableStruct(databasesTableName, databasesMID,
+	databases, err := ps.MakeTableStruct(databasesTableName, databasesMID,
 		[]sql.Identifier{sql.ID("database")},
 		[]sql.ColumnType{sql.IdColType},
 		[]sql.ColumnKey{sql.MakeColumnKey(0, false)})
 	if err != nil {
 		return nil, err
 	}
-	schemas, err := st.MakeTableStruct(schemasTableName, schemasMID,
+	schemas, err := ps.MakeTableStruct(schemasTableName, schemasMID,
 		[]sql.Identifier{sql.ID("database"), sql.ID("schema"), sql.ID("tables")},
 		[]sql.ColumnType{sql.IdColType, sql.IdColType, sql.Int64ColType},
 		[]sql.ColumnKey{sql.MakeColumnKey(0, false), sql.MakeColumnKey(1, false)})
 	if err != nil {
 		return nil, err
 	}
-	tables, err := st.MakeTableStruct(tablesTableName, tablesMID,
+	tables, err := ps.MakeTableStruct(tablesTableName, tablesMID,
 		[]sql.Identifier{sql.ID("database"), sql.ID("schema"), sql.ID("table"), sql.ID("mid"),
 			sql.ID("metadata")},
 		[]sql.ColumnType{sql.IdColType, sql.IdColType, sql.IdColType, sql.Int64ColType,
@@ -124,7 +121,7 @@ func NewStore(name string, st store) (storage.Store, error) {
 	if err != nil {
 		return nil, err
 	}
-	indexes, err := st.MakeTableStruct(indexesTableName, indexesMID,
+	indexes, err := ps.MakeTableStruct(indexesTableName, indexesMID,
 		[]sql.Identifier{sql.ID("database"), sql.ID("schema"), sql.ID("table"), sql.ID("index")},
 		[]sql.ColumnType{sql.IdColType, sql.IdColType, sql.IdColType, sql.IdColType},
 		[]sql.ColumnKey{sql.MakeColumnKey(0, false), sql.MakeColumnKey(1, false),
@@ -133,19 +130,19 @@ func NewStore(name string, st store) (storage.Store, error) {
 		return nil, err
 	}
 
-	tblst := &tableStore{
+	st := &Store{
 		name:      name,
-		st:        st,
+		ps:        ps,
 		sequences: sequences,
 		databases: databases,
 		schemas:   schemas,
 		tables:    tables,
 		indexes:   indexes,
 	}
-	if st.NeedsInit() {
+	if init {
 		ctx := context.Background()
-		tx := tblst.st.Begin(0)
-		err = tblst.init(ctx, tx)
+		tx := st.ps.Begin(0)
+		err = st.init(ctx, tx)
 		if err != nil {
 			tx.Rollback()
 			return nil, err
@@ -156,15 +153,15 @@ func NewStore(name string, st store) (storage.Store, error) {
 		}
 	}
 
-	return tblst, nil
+	return st, nil
 }
 
-func (tblst *tableStore) init(ctx context.Context, tx storage.Transaction) error {
-	tbl, err := tblst.sequences.Table(ctx, tx)
+func (st *Store) init(ctx context.Context, tx sql.Transaction) error {
+	tbl, err := st.sequences.Table(ctx, tx)
 	if err != nil {
 		return err
 	}
-	ttbl := util.MakeTypedTable(sequencesTableName, tbl)
+	ttbl := MakeTypedTable(sequencesTableName, tbl)
 	err = ttbl.Insert(ctx,
 		sequenceRow{
 			Sequence: midSequence,
@@ -174,11 +171,11 @@ func (tblst *tableStore) init(ctx context.Context, tx storage.Transaction) error
 		return err
 	}
 
-	tbl, err = tblst.databases.Table(ctx, tx)
+	tbl, err = st.databases.Table(ctx, tx)
 	if err != nil {
 		return err
 	}
-	ttbl = util.MakeTypedTable(databasesTableName, tbl)
+	ttbl = MakeTypedTable(databasesTableName, tbl)
 	err = ttbl.Insert(ctx,
 		databaseRow{
 			Database: sql.SYSTEM.String(),
@@ -187,11 +184,11 @@ func (tblst *tableStore) init(ctx context.Context, tx storage.Transaction) error
 		return err
 	}
 
-	tbl, err = tblst.schemas.Table(ctx, tx)
+	tbl, err = st.schemas.Table(ctx, tx)
 	if err != nil {
 		return err
 	}
-	ttbl = util.MakeTypedTable(schemasTableName, tbl)
+	ttbl = MakeTypedTable(schemasTableName, tbl)
 	err = ttbl.Insert(ctx,
 		schemaRow{
 			Database: sql.SYSTEM.String(),
@@ -203,31 +200,31 @@ func (tblst *tableStore) init(ctx context.Context, tx storage.Transaction) error
 	}
 
 	tx.NextStmt()
-	err = tblst.createTable(ctx, tx, sequencesTableName, sequencesMID, tblst.sequences)
+	err = st.createTable(ctx, tx, sequencesTableName, sequencesMID, st.sequences)
 	if err != nil {
 		return err
 	}
 
 	tx.NextStmt()
-	err = tblst.createTable(ctx, tx, databasesTableName, databasesMID, tblst.databases)
+	err = st.createTable(ctx, tx, databasesTableName, databasesMID, st.databases)
 	if err != nil {
 		return err
 	}
 
 	tx.NextStmt()
-	err = tblst.createTable(ctx, tx, schemasTableName, schemasMID, tblst.schemas)
+	err = st.createTable(ctx, tx, schemasTableName, schemasMID, st.schemas)
 	if err != nil {
 		return err
 	}
 
 	tx.NextStmt()
-	err = tblst.createTable(ctx, tx, tablesTableName, tablesMID, tblst.tables)
+	err = st.createTable(ctx, tx, tablesTableName, tablesMID, st.tables)
 	if err != nil {
 		return err
 	}
 
 	tx.NextStmt()
-	err = tblst.createTable(ctx, tx, indexesTableName, indexesMID, tblst.indexes)
+	err = st.createTable(ctx, tx, indexesTableName, indexesMID, st.indexes)
 	if err != nil {
 		return err
 	}
@@ -235,14 +232,14 @@ func (tblst *tableStore) init(ctx context.Context, tx storage.Transaction) error
 	return nil
 }
 
-func (tblst *tableStore) createDatabase(ctx context.Context, tx storage.Transaction,
+func (st *Store) createDatabase(ctx context.Context, tx sql.Transaction,
 	dbname sql.Identifier) error {
 
-	tbl, err := tblst.databases.Table(ctx, tx)
+	tbl, err := st.databases.Table(ctx, tx)
 	if err != nil {
 		return err
 	}
-	ttbl := util.MakeTypedTable(databasesTableName, tbl)
+	ttbl := MakeTypedTable(databasesTableName, tbl)
 
 	err = ttbl.Insert(ctx,
 		databaseRow{
@@ -253,19 +250,19 @@ func (tblst *tableStore) createDatabase(ctx context.Context, tx storage.Transact
 	}
 
 	tx.NextStmt()
-	return tblst.CreateSchema(ctx, tx, sql.SchemaName{dbname, sql.PUBLIC})
+	return st.CreateSchema(ctx, tx, sql.SchemaName{dbname, sql.PUBLIC})
 }
 
-func (tblst *tableStore) CreateDatabase(dbname sql.Identifier,
+func (st *Store) CreateDatabase(dbname sql.Identifier,
 	options map[sql.Identifier]string) error {
 
 	if len(options) != 0 {
-		return fmt.Errorf("%s: unexpected option to create database: %s", tblst.name, dbname)
+		return fmt.Errorf("%s: unexpected option to create database: %s", st.name, dbname)
 	}
 
 	ctx := context.Background()
-	tx := tblst.st.Begin(0)
-	err := tblst.createDatabase(ctx, tx, dbname)
+	tx := st.ps.Begin(0)
+	err := st.createDatabase(ctx, tx, dbname)
 	if err != nil {
 		tx.Rollback()
 		return err
@@ -273,14 +270,14 @@ func (tblst *tableStore) CreateDatabase(dbname sql.Identifier,
 	return tx.Commit(ctx)
 }
 
-func (tblst *tableStore) lookupDatabase(ctx context.Context, tx storage.Transaction,
-	dbname sql.Identifier) (*util.Rows, error) {
+func (st *Store) lookupDatabase(ctx context.Context, tx sql.Transaction,
+	dbname sql.Identifier) (*typedRows, error) {
 
-	tbl, err := tblst.databases.Table(ctx, tx)
+	tbl, err := st.databases.Table(ctx, tx)
 	if err != nil {
 		return nil, err
 	}
-	ttbl := util.MakeTypedTable(databasesTableName, tbl)
+	ttbl := MakeTypedTable(databasesTableName, tbl)
 
 	keyRow := databaseRow{Database: dbname.String()}
 	rows, err := ttbl.Rows(ctx, keyRow, keyRow)
@@ -300,10 +297,10 @@ func (tblst *tableStore) lookupDatabase(ctx context.Context, tx storage.Transact
 	return rows, nil
 }
 
-func (tblst *tableStore) validDatabase(ctx context.Context, tx storage.Transaction,
+func (st *Store) validDatabase(ctx context.Context, tx sql.Transaction,
 	dbname sql.Identifier) (bool, error) {
 
-	rows, err := tblst.lookupDatabase(ctx, tx, dbname)
+	rows, err := st.lookupDatabase(ctx, tx, dbname)
 	if err != nil {
 		return false, err
 	}
@@ -314,10 +311,10 @@ func (tblst *tableStore) validDatabase(ctx context.Context, tx storage.Transacti
 	return true, nil
 }
 
-func (tblst *tableStore) dropDatabase(ctx context.Context, tx storage.Transaction,
+func (st *Store) dropDatabase(ctx context.Context, tx sql.Transaction,
 	dbname sql.Identifier, ifExists bool) error {
 
-	rows, err := tblst.lookupDatabase(ctx, tx, dbname)
+	rows, err := st.lookupDatabase(ctx, tx, dbname)
 	if err != nil {
 		return err
 	}
@@ -325,16 +322,16 @@ func (tblst *tableStore) dropDatabase(ctx context.Context, tx storage.Transactio
 		if ifExists {
 			return nil
 		}
-		return fmt.Errorf("%s: database %s does not exist", tblst.name, dbname)
+		return fmt.Errorf("%s: database %s does not exist", st.name, dbname)
 	}
 	defer rows.Close()
 
-	scnames, err := tblst.ListSchemas(ctx, tx, dbname)
+	scnames, err := st.ListSchemas(ctx, tx, dbname)
 	if err != nil {
 		return err
 	}
 	for _, scname := range scnames {
-		err = tblst.DropSchema(ctx, tx, sql.SchemaName{dbname, scname}, true)
+		err = st.DropSchema(ctx, tx, sql.SchemaName{dbname, scname}, true)
 		if err != nil {
 			return err
 		}
@@ -343,16 +340,16 @@ func (tblst *tableStore) dropDatabase(ctx context.Context, tx storage.Transactio
 	return rows.Delete(ctx)
 }
 
-func (tblst *tableStore) DropDatabase(dbname sql.Identifier, ifExists bool,
+func (st *Store) DropDatabase(dbname sql.Identifier, ifExists bool,
 	options map[sql.Identifier]string) error {
 
 	if len(options) != 0 {
-		return fmt.Errorf("%s: unexpected option to drop database: %s", tblst.name, dbname)
+		return fmt.Errorf("%s: unexpected option to drop database: %s", st.name, dbname)
 	}
 
 	ctx := context.Background()
-	tx := tblst.st.Begin(0)
-	err := tblst.dropDatabase(ctx, tx, dbname, ifExists)
+	tx := st.ps.Begin(0)
+	err := st.dropDatabase(ctx, tx, dbname, ifExists)
 	if err != nil {
 		tx.Rollback()
 		return err
@@ -360,22 +357,22 @@ func (tblst *tableStore) DropDatabase(dbname sql.Identifier, ifExists bool,
 	return tx.Commit(ctx)
 }
 
-func (tblst *tableStore) CreateSchema(ctx context.Context, tx storage.Transaction,
+func (st *Store) CreateSchema(ctx context.Context, tx sql.Transaction,
 	sn sql.SchemaName) error {
 
-	ok, err := tblst.validDatabase(ctx, tx, sn.Database)
+	ok, err := st.validDatabase(ctx, tx, sn.Database)
 	if err != nil {
 		return err
 	}
 	if !ok {
-		return fmt.Errorf("%s: database %s not found", tblst.name, sn.Database)
+		return fmt.Errorf("%s: database %s not found", st.name, sn.Database)
 	}
 
-	tbl, err := tblst.schemas.Table(ctx, tx)
+	tbl, err := st.schemas.Table(ctx, tx)
 	if err != nil {
 		return err
 	}
-	ttbl := util.MakeTypedTable(schemasTableName, tbl)
+	ttbl := MakeTypedTable(schemasTableName, tbl)
 
 	return ttbl.Insert(ctx,
 		schemaRow{
@@ -385,14 +382,14 @@ func (tblst *tableStore) CreateSchema(ctx context.Context, tx storage.Transactio
 		})
 }
 
-func (tblst *tableStore) DropSchema(ctx context.Context, tx storage.Transaction, sn sql.SchemaName,
+func (st *Store) DropSchema(ctx context.Context, tx sql.Transaction, sn sql.SchemaName,
 	ifExists bool) error {
 
-	tbl, err := tblst.schemas.Table(ctx, tx)
+	tbl, err := st.schemas.Table(ctx, tx)
 	if err != nil {
 		return err
 	}
-	ttbl := util.MakeTypedTable(schemasTableName, tbl)
+	ttbl := MakeTypedTable(schemasTableName, tbl)
 
 	keyRow := schemaRow{
 		Database: sn.Database.String(),
@@ -410,24 +407,24 @@ func (tblst *tableStore) DropSchema(ctx context.Context, tx storage.Transaction,
 		if ifExists {
 			return nil
 		}
-		return fmt.Errorf("%s: schema %s not found", tblst.name, sn)
+		return fmt.Errorf("%s: schema %s not found", st.name, sn)
 	} else if err != nil {
 		return err
 	}
 	if sr.Tables > 0 {
-		return fmt.Errorf("%s: schema %s is not empty", tblst.name, sn)
+		return fmt.Errorf("%s: schema %s is not empty", st.name, sn)
 	}
 	return rows.Delete(ctx)
 }
 
-func (tblst *tableStore) updateSchema(ctx context.Context, tx storage.Transaction,
+func (st *Store) updateSchema(ctx context.Context, tx sql.Transaction,
 	sn sql.SchemaName, delta int64) error {
 
-	tbl, err := tblst.schemas.Table(ctx, tx)
+	tbl, err := st.schemas.Table(ctx, tx)
 	if err != nil {
 		return err
 	}
-	ttbl := util.MakeTypedTable(schemasTableName, tbl)
+	ttbl := MakeTypedTable(schemasTableName, tbl)
 
 	keyRow := schemaRow{
 		Database: sn.Database.String(),
@@ -442,7 +439,7 @@ func (tblst *tableStore) updateSchema(ctx context.Context, tx storage.Transactio
 	var sr schemaRow
 	err = rows.Next(ctx, &sr)
 	if err == io.EOF {
-		return fmt.Errorf("%s: schema %s not found", tblst.name, sn)
+		return fmt.Errorf("%s: schema %s not found", st.name, sn)
 	} else if err != nil {
 		return err
 	}
@@ -453,14 +450,14 @@ func (tblst *tableStore) updateSchema(ctx context.Context, tx storage.Transactio
 		}{sr.Tables + delta})
 }
 
-func (tblst *tableStore) lookupTable(ctx context.Context, tx storage.Transaction,
-	tn sql.TableName) (*util.Rows, error) {
+func (st *Store) lookupTable(ctx context.Context, tx sql.Transaction,
+	tn sql.TableName) (*typedRows, error) {
 
-	tbl, err := tblst.tables.Table(ctx, tx)
+	tbl, err := st.tables.Table(ctx, tx)
 	if err != nil {
 		return nil, err
 	}
-	ttbl := util.MakeTypedTable(tablesTableName, tbl)
+	ttbl := MakeTypedTable(tablesTableName, tbl)
 
 	keyRow := tableRow{
 		Database: tn.Database.String(),
@@ -474,10 +471,10 @@ func (tblst *tableStore) lookupTable(ctx context.Context, tx storage.Transaction
 	return rows, nil
 }
 
-func (tblst *tableStore) validTable(ctx context.Context, tx storage.Transaction,
+func (st *Store) validTable(ctx context.Context, tx sql.Transaction,
 	tn sql.TableName) (bool, error) {
 
-	rows, err := tblst.lookupTable(ctx, tx, tn)
+	rows, err := st.lookupTable(ctx, tx, tn)
 	if err != nil {
 		return false, err
 	}
@@ -495,7 +492,7 @@ func (tblst *tableStore) validTable(ctx context.Context, tx storage.Transaction,
 	return true, nil
 }
 
-func (tblst *tableStore) decodeTableMetadata(tn sql.TableName, mid int64,
+func (st *Store) decodeTableMetadata(tn sql.TableName, mid int64,
 	buf []byte) (TableStruct, error) {
 
 	var md TableMetadata
@@ -508,7 +505,6 @@ func (tblst *tableStore) decodeTableMetadata(tn sql.TableName, mid int64,
 	colTypes := make([]sql.ColumnType, 0, len(md.Columns))
 	for cdx := range md.Columns {
 		cols = append(cols, sql.QuotedID(md.Columns[cdx].Name))
-
 		var dflt sql.Expr
 		if md.Columns[cdx].Default != "" {
 			p := parser.NewParser(strings.NewReader(md.Columns[cdx].Default),
@@ -533,13 +529,13 @@ func (tblst *tableStore) decodeTableMetadata(tn sql.TableName, mid int64,
 		primary = append(primary, sql.MakeColumnKey(int(pk.Number), pk.Reverse))
 	}
 
-	return tblst.st.MakeTableStruct(tn, mid, cols, colTypes, primary)
+	return st.ps.MakeTableStruct(tn, mid, cols, colTypes, primary)
 }
 
-func (tblst *tableStore) LookupTable(ctx context.Context, tx storage.Transaction,
-	tn sql.TableName) (storage.Table, error) {
+func (st *Store) LookupTable(ctx context.Context, tx sql.Transaction,
+	tn sql.TableName) (sql.Table, error) {
 
-	rows, err := tblst.lookupTable(ctx, tx, tn)
+	rows, err := st.lookupTable(ctx, tx, tn)
 	if err != nil {
 		return nil, err
 	}
@@ -549,13 +545,13 @@ func (tblst *tableStore) LookupTable(ctx context.Context, tx storage.Transaction
 	err = rows.Next(ctx, &tr)
 	if err != nil {
 		if err == io.EOF {
-			return nil, fmt.Errorf("%s: table %s not found", tblst.name, tn)
+			return nil, fmt.Errorf("%s: table %s not found", st.name, tn)
 		}
 		return nil, err
 	}
 	mid := tr.MID
 
-	ts, err := tblst.decodeTableMetadata(tn, mid, tr.Metadata)
+	ts, err := st.decodeTableMetadata(tn, mid, tr.Metadata)
 	if err != nil {
 		return nil, err
 	}
@@ -598,10 +594,10 @@ func encodeTableMetadata(ts TableStruct) ([]byte, error) {
 	return proto.Marshal(&md)
 }
 
-func (tblst *tableStore) createTable(ctx context.Context, tx storage.Transaction, tn sql.TableName,
+func (st *Store) createTable(ctx context.Context, tx sql.Transaction, tn sql.TableName,
 	mid int64, ts TableStruct) error {
 
-	err := tblst.updateSchema(ctx, tx, tn.SchemaName(), 1)
+	err := st.updateSchema(ctx, tx, tn.SchemaName(), 1)
 	if err != nil {
 		return err
 	}
@@ -611,11 +607,11 @@ func (tblst *tableStore) createTable(ctx context.Context, tx storage.Transaction
 		return err
 	}
 
-	tbl, err := tblst.tables.Table(ctx, tx)
+	tbl, err := st.tables.Table(ctx, tx)
 	if err != nil {
 		return err
 	}
-	ttbl := util.MakeTypedTable(tablesTableName, tbl)
+	ttbl := MakeTypedTable(tablesTableName, tbl)
 
 	err = ttbl.Insert(ctx,
 		tableRow{
@@ -632,7 +628,7 @@ func (tblst *tableStore) createTable(ctx context.Context, tx storage.Transaction
 	return nil
 }
 
-func (tblst *tableStore) CreateTable(ctx context.Context, tx storage.Transaction, tn sql.TableName,
+func (st *Store) CreateTable(ctx context.Context, tx sql.Transaction, tn sql.TableName,
 	cols []sql.Identifier, colTypes []sql.ColumnType, primary []sql.ColumnKey,
 	ifNotExists bool) error {
 
@@ -642,7 +638,7 @@ func (tblst *tableStore) CreateTable(ctx context.Context, tx storage.Transaction
 		for _, col := range cols {
 			if col == rowID {
 				return fmt.Errorf("%s: unable to add %s column for table %s missing primary key",
-					tblst.name, rowID, tn)
+					st.name, rowID, tn)
 			}
 		}
 
@@ -658,7 +654,7 @@ func (tblst *tableStore) CreateTable(ctx context.Context, tx storage.Transaction
 		})
 	}
 
-	ok, err := tblst.validTable(ctx, tx, tn)
+	ok, err := st.validTable(ctx, tx, tn)
 	if err != nil {
 		return err
 	}
@@ -666,35 +662,35 @@ func (tblst *tableStore) CreateTable(ctx context.Context, tx storage.Transaction
 		if ifNotExists {
 			return nil
 		}
-		return fmt.Errorf("%s: table %s already exists", tblst.name, tn)
+		return fmt.Errorf("%s: table %s already exists", st.name, tn)
 	}
 
-	mid, err := tblst.nextSequenceValue(ctx, tx, midSequence)
+	mid, err := st.nextSequenceValue(ctx, tx, midSequence)
 	if err != nil {
 		return err
 	}
 
-	ts, err := tblst.st.MakeTableStruct(tn, mid, cols, colTypes, primary)
+	ts, err := st.ps.MakeTableStruct(tn, mid, cols, colTypes, primary)
 	if err != nil {
 		return err
 	}
 
-	return tblst.createTable(ctx, tx, tn, mid, ts)
+	return st.createTable(ctx, tx, tn, mid, ts)
 }
 
-func (tblst *tableStore) DropTable(ctx context.Context, tx storage.Transaction, tn sql.TableName,
+func (st *Store) DropTable(ctx context.Context, tx sql.Transaction, tn sql.TableName,
 	ifExists bool) error {
 
-	err := tblst.updateSchema(ctx, tx, tn.SchemaName(), -1)
+	err := st.updateSchema(ctx, tx, tn.SchemaName(), -1)
 	if err != nil {
 		return err
 	}
 
-	tbl, err := tblst.tables.Table(ctx, tx)
+	tbl, err := st.tables.Table(ctx, tx)
 	if err != nil {
 		return err
 	}
-	ttbl := util.MakeTypedTable(tablesTableName, tbl)
+	ttbl := MakeTypedTable(tablesTableName, tbl)
 
 	keyRow := tableRow{
 		Database: tn.Database.String(),
@@ -713,7 +709,7 @@ func (tblst *tableStore) DropTable(ctx context.Context, tx storage.Transaction, 
 		if ifExists {
 			return nil
 		}
-		return fmt.Errorf("%s: table %s not found", tblst.name, tn)
+		return fmt.Errorf("%s: table %s not found", st.name, tn)
 	} else if err != nil {
 		return err
 	}
@@ -721,14 +717,14 @@ func (tblst *tableStore) DropTable(ctx context.Context, tx storage.Transaction, 
 	return rows.Delete(ctx)
 }
 
-func (tblst *tableStore) lookupIndex(ctx context.Context, tx storage.Transaction, tn sql.TableName,
+func (st *Store) lookupIndex(ctx context.Context, tx sql.Transaction, tn sql.TableName,
 	idxname sql.Identifier) (bool, error) {
 
-	tbl, err := tblst.indexes.Table(ctx, tx)
+	tbl, err := st.indexes.Table(ctx, tx)
 	if err != nil {
 		return false, err
 	}
-	ttbl := util.MakeTypedTable(indexesTableName, tbl)
+	ttbl := MakeTypedTable(indexesTableName, tbl)
 
 	keyRow := indexRow{
 		Database: tn.Database.String(),
@@ -753,11 +749,11 @@ func (tblst *tableStore) lookupIndex(ctx context.Context, tx storage.Transaction
 	return true, nil
 }
 
-func (tblst *tableStore) CreateIndex(ctx context.Context, tx storage.Transaction,
+func (st *Store) CreateIndex(ctx context.Context, tx sql.Transaction,
 	idxname sql.Identifier, tn sql.TableName, unique bool, keys []sql.ColumnKey,
 	ifNotExists bool) error {
 
-	ok, err := tblst.lookupIndex(ctx, tx, tn, idxname)
+	ok, err := st.lookupIndex(ctx, tx, tn, idxname)
 	if err != nil {
 		return err
 	}
@@ -765,22 +761,22 @@ func (tblst *tableStore) CreateIndex(ctx context.Context, tx storage.Transaction
 		if ifNotExists {
 			return nil
 		}
-		return fmt.Errorf("%s: index %s on table %s already exists", tblst.name, idxname, tn)
+		return fmt.Errorf("%s: index %s on table %s already exists", st.name, idxname, tn)
 	}
 
-	ok, err = tblst.validTable(ctx, tx, tn)
+	ok, err = st.validTable(ctx, tx, tn)
 	if err != nil {
 		return err
 	}
 	if !ok {
-		return fmt.Errorf("%s: table %s not found", tblst.name, tn)
+		return fmt.Errorf("%s: table %s not found", st.name, tn)
 	}
 
-	tbl, err := tblst.indexes.Table(ctx, tx)
+	tbl, err := st.indexes.Table(ctx, tx)
 	if err != nil {
 		return err
 	}
-	ttbl := util.MakeTypedTable(indexesTableName, tbl)
+	ttbl := MakeTypedTable(indexesTableName, tbl)
 
 	return ttbl.Insert(ctx,
 		indexRow{
@@ -791,14 +787,14 @@ func (tblst *tableStore) CreateIndex(ctx context.Context, tx storage.Transaction
 		})
 }
 
-func (tblst *tableStore) DropIndex(ctx context.Context, tx storage.Transaction,
+func (st *Store) DropIndex(ctx context.Context, tx sql.Transaction,
 	idxname sql.Identifier, tn sql.TableName, ifExists bool) error {
 
-	tbl, err := tblst.indexes.Table(ctx, tx)
+	tbl, err := st.indexes.Table(ctx, tx)
 	if err != nil {
 		return err
 	}
-	ttbl := util.MakeTypedTable(indexesTableName, tbl)
+	ttbl := MakeTypedTable(indexesTableName, tbl)
 
 	keyRow := indexRow{
 		Database: tn.Database.String(),
@@ -818,7 +814,7 @@ func (tblst *tableStore) DropIndex(ctx context.Context, tx storage.Transaction,
 		if ifExists {
 			return nil
 		}
-		return fmt.Errorf("%s: index %s on table %s not found", tblst.name, idxname, tn)
+		return fmt.Errorf("%s: index %s on table %s not found", st.name, idxname, tn)
 	} else if err != nil {
 		return err
 	}
@@ -826,18 +822,18 @@ func (tblst *tableStore) DropIndex(ctx context.Context, tx storage.Transaction,
 	return rows.Delete(ctx)
 }
 
-func (tblst *tableStore) Begin(sesid uint64) storage.Transaction {
-	return tblst.st.Begin(sesid)
+func (st *Store) Begin(sesid uint64) sql.Transaction {
+	return st.ps.Begin(sesid)
 }
 
-func (tblst *tableStore) ListDatabases(ctx context.Context,
-	tx storage.Transaction) ([]sql.Identifier, error) {
+func (st *Store) ListDatabases(ctx context.Context,
+	tx sql.Transaction) ([]sql.Identifier, error) {
 
-	tbl, err := tblst.databases.Table(ctx, tx)
+	tbl, err := st.databases.Table(ctx, tx)
 	if err != nil {
 		return nil, err
 	}
-	ttbl := util.MakeTypedTable(databasesTableName, tbl)
+	ttbl := MakeTypedTable(databasesTableName, tbl)
 
 	rows, err := ttbl.Rows(ctx, nil, nil)
 	if err != nil {
@@ -859,14 +855,14 @@ func (tblst *tableStore) ListDatabases(ctx context.Context,
 	return dbnames, nil
 }
 
-func (tblst *tableStore) ListSchemas(ctx context.Context, tx storage.Transaction,
+func (st *Store) ListSchemas(ctx context.Context, tx sql.Transaction,
 	dbname sql.Identifier) ([]sql.Identifier, error) {
 
-	tbl, err := tblst.schemas.Table(ctx, tx)
+	tbl, err := st.schemas.Table(ctx, tx)
 	if err != nil {
 		return nil, err
 	}
-	ttbl := util.MakeTypedTable(schemasTableName, tbl)
+	ttbl := MakeTypedTable(schemasTableName, tbl)
 
 	rows, err := ttbl.Rows(ctx, schemaRow{Database: dbname.String()}, nil)
 	if err != nil {
@@ -891,14 +887,14 @@ func (tblst *tableStore) ListSchemas(ctx context.Context, tx storage.Transaction
 	return scnames, nil
 }
 
-func (tblst *tableStore) ListTables(ctx context.Context, tx storage.Transaction,
+func (st *Store) ListTables(ctx context.Context, tx sql.Transaction,
 	sn sql.SchemaName) ([]sql.Identifier, error) {
 
-	tbl, err := tblst.tables.Table(ctx, tx)
+	tbl, err := st.tables.Table(ctx, tx)
 	if err != nil {
 		return nil, err
 	}
-	ttbl := util.MakeTypedTable(tablesTableName, tbl)
+	ttbl := MakeTypedTable(tablesTableName, tbl)
 
 	rows, err := ttbl.Rows(ctx,
 		tableRow{Database: sn.Database.String(), Table: sn.Schema.String()}, nil)
@@ -924,14 +920,14 @@ func (tblst *tableStore) ListTables(ctx context.Context, tx storage.Transaction,
 	return tblnames, nil
 }
 
-func (tblst *tableStore) nextSequenceValue(ctx context.Context, tx storage.Transaction,
+func (st *Store) nextSequenceValue(ctx context.Context, tx sql.Transaction,
 	sequence string) (int64, error) {
 
-	tbl, err := tblst.sequences.Table(ctx, tx)
+	tbl, err := st.sequences.Table(ctx, tx)
 	if err != nil {
 		return 0, err
 	}
-	ttbl := util.MakeTypedTable(sequencesTableName, tbl)
+	ttbl := MakeTypedTable(sequencesTableName, tbl)
 
 	keyRow := sequenceRow{Sequence: sequence}
 	rows, err := ttbl.Rows(ctx, keyRow, keyRow)
@@ -943,7 +939,7 @@ func (tblst *tableStore) nextSequenceValue(ctx context.Context, tx storage.Trans
 	var sr sequenceRow
 	err = rows.Next(ctx, &sr)
 	if err != nil {
-		return 0, fmt.Errorf("%s: sequence %s not found", tblst.name, sequence)
+		return 0, fmt.Errorf("%s: sequence %s not found", st.name, sequence)
 	}
 	err = rows.Update(ctx,
 		struct {

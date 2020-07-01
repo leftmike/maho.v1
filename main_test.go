@@ -98,7 +98,7 @@ select * from metadata.tables
 	}
 )
 
-func testStore(t *testing.T, st storage.Store, cases []testCase) {
+func testStore(t *testing.T, st *storage.Store, cases []testCase) {
 	e, err := engine.NewEngine(st)
 	if err != nil {
 		t.Fatal(err)

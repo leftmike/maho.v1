@@ -3,7 +3,6 @@ package query
 import (
 	"fmt"
 
-	"github.com/leftmike/maho/engine"
 	"github.com/leftmike/maho/evaluate"
 	"github.com/leftmike/maho/evaluate/expr"
 	"github.com/leftmike/maho/sql"
@@ -11,7 +10,7 @@ import (
 
 type FromItem interface {
 	fmt.Stringer
-	rows(ses *evaluate.Session, tx engine.Transaction) (sql.Rows, *fromContext, error)
+	rows(ses *evaluate.Session, tx sql.Transaction) (sql.Rows, *fromContext, error)
 }
 
 type FromTableAlias struct {
@@ -27,7 +26,7 @@ func (fta FromTableAlias) String() string {
 	return s
 }
 
-func lookupRows(ses *evaluate.Session, tx engine.Transaction, tn sql.TableName) (sql.Rows, error) {
+func lookupRows(ses *evaluate.Session, tx sql.Transaction, tn sql.TableName) (sql.Rows, error) {
 	tbl, _, err := ses.Engine.LookupTable(ses.Context(), tx, ses.ResolveTableName(tn))
 	if err != nil {
 		return nil, err
@@ -35,7 +34,7 @@ func lookupRows(ses *evaluate.Session, tx engine.Transaction, tn sql.TableName) 
 	return tbl.Rows(ses.Context(), nil, nil)
 }
 
-func (fta FromTableAlias) rows(ses *evaluate.Session, tx engine.Transaction) (sql.Rows,
+func (fta FromTableAlias) rows(ses *evaluate.Session, tx sql.Transaction) (sql.Rows,
 	*fromContext, error) {
 
 	rows, err := lookupRows(ses, tx, fta.TableName)
@@ -70,8 +69,8 @@ func (fs FromStmt) String() string {
 	return s
 }
 
-func (fs FromStmt) rows(ses *evaluate.Session, tx engine.Transaction) (sql.Rows,
-	*fromContext, error) {
+func (fs FromStmt) rows(ses *evaluate.Session, tx sql.Transaction) (sql.Rows, *fromContext,
+	error) {
 
 	ret, err := fs.Stmt.Plan(ses, tx)
 	if err != nil {

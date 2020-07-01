@@ -12,7 +12,7 @@ import (
 	"github.com/leftmike/maho/testutil"
 )
 
-func startEngine(t *testing.T) *engine.Engine {
+func startEngine(t *testing.T) sql.Engine {
 	t.Helper()
 
 	st, err := basic.NewStore("testdata")

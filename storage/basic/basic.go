@@ -13,7 +13,6 @@ import (
 	"github.com/leftmike/maho/sql"
 	"github.com/leftmike/maho/storage"
 	"github.com/leftmike/maho/storage/encode"
-	"github.com/leftmike/maho/storage/tblstore"
 )
 
 var (
@@ -56,14 +55,14 @@ type rows struct {
 	rows [][]sql.Value
 }
 
-func NewStore(dataDir string) (storage.Store, error) {
+func NewStore(dataDir string) (*storage.Store, error) {
 	bst := &basicStore{
 		tree: btree.New(16),
 	}
-	return tblstore.NewStore("basic", bst)
+	return storage.NewStore("basic", bst, true)
 }
 
-func (ts *tableStruct) Table(ctx context.Context, tx storage.Transaction) (storage.Table,
+func (ts *tableStruct) Table(ctx context.Context, tx sql.Transaction) (sql.Table,
 	error) {
 
 	etx := tx.(*transaction)
@@ -91,7 +90,7 @@ func (_ *basicStore) NeedsInit() bool {
 }
 
 func (_ *basicStore) MakeTableStruct(tn sql.TableName, mid int64, cols []sql.Identifier,
-	colTypes []sql.ColumnType, primary []sql.ColumnKey) (tblstore.TableStruct, error) {
+	colTypes []sql.ColumnType, primary []sql.ColumnKey) (storage.TableStruct, error) {
 
 	if len(primary) == 0 {
 		panic(fmt.Sprintf("basic: table %s: missing required primary key", tn))
@@ -106,7 +105,7 @@ func (_ *basicStore) MakeTableStruct(tn sql.TableName, mid int64, cols []sql.Ide
 	}, nil
 }
 
-func (bst *basicStore) Begin(sesid uint64) storage.Transaction {
+func (bst *basicStore) Begin(sesid uint64) sql.Transaction {
 	bst.mutex.Lock()
 	return &transaction{
 		bst:  bst,

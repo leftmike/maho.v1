@@ -17,7 +17,7 @@ type Handler func(ses *evaluate.Session, rr io.RuneReader, w io.Writer)
 
 type Server struct {
 	Handler         Handler
-	Engine          *engine.Engine
+	Engine          sql.Engine
 	DefaultDatabase sql.Identifier
 
 	mutex         sync.Mutex
@@ -115,8 +115,8 @@ func (svr *Server) Shutdown(ctx context.Context) error {
 		})
 }
 
-func (svr *Server) makeSessionsVirtual(ctx context.Context, tx engine.Transaction,
-	tn sql.TableName) (engine.Table, *engine.TableType, error) {
+func (svr *Server) makeSessionsVirtual(ctx context.Context, tx sql.Transaction,
+	tn sql.TableName) (sql.Table, sql.TableType, error) {
 
 	svr.mutex.Lock()
 	defer svr.mutex.Unlock()

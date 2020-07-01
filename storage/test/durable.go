@@ -42,7 +42,7 @@ func DurableTests(t *testing.T, helper string) {
 	}
 }
 
-func DurableHelper(t *testing.T, createStore func() (storage.Store, error)) {
+func DurableHelper(t *testing.T, createStore func() (*storage.Store, error)) {
 	test := os.Getenv("MAHO_DURABLE_TEST")
 	if test == "" {
 		return

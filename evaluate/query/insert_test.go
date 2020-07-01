@@ -5,7 +5,6 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/leftmike/maho/engine"
 	"github.com/leftmike/maho/evaluate"
 	"github.com/leftmike/maho/evaluate/expr"
 	"github.com/leftmike/maho/evaluate/query"
@@ -205,7 +204,7 @@ func TestInsert(t *testing.T) {
 		insertColumnTypes3, insertCases3)
 }
 
-func statement(ses *evaluate.Session, tx engine.Transaction, s string) error {
+func statement(ses *evaluate.Session, tx sql.Transaction, s string) error {
 	p := parser.NewParser(strings.NewReader(s), "statement")
 	stmt, err := p.Parse()
 	if err != nil {
@@ -235,7 +234,7 @@ func allRows(ses *evaluate.Session, rows sql.Rows, numCols int) ([][]sql.Value, 
 	return all, nil
 }
 
-func testInsert(t *testing.T, e *engine.Engine, ses *evaluate.Session, tn sql.TableName,
+func testInsert(t *testing.T, e sql.Engine, ses *evaluate.Session, tn sql.TableName,
 	cols []sql.Identifier, colTypes []sql.ColumnType, cases []insertCase) {
 
 	for _, c := range cases {
@@ -254,7 +253,7 @@ func testInsert(t *testing.T, e *engine.Engine, ses *evaluate.Session, tn sql.Ta
 		} else if err != nil {
 			t.Errorf("Parse(\"%s\").Execute() failed with %s", c.stmt, err.Error())
 		} else {
-			var tbl engine.Table
+			var tbl sql.Table
 			tbl, _, err = e.LookupTable(ses.Context(), tx, tn)
 			if err != nil {
 				t.Error(err)

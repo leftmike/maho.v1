@@ -6,7 +6,6 @@ import (
 	"io"
 	"sort"
 
-	"github.com/leftmike/maho/engine"
 	"github.com/leftmike/maho/evaluate"
 	"github.com/leftmike/maho/evaluate/expr"
 	"github.com/leftmike/maho/sql"
@@ -115,7 +114,7 @@ func (stmt *Select) String() string {
 	return s
 }
 
-func (stmt *Select) Plan(ses *evaluate.Session, tx engine.Transaction) (interface{}, error) {
+func (stmt *Select) Plan(ses *evaluate.Session, tx sql.Transaction) (interface{}, error) {
 	var rows sql.Rows
 	var fctx *fromContext
 	var err error
@@ -348,7 +347,7 @@ func (fr *filterRows) Update(ctx context.Context, updates []sql.ColumnUpdate) er
 	return fr.rows.Update(ctx, updates)
 }
 
-func where(ses *evaluate.Session, tx engine.Transaction, rows sql.Rows, fctx *fromContext,
+func where(ses *evaluate.Session, tx sql.Transaction, rows sql.Rows, fctx *fromContext,
 	cond sql.Expr) (sql.Rows, error) {
 
 	if cond == nil {
@@ -474,7 +473,7 @@ func (_ *resultRows) Update(ctx context.Context, updates []sql.ColumnUpdate) err
 	return fmt.Errorf("result rows may not be updated")
 }
 
-func results(ses *evaluate.Session, tx engine.Transaction, rows sql.Rows, fctx *fromContext,
+func results(ses *evaluate.Session, tx sql.Transaction, rows sql.Rows, fctx *fromContext,
 	results []SelectResult) (sql.Rows, error) {
 
 	if results == nil {

@@ -6,12 +6,11 @@ import (
 	"io"
 
 	"github.com/leftmike/maho/config"
-	"github.com/leftmike/maho/engine"
 	"github.com/leftmike/maho/sql"
 )
 
 type Session struct {
-	Engine          *engine.Engine
+	Engine          sql.Engine
 	DefaultDatabase sql.Identifier
 	DefaultSchema   sql.Identifier
 	User            string
@@ -19,7 +18,7 @@ type Session struct {
 	Addr            string
 	Interactive     bool
 	sesid           uint64
-	tx              engine.Transaction
+	tx              sql.Transaction
 }
 
 func (ses *Session) SetSessionID(sesid uint64) {
@@ -60,7 +59,7 @@ func (ses *Session) Rollback() error {
 	return err
 }
 
-func (ses *Session) Run(stmt Stmt, run func(tx engine.Transaction, stmt Stmt) error) error {
+func (ses *Session) Run(stmt Stmt, run func(tx sql.Transaction, stmt Stmt) error) error {
 	if ses.tx != nil {
 		ses.tx.NextStmt()
 		return run(ses.tx, stmt)

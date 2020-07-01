@@ -5,19 +5,12 @@ import (
 	"fmt"
 
 	"github.com/leftmike/maho/sql"
-	"github.com/leftmike/maho/storage"
 )
-
-type Table interface {
-	Type() *TableType
-	Rows(ctx context.Context, minRow, maxRow []sql.Value) (sql.Rows, error)
-	Insert(ctx context.Context, row []sql.Value) error
-}
 
 type table struct {
 	tn sql.TableName
-	st storage.Table
-	tt *TableType
+	st sql.Table
+	tt sql.TableType
 }
 
 type rows struct {
@@ -25,7 +18,7 @@ type rows struct {
 	rows sql.Rows
 }
 
-func makeTable(tn sql.TableName, st storage.Table, tt *TableType) (*table, *TableType, error) {
+func makeTable(tn sql.TableName, st sql.Table, tt sql.TableType) (*table, sql.TableType, error) {
 	return &table{
 		tn: tn,
 		st: st,
@@ -33,8 +26,16 @@ func makeTable(tn sql.TableName, st storage.Table, tt *TableType) (*table, *Tabl
 	}, tt, nil
 }
 
-func (tbl *table) Type() *TableType {
-	return tbl.tt
+func (tbl *table) Columns(ctx context.Context) []sql.Identifier {
+	return tbl.tt.Columns()
+}
+
+func (tbl *table) ColumnTypes(ctx context.Context) []sql.ColumnType {
+	return tbl.tt.ColumnTypes()
+}
+
+func (tbl *table) PrimaryKey(ctx context.Context) []sql.ColumnKey {
+	return tbl.tt.PrimaryKey()
 }
 
 func (tbl *table) Rows(ctx context.Context, minRow, maxRow []sql.Value) (sql.Rows, error) {

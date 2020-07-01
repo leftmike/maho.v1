@@ -5,7 +5,6 @@ import (
 	"fmt"
 	"io"
 
-	"github.com/leftmike/maho/engine"
 	"github.com/leftmike/maho/evaluate"
 	"github.com/leftmike/maho/evaluate/copy"
 	"github.com/leftmike/maho/evaluate/expr"
@@ -38,7 +37,7 @@ func (stmt *Copy) String() string {
 	return s
 }
 
-func (stmt *Copy) Plan(ses *evaluate.Session, tx engine.Transaction) (interface{}, error) {
+func (stmt *Copy) Plan(ses *evaluate.Session, tx sql.Transaction) (interface{}, error) {
 	tbl, tt, err := ses.Engine.LookupTable(ses.Context(), tx, ses.ResolveTableName(stmt.Table))
 	if err != nil {
 		return nil, err
@@ -91,7 +90,7 @@ func (stmt *Copy) Plan(ses *evaluate.Session, tx engine.Transaction) (interface{
 }
 
 type copyPlan struct {
-	tbl        engine.Table
+	tbl        sql.Table
 	cols       []sql.Identifier
 	from       *copy.Reader
 	fromToRow  []int
@@ -99,8 +98,8 @@ type copyPlan struct {
 	delimiter  rune
 }
 
-func (plan *copyPlan) Execute(ctx context.Context, e *engine.Engine,
-	tx engine.Transaction) (int64, error) {
+func (plan *copyPlan) Execute(ctx context.Context, e sql.Engine, tx sql.Transaction) (int64,
+	error) {
 
 	var cnt int64
 

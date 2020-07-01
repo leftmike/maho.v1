@@ -4,7 +4,6 @@ import (
 	"fmt"
 	"math"
 
-	"github.com/leftmike/maho/engine"
 	"github.com/leftmike/maho/evaluate"
 	"github.com/leftmike/maho/sql"
 )
@@ -30,7 +29,7 @@ func CompileRef(idx int) CExpr {
 	return colIndex(idx)
 }
 
-func Compile(ses *evaluate.Session, tx engine.Transaction, ctx CompileContext, e sql.Expr,
+func Compile(ses *evaluate.Session, tx sql.Transaction, ctx CompileContext, e sql.Expr,
 	agg bool) (CExpr, error) {
 
 	if agg {

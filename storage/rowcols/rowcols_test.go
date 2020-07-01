@@ -39,7 +39,7 @@ func TestDurability(t *testing.T) {
 
 func TestRowColsHelper(t *testing.T) {
 	test.DurableHelper(t,
-		func() (storage.Store, error) {
+		func() (*storage.Store, error) {
 			st, err := rowcols.NewStore("testdata")
 			if err != nil {
 				return nil, err

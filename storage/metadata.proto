@@ -1,6 +1,6 @@
 syntax = "proto3";
 
-option go_package = "./tblstore";
+option go_package = "./storage";
 
 message TableMetadata {
     repeated ColumnMetadata Columns = 1;

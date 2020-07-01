@@ -6,7 +6,6 @@ import (
 	"sync"
 
 	"github.com/leftmike/maho/sql"
-	"github.com/leftmike/maho/storage"
 )
 
 type TransactionService struct {
@@ -133,6 +132,6 @@ func (tx *Transaction) getContext(d Database) interface{} {
 	return tctx
 }
 
-func GetTxContext(tx storage.Transaction, d Database) interface{} {
+func GetTxContext(tx sql.Transaction, d Database) interface{} {
 	return tx.(*Transaction).getContext(d)
 }

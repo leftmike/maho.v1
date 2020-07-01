@@ -7,14 +7,13 @@ import (
 
 	"github.com/leftmike/sqltest/sqltestdb"
 
-	"github.com/leftmike/maho/engine"
 	"github.com/leftmike/maho/evaluate"
 	"github.com/leftmike/maho/parser"
 	"github.com/leftmike/maho/sql"
 )
 
 type Runner struct {
-	Engine   *engine.Engine
+	Engine   sql.Engine
 	Database sql.Identifier
 	ses      *evaluate.Session
 }
@@ -41,7 +40,7 @@ func (run *Runner) RunExec(tst *sqltestdb.Test) (int64, error) {
 		}
 
 		err = run.ses.Run(stmt,
-			func(tx engine.Transaction, stmt evaluate.Stmt) error {
+			func(tx sql.Transaction, stmt evaluate.Stmt) error {
 				ret, err2 := stmt.Plan(run.ses, tx)
 				if err2 != nil {
 					return err2
@@ -87,7 +86,7 @@ func (run *Runner) RunQuery(tst *sqltestdb.Test) ([]string, [][]string, error) {
 	var resultCols []string
 	var results [][]string
 	err = run.ses.Run(stmt,
-		func(tx engine.Transaction, stmt evaluate.Stmt) error {
+		func(tx sql.Transaction, stmt evaluate.Stmt) error {
 			ret, err2 := stmt.Plan(run.ses, tx)
 			if err2 != nil {
 				return err2

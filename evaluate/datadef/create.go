@@ -4,7 +4,6 @@ import (
 	"context"
 	"fmt"
 
-	"github.com/leftmike/maho/engine"
 	"github.com/leftmike/maho/evaluate"
 	"github.com/leftmike/maho/sql"
 )
@@ -72,7 +71,7 @@ func (stmt *CreateTable) String() string {
 	return s
 }
 
-func (stmt *CreateTable) Plan(ses *evaluate.Session, tx engine.Transaction) (interface{}, error) {
+func (stmt *CreateTable) Plan(ses *evaluate.Session, tx sql.Transaction) (interface{}, error) {
 	stmt.Table = ses.ResolveTableName(stmt.Table)
 
 	var err error
@@ -96,8 +95,8 @@ func (stmt *CreateTable) Plan(ses *evaluate.Session, tx engine.Transaction) (int
 	return stmt, nil
 }
 
-func (stmt *CreateTable) Execute(ctx context.Context, e *engine.Engine,
-	tx engine.Transaction) (int64, error) {
+func (stmt *CreateTable) Execute(ctx context.Context, e sql.Engine, tx sql.Transaction) (int64,
+	error) {
 
 	err := e.CreateTable(ctx, tx, stmt.Table, stmt.Columns, stmt.ColumnTypes, stmt.primaryColKeys,
 		stmt.IfNotExists)
@@ -138,13 +137,13 @@ func (stmt *CreateIndex) String() string {
 	return s
 }
 
-func (stmt *CreateIndex) Plan(ses *evaluate.Session, tx engine.Transaction) (interface{}, error) {
+func (stmt *CreateIndex) Plan(ses *evaluate.Session, tx sql.Transaction) (interface{}, error) {
 	stmt.Table = ses.ResolveTableName(stmt.Table)
 	return stmt, nil
 }
 
-func (stmt *CreateIndex) Execute(ctx context.Context, e *engine.Engine,
-	tx engine.Transaction) (int64, error) {
+func (stmt *CreateIndex) Execute(ctx context.Context, e sql.Engine, tx sql.Transaction) (int64,
+	error) {
 
 	_, tt, err := e.LookupTable(ctx, tx, stmt.Table)
 	if err != nil {
@@ -176,9 +175,7 @@ func (stmt *CreateDatabase) String() string {
 	return s
 }
 
-func (stmt *CreateDatabase) Plan(ses *evaluate.Session, tx engine.Transaction) (interface{},
-	error) {
-
+func (stmt *CreateDatabase) Plan(ses *evaluate.Session, tx sql.Transaction) (interface{}, error) {
 	return stmt, nil
 }
 
@@ -194,15 +191,13 @@ func (stmt *CreateSchema) String() string {
 	return fmt.Sprintf("CREATE SCHEMA %s", stmt.Schema)
 }
 
-func (stmt *CreateSchema) Plan(ses *evaluate.Session, tx engine.Transaction) (interface{},
-	error) {
-
+func (stmt *CreateSchema) Plan(ses *evaluate.Session, tx sql.Transaction) (interface{}, error) {
 	stmt.Schema = ses.ResolveSchemaName(stmt.Schema)
 	return stmt, nil
 }
 
-func (stmt *CreateSchema) Execute(ctx context.Context, e *engine.Engine,
-	tx engine.Transaction) (int64, error) {
+func (stmt *CreateSchema) Execute(ctx context.Context, e sql.Engine, tx sql.Transaction) (int64,
+	error) {
 
 	return -1, e.CreateSchema(ctx, tx, stmt.Schema)
 }

@@ -39,7 +39,7 @@ func TestBadgerDurability(t *testing.T) {
 
 func TestBadgerHelper(t *testing.T) {
 	test.DurableHelper(t,
-		func() (storage.Store, error) {
+		func() (*storage.Store, error) {
 			st, err := keyval.NewBadgerStore("testdata")
 			if err != nil {
 				return nil, err
@@ -79,7 +79,7 @@ func TestBBoltDurability(t *testing.T) {
 
 func TestBBoltHelper(t *testing.T) {
 	test.DurableHelper(t,
-		func() (storage.Store, error) {
+		func() (*storage.Store, error) {
 			st, err := keyval.NewBBoltStore("testdata")
 			if err != nil {
 				return nil, err

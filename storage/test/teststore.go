@@ -62,8 +62,8 @@ type storeCmd struct {
 
 type transactionState struct {
 	tdx int
-	tx  storage.Transaction
-	tbl storage.Table
+	tx  sql.Transaction
+	tbl sql.Table
 }
 
 var (
@@ -98,7 +98,7 @@ func allRows(t *testing.T, ctx context.Context, rows sql.Rows,
 	return all
 }
 
-func testDatabase(t *testing.T, st storage.Store, dbname sql.Identifier, cmds []storeCmd) {
+func testDatabase(t *testing.T, st *storage.Store, dbname sql.Identifier, cmds []storeCmd) {
 	var state transactionState
 	var ctx context.Context
 	scname := sql.PUBLIC
@@ -349,7 +349,7 @@ func testDatabase(t *testing.T, st storage.Store, dbname sql.Identifier, cmds []
 
 type dbCmd storeCmd
 
-func testStore(t *testing.T, st storage.Store, cmds []dbCmd) {
+func testStore(t *testing.T, st *storage.Store, cmds []dbCmd) {
 	for _, cmd := range cmds {
 		switch cmd.cmd {
 		case cmdCreateDatabase:
@@ -376,7 +376,7 @@ func testStore(t *testing.T, st storage.Store, cmds []dbCmd) {
 	}
 }
 
-func runTest(t *testing.T, st storage.Store, dbname sql.Identifier, test interface{}) {
+func runTest(t *testing.T, st *storage.Store, dbname sql.Identifier, test interface{}) {
 	switch tst := test.(type) {
 	case string:
 		switch tst {
@@ -420,7 +420,7 @@ var (
 	}
 )
 
-func RunDatabaseTest(t *testing.T, st storage.Store) {
+func RunDatabaseTest(t *testing.T, st *storage.Store) {
 	t.Helper()
 
 	dbname := sql.ID("database_test")
@@ -449,7 +449,7 @@ var (
 	}
 )
 
-func RunTableTest(t *testing.T, st storage.Store) {
+func RunTableTest(t *testing.T, st *storage.Store) {
 	t.Helper()
 
 	dbname := sql.ID("table_test")
@@ -668,7 +668,7 @@ var (
 	}
 )
 
-func RunTableLifecycleTest(t *testing.T, st storage.Store) {
+func RunTableLifecycleTest(t *testing.T, st *storage.Store) {
 	t.Helper()
 
 	dbname := sql.ID("tbl_lifecycle_test")
@@ -940,7 +940,7 @@ var (
 	}
 )
 
-func RunSchemaTest(t *testing.T, st storage.Store) {
+func RunSchemaTest(t *testing.T, st *storage.Store) {
 	t.Helper()
 
 	dbname := sql.ID("schema_test")
@@ -1245,7 +1245,7 @@ var (
 	}
 )
 
-func RunTableRowsTest(t *testing.T, st storage.Store) {
+func RunTableRowsTest(t *testing.T, st *storage.Store) {
 	t.Helper()
 
 	dbname := sql.ID("table_rows_test")
@@ -1254,7 +1254,7 @@ func RunTableRowsTest(t *testing.T, st storage.Store) {
 	}
 }
 
-func RunParallelTest(t *testing.T, st storage.Store) {
+func RunParallelTest(t *testing.T, st *storage.Store) {
 	t.Helper()
 
 	dbname := sql.ID("parallel_test")
@@ -1302,7 +1302,7 @@ func RunParallelTest(t *testing.T, st storage.Store) {
 	wg.Wait()
 }
 
-func incColumn(t *testing.T, st storage.Store, tx storage.Transaction, tdx uint64, i int,
+func incColumn(t *testing.T, st *storage.Store, tx sql.Transaction, tdx uint64, i int,
 	tn sql.TableName) bool {
 
 	var ctx context.Context
@@ -1346,7 +1346,7 @@ func incColumn(t *testing.T, st storage.Store, tx storage.Transaction, tdx uint6
 	return false
 }
 
-func RunStressTest(t *testing.T, st storage.Store) {
+func RunStressTest(t *testing.T, st *storage.Store) {
 	t.Helper()
 
 	dbname := sql.ID("stress_test")

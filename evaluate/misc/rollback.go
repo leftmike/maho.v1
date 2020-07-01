@@ -1,8 +1,8 @@
 package misc
 
 import (
-	"github.com/leftmike/maho/engine"
 	"github.com/leftmike/maho/evaluate"
+	"github.com/leftmike/maho/sql"
 )
 
 type Rollback struct{}
@@ -11,7 +11,7 @@ func (stmt *Rollback) String() string {
 	return "ROLLBACK"
 }
 
-func (stmt *Rollback) Plan(ses *evaluate.Session, tx engine.Transaction) (interface{}, error) {
+func (stmt *Rollback) Plan(ses *evaluate.Session, tx sql.Transaction) (interface{}, error) {
 	return stmt, nil
 }
 

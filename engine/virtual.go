@@ -10,38 +10,46 @@ import (
 )
 
 func MakeVirtualTable(tn sql.TableName, cols []sql.Identifier, colTypes []sql.ColumnType,
-	values [][]sql.Value) (Table, *TableType, error) {
+	values [][]sql.Value) (sql.Table, sql.TableType, error) {
 
 	tt := MakeTableType(cols, colTypes, nil)
 	return &virtualTable{
 		tn:     tn,
-		tt:     tt, // XXX: just need cols
+		tt:     tt,
 		values: values,
 	}, tt, nil
 }
 
 type virtualTable struct {
 	tn     sql.TableName
-	tt     *TableType
+	tt     sql.TableType
 	values [][]sql.Value
 }
 
 type virtualRows struct {
-	tn      sql.TableName
-	columns []sql.Identifier
-	rows    [][]sql.Value
-	index   int
+	tn    sql.TableName
+	cols  []sql.Identifier
+	rows  [][]sql.Value
+	index int
 }
 
-func (vt *virtualTable) Type() *TableType {
-	return vt.tt
+func (vt *virtualTable) Columns(ctx context.Context) []sql.Identifier {
+	return vt.tt.Columns()
+}
+
+func (vt *virtualTable) ColumnTypes(ctx context.Context) []sql.ColumnType {
+	return vt.tt.ColumnTypes()
+}
+
+func (vt *virtualTable) PrimaryKey(ctx context.Context) []sql.ColumnKey {
+	return vt.tt.PrimaryKey()
 }
 
 func (vt *virtualTable) Rows(ctx context.Context, minRow, maxRow []sql.Value) (sql.Rows, error) {
 	if minRow != nil || maxRow != nil {
 		panic("virtual: not implemented: minRow != nil || maxRow != nil")
 	}
-	return &virtualRows{tn: vt.tn, columns: vt.tt.Columns(), rows: vt.values}, nil
+	return &virtualRows{tn: vt.tn, cols: vt.tt.Columns(), rows: vt.values}, nil
 }
 
 func (vt *virtualTable) Insert(ctx context.Context, row []sql.Value) error {
@@ -49,7 +57,7 @@ func (vt *virtualTable) Insert(ctx context.Context, row []sql.Value) error {
 }
 
 func (vr *virtualRows) Columns() []sql.Identifier {
-	return vr.columns
+	return vr.cols
 }
 
 func (vr *virtualRows) Close() error {
@@ -78,7 +86,7 @@ func (vr *virtualRows) Update(ctx context.Context, updates []sql.ColumnUpdate) e
 	return fmt.Errorf("virtual: table %s can not be modified", vr.tn)
 }
 
-func (e *Engine) listSchemas(ctx context.Context, tx Transaction,
+func (e *Engine) listSchemas(ctx context.Context, tx sql.Transaction,
 	dbname sql.Identifier) ([]sql.Identifier, error) {
 
 	if dbname == sql.SYSTEM {
@@ -109,8 +117,8 @@ func (e *Engine) listSchemas(ctx context.Context, tx Transaction,
 	return scnames, nil
 }
 
-func (e *Engine) makeSchemasTable(ctx context.Context, tx Transaction, tn sql.TableName) (Table,
-	*TableType, error) {
+func (e *Engine) makeSchemasTable(ctx context.Context, tx sql.Transaction,
+	tn sql.TableName) (sql.Table, sql.TableType, error) {
 
 	e.mutex.RLock()
 	defer e.mutex.RUnlock()
@@ -134,7 +142,7 @@ func (e *Engine) makeSchemasTable(ctx context.Context, tx Transaction, tn sql.Ta
 		[]sql.ColumnType{sql.IdColType, sql.IdColType}, values)
 }
 
-func (e *Engine) listTables(ctx context.Context, tx Transaction,
+func (e *Engine) listTables(ctx context.Context, tx sql.Transaction,
 	sn sql.SchemaName) ([]sql.Identifier, error) {
 
 	if sn.Schema == sql.METADATA {
@@ -153,8 +161,8 @@ func (e *Engine) listTables(ctx context.Context, tx Transaction,
 	return e.st.ListTables(ctx, tx, sn)
 }
 
-func (e *Engine) makeTablesTable(ctx context.Context, tx Transaction, tn sql.TableName) (Table,
-	*TableType, error) {
+func (e *Engine) makeTablesTable(ctx context.Context, tx sql.Transaction,
+	tn sql.TableName) (sql.Table, sql.TableType, error) {
 
 	e.mutex.RLock()
 	defer e.mutex.RUnlock()
@@ -224,8 +232,8 @@ func appendColumns(values [][]sql.Value, tn sql.TableName, cols []sql.Identifier
 	return values
 }
 
-func (e *Engine) makeColumnsTable(ctx context.Context, tx Transaction, tn sql.TableName) (Table,
-	*TableType, error) {
+func (e *Engine) makeColumnsTable(ctx context.Context, tx sql.Transaction,
+	tn sql.TableName) (sql.Table, sql.TableType, error) {
 
 	e.mutex.RLock()
 	defer e.mutex.RUnlock()
@@ -260,8 +268,8 @@ func (e *Engine) makeColumnsTable(ctx context.Context, tx Transaction, tn sql.Ta
 	return MakeVirtualTable(tn, columnsColumns, columnsColumnTypes, values)
 }
 
-func (e *Engine) makeDatabasesTable(ctx context.Context, tx Transaction, tn sql.TableName) (Table,
-	*TableType, error) {
+func (e *Engine) makeDatabasesTable(ctx context.Context, tx sql.Transaction,
+	tn sql.TableName) (sql.Table, sql.TableType, error) {
 
 	dbnames, err := e.st.ListDatabases(ctx, tx)
 	if err != nil {
@@ -290,8 +298,8 @@ func (e *Engine) makeDatabasesTable(ctx context.Context, tx Transaction, tn sql.
 
 }
 
-func makeIdentifiersTable(ctx context.Context, tx Transaction, tn sql.TableName) (Table,
-	*TableType, error) {
+func makeIdentifiersTable(ctx context.Context, tx sql.Transaction, tn sql.TableName) (sql.Table,
+	sql.TableType, error) {
 
 	values := [][]sql.Value{}
 
@@ -309,8 +317,8 @@ func makeIdentifiersTable(ctx context.Context, tx Transaction, tn sql.TableName)
 		[]sql.ColumnType{sql.IdColType, sql.Int32ColType, sql.BoolColType}, values)
 }
 
-func makeConfigTable(ctx context.Context, tx Transaction, tn sql.TableName) (Table,
-	*TableType, error) {
+func makeConfigTable(ctx context.Context, tx sql.Transaction, tn sql.TableName) (sql.Table,
+	sql.TableType, error) {
 
 	values := [][]sql.Value{}
 

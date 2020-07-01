@@ -1,4 +1,4 @@
-package util
+package storage
 
 import (
 	"context"
@@ -7,7 +7,6 @@ import (
 	"strings"
 
 	"github.com/leftmike/maho/sql"
-	"github.com/leftmike/maho/storage"
 )
 
 type columnField struct {
@@ -18,8 +17,8 @@ type columnField struct {
 	pointer  bool
 }
 
-type TypedTable struct {
-	tbl          storage.Table
+type typedTable struct {
+	tbl          sql.Table
 	tn           sql.TableName
 	rowType      reflect.Type
 	rowFields    []columnField
@@ -27,31 +26,31 @@ type TypedTable struct {
 	updateFields []columnField
 }
 
-type Rows struct {
-	ttbl *TypedTable
+type typedRows struct {
+	ttbl *typedTable
 	rows sql.Rows
 }
 
-func MakeTypedTable(tn sql.TableName, tbl storage.Table) *TypedTable {
-	return &TypedTable{
+func MakeTypedTable(tn sql.TableName, tbl sql.Table) *typedTable {
+	return &typedTable{
 		tbl: tbl,
 		tn:  tn,
 	}
 }
 
-func (ttbl *TypedTable) Columns(ctx context.Context) []sql.Identifier {
+func (ttbl *typedTable) Columns(ctx context.Context) []sql.Identifier {
 	return ttbl.tbl.Columns(ctx)
 }
 
-func (ttbl *TypedTable) ColumnTypes(ctx context.Context) []sql.ColumnType {
+func (ttbl *typedTable) ColumnTypes(ctx context.Context) []sql.ColumnType {
 	return ttbl.tbl.ColumnTypes(ctx)
 }
 
-func (ttbl *TypedTable) PrimaryKey(ctx context.Context) []sql.ColumnKey {
+func (ttbl *typedTable) PrimaryKey(ctx context.Context) []sql.ColumnKey {
 	return ttbl.tbl.PrimaryKey(ctx)
 }
 
-func (ttbl *TypedTable) Rows(ctx context.Context, minObj, maxObj interface{}) (*Rows, error) {
+func (ttbl *typedTable) Rows(ctx context.Context, minObj, maxObj interface{}) (*typedRows, error) {
 	var minRow, maxRow []sql.Value
 	if minObj != nil {
 		minRow = ttbl.rowObjToRow(ctx, "minObj", minObj)
@@ -64,13 +63,13 @@ func (ttbl *TypedTable) Rows(ctx context.Context, minObj, maxObj interface{}) (*
 	if err != nil {
 		return nil, err
 	}
-	return &Rows{
+	return &typedRows{
 		rows: r,
 		ttbl: ttbl,
 	}, nil
 }
 
-func (ttbl *TypedTable) makeColumnField(cn string, ct sql.ColumnType, idx int,
+func (ttbl *typedTable) makeColumnField(cn string, ct sql.ColumnType, idx int,
 	sf reflect.StructField) columnField {
 
 	ptr := !ct.NotNull
@@ -139,7 +138,7 @@ func (ttbl *TypedTable) makeColumnField(cn string, ct sql.ColumnType, idx int,
 	}
 }
 
-func (ttbl *TypedTable) makeRowFields(ctx context.Context, rowType reflect.Type) []columnField {
+func (ttbl *typedTable) makeRowFields(ctx context.Context, rowType reflect.Type) []columnField {
 	var rowFields []columnField
 
 	fields := map[string]reflect.StructField{}
@@ -167,7 +166,7 @@ func (ttbl *TypedTable) makeRowFields(ctx context.Context, rowType reflect.Type)
 	return rowFields
 }
 
-func (ttbl *TypedTable) rowObjToRow(ctx context.Context, nam string,
+func (ttbl *typedTable) rowObjToRow(ctx context.Context, nam string,
 	rowObj interface{}) []sql.Value {
 
 	rowType := reflect.TypeOf(rowObj)
@@ -216,21 +215,21 @@ func (ttbl *TypedTable) rowObjToRow(ctx context.Context, nam string,
 	return dest
 }
 
-func (ttbl *TypedTable) Insert(ctx context.Context, rowObj interface{}) error {
+func (ttbl *typedTable) Insert(ctx context.Context, rowObj interface{}) error {
 	return ttbl.tbl.Insert(ctx, ttbl.rowObjToRow(ctx, "rowObj", rowObj))
 }
 
-func (r *Rows) Columns() []sql.Identifier {
+func (r *typedRows) Columns() []sql.Identifier {
 	return r.rows.Columns()
 }
 
-func (r *Rows) Close() error {
+func (r *typedRows) Close() error {
 	err := r.rows.Close()
 	r.rows = nil
 	return err
 }
 
-func (r *Rows) Next(ctx context.Context, destObj interface{}) error {
+func (r *typedRows) Next(ctx context.Context, destObj interface{}) error {
 	ttbl := r.ttbl
 
 	rowType := reflect.TypeOf(destObj)
@@ -314,11 +313,11 @@ func (r *Rows) Next(ctx context.Context, destObj interface{}) error {
 	return nil
 }
 
-func (r *Rows) Delete(ctx context.Context) error {
+func (r *typedRows) Delete(ctx context.Context) error {
 	return r.rows.Delete(ctx)
 }
 
-func (ttbl *TypedTable) makeUpdateFields(ctx context.Context,
+func (ttbl *typedTable) makeUpdateFields(ctx context.Context,
 	updateType reflect.Type) []columnField {
 
 	var updateFields []columnField
@@ -348,7 +347,7 @@ func (ttbl *TypedTable) makeUpdateFields(ctx context.Context,
 	return updateFields
 }
 
-func (r *Rows) Update(ctx context.Context, updateObj interface{}) error {
+func (r *typedRows) Update(ctx context.Context, updateObj interface{}) error {
 	ttbl := r.ttbl
 
 	updateType := reflect.TypeOf(updateObj)
