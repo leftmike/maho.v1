@@ -43,7 +43,7 @@ type Engine struct {
 	metadataTables   map[sql.Identifier]sql.MakeVirtual
 }
 
-func NewEngine(st store) (sql.Engine, error) {
+func NewEngine(st store) sql.Engine {
 	e := &Engine{
 		st:               st,
 		systemInfoTables: map[sql.Identifier]sql.MakeVirtual{},
@@ -58,7 +58,7 @@ func NewEngine(st store) (sql.Engine, error) {
 	e.CreateMetadataTable(sql.SCHEMAS, e.makeSchemasTable)
 	e.CreateMetadataTable(sql.TABLES, e.makeTablesTable)
 
-	return e, nil
+	return e
 }
 
 func (e *Engine) CreateSystemInfoTable(tblname sql.Identifier, maker sql.MakeVirtual) {

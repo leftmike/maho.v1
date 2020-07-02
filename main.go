@@ -43,8 +43,6 @@ To Do:
 - subquery expressions: EXISTS, IN, NOT IN, ANY/SOME, ALL
 - conditional expressions: CASE, COALESCE, NULLIF, GREATEST, LEAST
 
--- engine.NewEngine doesn't need to return an error
-
 -- checks all constraints including unique and foreign key references
 -- converts from engine metadata to evaluate metadata; eg. Default from string to Expr
 -- generated columns
@@ -243,11 +241,7 @@ func main() {
 		return
 	}
 
-	e, err := engine.NewEngine(st)
-	if err != nil {
-		fmt.Fprintf(os.Stderr, "maho: %s", err)
-		return
-	}
+	e := engine.NewEngine(st)
 	svr := server.Server{
 		Handler: func(ses *evaluate.Session, rr io.RuneReader, w io.Writer) {
 			src := fmt.Sprintf("%s@%s", ses.User, ses.Type)
