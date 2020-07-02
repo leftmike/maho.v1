@@ -1,4 +1,4 @@
-package storage
+package util
 
 import (
 	"context"
@@ -28,7 +28,7 @@ type typedTable struct {
 	updateFields []columnField
 }
 
-type typedRows struct {
+type TypedRows struct {
 	ttbl *typedTable
 	rows sql.Rows
 }
@@ -41,7 +41,7 @@ func MakeTypedTable(tn sql.TableName, tbl sql.Table, tt *engine.TableType) *type
 	}
 }
 
-func (ttbl *typedTable) Rows(ctx context.Context, minObj, maxObj interface{}) (*typedRows, error) {
+func (ttbl *typedTable) Rows(ctx context.Context, minObj, maxObj interface{}) (*TypedRows, error) {
 	var minRow, maxRow []sql.Value
 	if minObj != nil {
 		minRow = ttbl.rowObjToRow(ctx, "minObj", minObj)
@@ -54,7 +54,7 @@ func (ttbl *typedTable) Rows(ctx context.Context, minObj, maxObj interface{}) (*
 	if err != nil {
 		return nil, err
 	}
-	return &typedRows{
+	return &TypedRows{
 		rows: r,
 		ttbl: ttbl,
 	}, nil
@@ -210,17 +210,17 @@ func (ttbl *typedTable) Insert(ctx context.Context, rowObj interface{}) error {
 	return ttbl.tbl.Insert(ctx, ttbl.rowObjToRow(ctx, "rowObj", rowObj))
 }
 
-func (r *typedRows) Columns() []sql.Identifier {
+func (r *TypedRows) Columns() []sql.Identifier {
 	return r.rows.Columns()
 }
 
-func (r *typedRows) Close() error {
+func (r *TypedRows) Close() error {
 	err := r.rows.Close()
 	r.rows = nil
 	return err
 }
 
-func (r *typedRows) Next(ctx context.Context, destObj interface{}) error {
+func (r *TypedRows) Next(ctx context.Context, destObj interface{}) error {
 	ttbl := r.ttbl
 
 	rowType := reflect.TypeOf(destObj)
@@ -304,7 +304,7 @@ func (r *typedRows) Next(ctx context.Context, destObj interface{}) error {
 	return nil
 }
 
-func (r *typedRows) Delete(ctx context.Context) error {
+func (r *TypedRows) Delete(ctx context.Context) error {
 	return r.rows.Delete(ctx)
 }
 
@@ -338,7 +338,7 @@ func (ttbl *typedTable) makeUpdateFields(ctx context.Context,
 	return updateFields
 }
 
-func (r *typedRows) Update(ctx context.Context, updateObj interface{}) error {
+func (r *TypedRows) Update(ctx context.Context, updateObj interface{}) error {
 	ttbl := r.ttbl
 
 	updateType := reflect.TypeOf(updateObj)

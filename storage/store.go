@@ -7,6 +7,7 @@ import (
 
 	"github.com/leftmike/maho/engine"
 	"github.com/leftmike/maho/sql"
+	"github.com/leftmike/maho/storage/util"
 )
 
 const (
@@ -130,7 +131,7 @@ func (st *Store) init(ctx context.Context, tx sql.Transaction) error {
 	if err != nil {
 		return err
 	}
-	ttbl := MakeTypedTable(sequencesTableName, tbl, st.sequences)
+	ttbl := util.MakeTypedTable(sequencesTableName, tbl, st.sequences)
 	err = ttbl.Insert(ctx,
 		sequenceRow{
 			Sequence: midSequence,
@@ -144,7 +145,7 @@ func (st *Store) init(ctx context.Context, tx sql.Transaction) error {
 	if err != nil {
 		return err
 	}
-	ttbl = MakeTypedTable(databasesTableName, tbl, st.databases)
+	ttbl = util.MakeTypedTable(databasesTableName, tbl, st.databases)
 	err = ttbl.Insert(ctx,
 		databaseRow{
 			Database: sql.SYSTEM.String(),
@@ -157,7 +158,7 @@ func (st *Store) init(ctx context.Context, tx sql.Transaction) error {
 	if err != nil {
 		return err
 	}
-	ttbl = MakeTypedTable(schemasTableName, tbl, st.schemas)
+	ttbl = util.MakeTypedTable(schemasTableName, tbl, st.schemas)
 	err = ttbl.Insert(ctx,
 		schemaRow{
 			Database: sql.SYSTEM.String(),
@@ -208,7 +209,7 @@ func (st *Store) createDatabase(ctx context.Context, tx sql.Transaction,
 	if err != nil {
 		return err
 	}
-	ttbl := MakeTypedTable(databasesTableName, tbl, st.databases)
+	ttbl := util.MakeTypedTable(databasesTableName, tbl, st.databases)
 
 	err = ttbl.Insert(ctx,
 		databaseRow{
@@ -238,13 +239,13 @@ func (st *Store) CreateDatabase(dbname sql.Identifier, options map[sql.Identifie
 }
 
 func (st *Store) lookupDatabase(ctx context.Context, tx sql.Transaction,
-	dbname sql.Identifier) (*typedRows, error) {
+	dbname sql.Identifier) (*util.TypedRows, error) {
 
 	tbl, err := st.ps.Table(ctx, tx, databasesTableName, databasesMID, st.databases)
 	if err != nil {
 		return nil, err
 	}
-	ttbl := MakeTypedTable(databasesTableName, tbl, st.databases)
+	ttbl := util.MakeTypedTable(databasesTableName, tbl, st.databases)
 
 	keyRow := databaseRow{Database: dbname.String()}
 	rows, err := ttbl.Rows(ctx, keyRow, keyRow)
@@ -337,7 +338,7 @@ func (st *Store) CreateSchema(ctx context.Context, tx sql.Transaction, sn sql.Sc
 	if err != nil {
 		return err
 	}
-	ttbl := MakeTypedTable(schemasTableName, tbl, st.schemas)
+	ttbl := util.MakeTypedTable(schemasTableName, tbl, st.schemas)
 
 	return ttbl.Insert(ctx,
 		schemaRow{
@@ -354,7 +355,7 @@ func (st *Store) DropSchema(ctx context.Context, tx sql.Transaction, sn sql.Sche
 	if err != nil {
 		return err
 	}
-	ttbl := MakeTypedTable(schemasTableName, tbl, st.schemas)
+	ttbl := util.MakeTypedTable(schemasTableName, tbl, st.schemas)
 
 	keyRow := schemaRow{
 		Database: sn.Database.String(),
@@ -389,7 +390,7 @@ func (st *Store) updateSchema(ctx context.Context, tx sql.Transaction,
 	if err != nil {
 		return err
 	}
-	ttbl := MakeTypedTable(schemasTableName, tbl, st.schemas)
+	ttbl := util.MakeTypedTable(schemasTableName, tbl, st.schemas)
 
 	keyRow := schemaRow{
 		Database: sn.Database.String(),
@@ -416,13 +417,13 @@ func (st *Store) updateSchema(ctx context.Context, tx sql.Transaction,
 }
 
 func (st *Store) lookupTable(ctx context.Context, tx sql.Transaction,
-	tn sql.TableName) (*typedRows, error) {
+	tn sql.TableName) (*util.TypedRows, error) {
 
 	tbl, err := st.ps.Table(ctx, tx, tablesTableName, tablesMID, st.tables)
 	if err != nil {
 		return nil, err
 	}
-	ttbl := MakeTypedTable(tablesTableName, tbl, st.tables)
+	ttbl := util.MakeTypedTable(tablesTableName, tbl, st.tables)
 
 	keyRow := tableRow{
 		Database: tn.Database.String(),
@@ -505,7 +506,7 @@ func (st *Store) createTable(ctx context.Context, tx sql.Transaction, tn sql.Tab
 	if err != nil {
 		return err
 	}
-	ttbl := MakeTypedTable(tablesTableName, tbl, st.tables)
+	ttbl := util.MakeTypedTable(tablesTableName, tbl, st.tables)
 
 	err = ttbl.Insert(ctx,
 		tableRow{
@@ -556,7 +557,7 @@ func (st *Store) DropTable(ctx context.Context, tx sql.Transaction, tn sql.Table
 	if err != nil {
 		return err
 	}
-	ttbl := MakeTypedTable(tablesTableName, tbl, st.tables)
+	ttbl := util.MakeTypedTable(tablesTableName, tbl, st.tables)
 
 	keyRow := tableRow{
 		Database: tn.Database.String(),
@@ -590,7 +591,7 @@ func (st *Store) lookupIndex(ctx context.Context, tx sql.Transaction, tn sql.Tab
 	if err != nil {
 		return false, err
 	}
-	ttbl := MakeTypedTable(indexesTableName, tbl, st.indexes)
+	ttbl := util.MakeTypedTable(indexesTableName, tbl, st.indexes)
 
 	keyRow := indexRow{
 		Database: tn.Database.String(),
@@ -641,7 +642,7 @@ func (st *Store) CreateIndex(ctx context.Context, tx sql.Transaction, idxname sq
 	if err != nil {
 		return err
 	}
-	ttbl := MakeTypedTable(indexesTableName, tbl, st.indexes)
+	ttbl := util.MakeTypedTable(indexesTableName, tbl, st.indexes)
 
 	return ttbl.Insert(ctx,
 		indexRow{
@@ -659,7 +660,7 @@ func (st *Store) DropIndex(ctx context.Context, tx sql.Transaction, idxname sql.
 	if err != nil {
 		return err
 	}
-	ttbl := MakeTypedTable(indexesTableName, tbl, st.indexes)
+	ttbl := util.MakeTypedTable(indexesTableName, tbl, st.indexes)
 
 	keyRow := indexRow{
 		Database: tn.Database.String(),
@@ -696,7 +697,7 @@ func (st *Store) ListDatabases(ctx context.Context, tx sql.Transaction) ([]sql.I
 	if err != nil {
 		return nil, err
 	}
-	ttbl := MakeTypedTable(databasesTableName, tbl, st.databases)
+	ttbl := util.MakeTypedTable(databasesTableName, tbl, st.databases)
 
 	rows, err := ttbl.Rows(ctx, nil, nil)
 	if err != nil {
@@ -725,7 +726,7 @@ func (st *Store) ListSchemas(ctx context.Context, tx sql.Transaction,
 	if err != nil {
 		return nil, err
 	}
-	ttbl := MakeTypedTable(schemasTableName, tbl, st.schemas)
+	ttbl := util.MakeTypedTable(schemasTableName, tbl, st.schemas)
 
 	rows, err := ttbl.Rows(ctx, schemaRow{Database: dbname.String()}, nil)
 	if err != nil {
@@ -757,7 +758,7 @@ func (st *Store) ListTables(ctx context.Context, tx sql.Transaction,
 	if err != nil {
 		return nil, err
 	}
-	ttbl := MakeTypedTable(tablesTableName, tbl, st.tables)
+	ttbl := util.MakeTypedTable(tablesTableName, tbl, st.tables)
 
 	rows, err := ttbl.Rows(ctx,
 		tableRow{Database: sn.Database.String(), Table: sn.Schema.String()}, nil)
@@ -790,7 +791,7 @@ func (st *Store) nextSequenceValue(ctx context.Context, tx sql.Transaction,
 	if err != nil {
 		return 0, err
 	}
-	ttbl := MakeTypedTable(sequencesTableName, tbl, st.sequences)
+	ttbl := util.MakeTypedTable(sequencesTableName, tbl, st.sequences)
 
 	keyRow := sequenceRow{Sequence: sequence}
 	rows, err := ttbl.Rows(ctx, keyRow, keyRow)

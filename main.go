@@ -44,7 +44,6 @@ To Do:
 - conditional expressions: CASE, COALESCE, NULLIF, GREATEST, LEAST
 
 -- engine.NewEngine doesn't need to return an error
--- move TypedTable to storage/util
 
 -- checks all constraints including unique and foreign key references
 -- converts from engine metadata to evaluate metadata; eg. Default from string to Expr
