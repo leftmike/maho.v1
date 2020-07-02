@@ -5,18 +5,45 @@ import (
 	"fmt"
 	"sync"
 
+	"github.com/leftmike/maho/evaluate/expr"
 	"github.com/leftmike/maho/sql"
-	"github.com/leftmike/maho/storage"
 )
+
+type store interface {
+	CreateDatabase(dbname sql.Identifier, options map[sql.Identifier]string) error
+	DropDatabase(dbname sql.Identifier, ifExists bool, options map[sql.Identifier]string) error
+
+	CreateSchema(ctx context.Context, tx sql.Transaction, sn sql.SchemaName) error
+	DropSchema(ctx context.Context, tx sql.Transaction, sn sql.SchemaName, ifExists bool) error
+
+	LookupTable(ctx context.Context, tx sql.Transaction, tn sql.TableName) (sql.Table, error)
+	CreateTable(ctx context.Context, tx sql.Transaction, tn sql.TableName,
+		cols []sql.Identifier, colTypes []sql.ColumnType, primary []sql.ColumnKey,
+		ifNotExists bool) error
+	DropTable(ctx context.Context, tx sql.Transaction, tn sql.TableName, ifExists bool) error
+
+	CreateIndex(ctx context.Context, tx sql.Transaction, idxname sql.Identifier, tn sql.TableName,
+		unique bool, keys []sql.ColumnKey, ifNotExists bool) error
+	DropIndex(ctx context.Context, tx sql.Transaction, idxname sql.Identifier, tn sql.TableName,
+		ifExists bool) error
+
+	ListDatabases(ctx context.Context, tx sql.Transaction) ([]sql.Identifier, error)
+	ListSchemas(ctx context.Context, tx sql.Transaction, dbname sql.Identifier) ([]sql.Identifier,
+		error)
+	ListTables(ctx context.Context, tx sql.Transaction, sn sql.SchemaName) ([]sql.Identifier,
+		error)
+
+	Begin(sesid uint64) sql.Transaction
+}
 
 type Engine struct {
 	mutex            sync.RWMutex
-	st               *storage.Store
+	st               store
 	systemInfoTables map[sql.Identifier]sql.MakeVirtual
 	metadataTables   map[sql.Identifier]sql.MakeVirtual
 }
 
-func NewEngine(st *storage.Store) (*Engine, error) {
+func NewEngine(st store) (sql.Engine, error) {
 	e := &Engine{
 		st:               st,
 		systemInfoTables: map[sql.Identifier]sql.MakeVirtual{},
@@ -128,6 +155,29 @@ func (e *Engine) CreateTable(ctx context.Context, tx sql.Transaction, tn sql.Tab
 	if tn.Schema == sql.METADATA {
 		return fmt.Errorf("engine: schema %s may not be modified", tn.Schema)
 	}
+
+	if len(primary) == 0 {
+		rowID := sql.ID("rowid")
+
+		for _, col := range cols {
+			if col == rowID {
+				return fmt.Errorf(
+					"engine: unable to add %s column for table %s missing primary key", rowID, tn)
+			}
+		}
+
+		primary = []sql.ColumnKey{
+			sql.MakeColumnKey(len(cols), false),
+		}
+		cols = append(cols, rowID)
+		colTypes = append(colTypes, sql.ColumnType{
+			Type:    sql.IntegerType,
+			Size:    8,
+			NotNull: true,
+			Default: &expr.Call{Name: sql.ID("unique_rowid")},
+		})
+	}
+
 	return e.st.CreateTable(ctx, tx, tn, cols, colTypes, primary, ifNotExists)
 }
 

@@ -9,7 +9,6 @@ import (
 	"strings"
 
 	"github.com/golang/protobuf/proto"
-	"github.com/leftmike/maho/evaluate/expr"
 	"github.com/leftmike/maho/parser"
 	"github.com/leftmike/maho/sql"
 )
@@ -253,9 +252,7 @@ func (st *Store) createDatabase(ctx context.Context, tx sql.Transaction,
 	return st.CreateSchema(ctx, tx, sql.SchemaName{dbname, sql.PUBLIC})
 }
 
-func (st *Store) CreateDatabase(dbname sql.Identifier,
-	options map[sql.Identifier]string) error {
-
+func (st *Store) CreateDatabase(dbname sql.Identifier, options map[sql.Identifier]string) error {
 	if len(options) != 0 {
 		return fmt.Errorf("%s: unexpected option to create database: %s", st.name, dbname)
 	}
@@ -357,9 +354,7 @@ func (st *Store) DropDatabase(dbname sql.Identifier, ifExists bool,
 	return tx.Commit(ctx)
 }
 
-func (st *Store) CreateSchema(ctx context.Context, tx sql.Transaction,
-	sn sql.SchemaName) error {
-
+func (st *Store) CreateSchema(ctx context.Context, tx sql.Transaction, sn sql.SchemaName) error {
 	ok, err := st.validDatabase(ctx, tx, sn.Database)
 	if err != nil {
 		return err
@@ -471,8 +466,8 @@ func (st *Store) lookupTable(ctx context.Context, tx sql.Transaction,
 	return rows, nil
 }
 
-func (st *Store) validTable(ctx context.Context, tx sql.Transaction,
-	tn sql.TableName) (bool, error) {
+func (st *Store) validTable(ctx context.Context, tx sql.Transaction, tn sql.TableName) (bool,
+	error) {
 
 	rows, err := st.lookupTable(ctx, tx, tn)
 	if err != nil {
@@ -492,9 +487,7 @@ func (st *Store) validTable(ctx context.Context, tx sql.Transaction,
 	return true, nil
 }
 
-func (st *Store) decodeTableMetadata(tn sql.TableName, mid int64,
-	buf []byte) (TableStruct, error) {
-
+func (st *Store) decodeTableMetadata(tn sql.TableName, mid int64, buf []byte) (TableStruct, error) {
 	var md TableMetadata
 	err := proto.Unmarshal(buf, &md)
 	if err != nil {
@@ -532,8 +525,8 @@ func (st *Store) decodeTableMetadata(tn sql.TableName, mid int64,
 	return st.ps.MakeTableStruct(tn, mid, cols, colTypes, primary)
 }
 
-func (st *Store) LookupTable(ctx context.Context, tx sql.Transaction,
-	tn sql.TableName) (sql.Table, error) {
+func (st *Store) LookupTable(ctx context.Context, tx sql.Transaction, tn sql.TableName) (sql.Table,
+	error) {
 
 	rows, err := st.lookupTable(ctx, tx, tn)
 	if err != nil {
@@ -594,8 +587,8 @@ func encodeTableMetadata(ts TableStruct) ([]byte, error) {
 	return proto.Marshal(&md)
 }
 
-func (st *Store) createTable(ctx context.Context, tx sql.Transaction, tn sql.TableName,
-	mid int64, ts TableStruct) error {
+func (st *Store) createTable(ctx context.Context, tx sql.Transaction, tn sql.TableName, mid int64,
+	ts TableStruct) error {
 
 	err := st.updateSchema(ctx, tx, tn.SchemaName(), 1)
 	if err != nil {
@@ -631,28 +624,6 @@ func (st *Store) createTable(ctx context.Context, tx sql.Transaction, tn sql.Tab
 func (st *Store) CreateTable(ctx context.Context, tx sql.Transaction, tn sql.TableName,
 	cols []sql.Identifier, colTypes []sql.ColumnType, primary []sql.ColumnKey,
 	ifNotExists bool) error {
-
-	if len(primary) == 0 {
-		rowID := sql.ID("rowid")
-
-		for _, col := range cols {
-			if col == rowID {
-				return fmt.Errorf("%s: unable to add %s column for table %s missing primary key",
-					st.name, rowID, tn)
-			}
-		}
-
-		primary = []sql.ColumnKey{
-			sql.MakeColumnKey(len(cols), false),
-		}
-		cols = append(cols, rowID)
-		colTypes = append(colTypes, sql.ColumnType{
-			Type:    sql.IntegerType,
-			Size:    8,
-			NotNull: true,
-			Default: &expr.Call{Name: sql.ID("unique_rowid")},
-		})
-	}
 
 	ok, err := st.validTable(ctx, tx, tn)
 	if err != nil {
@@ -749,9 +720,8 @@ func (st *Store) lookupIndex(ctx context.Context, tx sql.Transaction, tn sql.Tab
 	return true, nil
 }
 
-func (st *Store) CreateIndex(ctx context.Context, tx sql.Transaction,
-	idxname sql.Identifier, tn sql.TableName, unique bool, keys []sql.ColumnKey,
-	ifNotExists bool) error {
+func (st *Store) CreateIndex(ctx context.Context, tx sql.Transaction, idxname sql.Identifier,
+	tn sql.TableName, unique bool, keys []sql.ColumnKey, ifNotExists bool) error {
 
 	ok, err := st.lookupIndex(ctx, tx, tn, idxname)
 	if err != nil {
@@ -787,8 +757,8 @@ func (st *Store) CreateIndex(ctx context.Context, tx sql.Transaction,
 		})
 }
 
-func (st *Store) DropIndex(ctx context.Context, tx sql.Transaction,
-	idxname sql.Identifier, tn sql.TableName, ifExists bool) error {
+func (st *Store) DropIndex(ctx context.Context, tx sql.Transaction, idxname sql.Identifier,
+	tn sql.TableName, ifExists bool) error {
 
 	tbl, err := st.indexes.Table(ctx, tx)
 	if err != nil {
@@ -826,9 +796,7 @@ func (st *Store) Begin(sesid uint64) sql.Transaction {
 	return st.ps.Begin(sesid)
 }
 
-func (st *Store) ListDatabases(ctx context.Context,
-	tx sql.Transaction) ([]sql.Identifier, error) {
-
+func (st *Store) ListDatabases(ctx context.Context, tx sql.Transaction) ([]sql.Identifier, error) {
 	tbl, err := st.databases.Table(ctx, tx)
 	if err != nil {
 		return nil, err

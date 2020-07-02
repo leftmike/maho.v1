@@ -1,6 +1,15 @@
-package evaluate
+package evaluate_test
 
-/*
+import (
+	"context"
+	"errors"
+	"testing"
+
+	"github.com/leftmike/maho/engine"
+	"github.com/leftmike/maho/evaluate"
+	"github.com/leftmike/maho/sql"
+)
+
 type testStore struct {
 	t            *testing.T
 	transactions []testTransaction
@@ -28,28 +37,28 @@ func (st *testStore) DropDatabase(dbname sql.Identifier, ifExists bool,
 	return nil
 }
 
-func (st *testStore) CreateSchema(ctx context.Context, tx storage.Transaction,
+func (st *testStore) CreateSchema(ctx context.Context, tx sql.Transaction,
 	sn sql.SchemaName) error {
 
 	st.t.Error("CreateSchema should never be called")
 	return nil
 }
 
-func (st *testStore) DropSchema(ctx context.Context, tx storage.Transaction, sn sql.SchemaName,
+func (st *testStore) DropSchema(ctx context.Context, tx sql.Transaction, sn sql.SchemaName,
 	ifExists bool) error {
 
 	st.t.Error("DropSchema should never be called")
 	return nil
 }
 
-func (st *testStore) LookupTable(ctx context.Context, tx storage.Transaction,
-	tn sql.TableName) (storage.Table, error) {
+func (st *testStore) LookupTable(ctx context.Context, tx sql.Transaction,
+	tn sql.TableName) (sql.Table, error) {
 
 	st.t.Error("LookupTable should never be called")
 	return nil, nil
 }
 
-func (st *testStore) CreateTable(ctx context.Context, tx storage.Transaction, tn sql.TableName,
+func (st *testStore) CreateTable(ctx context.Context, tx sql.Transaction, tn sql.TableName,
 	cols []sql.Identifier, colTypes []sql.ColumnType, primary []sql.ColumnKey,
 	ifNotExists bool) error {
 
@@ -57,29 +66,28 @@ func (st *testStore) CreateTable(ctx context.Context, tx storage.Transaction, tn
 	return nil
 }
 
-func (st *testStore) DropTable(ctx context.Context, tx storage.Transaction, tn sql.TableName,
+func (st *testStore) DropTable(ctx context.Context, tx sql.Transaction, tn sql.TableName,
 	ifExists bool) error {
 
 	st.t.Error("DropTable should never be called")
 	return nil
 }
 
-func (st *testStore) CreateIndex(ctx context.Context, tx storage.Transaction,
-	idxname sql.Identifier, tn sql.TableName, unique bool, keys []sql.ColumnKey,
-	ifNotExists bool) error {
+func (st *testStore) CreateIndex(ctx context.Context, tx sql.Transaction, idxname sql.Identifier,
+	tn sql.TableName, unique bool, keys []sql.ColumnKey, ifNotExists bool) error {
 
 	st.t.Error("CreateIndex should never be called")
 	return nil
 }
 
-func (st *testStore) DropIndex(ctx context.Context, tx storage.Transaction, idxname sql.Identifier,
+func (st *testStore) DropIndex(ctx context.Context, tx sql.Transaction, idxname sql.Identifier,
 	tn sql.TableName, ifExists bool) error {
 
 	st.t.Error("DropIndex should never be called")
 	return nil
 }
 
-func (st *testStore) Begin(sesid uint64) storage.Transaction {
+func (st *testStore) Begin(sesid uint64) sql.Transaction {
 	if len(st.transactions) == 0 {
 		st.t.Error("Begin called too many times on engine")
 	}
@@ -90,21 +98,21 @@ func (st *testStore) Begin(sesid uint64) storage.Transaction {
 	return &tx
 }
 
-func (st *testStore) ListDatabases(ctx context.Context,
-	tx storage.Transaction) ([]sql.Identifier, error) {
+func (st *testStore) ListDatabases(ctx context.Context, tx sql.Transaction) ([]sql.Identifier,
+	error) {
 
 	st.t.Error("ListDatabases should never be called")
 	return nil, nil
 }
 
-func (st *testStore) ListSchemas(ctx context.Context, tx storage.Transaction,
+func (st *testStore) ListSchemas(ctx context.Context, tx sql.Transaction,
 	dbname sql.Identifier) ([]sql.Identifier, error) {
 
 	st.t.Error("ListSchemas should never be called")
 	return nil, nil
 }
 
-func (st *testStore) ListTables(ctx context.Context, tx storage.Transaction,
+func (st *testStore) ListTables(ctx context.Context, tx sql.Transaction,
 	sn sql.SchemaName) ([]sql.Identifier, error) {
 
 	st.t.Error("ListTables should never be called")
@@ -149,9 +157,9 @@ func TestSessionCommit(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	ses := Session{Engine: e}
+	ses := evaluate.Session{Engine: e}
 	ses.SetSessionID(123)
-	if ses.String() != "session-123" || ses.sesid != 123 {
+	if ses.String() != "session-123" {
 		t.Errorf("SetSessionID: got %s want session-123", ses.String())
 	}
 	err = ses.Begin()
@@ -188,7 +196,7 @@ func TestSessionRollback(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	ses := Session{Engine: e}
+	ses := evaluate.Session{Engine: e}
 	err = ses.Begin()
 	if err != nil {
 		t.Errorf("Begin failed with %s", err)
@@ -219,7 +227,7 @@ func TestSessionRunExplicit(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	ses := Session{Engine: e}
+	ses := evaluate.Session{Engine: e}
 	err = ses.Begin()
 	if err != nil {
 		t.Errorf("Begin failed with %s", err)
@@ -227,7 +235,7 @@ func TestSessionRunExplicit(t *testing.T) {
 
 	var ran bool
 	err = ses.Run(nil,
-		func(tx engine.Transaction, stmt Stmt) error {
+		func(tx sql.Transaction, stmt evaluate.Stmt) error {
 			ran = true
 			return nil
 		})
@@ -241,7 +249,7 @@ func TestSessionRunExplicit(t *testing.T) {
 	ran = false
 	wantErr := errors.New("failed")
 	err = ses.Run(nil,
-		func(tx engine.Transaction, stmt Stmt) error {
+		func(tx sql.Transaction, stmt evaluate.Stmt) error {
 			ran = true
 			return wantErr
 		})
@@ -271,11 +279,11 @@ func TestSessionRunImplicit(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	ses := Session{Engine: e}
+	ses := evaluate.Session{Engine: e}
 
 	var ran bool
 	err = ses.Run(nil,
-		func(tx engine.Transaction, stmt Stmt) error {
+		func(tx sql.Transaction, stmt evaluate.Stmt) error {
 			ran = true
 			return nil
 		})
@@ -289,7 +297,7 @@ func TestSessionRunImplicit(t *testing.T) {
 	ran = false
 	wantErr := errors.New("failed")
 	err = ses.Run(nil,
-		func(tx engine.Transaction, stmt Stmt) error {
+		func(tx sql.Transaction, stmt evaluate.Stmt) error {
 			ran = true
 			return wantErr
 		})
@@ -309,4 +317,3 @@ func TestSessionRunImplicit(t *testing.T) {
 		t.Error("Rollback should have failed; no active transaction")
 	}
 }
-*/
