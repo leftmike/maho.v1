@@ -12,6 +12,7 @@ import (
 
 	"github.com/google/btree"
 
+	"github.com/leftmike/maho/engine"
 	"github.com/leftmike/maho/sql"
 	"github.com/leftmike/maho/storage"
 	"github.com/leftmike/maho/storage/encode"
@@ -37,21 +38,15 @@ type transaction struct {
 	delta *btree.BTree
 }
 
-type tableStruct struct {
-	tn          sql.TableName
-	columns     []sql.Identifier
-	columnTypes []sql.ColumnType
-	primary     []sql.ColumnKey
-	mid         int64
-
+type table struct {
+	st      *rowColsStore
+	tn      sql.TableName
+	mid     int64
+	cols    []sql.Identifier
+	primary []sql.ColumnKey
 	reverse uint32
 	rowCols []int
-}
-
-type table struct {
-	st *rowColsStore
-	tx *transaction
-	ts *tableStruct
+	tx      *transaction
 }
 
 type rowItem struct {
@@ -88,33 +83,10 @@ func NewStore(dataDir string) (*storage.Store, error) {
 	return storage.NewStore("rowcols", rcst, init)
 }
 
-func (ts *tableStruct) Table(ctx context.Context, tx sql.Transaction) (sql.Table,
-	error) {
+func (rcst *rowColsStore) Table(ctx context.Context, tx sql.Transaction, tn sql.TableName,
+	mid int64, tt *engine.TableType) (sql.Table, error) {
 
-	etx := tx.(*transaction)
-	return &table{
-		st: etx.st,
-		tx: etx,
-		ts: ts,
-	}, nil
-
-}
-
-func (ts *tableStruct) Columns() []sql.Identifier {
-	return ts.columns
-}
-
-func (ts *tableStruct) ColumnTypes() []sql.ColumnType {
-	return ts.columnTypes
-}
-
-func (ts *tableStruct) PrimaryKey() []sql.ColumnKey {
-	return ts.primary
-}
-
-func (_ *rowColsStore) MakeTableStruct(tn sql.TableName, mid int64, cols []sql.Identifier,
-	colTypes []sql.ColumnType, primary []sql.ColumnKey) (storage.TableStruct, error) {
-
+	primary := tt.PrimaryKey()
 	if len(primary) == 0 {
 		panic(fmt.Sprintf("rowcols: table %s: missing required primary key", tn))
 	}
@@ -122,25 +94,18 @@ func (_ *rowColsStore) MakeTableStruct(tn sql.TableName, mid int64, cols []sql.I
 		panic(fmt.Sprintf("rowcols: table %s: primary key with too many columns", tn))
 	}
 
-	ts := tableStruct{
-		tn:          tn,
-		columns:     cols,
-		columnTypes: colTypes,
-		primary:     primary,
-		mid:         mid,
-	}
-
-	ts.reverse = 0
-	ts.rowCols = make([]int, len(cols))
+	cols := tt.Columns()
+	reverse := uint32(0)
+	rowCols := make([]int, len(cols))
 	vn := len(primary)
 	for cn := range cols {
 		isValue := true
 
 		for kn, ck := range primary {
 			if ck.Number() == cn {
-				ts.rowCols[kn] = cn
+				rowCols[kn] = cn
 				if ck.Reverse() {
-					ts.reverse |= 1 << kn
+					reverse |= 1 << kn
 				}
 				isValue = false
 				break
@@ -148,12 +113,22 @@ func (_ *rowColsStore) MakeTableStruct(tn sql.TableName, mid int64, cols []sql.I
 		}
 
 		if isValue {
-			ts.rowCols[vn] = cn
+			rowCols[vn] = cn
 			vn += 1
 		}
 	}
 
-	return &ts, nil
+	etx := tx.(*transaction)
+	return &table{
+		st:      etx.st,
+		tn:      tn,
+		mid:     mid,
+		cols:    cols,
+		primary: primary,
+		reverse: reverse,
+		rowCols: rowCols,
+		tx:      etx,
+	}, nil
 }
 
 func (rcst *rowColsStore) Begin(sesid uint64) sql.Transaction {
@@ -263,19 +238,6 @@ func (rctx *transaction) forWrite() {
 	}
 }
 
-func (ts *tableStruct) toItem(row []sql.Value, deleted bool) btree.Item {
-	ri := rowItem{
-		mid: ts.mid,
-	}
-	if row != nil {
-		ri.key = encode.MakeKey(ts.primary, row)
-		if !deleted {
-			ri.row = append(make([]sql.Value, 0, len(ts.columns)), row...)
-		}
-	}
-	return ri
-}
-
 func (ri rowItem) compare(ri2 rowItem) int {
 	if ri.mid < ri2.mid {
 		return -1
@@ -290,20 +252,21 @@ func (ri rowItem) Less(item btree.Item) bool {
 	return ri.compare(item.(rowItem)) < 0
 }
 
-func (rct *table) Columns(ctx context.Context) []sql.Identifier {
-	return rct.ts.columns
-}
-
-func (rct *table) ColumnTypes(ctx context.Context) []sql.ColumnType {
-	return rct.ts.columnTypes
-}
-
-func (rct *table) PrimaryKey(ctx context.Context) []sql.ColumnKey {
-	return rct.ts.primary
-}
-
 func copyRow(row []sql.Value) []sql.Value {
 	return append(make([]sql.Value, 0, len(row)), row...)
+}
+
+func (rct *table) toItem(row []sql.Value, deleted bool) btree.Item {
+	ri := rowItem{
+		mid: rct.mid,
+	}
+	if row != nil {
+		ri.key = encode.MakeKey(rct.primary, row)
+		if !deleted {
+			ri.row = append(make([]sql.Value, 0, len(rct.cols)), row...)
+		}
+	}
+	return ri
 }
 
 func (rct *table) Rows(ctx context.Context, minRow, maxRow []sql.Value) (sql.Rows, error) {
@@ -314,17 +277,17 @@ func (rct *table) Rows(ctx context.Context, minRow, maxRow []sql.Value) (sql.Row
 
 	var maxItem btree.Item
 	if maxRow != nil {
-		maxItem = rct.ts.toItem(maxRow, false)
+		maxItem = rct.toItem(maxRow, false)
 	}
 
 	if rct.tx.delta == nil {
-		rct.tx.tree.AscendGreaterOrEqual(rct.ts.toItem(minRow, false),
+		rct.tx.tree.AscendGreaterOrEqual(rct.toItem(minRow, false),
 			func(item btree.Item) bool {
 				if maxItem != nil && maxItem.Less(item) {
 					return false
 				}
 				ri := item.(rowItem)
-				if ri.mid != rct.ts.mid {
+				if ri.mid != rct.mid {
 					return false
 				}
 				if ri.row != nil {
@@ -336,26 +299,26 @@ func (rct *table) Rows(ctx context.Context, minRow, maxRow []sql.Value) (sql.Row
 	}
 
 	var deltaRows []rowItem
-	rct.tx.delta.AscendGreaterOrEqual(rct.ts.toItem(minRow, false),
+	rct.tx.delta.AscendGreaterOrEqual(rct.toItem(minRow, false),
 		func(item btree.Item) bool {
 			if maxItem != nil && maxItem.Less(item) {
 				return false
 			}
 			ri := item.(rowItem)
-			if ri.mid != rct.ts.mid {
+			if ri.mid != rct.mid {
 				return false
 			}
 			deltaRows = append(deltaRows, ri)
 			return true
 		})
 
-	rct.tx.tree.AscendGreaterOrEqual(rct.ts.toItem(minRow, false),
+	rct.tx.tree.AscendGreaterOrEqual(rct.toItem(minRow, false),
 		func(item btree.Item) bool {
 			if maxItem != nil && maxItem.Less(item) {
 				return false
 			}
 			ri := item.(rowItem)
-			if ri.mid != rct.ts.mid {
+			if ri.mid != rct.mid {
 				return false
 			}
 
@@ -396,13 +359,13 @@ func (rct *table) Rows(ctx context.Context, minRow, maxRow []sql.Value) (sql.Row
 func (rct *table) Insert(ctx context.Context, row []sql.Value) error {
 	rct.tx.forWrite()
 
-	ri := rct.ts.toItem(row, false)
+	ri := rct.toItem(row, false)
 	if item := rct.tx.delta.Get(ri); item != nil {
 		if (item.(rowItem)).row != nil {
-			return fmt.Errorf("rowcols: %s: existing row with duplicate primary key", rct.ts.tn)
+			return fmt.Errorf("rowcols: %s: existing row with duplicate primary key", rct.tn)
 		}
 	} else if item := rct.tx.tree.Get(ri); item != nil && (item.(rowItem)).row != nil {
-		return fmt.Errorf("rowcols: %s: existing row with duplicate primary key", rct.ts.tn)
+		return fmt.Errorf("rowcols: %s: existing row with duplicate primary key", rct.tn)
 	}
 
 	rct.tx.delta.ReplaceOrInsert(ri)
@@ -410,7 +373,7 @@ func (rct *table) Insert(ctx context.Context, row []sql.Value) error {
 }
 
 func (rcr *rows) Columns() []sql.Identifier {
-	return rcr.tbl.ts.columns
+	return rcr.tbl.cols
 }
 
 func (rcr *rows) Close() error {
@@ -434,10 +397,10 @@ func (rcr *rows) Delete(ctx context.Context) error {
 	rcr.tbl.tx.forWrite()
 
 	if rcr.idx == 0 {
-		panic(fmt.Sprintf("rowcols: table %s no row to delete", rcr.tbl.ts.tn))
+		panic(fmt.Sprintf("rowcols: table %s no row to delete", rcr.tbl.tn))
 	}
 
-	rcr.tbl.tx.delta.ReplaceOrInsert(rcr.tbl.ts.toItem(rcr.rows[rcr.idx-1], true))
+	rcr.tbl.tx.delta.ReplaceOrInsert(rcr.tbl.toItem(rcr.rows[rcr.idx-1], true))
 	return nil
 }
 
@@ -445,12 +408,12 @@ func (rcr *rows) Update(ctx context.Context, updates []sql.ColumnUpdate) error {
 	rcr.tbl.tx.forWrite()
 
 	if rcr.idx == 0 {
-		panic(fmt.Sprintf("rowcols: table %s no row to update", rcr.tbl.ts.tn))
+		panic(fmt.Sprintf("rowcols: table %s no row to update", rcr.tbl.tn))
 	}
 
 	var primaryUpdated bool
 	for _, update := range updates {
-		for _, ck := range rcr.tbl.ts.primary {
+		for _, ck := range rcr.tbl.primary {
 			if ck.Number() == update.Index {
 				primaryUpdated = true
 			}
@@ -470,6 +433,6 @@ func (rcr *rows) Update(ctx context.Context, updates []sql.ColumnUpdate) error {
 	for _, update := range updates {
 		rcr.rows[rcr.idx-1][update.Index] = update.Value
 	}
-	rcr.tbl.tx.delta.ReplaceOrInsert(rcr.tbl.ts.toItem(rcr.rows[rcr.idx-1], false))
+	rcr.tbl.tx.delta.ReplaceOrInsert(rcr.tbl.toItem(rcr.rows[rcr.idx-1], false))
 	return nil
 }

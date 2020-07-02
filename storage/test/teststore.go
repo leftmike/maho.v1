@@ -9,6 +9,7 @@ import (
 	"sync"
 	"testing"
 
+	"github.com/leftmike/maho/engine"
 	"github.com/leftmike/maho/sql"
 	"github.com/leftmike/maho/storage"
 	"github.com/leftmike/maho/testutil"
@@ -205,7 +206,8 @@ func testDatabase(t *testing.T, st *storage.Store, dbname sql.Identifier, cmds [
 			}
 		case cmdLookupTable:
 			var err error
-			state.tbl, err = st.LookupTable(ctx, state.tx,
+			var tt *engine.TableType
+			state.tbl, tt, err = st.LookupTable(ctx, state.tx,
 				sql.TableName{dbname, scname, cmd.name})
 			if cmd.fail {
 				if err == nil {
@@ -214,18 +216,18 @@ func testDatabase(t *testing.T, st *storage.Store, dbname sql.Identifier, cmds [
 			} else if err != nil {
 				t.Errorf("%sLookupTable(%s) failed with %s", cmd.fln, cmd.name, err)
 			} else {
-				cols := state.tbl.Columns(ctx)
+				cols := tt.Columns()
 				if !reflect.DeepEqual(cols, columns) {
 					t.Errorf("%stbl.Columns() got %v want %v", cmd.fln, cols, columns)
 				}
-				colTypes := state.tbl.ColumnTypes(ctx)
+				colTypes := tt.ColumnTypes()
 				if !reflect.DeepEqual(colTypes, columnTypes) {
 					t.Errorf("%stbl.ColumnTypes() got %v want %v", cmd.fln, colTypes, columnTypes)
 				}
 			}
 		case cmdCreateTable:
 			err := st.CreateTable(ctx, state.tx, sql.TableName{dbname, scname, cmd.name},
-				columns, columnTypes, primary, false)
+				engine.MakeTableType(columns, columnTypes, primary), false)
 			if cmd.fail {
 				if err == nil {
 					t.Errorf("%sCreateTable(%s) did not fail", cmd.fln, cmd.name)
@@ -1307,7 +1309,7 @@ func incColumn(t *testing.T, st *storage.Store, tx sql.Transaction, tdx uint64, 
 
 	var ctx context.Context
 
-	tbl, err := st.LookupTable(ctx, tx, tn)
+	tbl, _, err := st.LookupTable(ctx, tx, tn)
 	if err != nil {
 		t.Fatalf("LookupTable(%s) failed with %s", tn, err)
 	}

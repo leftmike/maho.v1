@@ -10,6 +10,7 @@ import (
 
 	"github.com/google/btree"
 
+	"github.com/leftmike/maho/engine"
 	"github.com/leftmike/maho/sql"
 	"github.com/leftmike/maho/storage"
 	"github.com/leftmike/maho/storage/encode"
@@ -29,18 +30,13 @@ type transaction struct {
 	tree *btree.BTree
 }
 
-type tableStruct struct {
-	mid         int64
-	tn          sql.TableName
-	columns     []sql.Identifier
-	columnTypes []sql.ColumnType
-	primary     []sql.ColumnKey
-}
-
 type table struct {
-	bst *basicStore
-	tx  *transaction
-	ts  *tableStruct
+	bst     *basicStore
+	tn      sql.TableName
+	mid     int64
+	cols    []sql.Identifier
+	primary []sql.ColumnKey
+	tx      *transaction
 }
 
 type rowItem struct {
@@ -62,46 +58,22 @@ func NewStore(dataDir string) (*storage.Store, error) {
 	return storage.NewStore("basic", bst, true)
 }
 
-func (ts *tableStruct) Table(ctx context.Context, tx sql.Transaction) (sql.Table,
-	error) {
+func (_ *basicStore) Table(ctx context.Context, tx sql.Transaction, tn sql.TableName, mid int64,
+	tt *engine.TableType) (sql.Table, error) {
 
-	etx := tx.(*transaction)
-	return &table{
-		bst: etx.bst,
-		tx:  etx,
-		ts:  ts,
-	}, nil
-}
-
-func (ts *tableStruct) Columns() []sql.Identifier {
-	return ts.columns
-}
-
-func (ts *tableStruct) ColumnTypes() []sql.ColumnType {
-	return ts.columnTypes
-}
-
-func (ts *tableStruct) PrimaryKey() []sql.ColumnKey {
-	return ts.primary
-}
-
-func (_ *basicStore) NeedsInit() bool {
-	return true
-}
-
-func (_ *basicStore) MakeTableStruct(tn sql.TableName, mid int64, cols []sql.Identifier,
-	colTypes []sql.ColumnType, primary []sql.ColumnKey) (storage.TableStruct, error) {
-
+	primary := tt.PrimaryKey()
 	if len(primary) == 0 {
 		panic(fmt.Sprintf("basic: table %s: missing required primary key", tn))
 	}
 
-	return &tableStruct{
-		mid:         mid,
-		tn:          tn,
-		columns:     cols,
-		columnTypes: colTypes,
-		primary:     primary,
+	etx := tx.(*transaction)
+	return &table{
+		bst:     etx.bst,
+		tn:      tn,
+		mid:     mid,
+		cols:    tt.Columns(),
+		primary: primary,
+		tx:      etx,
 	}, nil
 }
 
@@ -144,13 +116,13 @@ func (btx *transaction) forWrite() {
 	}
 }
 
-func (ts *tableStruct) toItem(row []sql.Value) btree.Item {
+func (bt *table) toItem(row []sql.Value) btree.Item {
 	ri := rowItem{
-		mid: ts.mid,
+		mid: bt.mid,
 	}
 	if row != nil {
-		ri.key = encode.MakeKey(ts.primary, row)
-		ri.row = append(make([]sql.Value, 0, len(ts.columns)), row...)
+		ri.key = encode.MakeKey(bt.primary, row)
+		ri.row = append(make([]sql.Value, 0, len(bt.cols)), row...)
 	}
 	return ri
 }
@@ -163,18 +135,6 @@ func (ri rowItem) Less(item btree.Item) bool {
 	return ri.mid == ri2.mid && bytes.Compare(ri.key, ri2.key) < 0
 }
 
-func (bt *table) Columns(ctx context.Context) []sql.Identifier {
-	return bt.ts.columns
-}
-
-func (bt *table) ColumnTypes(ctx context.Context) []sql.ColumnType {
-	return bt.ts.columnTypes
-}
-
-func (bt *table) PrimaryKey(ctx context.Context) []sql.ColumnKey {
-	return bt.ts.primary
-}
-
 func (bt *table) Rows(ctx context.Context, minRow, maxRow []sql.Value) (sql.Rows, error) {
 	br := &rows{
 		tbl: bt,
@@ -183,16 +143,16 @@ func (bt *table) Rows(ctx context.Context, minRow, maxRow []sql.Value) (sql.Rows
 
 	var maxItem btree.Item
 	if maxRow != nil {
-		maxItem = bt.ts.toItem(maxRow)
+		maxItem = bt.toItem(maxRow)
 	}
 
-	bt.tx.tree.AscendGreaterOrEqual(bt.ts.toItem(minRow),
+	bt.tx.tree.AscendGreaterOrEqual(bt.toItem(minRow),
 		func(item btree.Item) bool {
 			if maxItem != nil && maxItem.Less(item) {
 				return false
 			}
 			ri := item.(rowItem)
-			if ri.mid != bt.ts.mid {
+			if ri.mid != bt.mid {
 				return false
 			}
 			br.rows = append(br.rows, append(make([]sql.Value, 0, len(ri.row)), ri.row...))
@@ -204,16 +164,16 @@ func (bt *table) Rows(ctx context.Context, minRow, maxRow []sql.Value) (sql.Rows
 func (bt *table) Insert(ctx context.Context, row []sql.Value) error {
 	bt.tx.forWrite()
 
-	if bt.tx.tree.Has(bt.ts.toItem(row)) {
-		return fmt.Errorf("basic: %s: existing row with duplicate primary key", bt.ts.tn)
+	if bt.tx.tree.Has(bt.toItem(row)) {
+		return fmt.Errorf("basic: %s: existing row with duplicate primary key", bt.tn)
 	}
 
-	bt.tx.tree.ReplaceOrInsert(bt.ts.toItem(row))
+	bt.tx.tree.ReplaceOrInsert(bt.toItem(row))
 	return nil
 }
 
 func (br *rows) Columns() []sql.Identifier {
-	return br.tbl.ts.columns
+	return br.tbl.cols
 }
 
 func (br *rows) Close() error {
@@ -237,10 +197,10 @@ func (br *rows) Delete(ctx context.Context) error {
 	br.tbl.tx.forWrite()
 
 	if br.idx == 0 {
-		panic(fmt.Sprintf("basic: table %s no row to delete", br.tbl.ts.tn))
+		panic(fmt.Sprintf("basic: table %s no row to delete", br.tbl.tn))
 	}
 
-	br.tbl.tx.tree.Delete(br.tbl.ts.toItem(br.rows[br.idx-1]))
+	br.tbl.tx.tree.Delete(br.tbl.toItem(br.rows[br.idx-1]))
 	return nil
 }
 
@@ -248,12 +208,12 @@ func (br *rows) Update(ctx context.Context, updates []sql.ColumnUpdate) error {
 	br.tbl.tx.forWrite()
 
 	if br.idx == 0 {
-		panic(fmt.Sprintf("basic: table %s no row to update", br.tbl.ts.tn))
+		panic(fmt.Sprintf("basic: table %s no row to update", br.tbl.tn))
 	}
 
 	var primaryUpdated bool
 	for _, update := range updates {
-		for _, ck := range br.tbl.ts.primary {
+		for _, ck := range br.tbl.primary {
 			if ck.Number() == update.Index {
 				primaryUpdated = true
 			}
@@ -274,6 +234,6 @@ func (br *rows) Update(ctx context.Context, updates []sql.ColumnUpdate) error {
 	for _, update := range updates {
 		row[update.Index] = update.Value
 	}
-	br.tbl.tx.tree.ReplaceOrInsert(br.tbl.ts.toItem(row))
+	br.tbl.tx.tree.ReplaceOrInsert(br.tbl.toItem(row))
 	return nil
 }

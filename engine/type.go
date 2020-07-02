@@ -1,13 +1,18 @@
 package engine
 
-import (
-	"bytes"
-	"encoding/gob"
+//go:generate protoc --go_opt=paths=source_relative --go_out=. metadata.proto
 
+import (
+	"fmt"
+	"strings"
+
+	"github.com/golang/protobuf/proto"
+
+	"github.com/leftmike/maho/parser"
 	"github.com/leftmike/maho/sql"
 )
 
-type tableType struct {
+type TableType struct {
 	ver      uint
 	cols     []sql.Identifier
 	colTypes []sql.ColumnType
@@ -15,9 +20,9 @@ type tableType struct {
 }
 
 func MakeTableType(cols []sql.Identifier, colTypes []sql.ColumnType,
-	primary []sql.ColumnKey) sql.TableType {
+	primary []sql.ColumnKey) *TableType {
 
-	return &tableType{
+	return &TableType{
 		ver:      1,
 		cols:     cols,
 		colTypes: colTypes,
@@ -25,74 +30,95 @@ func MakeTableType(cols []sql.Identifier, colTypes []sql.ColumnType,
 	}
 }
 
-func (tt *tableType) Columns() []sql.Identifier {
+func (tt *TableType) Columns() []sql.Identifier {
 	return tt.cols
 }
 
-func (tt *tableType) ColumnTypes() []sql.ColumnType {
+func (tt *TableType) ColumnTypes() []sql.ColumnType {
 	return tt.colTypes
 }
 
-func (tt *tableType) PrimaryKey() []sql.ColumnKey {
+func (tt *TableType) PrimaryKey() []sql.ColumnKey {
 	return tt.primary
 }
 
-func (tt *tableType) Version() uint {
+func (tt *TableType) Version() uint {
 	return tt.ver
 }
 
-func (tt *tableType) AddColumns(cols []sql.Identifier, colTypes []sql.ColumnType) sql.TableType {
-	return &tableType{
-		ver:      tt.ver + 1,
-		cols:     append(tt.cols, cols...),
-		colTypes: append(tt.colTypes, colTypes...),
-		primary:  tt.primary,
+func (tt *TableType) Encode() ([]byte, error) {
+	cols := tt.Columns()
+	colTypes := tt.ColumnTypes()
+
+	var md TableMetadata
+	md.Columns = make([]*ColumnMetadata, 0, len(cols))
+	for cdx := range cols {
+		var dflt string
+		if colTypes[cdx].Default != nil {
+			dflt = colTypes[cdx].Default.String()
+		}
+		md.Columns = append(md.Columns,
+			&ColumnMetadata{
+				Name:    cols[cdx].String(),
+				Type:    DataType(colTypes[cdx].Type),
+				Size:    colTypes[cdx].Size,
+				Fixed:   colTypes[cdx].Fixed,
+				NotNull: colTypes[cdx].NotNull,
+				Default: dflt,
+			})
 	}
+
+	primary := tt.PrimaryKey()
+	md.Primary = make([]*ColumnKey, 0, len(primary))
+	for _, pk := range primary {
+		md.Primary = append(md.Primary,
+			&ColumnKey{
+				Number:  int32(pk.Number()),
+				Reverse: pk.Reverse(),
+			})
+	}
+
+	return proto.Marshal(&md)
 }
 
-func (tt *tableType) SetPrimaryKey(primary []sql.ColumnKey) sql.TableType {
-	if len(tt.primary) > 0 {
-		panic("metadata: primary key may not be changed")
+func DecodeTableType(tn sql.TableName, buf []byte) (*TableType, error) {
+	var md TableMetadata
+	err := proto.Unmarshal(buf, &md)
+	if err != nil {
+		return nil, err
 	}
 
-	return &tableType{
-		ver:      tt.ver + 1,
-		cols:     tt.cols,
-		colTypes: tt.colTypes,
+	cols := make([]sql.Identifier, 0, len(md.Columns))
+	colTypes := make([]sql.ColumnType, 0, len(md.Columns))
+	for cdx := range md.Columns {
+		cols = append(cols, sql.QuotedID(md.Columns[cdx].Name))
+		var dflt sql.Expr
+		if md.Columns[cdx].Default != "" {
+			p := parser.NewParser(strings.NewReader(md.Columns[cdx].Default),
+				fmt.Sprintf("%s metadata", tn))
+			dflt, err = p.ParseExpr()
+			if err != nil {
+				return nil, err
+			}
+		}
+		colTypes = append(colTypes,
+			sql.ColumnType{
+				Type:    sql.DataType(md.Columns[cdx].Type),
+				Size:    md.Columns[cdx].Size,
+				Fixed:   md.Columns[cdx].Fixed,
+				NotNull: md.Columns[cdx].NotNull,
+				Default: dflt,
+			})
+	}
+
+	primary := make([]sql.ColumnKey, 0, len(md.Primary))
+	for _, pk := range md.Primary {
+		primary = append(primary, sql.MakeColumnKey(int(pk.Number), pk.Reverse))
+	}
+
+	return &TableType{
+		cols:     cols,
+		colTypes: colTypes,
 		primary:  primary,
-	}
-}
-
-type tableMetadata struct {
-	Columns     []sql.Identifier
-	ColumnTypes []sql.ColumnType
-	Primary     []sql.ColumnKey
-}
-
-func (tt *tableType) Encode() ([]byte, error) {
-	var buf bytes.Buffer
-	enc := gob.NewEncoder(&buf)
-	err := enc.Encode(&tableMetadata{
-		Columns:     tt.cols,
-		ColumnTypes: tt.colTypes,
-		Primary:     tt.primary,
-	})
-	if err != nil {
-		return nil, err
-	}
-	return buf.Bytes(), nil
-}
-
-func DecodeTableType(buf []byte) (sql.TableType, error) {
-	dec := gob.NewDecoder(bytes.NewBuffer(buf))
-	var tm tableMetadata
-	err := dec.Decode(&tm)
-	if err != nil {
-		return nil, err
-	}
-	return &tableType{
-		cols:     tm.Columns,
-		colTypes: tm.ColumnTypes,
-		primary:  tm.Primary,
 	}, nil
 }

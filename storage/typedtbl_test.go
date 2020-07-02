@@ -6,6 +6,7 @@ import (
 	"io"
 	"testing"
 
+	"github.com/leftmike/maho/engine"
 	"github.com/leftmike/maho/sql"
 	"github.com/leftmike/maho/storage"
 	"github.com/leftmike/maho/storage/basic"
@@ -71,7 +72,8 @@ func TestTypedTable(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	err = st.CreateTable(ctx, tx, tn, columns, columnTypes, primaryKey, false)
+	err = st.CreateTable(ctx, tx, tn, engine.MakeTableType(columns, columnTypes, primaryKey),
+		false)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -81,7 +83,7 @@ func TestTypedTable(t *testing.T) {
 	}
 
 	tx = st.Begin(0)
-	tbl, err := st.LookupTable(ctx, tx, tn)
+	tbl, tt, err := st.LookupTable(ctx, tx, tn)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -92,17 +94,17 @@ func TestTypedTable(t *testing.T) {
 		}
 	}()
 
-	ttbl := storage.MakeTypedTable(tn, tbl)
+	ttbl := storage.MakeTypedTable(tn, tbl, tt)
 
-	cols := ttbl.Columns(ctx)
+	cols := tt.Columns()
 	if !testutil.DeepEqual(cols, columns) {
 		t.Errorf("Columns(): got %v want %v", cols, columns)
 	}
-	colTypes := ttbl.ColumnTypes(ctx)
+	colTypes := tt.ColumnTypes()
 	if !testutil.DeepEqual(colTypes, columnTypes) {
 		t.Errorf("ColumnTypes(): got %v want %v", colTypes, columnTypes)
 	}
-	pkey := ttbl.PrimaryKey(ctx)
+	pkey := tt.PrimaryKey()
 	if !testutil.DeepEqual(pkey, primaryKey) {
 		t.Errorf("PrimaryKey(): got %v want %v", pkey, primaryKey)
 	}

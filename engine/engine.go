@@ -16,9 +16,9 @@ type store interface {
 	CreateSchema(ctx context.Context, tx sql.Transaction, sn sql.SchemaName) error
 	DropSchema(ctx context.Context, tx sql.Transaction, sn sql.SchemaName, ifExists bool) error
 
-	LookupTable(ctx context.Context, tx sql.Transaction, tn sql.TableName) (sql.Table, error)
-	CreateTable(ctx context.Context, tx sql.Transaction, tn sql.TableName,
-		cols []sql.Identifier, colTypes []sql.ColumnType, primary []sql.ColumnKey,
+	LookupTable(ctx context.Context, tx sql.Transaction, tn sql.TableName) (sql.Table,
+		*TableType, error)
+	CreateTable(ctx context.Context, tx sql.Transaction, tn sql.TableName, tt *TableType,
 		ifNotExists bool) error
 	DropTable(ctx context.Context, tx sql.Transaction, tn sql.TableName, ifExists bool) error
 
@@ -137,11 +137,10 @@ func (e *Engine) LookupTable(ctx context.Context, tx sql.Transaction, tn sql.Tab
 		return nil, nil, fmt.Errorf("engine: table %s not found", tn)
 	}
 
-	st, err := e.st.LookupTable(ctx, tx, tn)
+	st, tt, err := e.st.LookupTable(ctx, tx, tn)
 	if err != nil {
 		return nil, nil, err
 	}
-	tt := MakeTableType(st.Columns(ctx), st.ColumnTypes(ctx), st.PrimaryKey(ctx))
 	return makeTable(tn, st, tt)
 }
 
@@ -178,7 +177,7 @@ func (e *Engine) CreateTable(ctx context.Context, tx sql.Transaction, tn sql.Tab
 		})
 	}
 
-	return e.st.CreateTable(ctx, tx, tn, cols, colTypes, primary, ifNotExists)
+	return e.st.CreateTable(ctx, tx, tn, MakeTableType(cols, colTypes, primary), ifNotExists)
 }
 
 func (e *Engine) DropTable(ctx context.Context, tx sql.Transaction, tn sql.TableName,

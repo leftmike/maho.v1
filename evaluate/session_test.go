@@ -52,15 +52,14 @@ func (st *testStore) DropSchema(ctx context.Context, tx sql.Transaction, sn sql.
 }
 
 func (st *testStore) LookupTable(ctx context.Context, tx sql.Transaction,
-	tn sql.TableName) (sql.Table, error) {
+	tn sql.TableName) (sql.Table, *engine.TableType, error) {
 
 	st.t.Error("LookupTable should never be called")
-	return nil, nil
+	return nil, nil, nil
 }
 
 func (st *testStore) CreateTable(ctx context.Context, tx sql.Transaction, tn sql.TableName,
-	cols []sql.Identifier, colTypes []sql.ColumnType, primary []sql.ColumnKey,
-	ifNotExists bool) error {
+	tt *engine.TableType, ifNotExists bool) error {
 
 	st.t.Error("CreateTable should never be called")
 	return nil

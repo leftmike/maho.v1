@@ -44,10 +44,7 @@ To Do:
 - conditional expressions: CASE, COALESCE, NULLIF, GREATEST, LEAST
 
 -- engine.NewEngine doesn't need to return an error
--- MakeTypedTable(tn, tbl sql.Table, tt *engine.TableType)
 -- move TypedTable to storage/util
--- sql.Table: remove Columns, ColumnTypes, and PrimaryKey; don't need Type()
--- storage: remove TableStruct: directly access tables from PeristentStore.Table
 
 -- checks all constraints including unique and foreign key references
 -- converts from engine metadata to evaluate metadata; eg. Default from string to Expr

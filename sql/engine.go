@@ -10,10 +10,13 @@ type Transaction interface {
 	NextStmt()
 }
 
+type TableType interface {
+	Columns() []Identifier
+	ColumnTypes() []ColumnType
+	PrimaryKey() []ColumnKey
+}
+
 type Table interface {
-	Columns(ctx context.Context) []Identifier
-	ColumnTypes(ctx context.Context) []ColumnType
-	PrimaryKey(ctx context.Context) []ColumnKey
 	Rows(ctx context.Context, minRow, maxRow []Value) (Rows, error)
 	Insert(ctx context.Context, row []Value) error
 }
@@ -42,10 +45,4 @@ type Engine interface {
 
 	Begin(sesid uint64) Transaction
 	ListDatabases(ctx context.Context, tx Transaction) ([]Identifier, error)
-}
-
-type TableType interface {
-	Columns() []Identifier
-	ColumnTypes() []ColumnType
-	PrimaryKey() []ColumnKey
 }

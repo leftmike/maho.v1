@@ -6,6 +6,7 @@ import (
 	"reflect"
 	"strings"
 
+	"github.com/leftmike/maho/engine"
 	"github.com/leftmike/maho/sql"
 )
 
@@ -20,6 +21,7 @@ type columnField struct {
 type typedTable struct {
 	tbl          sql.Table
 	tn           sql.TableName
+	tt           *engine.TableType
 	rowType      reflect.Type
 	rowFields    []columnField
 	updateType   reflect.Type
@@ -31,23 +33,12 @@ type typedRows struct {
 	rows sql.Rows
 }
 
-func MakeTypedTable(tn sql.TableName, tbl sql.Table) *typedTable {
+func MakeTypedTable(tn sql.TableName, tbl sql.Table, tt *engine.TableType) *typedTable {
 	return &typedTable{
 		tbl: tbl,
 		tn:  tn,
+		tt:  tt,
 	}
-}
-
-func (ttbl *typedTable) Columns(ctx context.Context) []sql.Identifier {
-	return ttbl.tbl.Columns(ctx)
-}
-
-func (ttbl *typedTable) ColumnTypes(ctx context.Context) []sql.ColumnType {
-	return ttbl.tbl.ColumnTypes(ctx)
-}
-
-func (ttbl *typedTable) PrimaryKey(ctx context.Context) []sql.ColumnKey {
-	return ttbl.tbl.PrimaryKey(ctx)
 }
 
 func (ttbl *typedTable) Rows(ctx context.Context, minObj, maxObj interface{}) (*typedRows, error) {
@@ -148,8 +139,8 @@ func (ttbl *typedTable) makeRowFields(ctx context.Context, rowType reflect.Type)
 		fields[strings.ToLower(sf.Name)] = sf
 	}
 
-	cols := ttbl.tbl.Columns(ctx)
-	colTypes := ttbl.tbl.ColumnTypes(ctx)
+	cols := ttbl.tt.Columns()
+	colTypes := ttbl.tt.ColumnTypes()
 	for cdx := range cols {
 		cn := cols[cdx].String()
 		ct := colTypes[cdx]
@@ -329,8 +320,8 @@ func (ttbl *typedTable) makeUpdateFields(ctx context.Context,
 	}
 	fields := map[string]column{}
 
-	cols := ttbl.tbl.Columns(ctx)
-	colTypes := ttbl.tbl.ColumnTypes(ctx)
+	cols := ttbl.tt.Columns()
+	colTypes := ttbl.tt.ColumnTypes()
 	for cdx := range cols {
 		fields[strings.ToLower(cols[cdx].String())] = column{cols[cdx].String(), colTypes[cdx], cdx}
 	}

@@ -13,6 +13,8 @@ import (
 	"sync"
 
 	"github.com/golang/protobuf/proto"
+
+	"github.com/leftmike/maho/engine"
 	"github.com/leftmike/maho/sql"
 	"github.com/leftmike/maho/storage"
 	"github.com/leftmike/maho/storage/encode"
@@ -59,14 +61,6 @@ type kvStore struct {
 	commitMutex  sync.Mutex
 }
 
-type tableStruct struct {
-	tn          sql.TableName
-	columns     []sql.Identifier
-	columnTypes []sql.ColumnType
-	primary     []sql.ColumnKey
-	mid         int64
-}
-
 type transaction struct {
 	sesid       uint64
 	st          *kvStore
@@ -77,9 +71,12 @@ type transaction struct {
 }
 
 type table struct {
-	st *kvStore
-	tx *transaction
-	ts *tableStruct
+	st      *kvStore
+	tn      sql.TableName
+	mid     int64
+	cols    []sql.Identifier
+	primary []sql.ColumnKey
+	tx      *transaction
 }
 
 type rows struct {
@@ -231,50 +228,23 @@ func (kvst *kvStore) startupStore(upd Updater) error {
 	return nil
 }
 
-func (ts *tableStruct) Table(ctx context.Context, tx sql.Transaction) (sql.Table, error) {
-	etx := tx.(*transaction)
-	return &table{
-		st: etx.st,
-		tx: etx,
-		ts: ts,
-	}, nil
-}
+func (kvst *kvStore) Table(ctx context.Context, tx sql.Transaction, tn sql.TableName,
+	mid int64, tt *engine.TableType) (sql.Table, error) {
 
-func (ts *tableStruct) Columns() []sql.Identifier {
-	return ts.columns
-}
-
-func (ts *tableStruct) ColumnTypes() []sql.ColumnType {
-	return ts.columnTypes
-}
-
-func (ts *tableStruct) PrimaryKey() []sql.ColumnKey {
-	return ts.primary
-}
-
-func (ts *tableStruct) makeKey(row []sql.Value) []byte {
-	buf := encode.EncodeUint64(make([]byte, 0, 8), uint64(ts.mid))
-	if row != nil {
-		buf = append(buf, encode.MakeKey(ts.primary, row)...)
-	}
-	return buf
-}
-
-func (kvst *kvStore) MakeTableStruct(tn sql.TableName, mid int64, cols []sql.Identifier,
-	colTypes []sql.ColumnType, primary []sql.ColumnKey) (storage.TableStruct, error) {
-
+	primary := tt.PrimaryKey()
 	if len(primary) == 0 {
 		panic(fmt.Sprintf("kvrows: table %s: missing required primary key", tn))
 	}
 
-	ts := tableStruct{
-		tn:          tn,
-		columns:     cols,
-		columnTypes: colTypes,
-		primary:     primary,
-		mid:         mid,
-	}
-	return &ts, nil
+	etx := tx.(*transaction)
+	return &table{
+		st:      etx.st,
+		tn:      tn,
+		mid:     mid,
+		cols:    tt.Columns(),
+		primary: primary,
+		tx:      etx,
+	}, nil
 }
 
 func (kvst *kvStore) setTransactionData(tid uint64, td *TransactionData) error {
@@ -405,24 +375,12 @@ func (kvtx *transaction) NextStmt() {
 	kvtx.sid += 1
 }
 
-func (kvt *table) Columns(ctx context.Context) []sql.Identifier {
-	return kvt.ts.columns
-}
-
-func (kvt *table) ColumnTypes(ctx context.Context) []sql.ColumnType {
-	return kvt.ts.columnTypes
-}
-
-func (kvt *table) PrimaryKey(ctx context.Context) []sql.ColumnKey {
-	return kvt.ts.primary
-}
-
 func (kvt *table) unmarshalProposal(key, val []byte) (*ProposalData, error) {
 	var pd ProposalData
 	err := proto.Unmarshal(val, &pd)
 	if err != nil || len(pd.Updates) == 0 {
-		return nil, fmt.Errorf("kvrows: %s: unable to unmarshal proposal at %v: %v",
-			kvt.ts.tn, key, val)
+		return nil, fmt.Errorf("kvrows: %s: unable to unmarshal proposal at %v: %v", kvt.tn, key,
+			val)
 	}
 
 	return &pd, nil
@@ -432,8 +390,7 @@ func (kvt *table) decodeRow(key, val []byte) ([]sql.Value, error) {
 	row := encode.DecodeRowValue(val)
 	if row == nil {
 		return nil,
-			fmt.Errorf("kvrows: %s: unable to decode proposed row at %v: %v",
-				kvt.ts.tn, key, val)
+			fmt.Errorf("kvrows: %s: unable to decode proposed row at %v: %v", kvt.tn, key, val)
 	}
 
 	return row, nil
@@ -475,11 +432,19 @@ func (kvt *table) getProposedRow(key, val []byte) ([]sql.Value, bool, error) {
 	return nil, false, nil
 }
 
+func (kvt *table) makeKey(row []sql.Value) []byte {
+	buf := encode.EncodeUint64(make([]byte, 0, 8), uint64(kvt.mid))
+	if row != nil {
+		buf = append(buf, encode.MakeKey(kvt.primary, row)...)
+	}
+	return buf
+}
+
 func (kvt *table) Rows(ctx context.Context, minRow, maxRow []sql.Value) (sql.Rows, error) {
-	minKey := kvt.ts.makeKey(minRow)
+	minKey := kvt.makeKey(minRow)
 	var maxKey []byte
 	if maxRow != nil {
-		maxKey = kvt.ts.makeKey(maxRow)
+		maxKey = kvt.makeKey(maxRow)
 	}
 
 	it, err := kvt.st.kv.Iterate(minKey)
@@ -498,7 +463,7 @@ func (kvt *table) Rows(ctx context.Context, minRow, maxRow []sql.Value) (sql.Row
 		err = it.Item(
 			func(key, val []byte) error {
 				if len(key) < 16 {
-					return fmt.Errorf("kvrows: %s: key too short: %v", kvt.ts.tn, key)
+					return fmt.Errorf("kvrows: %s: key too short: %v", kvt.tn, key)
 				}
 				ver := ^binary.BigEndian.Uint64(key[len(key)-8:])
 				key = key[:len(key)-8]
@@ -579,19 +544,18 @@ func (kvt *table) prepareUpdate(upd Updater, updateKey []byte) (*ProposalData, b
 	pu := pd.Updates[0]
 	if pd.TID == kvt.tx.tid {
 		if pu.SID == kvt.tx.sid {
-			return nil, false, fmt.Errorf("kvrows: %s: multiple updates of %v",
-				kvt.ts.tn, updateKey)
+			return nil, false, fmt.Errorf("kvrows: %s: multiple updates of %v", kvt.tn, updateKey)
 		}
 		return pd, len(pu.Value) != 0, nil
 	} else {
 		state, ver := kvt.st.getTxState(pd.TID)
 		if state == TransactionState_Active {
 			return nil, false, fmt.Errorf("kvrows: %s: conflict with proposed version of %v",
-				kvt.ts.tn, updateKey)
+				kvt.tn, updateKey)
 		} else if state == TransactionState_Committed {
 			if ver > kvt.tx.ver {
 				return nil, false, fmt.Errorf("kvrows: %s: conflict with newer version of %v",
-					kvt.ts.tn, updateKey)
+					kvt.tn, updateKey)
 			}
 			err := upd.Set(makeKeyVersion(updateKey, ver), pu.Value)
 			if err != nil {
@@ -613,7 +577,7 @@ func (kvt *table) prepareUpdate(upd Updater, updateKey []byte) (*ProposalData, b
 	err = it.Item(
 		func(key, val []byte) error {
 			if len(key) < 16 {
-				return fmt.Errorf("kvrows: %s: key too short: %v", kvt.ts.tn, key)
+				return fmt.Errorf("kvrows: %s: key too short: %v", kvt.tn, key)
 			}
 			ver := ^binary.BigEndian.Uint64(key[len(key)-8:])
 			key = key[:len(key)-8]
@@ -624,7 +588,7 @@ func (kvt *table) prepareUpdate(upd Updater, updateKey []byte) (*ProposalData, b
 
 			if ver > kvt.tx.ver {
 				return fmt.Errorf("kvrows: %s: conflict with newer version of %v",
-					kvt.ts.tn, updateKey)
+					kvt.tn, updateKey)
 			}
 
 			existing = len(val) > 0
@@ -648,12 +612,12 @@ func (kvt *table) proposeUpdate(upd Updater, updateKey []byte, row []sql.Value,
 	}
 	if mustExist {
 		if !exists {
-			panic(fmt.Sprintf("kvrows: %s: row missing for update at %v", kvt.ts.tn, updateKey))
+			panic(fmt.Sprintf("kvrows: %s: row missing for update at %v", kvt.tn, updateKey))
 		}
 	} else {
 		if exists {
 			return fmt.Errorf("kvrows: %s: existing row with duplicate primary key at %v",
-				kvt.ts.tn, updateKey)
+				kvt.tn, updateKey)
 		}
 	}
 
@@ -683,7 +647,7 @@ func (kvt *table) Insert(ctx context.Context, row []sql.Value) error {
 		return err
 	}
 
-	err = kvt.proposeUpdate(upd, kvt.ts.makeKey(row), row, false)
+	err = kvt.proposeUpdate(upd, kvt.makeKey(row), row, false)
 	if err != nil {
 		upd.Rollback()
 		return err
@@ -692,7 +656,7 @@ func (kvt *table) Insert(ctx context.Context, row []sql.Value) error {
 }
 
 func (kvr *rows) Columns() []sql.Identifier {
-	return kvr.tbl.ts.columns
+	return kvr.tbl.cols
 }
 
 func (kvr *rows) Close() error {
@@ -713,7 +677,7 @@ func (kvr *rows) Next(ctx context.Context, dest []sql.Value) error {
 
 func (kvr *rows) Delete(ctx context.Context) error {
 	if kvr.idx == 0 {
-		panic(fmt.Sprintf("kvrows: table %s no row to delete", kvr.tbl.ts.tn))
+		panic(fmt.Sprintf("kvrows: table %s no row to delete", kvr.tbl.tn))
 	}
 
 	upd, err := kvr.tbl.st.kv.Update()
@@ -721,7 +685,7 @@ func (kvr *rows) Delete(ctx context.Context) error {
 		return err
 	}
 
-	err = kvr.tbl.proposeUpdate(upd, kvr.tbl.ts.makeKey(kvr.rows[kvr.idx-1]), nil, true)
+	err = kvr.tbl.proposeUpdate(upd, kvr.tbl.makeKey(kvr.rows[kvr.idx-1]), nil, true)
 	if err != nil {
 		upd.Rollback()
 		return err
@@ -731,12 +695,12 @@ func (kvr *rows) Delete(ctx context.Context) error {
 
 func (kvr *rows) Update(ctx context.Context, updates []sql.ColumnUpdate) error {
 	if kvr.idx == 0 {
-		panic(fmt.Sprintf("kvrows: table %s no row to update", kvr.tbl.ts.tn))
+		panic(fmt.Sprintf("kvrows: table %s no row to update", kvr.tbl.tn))
 	}
 
 	var primaryUpdated bool
 	for _, update := range updates {
-		for _, ck := range kvr.tbl.ts.primary {
+		for _, ck := range kvr.tbl.primary {
 			if ck.Number() == update.Index {
 				primaryUpdated = true
 			}
@@ -758,7 +722,7 @@ func (kvr *rows) Update(ctx context.Context, updates []sql.ColumnUpdate) error {
 		return err
 	}
 
-	err = kvr.tbl.proposeUpdate(upd, kvr.tbl.ts.makeKey(updateRow), updateRow, true)
+	err = kvr.tbl.proposeUpdate(upd, kvr.tbl.makeKey(updateRow), updateRow, true)
 	if err != nil {
 		upd.Rollback()
 		return err
