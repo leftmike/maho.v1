@@ -43,12 +43,6 @@ To Do:
 - subquery expressions: EXISTS, IN, NOT IN, ANY/SOME, ALL
 - conditional expressions: CASE, COALESCE, NULLIF, GREATEST, LEAST
 
--- checks all constraints including unique and foreign key references
--- converts from engine metadata to evaluate metadata; eg. Default from string to Expr
--- generated columns
--- triggers
--- row level security
-
 - indexes
 -- based on column numbers
 -- engine.Table: return list of indexes?
