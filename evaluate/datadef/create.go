@@ -5,6 +5,7 @@ import (
 	"fmt"
 
 	"github.com/leftmike/maho/evaluate"
+	"github.com/leftmike/maho/evaluate/expr"
 	"github.com/leftmike/maho/sql"
 )
 
@@ -36,13 +37,22 @@ type Constraint struct {
 	Name   sql.Identifier
 	ColNum int
 	Key    IndexKey
-	Check  sql.Expr
+	Check  expr.Expr
+}
+
+type ColumnType struct {
+	Type    sql.DataType
+	Size    uint32
+	Fixed   bool
+	NotNull bool
+	Default expr.Expr
 }
 
 type CreateTable struct {
 	Table       sql.TableName
 	Columns     []sql.Identifier
-	ColumnTypes []sql.ColumnType
+	ColumnTypes []ColumnType
+	columnTypes []sql.ColumnType
 	IfNotExists bool
 	Constraints []Constraint
 	constraints []sql.Constraint
@@ -59,7 +69,7 @@ func (stmt *CreateTable) String() string {
 		if i > 0 {
 			s += ", "
 		}
-		s += fmt.Sprintf("%s %s", stmt.Columns[i], ct.DataType())
+		s += fmt.Sprintf("%s %s", stmt.Columns[i], sql.ColumnDataType(ct.Type, ct.Size, ct.Fixed))
 		if ct.NotNull {
 			s += " NOT NULL"
 		}
@@ -102,8 +112,27 @@ func (stmt *CreateTable) Plan(ses *evaluate.Session, tx sql.Transaction) (interf
 			Name:   con.Name,
 			ColNum: con.ColNum,
 			Key:    key,
-			Check:  con.Check,
+			Check:  nil, // XXX: con.Check,
 		})
+	}
+
+	for _, ct := range stmt.ColumnTypes {
+		var dflt sql.CExpr
+		if ct.Default != nil {
+			var err error
+			dflt, err = expr.Compile(ses, tx, nil, ct.Default)
+			if err != nil {
+				return nil, err
+			}
+		}
+		stmt.columnTypes = append(stmt.columnTypes,
+			sql.ColumnType{
+				Type:    ct.Type,
+				Size:    ct.Size,
+				Fixed:   ct.Fixed,
+				NotNull: ct.NotNull,
+				Default: dflt,
+			})
 	}
 
 	return stmt, nil
@@ -112,7 +141,7 @@ func (stmt *CreateTable) Plan(ses *evaluate.Session, tx sql.Transaction) (interf
 func (stmt *CreateTable) Execute(ctx context.Context, e sql.Engine, tx sql.Transaction) (int64,
 	error) {
 
-	err := e.CreateTable(ctx, tx, stmt.Table, stmt.Columns, stmt.ColumnTypes, stmt.constraints,
+	err := e.CreateTable(ctx, tx, stmt.Table, stmt.Columns, stmt.columnTypes, stmt.constraints,
 		stmt.IfNotExists)
 	if err != nil {
 		return -1, err

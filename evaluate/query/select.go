@@ -20,21 +20,21 @@ type TableResult struct {
 }
 
 type ExprResult struct {
-	Expr  sql.Expr
+	Expr  expr.Expr
 	Alias sql.Identifier
 }
 
 type OrderBy struct {
-	Expr    sql.Expr
+	Expr    expr.Expr
 	Reverse bool
 }
 
 type Select struct {
 	Results []SelectResult
 	From    FromItem
-	Where   sql.Expr
-	GroupBy []sql.Expr
-	Having  sql.Expr
+	Where   expr.Expr
+	GroupBy []expr.Expr
+	Having  expr.Expr
 	OrderBy []OrderBy
 }
 
@@ -297,7 +297,7 @@ func order(rows sql.Rows, fctx *fromContext, order []OrderBy) (sql.Rows, error) 
 
 type filterRows struct {
 	rows sql.Rows
-	cond expr.CExpr
+	cond sql.CExpr
 	dest []sql.Value
 }
 
@@ -348,12 +348,12 @@ func (fr *filterRows) Update(ctx context.Context, updates []sql.ColumnUpdate) er
 }
 
 func where(ses *evaluate.Session, tx sql.Transaction, rows sql.Rows, fctx *fromContext,
-	cond sql.Expr) (sql.Rows, error) {
+	cond expr.Expr) (sql.Rows, error) {
 
 	if cond == nil {
 		return rows, nil
 	}
-	ce, err := expr.Compile(ses, tx, fctx, cond, false)
+	ce, err := expr.Compile(ses, tx, fctx, cond)
 	if err != nil {
 		return nil, err
 	}
@@ -421,7 +421,7 @@ type src2dest struct {
 
 type expr2dest struct {
 	destColIndex int
-	expr         expr.CExpr
+	expr         sql.CExpr
 }
 
 type resultRows struct {
@@ -487,7 +487,7 @@ func results(ses *evaluate.Session, tx sql.Transaction, rows sql.Rows, fctx *fro
 		switch sr := sr.(type) {
 		case TableResult:
 			for _, col := range fctx.tableColumns(sr.Table) {
-				ce, err := expr.Compile(ses, tx, fctx, expr.Ref{sr.Table, col}, false)
+				ce, err := expr.Compile(ses, tx, fctx, expr.Ref{sr.Table, col})
 				if err != nil {
 					panic(err)
 				}
@@ -496,7 +496,7 @@ func results(ses *evaluate.Session, tx sql.Transaction, rows sql.Rows, fctx *fro
 				ddx += 1
 			}
 		case ExprResult:
-			ce, err := expr.Compile(ses, tx, fctx, sr.Expr, false)
+			ce, err := expr.Compile(ses, tx, fctx, sr.Expr)
 			if err != nil {
 				return nil, err
 			}

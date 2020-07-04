@@ -58,8 +58,9 @@ func TestDataType(t *testing.T) {
 	}
 
 	for _, c := range cases {
-		if c.ct.DataType() != c.dt {
-			t.Errorf("ColumnType{%v}.DataType() got %s want %s", c.ct, c.ct.DataType(), c.dt)
+		s := sql.ColumnDataType(c.ct.Type, c.ct.Size, c.ct.Fixed)
+		if s != c.dt {
+			t.Errorf("ColumnType{%v}.DataType() got %s want %s", c.ct, s, c.dt)
 		}
 	}
 }

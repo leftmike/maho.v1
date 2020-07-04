@@ -120,7 +120,7 @@ func TestCreateTable(t *testing.T) {
 				Table: sql.TableName{Table: sql.ID("t")},
 				Columns: []sql.Identifier{sql.ID("c1"), sql.ID("c2"), sql.ID("c3"), sql.ID("c4"),
 					sql.ID("c5"), sql.ID("c6")},
-				ColumnTypes: []sql.ColumnType{
+				ColumnTypes: []datadef.ColumnType{
 					{Type: sql.IntegerType, Size: 2},
 					{Type: sql.IntegerType, Size: 2},
 					{Type: sql.IntegerType, Size: 4},
@@ -135,7 +135,7 @@ func TestCreateTable(t *testing.T) {
 			stmt: datadef.CreateTable{
 				Table:       sql.TableName{Table: sql.ID("t")},
 				Columns:     []sql.Identifier{sql.ID("c")},
-				ColumnTypes: []sql.ColumnType{{Type: sql.IntegerType, Size: 4}},
+				ColumnTypes: []datadef.ColumnType{{Type: sql.IntegerType, Size: 4}},
 				IfNotExists: true,
 			},
 		},
@@ -144,7 +144,7 @@ func TestCreateTable(t *testing.T) {
 			stmt: datadef.CreateTable{
 				Table:   sql.TableName{Table: sql.ID("t")},
 				Columns: []sql.Identifier{sql.ID("b1"), sql.ID("b2"), sql.ID("d1"), sql.ID("d2")},
-				ColumnTypes: []sql.ColumnType{
+				ColumnTypes: []datadef.ColumnType{
 					{Type: sql.BooleanType, Size: 1},
 					{Type: sql.BooleanType, Size: 1},
 					{Type: sql.FloatType, Size: 8},
@@ -158,7 +158,7 @@ func TestCreateTable(t *testing.T) {
 				Table: sql.TableName{Table: sql.ID("t")},
 				Columns: []sql.Identifier{sql.ID("b1"), sql.ID("b2"), sql.ID("b3"), sql.ID("b4"),
 					sql.ID("b5")},
-				ColumnTypes: []sql.ColumnType{
+				ColumnTypes: []datadef.ColumnType{
 					{Type: sql.BytesType, Fixed: true, Size: 1},
 					{Type: sql.BytesType, Fixed: false, Size: 123},
 					{Type: sql.BytesType, Fixed: false, Size: sql.MaxColumnSize},
@@ -172,7 +172,7 @@ func TestCreateTable(t *testing.T) {
 			stmt: datadef.CreateTable{
 				Table:   sql.TableName{Table: sql.ID("t")},
 				Columns: []sql.Identifier{sql.ID("b1"), sql.ID("b2"), sql.ID("b3")},
-				ColumnTypes: []sql.ColumnType{
+				ColumnTypes: []datadef.ColumnType{
 					{Type: sql.BytesType, Fixed: true, Size: 123},
 					{Type: sql.BytesType, Fixed: false, Size: 456},
 					{Type: sql.BytesType, Fixed: false, Size: 789},
@@ -184,7 +184,7 @@ func TestCreateTable(t *testing.T) {
 			stmt: datadef.CreateTable{
 				Table:   sql.TableName{Table: sql.ID("t")},
 				Columns: []sql.Identifier{sql.ID("b1"), sql.ID("b2")},
-				ColumnTypes: []sql.ColumnType{
+				ColumnTypes: []datadef.ColumnType{
 					{Type: sql.BytesType, Fixed: false, Size: 456},
 					{Type: sql.BytesType, Fixed: false, Size: 789},
 				},
@@ -195,7 +195,7 @@ func TestCreateTable(t *testing.T) {
 			stmt: datadef.CreateTable{
 				Table:   sql.TableName{Table: sql.ID("t")},
 				Columns: []sql.Identifier{sql.ID("c1"), sql.ID("c2"), sql.ID("c3")},
-				ColumnTypes: []sql.ColumnType{
+				ColumnTypes: []datadef.ColumnType{
 					{Type: sql.StringType, Fixed: true, Size: 1},
 					{Type: sql.StringType, Fixed: false, Size: 123},
 					{Type: sql.StringType, Fixed: false, Size: sql.MaxColumnSize},
@@ -207,7 +207,7 @@ func TestCreateTable(t *testing.T) {
 			stmt: datadef.CreateTable{
 				Table:   sql.TableName{Table: sql.ID("t")},
 				Columns: []sql.Identifier{sql.ID("c1"), sql.ID("c2"), sql.ID("c3")},
-				ColumnTypes: []sql.ColumnType{
+				ColumnTypes: []datadef.ColumnType{
 					{Type: sql.StringType, Fixed: true, Size: 123},
 					{Type: sql.StringType, Fixed: false, Size: 456},
 					{Type: sql.StringType, Fixed: false, Size: 789},
@@ -219,7 +219,7 @@ func TestCreateTable(t *testing.T) {
 			stmt: datadef.CreateTable{
 				Table:   sql.TableName{Table: sql.ID("t")},
 				Columns: []sql.Identifier{sql.ID("c1"), sql.ID("c2")},
-				ColumnTypes: []sql.ColumnType{
+				ColumnTypes: []datadef.ColumnType{
 					{Type: sql.StringType, Fixed: false, Size: 64,
 						Default: expr.StringLiteral("abcd")},
 					{Type: sql.IntegerType, Size: 4, Default: expr.Int64Literal(123)},
@@ -235,7 +235,7 @@ func TestCreateTable(t *testing.T) {
 			stmt: datadef.CreateTable{
 				Table:   sql.TableName{Table: sql.ID("t")},
 				Columns: []sql.Identifier{sql.ID("c1"), sql.ID("c2")},
-				ColumnTypes: []sql.ColumnType{
+				ColumnTypes: []datadef.ColumnType{
 					{Type: sql.BooleanType, Size: 1, Default: expr.True()},
 					{Type: sql.BooleanType, Size: 1, NotNull: true},
 				},
@@ -251,7 +251,7 @@ c2 boolean not null default true)`,
 			stmt: datadef.CreateTable{
 				Table:   sql.TableName{Table: sql.ID("t")},
 				Columns: []sql.Identifier{sql.ID("c1"), sql.ID("c2")},
-				ColumnTypes: []sql.ColumnType{
+				ColumnTypes: []datadef.ColumnType{
 					{Type: sql.BooleanType, Size: 1, Default: expr.True(), NotNull: true},
 					{Type: sql.BooleanType, Size: 1, NotNull: true, Default: expr.True()},
 				},
@@ -275,7 +275,7 @@ c2 boolean not null default true)`,
 			stmt: datadef.CreateTable{
 				Table:   sql.TableName{Table: sql.ID("t")},
 				Columns: []sql.Identifier{sql.ID("c1"), sql.ID("c2")},
-				ColumnTypes: []sql.ColumnType{
+				ColumnTypes: []datadef.ColumnType{
 					{Type: sql.IntegerType, Size: 4},
 					{Type: sql.BooleanType, Size: 1},
 				},
@@ -298,7 +298,7 @@ c2 boolean not null default true)`,
 			stmt: datadef.CreateTable{
 				Table:   sql.TableName{Table: sql.ID("t")},
 				Columns: []sql.Identifier{sql.ID("c1"), sql.ID("c2")},
-				ColumnTypes: []sql.ColumnType{
+				ColumnTypes: []datadef.ColumnType{
 					{Type: sql.IntegerType, Size: 4},
 					{Type: sql.BooleanType, Size: 1},
 				},
@@ -321,7 +321,7 @@ c2 boolean not null default true)`,
 			stmt: datadef.CreateTable{
 				Table:   sql.TableName{Table: sql.ID("t")},
 				Columns: []sql.Identifier{sql.ID("c1"), sql.ID("c2")},
-				ColumnTypes: []sql.ColumnType{
+				ColumnTypes: []datadef.ColumnType{
 					{Type: sql.IntegerType, Size: 4},
 					{Type: sql.BooleanType, Size: 1},
 				},
@@ -344,7 +344,7 @@ c2 boolean not null default true)`,
 			stmt: datadef.CreateTable{
 				Table:   sql.TableName{Table: sql.ID("t")},
 				Columns: []sql.Identifier{sql.ID("c1"), sql.ID("c2")},
-				ColumnTypes: []sql.ColumnType{
+				ColumnTypes: []datadef.ColumnType{
 					{Type: sql.IntegerType, Size: 4},
 					{Type: sql.BooleanType, Size: 1},
 				},
@@ -367,7 +367,7 @@ c2 boolean not null default true)`,
 			stmt: datadef.CreateTable{
 				Table:   sql.TableName{Table: sql.ID("t")},
 				Columns: []sql.Identifier{sql.ID("c1"), sql.ID("c2")},
-				ColumnTypes: []sql.ColumnType{
+				ColumnTypes: []datadef.ColumnType{
 					{Type: sql.IntegerType, Size: 4},
 					{Type: sql.BooleanType, Size: 1},
 				},
@@ -410,7 +410,7 @@ c2 boolean not null default true)`,
 			stmt: datadef.CreateTable{
 				Table:   sql.TableName{Table: sql.ID("t")},
 				Columns: []sql.Identifier{sql.ID("c1"), sql.ID("c2")},
-				ColumnTypes: []sql.ColumnType{
+				ColumnTypes: []datadef.ColumnType{
 					{Type: sql.IntegerType, Size: 4},
 					{Type: sql.BooleanType, Size: 1},
 				},
@@ -444,7 +444,7 @@ constraint con2 unique (c2, c1))`,
 			stmt: datadef.CreateTable{
 				Table:   sql.TableName{Table: sql.ID("t")},
 				Columns: []sql.Identifier{sql.ID("c1"), sql.ID("c2")},
-				ColumnTypes: []sql.ColumnType{
+				ColumnTypes: []datadef.ColumnType{
 					{Type: sql.IntegerType, Size: 4},
 					{Type: sql.BooleanType, Size: 1},
 				},
@@ -478,7 +478,7 @@ c2 bool constraint dflt default true)`,
 			stmt: datadef.CreateTable{
 				Table:   sql.TableName{Table: sql.ID("t")},
 				Columns: []sql.Identifier{sql.ID("c1"), sql.ID("c2")},
-				ColumnTypes: []sql.ColumnType{
+				ColumnTypes: []datadef.ColumnType{
 					{Type: sql.IntegerType, Size: 4, NotNull: true},
 					{Type: sql.BooleanType, Size: 1, Default: expr.True()},
 				},
@@ -612,7 +612,7 @@ func TestInsertValues(t *testing.T) {
 			sql: "insert into t values (1, 'abc', true)",
 			stmt: query.InsertValues{
 				Table: sql.TableName{Table: sql.ID("t")},
-				Rows: [][]sql.Expr{
+				Rows: [][]expr.Expr{
 					{expr.Int64Literal(1), expr.StringLiteral("abc"), expr.True()},
 				},
 			},
@@ -621,7 +621,7 @@ func TestInsertValues(t *testing.T) {
 			sql: "insert into t values (1, 'abc', true), (2, 'def', false)",
 			stmt: query.InsertValues{
 				Table: sql.TableName{Table: sql.ID("t")},
-				Rows: [][]sql.Expr{
+				Rows: [][]expr.Expr{
 					{expr.Int64Literal(1), expr.StringLiteral("abc"), expr.True()},
 					{expr.Int64Literal(2), expr.StringLiteral("def"), expr.False()},
 				},
@@ -631,7 +631,7 @@ func TestInsertValues(t *testing.T) {
 			sql: "insert into t values (NULL, 'abc', NULL)",
 			stmt: query.InsertValues{
 				Table: sql.TableName{Table: sql.ID("t")},
-				Rows: [][]sql.Expr{
+				Rows: [][]expr.Expr{
 					{expr.Nil(), expr.StringLiteral("abc"), expr.Nil()},
 				},
 			},
@@ -990,7 +990,7 @@ func TestSelect(t *testing.T) {
 					Left: query.FromTableAlias{TableName: sql.TableName{Table: sql.ID("t2")}},
 					Right: query.FromStmt{
 						Stmt: &query.Values{
-							Expressions: [][]sql.Expr{
+							Expressions: [][]expr.Expr{
 								{expr.Int64Literal(1), expr.StringLiteral("abc"), expr.True()},
 							},
 						},
@@ -1016,7 +1016,7 @@ func TestSelect(t *testing.T) {
 					},
 					Right: query.FromStmt{
 						Stmt: &query.Values{
-							Expressions: [][]sql.Expr{
+							Expressions: [][]expr.Expr{
 								{expr.Int64Literal(1), expr.StringLiteral("abc"), expr.True()},
 							},
 						},
@@ -1037,7 +1037,7 @@ func TestSelect(t *testing.T) {
 			stmt: query.Select{
 				From: query.FromStmt{
 					Stmt: &query.Values{
-						Expressions: [][]sql.Expr{
+						Expressions: [][]expr.Expr{
 							{expr.Int64Literal(1), expr.StringLiteral("abc"), expr.True()},
 						},
 					},
@@ -1050,7 +1050,7 @@ func TestSelect(t *testing.T) {
 			stmt: query.Select{
 				From: query.FromStmt{
 					Stmt: &query.Values{
-						Expressions: [][]sql.Expr{
+						Expressions: [][]expr.Expr{
 							{expr.Int64Literal(1), expr.StringLiteral("abc"), expr.True()},
 						},
 					},
@@ -1124,7 +1124,7 @@ func TestSelect(t *testing.T) {
 				Results: []query.SelectResult{
 					query.ExprResult{Expr: expr.Ref{sql.ID("c")}},
 				},
-				GroupBy: []sql.Expr{expr.Ref{sql.ID("c")}},
+				GroupBy: []expr.Expr{expr.Ref{sql.ID("c")}},
 			},
 		},
 		{
@@ -1134,7 +1134,7 @@ func TestSelect(t *testing.T) {
 				Results: []query.SelectResult{
 					query.ExprResult{Expr: expr.Ref{sql.ID("c")}},
 				},
-				GroupBy: []sql.Expr{expr.Ref{sql.ID("c")}, expr.Ref{sql.ID("d")},
+				GroupBy: []expr.Expr{expr.Ref{sql.ID("c")}, expr.Ref{sql.ID("d")},
 					&expr.Binary{Op: expr.AddOp, Left: expr.Ref{sql.ID("e")},
 						Right: expr.Ref{sql.ID("f")}},
 				},
@@ -1147,7 +1147,7 @@ func TestSelect(t *testing.T) {
 				Results: []query.SelectResult{
 					query.ExprResult{Expr: expr.Ref{sql.ID("c")}},
 				},
-				GroupBy: []sql.Expr{expr.Ref{sql.ID("c")}},
+				GroupBy: []expr.Expr{expr.Ref{sql.ID("c")}},
 				Having: &expr.Binary{Op: expr.GreaterThanOp, Left: expr.Ref{sql.ID("c")},
 					Right: expr.Int64Literal(1)},
 			},
@@ -1189,7 +1189,7 @@ func TestValues(t *testing.T) {
 		{
 			sql: "values (1, 'abc', true)",
 			stmt: query.Values{
-				Expressions: [][]sql.Expr{
+				Expressions: [][]expr.Expr{
 					{expr.Int64Literal(1), expr.StringLiteral("abc"), expr.True()},
 				},
 			},
@@ -1197,7 +1197,7 @@ func TestValues(t *testing.T) {
 		{
 			sql: "values (1, 'abc', true), (2, 'def', false)",
 			stmt: query.Values{
-				Expressions: [][]sql.Expr{
+				Expressions: [][]expr.Expr{
 					{expr.Int64Literal(1), expr.StringLiteral("abc"), expr.True()},
 					{expr.Int64Literal(2), expr.StringLiteral("def"), expr.False()},
 				},

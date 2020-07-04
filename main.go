@@ -49,7 +49,6 @@ To Do:
 -- engine.Index: IndexRows(...) => engine.IndexRows {Columns, Close, Next, Delete, Update, Row}
 -- move Engine.CreateIndex, DropIndex to Table
 
--- should Constraint.Check (and ColumnType.Default be CExpr?
 -- change unique constraints into indexes
 
 - column constraints

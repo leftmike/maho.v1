@@ -11,7 +11,7 @@ import (
 )
 
 type Values struct {
-	Expressions [][]sql.Expr
+	Expressions [][]expr.Expr
 }
 
 func (stmt *Values) String() string {
@@ -38,7 +38,7 @@ func (stmt *Values) String() string {
 
 type exprValues struct {
 	columns []sql.Identifier
-	rows    [][]expr.CExpr
+	rows    [][]sql.CExpr
 	index   int
 }
 
@@ -86,12 +86,12 @@ func (stmt *Values) Plan(ses *evaluate.Session, tx sql.Transaction) (interface{}
 		columns[i] = sql.ID(fmt.Sprintf("column%d", i+1))
 	}
 
-	var rows [][]expr.CExpr
+	var rows [][]sql.CExpr
 	for _, r := range stmt.Expressions {
-		row := make([]expr.CExpr, len(r))
+		row := make([]sql.CExpr, len(r))
 		for j := range r {
 			var err error
-			row[j], err = expr.Compile(ses, tx, nil, r[j], false)
+			row[j], err = expr.Compile(ses, tx, nil, r[j])
 			if err != nil {
 				return nil, err
 			}

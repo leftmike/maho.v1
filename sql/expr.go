@@ -1,11 +1,15 @@
 package sql
 
 import (
+	"context"
 	"fmt"
 )
 
-type Expr interface {
+type EvalContext interface {
+	EvalRef(idx int) Value
+}
+
+type CExpr interface {
 	fmt.Stringer
-	Equal(e Expr) bool
-	HasRef() bool
+	Eval(ctx context.Context, etx EvalContext) (Value, error)
 }

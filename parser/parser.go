@@ -18,7 +18,7 @@ import (
 
 type Parser interface {
 	Parse() (evaluate.Stmt, error)
-	ParseExpr() (sql.Expr, error)
+	ParseExpr() (expr.Expr, error)
 }
 
 const lookBackAmount = 3
@@ -494,7 +494,7 @@ func (p *parser) parseCreateDetails(s *datadef.CreateTable) {
 	}
 }
 
-var types = map[sql.Identifier]sql.ColumnType{
+var types = map[sql.Identifier]datadef.ColumnType{
 	sql.BINARY:    {Type: sql.BytesType, Fixed: true, Size: 1},
 	sql.VARBINARY: {Type: sql.BytesType, Fixed: false},
 	sql.BLOB:      {Type: sql.BytesType, Fixed: false, Size: sql.MaxColumnSize},
@@ -517,7 +517,7 @@ var types = map[sql.Identifier]sql.ColumnType{
 	sql.BIGINT:    {Type: sql.IntegerType, Size: 8},
 }
 
-func (p *parser) parseColumnType() sql.ColumnType {
+func (p *parser) parseColumnType() datadef.ColumnType {
 	/*
 		data_type =
 			  BINARY ['(' length ')']
@@ -766,7 +766,7 @@ func (p *parser) optionalSubquery() (evaluate.Stmt, bool) {
 	return nil, false
 }
 
-func (p *parser) ParseExpr() (e sql.Expr, err error) {
+func (p *parser) ParseExpr() (e expr.Expr, err error) {
 	defer func() {
 		if r := recover(); r != nil {
 			if _, ok := r.(runtime.Error); ok {
@@ -781,7 +781,7 @@ func (p *parser) ParseExpr() (e sql.Expr, err error) {
 	return
 }
 
-func adjustPrecedence(e sql.Expr) sql.Expr {
+func adjustPrecedence(e expr.Expr) expr.Expr {
 	switch e := e.(type) {
 	case *expr.Unary:
 		e.Expr = adjustPrecedence(e.Expr)
@@ -821,7 +821,7 @@ func adjustPrecedence(e sql.Expr) sql.Expr {
 	return e
 }
 
-func (p *parser) parseExpr() sql.Expr {
+func (p *parser) parseExpr() expr.Expr {
 	return adjustPrecedence(p.parseSubExpr())
 }
 
@@ -861,8 +861,8 @@ var binaryOps = map[rune]expr.Op{
 	token.Star:           expr.MultiplyOp,
 }
 
-func (p *parser) parseSubExpr() sql.Expr {
-	var e sql.Expr
+func (p *parser) parseSubExpr() expr.Expr {
+	var e expr.Expr
 	r := p.scan()
 	if r == token.Reserved {
 		if p.sctx.Identifier == sql.TRUE {
@@ -975,7 +975,7 @@ func (p *parser) parseInsert() evaluate.Stmt {
 	p.expectReserved(sql.VALUES)
 
 	for {
-		var row []sql.Expr
+		var row []expr.Expr
 
 		p.expectTokens(token.LParen)
 		for {
@@ -1054,7 +1054,7 @@ func (p *parser) parseValues() *query.Values {
 
 	var s query.Values
 	for {
-		var row []sql.Expr
+		var row []expr.Expr
 
 		p.expectTokens(token.LParen)
 		for {

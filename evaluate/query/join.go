@@ -34,7 +34,7 @@ type FromJoin struct {
 	Left  FromItem
 	Right FromItem
 	Type  JoinType
-	On    sql.Expr
+	On    expr.Expr
 	Using []sql.Identifier
 }
 
@@ -90,7 +90,7 @@ type joinRows struct {
 
 	columns []sql.Identifier
 
-	on expr.CExpr
+	on sql.CExpr
 
 	using    []usingMatch
 	src2dest []int
@@ -300,7 +300,7 @@ func (fj FromJoin) rows(ses *evaluate.Session, tx sql.Transaction) (sql.Rows, *f
 		fctx = joinContextsOn(leftCtx, rightCtx)
 		rows.rightLen = len(rightCtx.cols)
 		if fj.On != nil {
-			rows.on, err = expr.Compile(ses, tx, fctx, fj.On, false)
+			rows.on, err = expr.Compile(ses, tx, fctx, fj.On)
 			if err != nil {
 				return nil, nil, err
 			}

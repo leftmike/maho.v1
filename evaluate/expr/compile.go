@@ -13,7 +13,7 @@ type CompileContext interface {
 }
 
 type AggregatorContext interface {
-	MaybeRefExpr(e sql.Expr) (int, bool)
+	MaybeRefExpr(e Expr) (int, bool)
 	CompileAggregator(c *Call, maker MakeAggregator) int
 }
 
@@ -25,12 +25,28 @@ func (e *ContextError) Error() string {
 	return fmt.Sprintf("engine: aggregate function \"%s\" used in scalar context", e.name)
 }
 
-func CompileRef(idx int) CExpr {
+func CompileRef(idx int) sql.CExpr {
 	return colIndex(idx)
 }
 
-func Compile(ses *evaluate.Session, tx sql.Transaction, ctx CompileContext, e sql.Expr,
-	agg bool) (CExpr, error) {
+func Compile(ses *evaluate.Session, tx sql.Transaction, ctx CompileContext, e Expr) (sql.CExpr,
+	error) {
+
+	return compile(ses, tx, ctx, e, false)
+}
+
+func CompileAggregator(ses *evaluate.Session, tx sql.Transaction, ctx CompileContext,
+	e Expr) (sql.CExpr, error) {
+
+	return compile(ses, tx, ctx, e, true)
+}
+
+func CompileExpr(e Expr) (sql.CExpr, error) {
+	return compile(nil, nil, nil, e, false)
+}
+
+func compile(ses *evaluate.Session, tx sql.Transaction, ctx CompileContext, e Expr,
+	agg bool) (sql.CExpr, error) {
 
 	if agg {
 		idx, ok := ctx.(AggregatorContext).MaybeRefExpr(e)
@@ -43,25 +59,25 @@ func Compile(ses *evaluate.Session, tx sql.Transaction, ctx CompileContext, e sq
 		return e, nil
 	case *Unary:
 		if e.Op == NoOp {
-			return Compile(ses, tx, ctx, e.Expr, agg)
+			return compile(ses, tx, ctx, e.Expr, agg)
 		}
 		cf := opFuncs[e.Op]
-		a1, err := Compile(ses, tx, ctx, e.Expr, agg)
+		a1, err := compile(ses, tx, ctx, e.Expr, agg)
 		if err != nil {
 			return nil, err
 		}
-		return &call{cf, []CExpr{a1}}, nil
+		return &call{cf, []sql.CExpr{a1}}, nil
 	case *Binary:
 		cf := opFuncs[e.Op]
-		a1, err := Compile(ses, tx, ctx, e.Left, agg)
+		a1, err := compile(ses, tx, ctx, e.Left, agg)
 		if err != nil {
 			return nil, err
 		}
-		a2, err := Compile(ses, tx, ctx, e.Right, agg)
+		a2, err := compile(ses, tx, ctx, e.Right, agg)
 		if err != nil {
 			return nil, err
 		}
-		return &call{cf, []CExpr{a1, a2}}, nil
+		return &call{cf, []sql.CExpr{a1, a2}}, nil
 	case Ref:
 		idx, err := ctx.CompileRef(e)
 		if err != nil {
@@ -90,16 +106,19 @@ func Compile(ses *evaluate.Session, tx sql.Transaction, ctx CompileContext, e sq
 			}
 		}
 
-		args := make([]CExpr, len(e.Args))
+		args := make([]sql.CExpr, len(e.Args))
 		for i, a := range e.Args {
 			var err error
-			args[i], err = Compile(ses, tx, ctx, a, agg)
+			args[i], err = compile(ses, tx, ctx, a, agg)
 			if err != nil {
 				return nil, err
 			}
 		}
 		return &call{cf, args}, nil
 	case Stmt:
+		if ses == nil || tx == nil {
+			return nil, fmt.Errorf("engine: expression statements not allowed here: %s", e.Stmt)
+		}
 		ret, err := e.Stmt.Plan(ses, tx)
 		if err != nil {
 			return nil, err
@@ -115,7 +134,7 @@ func Compile(ses *evaluate.Session, tx sql.Transaction, ctx CompileContext, e sq
 }
 
 type callFunc struct {
-	fn             func(ctx EvalContext, args []sql.Value) (sql.Value, error)
+	fn             func(ctx sql.EvalContext, args []sql.Value) (sql.Value, error)
 	minArgs        int16
 	maxArgs        int16
 	name           string

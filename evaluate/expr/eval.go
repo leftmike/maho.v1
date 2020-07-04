@@ -10,16 +10,7 @@ import (
 	"github.com/leftmike/maho/sql"
 )
 
-type EvalContext interface {
-	EvalRef(idx int) sql.Value
-}
-
-type CExpr interface {
-	fmt.Stringer
-	Eval(ctx context.Context, etx EvalContext) (sql.Value, error)
-}
-
-func (l *Literal) Eval(ctx context.Context, etx EvalContext) (sql.Value, error) {
+func (l *Literal) Eval(ctx context.Context, etx sql.EvalContext) (sql.Value, error) {
 	return l.Value, nil
 }
 
@@ -29,11 +20,11 @@ func (ci colIndex) String() string {
 	return fmt.Sprintf("row[%d]", ci)
 }
 
-func (ci colIndex) Eval(ctx context.Context, etx EvalContext) (sql.Value, error) {
+func (ci colIndex) Eval(ctx context.Context, etx sql.EvalContext) (sql.Value, error) {
 	return etx.EvalRef(int(ci)), nil
 }
 
-func ColumnIndex(ce CExpr) (int, bool) {
+func ColumnIndex(ce sql.CExpr) (int, bool) {
 	if ci, ok := ce.(colIndex); ok {
 		return int(ci), true
 	}
@@ -51,7 +42,7 @@ func (re *rowsExpr) String() string {
 	return fmt.Sprintf("rows: %#v", re)
 }
 
-func (re *rowsExpr) eval(ctx context.Context, etx EvalContext) (sql.Value, error) {
+func (re *rowsExpr) eval(ctx context.Context, etx sql.EvalContext) (sql.Value, error) {
 	if len(re.rows.Columns()) != 1 {
 		return nil, errors.New("engine: expected one column for scalar subquery")
 	}
@@ -69,7 +60,7 @@ func (re *rowsExpr) eval(ctx context.Context, etx EvalContext) (sql.Value, error
 	return dest[0], nil
 }
 
-func (re *rowsExpr) Eval(ctx context.Context, etx EvalContext) (sql.Value, error) {
+func (re *rowsExpr) Eval(ctx context.Context, etx sql.EvalContext) (sql.Value, error) {
 	if !re.done {
 		re.done = true
 		re.value, re.err = re.eval(ctx, etx)
@@ -79,7 +70,7 @@ func (re *rowsExpr) Eval(ctx context.Context, etx EvalContext) (sql.Value, error
 
 type call struct {
 	call *callFunc
-	args []CExpr
+	args []sql.CExpr
 }
 
 func (c *call) String() string {
@@ -94,7 +85,7 @@ func (c *call) String() string {
 	return s
 }
 
-func (c *call) Eval(ctx context.Context, etx EvalContext) (sql.Value, error) {
+func (c *call) Eval(ctx context.Context, etx sql.EvalContext) (sql.Value, error) {
 	args := make([]sql.Value, len(c.args))
 	for i, a := range c.args {
 		var err error
@@ -159,7 +150,7 @@ func shiftFunc(a0 sql.Value, a1 sql.Value,
 	return nil, fmt.Errorf("engine: want integer got %v", a0)
 }
 
-func addCall(ctx EvalContext, args []sql.Value) (sql.Value, error) {
+func addCall(ctx sql.EvalContext, args []sql.Value) (sql.Value, error) {
 	return numFunc(args[0], args[1],
 		func(i0, i1 sql.Int64Value) sql.Value {
 			return i0 + i1
@@ -169,7 +160,7 @@ func addCall(ctx EvalContext, args []sql.Value) (sql.Value, error) {
 		})
 }
 
-func andCall(ctx EvalContext, args []sql.Value) (sql.Value, error) {
+func andCall(ctx sql.EvalContext, args []sql.Value) (sql.Value, error) {
 	if a0, ok := args[0].(sql.BoolValue); ok {
 		if a1, ok := args[1].(sql.BoolValue); ok {
 			return a0 && a1, nil
@@ -179,21 +170,21 @@ func andCall(ctx EvalContext, args []sql.Value) (sql.Value, error) {
 	return nil, fmt.Errorf("engine: want boolean got %v", args[0])
 }
 
-func binaryAndCall(ctx EvalContext, args []sql.Value) (sql.Value, error) {
+func binaryAndCall(ctx sql.EvalContext, args []sql.Value) (sql.Value, error) {
 	return intFunc(args[0], args[1],
 		func(i0, i1 sql.Int64Value) sql.Value {
 			return i0 & i1
 		})
 }
 
-func binaryOrCall(ctx EvalContext, args []sql.Value) (sql.Value, error) {
+func binaryOrCall(ctx sql.EvalContext, args []sql.Value) (sql.Value, error) {
 	return intFunc(args[0], args[1],
 		func(i0, i1 sql.Int64Value) sql.Value {
 			return i0 | i1
 		})
 }
 
-func concatCall(ctx EvalContext, args []sql.Value) (sql.Value, error) {
+func concatCall(ctx sql.EvalContext, args []sql.Value) (sql.Value, error) {
 	s := ""
 	for _, a := range args {
 		if a == nil {
@@ -221,7 +212,7 @@ func concatCall(ctx EvalContext, args []sql.Value) (sql.Value, error) {
 	return sql.StringValue(s), nil
 }
 
-func divideCall(ctx EvalContext, args []sql.Value) (sql.Value, error) {
+func divideCall(ctx sql.EvalContext, args []sql.Value) (sql.Value, error) {
 	return numFunc(args[0], args[1],
 		func(i0, i1 sql.Int64Value) sql.Value {
 			return i0 / i1
@@ -231,7 +222,7 @@ func divideCall(ctx EvalContext, args []sql.Value) (sql.Value, error) {
 		})
 }
 
-func equalCall(ctx EvalContext, args []sql.Value) (sql.Value, error) {
+func equalCall(ctx sql.EvalContext, args []sql.Value) (sql.Value, error) {
 	cmp, err := args[0].Compare(args[1])
 	if err != nil {
 		return nil, err
@@ -239,7 +230,7 @@ func equalCall(ctx EvalContext, args []sql.Value) (sql.Value, error) {
 	return sql.BoolValue(cmp == 0), nil
 }
 
-func greaterEqualCall(ctx EvalContext, args []sql.Value) (sql.Value, error) {
+func greaterEqualCall(ctx sql.EvalContext, args []sql.Value) (sql.Value, error) {
 	cmp, err := args[0].Compare(args[1])
 	if err != nil {
 		return nil, err
@@ -247,7 +238,7 @@ func greaterEqualCall(ctx EvalContext, args []sql.Value) (sql.Value, error) {
 	return sql.BoolValue(cmp >= 0), nil
 }
 
-func greaterThanCall(ctx EvalContext, args []sql.Value) (sql.Value, error) {
+func greaterThanCall(ctx sql.EvalContext, args []sql.Value) (sql.Value, error) {
 	cmp, err := args[0].Compare(args[1])
 	if err != nil {
 		return nil, err
@@ -255,7 +246,7 @@ func greaterThanCall(ctx EvalContext, args []sql.Value) (sql.Value, error) {
 	return sql.BoolValue(cmp > 0), nil
 }
 
-func lessEqualCall(ctx EvalContext, args []sql.Value) (sql.Value, error) {
+func lessEqualCall(ctx sql.EvalContext, args []sql.Value) (sql.Value, error) {
 	cmp, err := args[0].Compare(args[1])
 	if err != nil {
 		return nil, err
@@ -263,7 +254,7 @@ func lessEqualCall(ctx EvalContext, args []sql.Value) (sql.Value, error) {
 	return sql.BoolValue(cmp <= 0), nil
 }
 
-func lessThanCall(ctx EvalContext, args []sql.Value) (sql.Value, error) {
+func lessThanCall(ctx sql.EvalContext, args []sql.Value) (sql.Value, error) {
 	cmp, err := args[0].Compare(args[1])
 	if err != nil {
 		return nil, err
@@ -271,21 +262,21 @@ func lessThanCall(ctx EvalContext, args []sql.Value) (sql.Value, error) {
 	return sql.BoolValue(cmp < 0), nil
 }
 
-func lShiftCall(ctx EvalContext, args []sql.Value) (sql.Value, error) {
+func lShiftCall(ctx sql.EvalContext, args []sql.Value) (sql.Value, error) {
 	return shiftFunc(args[0], args[1],
 		func(i0 sql.Int64Value, i1 uint64) sql.Value {
 			return i0 << i1
 		})
 }
 
-func moduloCall(ctx EvalContext, args []sql.Value) (sql.Value, error) {
+func moduloCall(ctx sql.EvalContext, args []sql.Value) (sql.Value, error) {
 	return intFunc(args[0], args[1],
 		func(i0, i1 sql.Int64Value) sql.Value {
 			return i0 % i1
 		})
 }
 
-func multiplyCall(ctx EvalContext, args []sql.Value) (sql.Value, error) {
+func multiplyCall(ctx sql.EvalContext, args []sql.Value) (sql.Value, error) {
 	return numFunc(args[0], args[1],
 		func(i0, i1 sql.Int64Value) sql.Value {
 			return i0 * i1
@@ -295,7 +286,7 @@ func multiplyCall(ctx EvalContext, args []sql.Value) (sql.Value, error) {
 		})
 }
 
-func negateCall(ctx EvalContext, args []sql.Value) (sql.Value, error) {
+func negateCall(ctx sql.EvalContext, args []sql.Value) (sql.Value, error) {
 
 	switch a0 := args[0].(type) {
 	case sql.Float64Value:
@@ -306,7 +297,7 @@ func negateCall(ctx EvalContext, args []sql.Value) (sql.Value, error) {
 	return nil, fmt.Errorf("engine: want number got %v", args[0])
 }
 
-func notEqualCall(ctx EvalContext, args []sql.Value) (sql.Value, error) {
+func notEqualCall(ctx sql.EvalContext, args []sql.Value) (sql.Value, error) {
 	cmp, err := args[0].Compare(args[1])
 	if err != nil {
 		return nil, err
@@ -314,7 +305,7 @@ func notEqualCall(ctx EvalContext, args []sql.Value) (sql.Value, error) {
 	return sql.BoolValue(cmp != 0), nil
 }
 
-func notCall(ctx EvalContext, args []sql.Value) (sql.Value, error) {
+func notCall(ctx sql.EvalContext, args []sql.Value) (sql.Value, error) {
 
 	if a0, ok := args[0].(sql.BoolValue); ok {
 		return sql.BoolValue(a0 == false), nil
@@ -322,7 +313,7 @@ func notCall(ctx EvalContext, args []sql.Value) (sql.Value, error) {
 	return nil, fmt.Errorf("engine: want boolean got %v", args[0])
 }
 
-func orCall(ctx EvalContext, args []sql.Value) (sql.Value, error) {
+func orCall(ctx sql.EvalContext, args []sql.Value) (sql.Value, error) {
 
 	if a0, ok := args[0].(sql.BoolValue); ok {
 		if a1, ok := args[1].(sql.BoolValue); ok {
@@ -332,14 +323,14 @@ func orCall(ctx EvalContext, args []sql.Value) (sql.Value, error) {
 	return nil, fmt.Errorf("engine: want boolean got %v", args[0])
 }
 
-func rShiftCall(ctx EvalContext, args []sql.Value) (sql.Value, error) {
+func rShiftCall(ctx sql.EvalContext, args []sql.Value) (sql.Value, error) {
 	return shiftFunc(args[0], args[1],
 		func(i0 sql.Int64Value, i1 uint64) sql.Value {
 			return i0 >> i1
 		})
 }
 
-func subtractCall(ctx EvalContext, args []sql.Value) (sql.Value, error) {
+func subtractCall(ctx sql.EvalContext, args []sql.Value) (sql.Value, error) {
 	return numFunc(args[0], args[1],
 		func(i0, i1 sql.Int64Value) sql.Value {
 			return i0 - i1
@@ -349,7 +340,7 @@ func subtractCall(ctx EvalContext, args []sql.Value) (sql.Value, error) {
 		})
 }
 
-func absCall(ctx EvalContext, args []sql.Value) (sql.Value, error) {
+func absCall(ctx sql.EvalContext, args []sql.Value) (sql.Value, error) {
 	switch a0 := args[0].(type) {
 	case sql.Float64Value:
 		if a0 < 0 {
@@ -369,6 +360,6 @@ var (
 	rowID = uint64(0)
 )
 
-func uniqueRowIDCall(ctx EvalContext, args []sql.Value) (sql.Value, error) {
+func uniqueRowIDCall(ctx sql.EvalContext, args []sql.Value) (sql.Value, error) {
 	return sql.Int64Value(atomic.AddUint64(&rowID, 1)), nil
 }

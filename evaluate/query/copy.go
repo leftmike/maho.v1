@@ -7,7 +7,6 @@ import (
 
 	"github.com/leftmike/maho/evaluate"
 	"github.com/leftmike/maho/evaluate/copy"
-	"github.com/leftmike/maho/evaluate/expr"
 	"github.com/leftmike/maho/sql"
 )
 
@@ -46,11 +45,11 @@ func (stmt *Copy) Plan(ses *evaluate.Session, tx sql.Transaction) (interface{}, 
 	cols := tt.Columns()
 	colTypes := tt.ColumnTypes()
 
-	defaultExprs := make([]sql.Expr, len(cols))
+	defaultRow := make([]sql.CExpr, len(cols))
 	cmap := map[sql.Identifier]int{}
 	for cdx, cn := range cols {
 		cmap[cn] = cdx
-		defaultExprs[cdx] = colTypes[cdx].Default
+		defaultRow[cdx] = colTypes[cdx].Default
 	}
 
 	fromToRow := make([]int, len(stmt.Columns))
@@ -60,23 +59,18 @@ func (stmt *Copy) Plan(ses *evaluate.Session, tx sql.Transaction) (interface{}, 
 			return nil, fmt.Errorf("engine: %s: column not found: %s", stmt.Table, cn)
 		}
 		fromToRow[fdx] = cdx
-		defaultExprs[cdx] = nil
+		defaultRow[cdx] = nil
 	}
 
-	var defaultRow []expr.CExpr
-	for edx, e := range defaultExprs {
-		if e == nil {
-			continue
+	allNil := true
+	for _, ce := range defaultRow {
+		if ce != nil {
+			allNil = false
+			break
 		}
-
-		ce, err := expr.Compile(ses, tx, nil, e, false)
-		if err != nil {
-			return nil, err
-		}
-		if defaultRow == nil {
-			defaultRow = make([]expr.CExpr, len(cols))
-		}
-		defaultRow[edx] = ce
+	}
+	if allNil {
+		defaultRow = nil
 	}
 
 	return &copyPlan{
@@ -94,7 +88,7 @@ type copyPlan struct {
 	cols       []sql.Identifier
 	from       *copy.Reader
 	fromToRow  []int
-	defaultRow []expr.CExpr
+	defaultRow []sql.CExpr
 	delimiter  rune
 }
 

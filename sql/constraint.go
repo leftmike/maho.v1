@@ -18,7 +18,7 @@ type Constraint struct {
 	Name   Identifier
 	ColNum int
 	Key    []ColumnKey // Primary and unique constraints
-	Check  Expr        // Check constraints
+	Check  CExpr       // Check constraints
 }
 
 func (ct ConstraintType) String() string {

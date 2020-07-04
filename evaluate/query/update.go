@@ -12,13 +12,13 @@ import (
 
 type ColumnUpdate struct {
 	Column sql.Identifier
-	Expr   sql.Expr
+	Expr   expr.Expr
 }
 
 type Update struct {
 	Table         sql.TableName
 	ColumnUpdates []ColumnUpdate
-	Where         sql.Expr
+	Where         expr.Expr
 }
 
 func (stmt *Update) String() string {
@@ -37,7 +37,7 @@ func (stmt *Update) String() string {
 
 type columnUpdate struct {
 	index int
-	expr  expr.CExpr
+	expr  sql.CExpr
 }
 
 type updatePlan struct {
@@ -94,7 +94,7 @@ func (stmt *Update) Plan(ses *evaluate.Session, tx sql.Transaction) (interface{}
 
 	fctx := makeFromContext(stmt.Table.Table, rows.Columns())
 	if stmt.Where != nil {
-		ce, err := expr.Compile(ses, tx, fctx, stmt.Where, false)
+		ce, err := expr.Compile(ses, tx, fctx, stmt.Where)
 		if err != nil {
 			return nil, err
 		}
@@ -108,7 +108,7 @@ func (stmt *Update) Plan(ses *evaluate.Session, tx sql.Transaction) (interface{}
 	}
 
 	for _, cu := range stmt.ColumnUpdates {
-		ce, err := expr.Compile(ses, tx, fctx, cu.Expr, false)
+		ce, err := expr.Compile(ses, tx, fctx, cu.Expr)
 		if err != nil {
 			return nil, err
 		}

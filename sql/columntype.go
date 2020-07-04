@@ -22,7 +22,7 @@ type ColumnType struct {
 	Fixed bool // fixed sized character column
 
 	NotNull bool // not allowed to be NULL
-	Default Expr
+	Default CExpr
 }
 
 var (
@@ -35,30 +35,30 @@ var (
 	NullStringColType = ColumnType{Type: StringType, Size: 4096}
 )
 
-func (ct ColumnType) DataType() string {
-	switch ct.Type {
+func ColumnDataType(dt DataType, size uint32, fixed bool) string {
+	switch dt {
 	case BooleanType:
 		return "BOOL"
 	case StringType:
-		if ct.Fixed {
-			return fmt.Sprintf("CHAR(%d)", ct.Size)
-		} else if ct.Size == MaxColumnSize {
+		if fixed {
+			return fmt.Sprintf("CHAR(%d)", size)
+		} else if size == MaxColumnSize {
 			return "TEXT"
 		} else {
-			return fmt.Sprintf("VARCHAR(%d)", ct.Size)
+			return fmt.Sprintf("VARCHAR(%d)", size)
 		}
 	case BytesType:
-		if ct.Fixed {
-			return fmt.Sprintf("BINARY(%d)", ct.Size)
-		} else if ct.Size == MaxColumnSize {
+		if fixed {
+			return fmt.Sprintf("BINARY(%d)", size)
+		} else if size == MaxColumnSize {
 			return "BYTES"
 		} else {
-			return fmt.Sprintf("VARBINARY(%d)", ct.Size)
+			return fmt.Sprintf("VARBINARY(%d)", size)
 		}
 	case FloatType:
 		return "DOUBLE"
 	case IntegerType:
-		switch ct.Size {
+		switch size {
 		case 2:
 			return "SMALLINT"
 		case 4:

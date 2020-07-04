@@ -12,7 +12,7 @@ import (
 
 type Delete struct {
 	Table sql.TableName
-	Where sql.Expr
+	Where expr.Expr
 }
 
 func (stmt *Delete) String() string {
@@ -54,7 +54,7 @@ func (stmt *Delete) Plan(ses *evaluate.Session, tx sql.Transaction) (interface{}
 	}
 	if stmt.Where != nil {
 		ce, err := expr.Compile(ses, tx, makeFromContext(stmt.Table.Table, rows.Columns()),
-			stmt.Where, false)
+			stmt.Where)
 		if err != nil {
 			return nil, err
 		}

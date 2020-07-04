@@ -8,6 +8,7 @@ import (
 
 	"github.com/golang/protobuf/proto"
 
+	"github.com/leftmike/maho/evaluate/expr"
 	"github.com/leftmike/maho/parser"
 	"github.com/leftmike/maho/sql"
 )
@@ -92,11 +93,15 @@ func DecodeTableType(tn sql.TableName, buf []byte) (*TableType, error) {
 	colTypes := make([]sql.ColumnType, 0, len(md.Columns))
 	for cdx := range md.Columns {
 		cols = append(cols, sql.QuotedID(md.Columns[cdx].Name))
-		var dflt sql.Expr
+		var dflt sql.CExpr
 		if md.Columns[cdx].Default != "" {
 			p := parser.NewParser(strings.NewReader(md.Columns[cdx].Default),
 				fmt.Sprintf("%s metadata", tn))
-			dflt, err = p.ParseExpr()
+			e, err := p.ParseExpr()
+			if err != nil {
+				return nil, err
+			}
+			dflt, err = expr.CompileExpr(e)
 			if err != nil {
 				return nil, err
 			}

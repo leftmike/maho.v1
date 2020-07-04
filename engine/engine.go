@@ -177,11 +177,16 @@ func (e *Engine) CreateTable(ctx context.Context, tx sql.Transaction, tn sql.Tab
 			sql.MakeColumnKey(len(cols), false),
 		}
 		cols = append(cols, rowID)
+
+		dflt, err := expr.CompileExpr(&expr.Call{Name: sql.ID("unique_rowid")})
+		if err != nil {
+			panic(fmt.Sprintf("unable to compile default for rowid: %s", err))
+		}
 		colTypes = append(colTypes, sql.ColumnType{
 			Type:    sql.IntegerType,
 			Size:    8,
 			NotNull: true,
-			Default: &expr.Call{Name: sql.ID("unique_rowid")},
+			Default: dflt,
 		})
 	}
 
