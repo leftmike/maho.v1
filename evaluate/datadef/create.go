@@ -17,7 +17,7 @@ func columnNumber(nam sql.Identifier, columns []sql.Identifier) (int, bool) {
 	return -1, false
 }
 
-func indexKeyToColumnKeys(ik sql.IndexKey, columns []sql.Identifier) ([]sql.ColumnKey, error) {
+func indexKeyToColumnKeys(ik IndexKey, columns []sql.Identifier) ([]sql.ColumnKey, error) {
 	var colKeys []sql.ColumnKey
 
 	for cdx, col := range ik.Columns {
@@ -31,15 +31,21 @@ func indexKeyToColumnKeys(ik sql.IndexKey, columns []sql.Identifier) ([]sql.Colu
 	return colKeys, nil
 }
 
+type Constraint struct {
+	Type   sql.ConstraintType
+	Name   sql.Identifier
+	ColNum int
+	Key    IndexKey
+	Check  sql.Expr
+}
+
 type CreateTable struct {
-	Table          sql.TableName
-	Columns        []sql.Identifier
-	ColumnTypes    []sql.ColumnType
-	Primary        sql.IndexKey
-	primaryColKeys []sql.ColumnKey
-	Indexes        []sql.IndexKey
-	indexesColKeys [][]sql.ColumnKey
-	IfNotExists    bool
+	Table       sql.TableName
+	Columns     []sql.Identifier
+	ColumnTypes []sql.ColumnType
+	IfNotExists bool
+	Constraints []Constraint
+	constraints []sql.Constraint
 }
 
 func (stmt *CreateTable) String() string {
@@ -61,11 +67,19 @@ func (stmt *CreateTable) String() string {
 			s += fmt.Sprintf(" DEFAULT %s", ct.Default)
 		}
 	}
-	if len(stmt.Primary.Columns) > 0 {
-		s += fmt.Sprintf(", PRIMARY KEY %s", stmt.Primary)
-	}
-	for _, key := range stmt.Indexes {
-		s += fmt.Sprintf(", UNIQUE %s", key)
+	for _, c := range stmt.Constraints {
+		switch c.Type {
+		case sql.DefaultConstraint:
+		case sql.NotNullConstraint:
+		case sql.PrimaryConstraint:
+			s += fmt.Sprintf(", PRIMARY KEY %s", c.Key)
+		case sql.UniqueConstraint:
+			s += fmt.Sprintf(", UNIQUE %s", c.Key)
+		case sql.CheckConstraint:
+		case sql.ForeignConstraint:
+		default:
+			panic(fmt.Sprintf("unexpected constraint type: %d", c.Type))
+		}
 	}
 	s += ")"
 	return s
@@ -74,22 +88,22 @@ func (stmt *CreateTable) String() string {
 func (stmt *CreateTable) Plan(ses *evaluate.Session, tx sql.Transaction) (interface{}, error) {
 	stmt.Table = ses.ResolveTableName(stmt.Table)
 
-	var err error
-	stmt.primaryColKeys, err = indexKeyToColumnKeys(stmt.Primary, stmt.Columns)
-	if err != nil {
-		return nil, fmt.Errorf("engine: %s in primary key for table %s", err, stmt.Table)
-	}
-	for _, col := range stmt.Primary.Columns {
-		num, _ := columnNumber(col, stmt.Columns)
-		stmt.ColumnTypes[num].NotNull = true
-	}
-
-	for _, ik := range stmt.Indexes {
-		colKeys, err := indexKeyToColumnKeys(ik, stmt.Columns)
-		if err != nil {
-			return nil, fmt.Errorf("engine: %s in unique key for table %s", err, stmt.Table)
+	for _, con := range stmt.Constraints {
+		var key []sql.ColumnKey
+		if len(con.Key.Columns) > 0 {
+			var err error
+			key, err = indexKeyToColumnKeys(con.Key, stmt.Columns)
+			if err != nil {
+				return nil, fmt.Errorf("engine: %s in primary key for table %s", err, stmt.Table)
+			}
 		}
-		stmt.indexesColKeys = append(stmt.indexesColKeys, colKeys)
+		stmt.constraints = append(stmt.constraints, sql.Constraint{
+			Type:   con.Type,
+			Name:   con.Name,
+			ColNum: con.ColNum,
+			Key:    key,
+			Check:  con.Check,
+		})
 	}
 
 	return stmt, nil
@@ -98,20 +112,10 @@ func (stmt *CreateTable) Plan(ses *evaluate.Session, tx sql.Transaction) (interf
 func (stmt *CreateTable) Execute(ctx context.Context, e sql.Engine, tx sql.Transaction) (int64,
 	error) {
 
-	err := e.CreateTable(ctx, tx, stmt.Table, stmt.Columns, stmt.ColumnTypes, stmt.primaryColKeys,
+	err := e.CreateTable(ctx, tx, stmt.Table, stmt.Columns, stmt.ColumnTypes, stmt.constraints,
 		stmt.IfNotExists)
 	if err != nil {
 		return -1, err
-	}
-	tx.NextStmt()
-
-	for i, ik := range stmt.Indexes {
-		err = e.CreateIndex(ctx, tx, sql.ID(fmt.Sprintf("index-%d", i)), stmt.Table, ik.Unique,
-			stmt.indexesColKeys[i], false)
-		if err != nil {
-			return -1, err
-		}
-		tx.NextStmt()
 	}
 
 	return -1, nil
@@ -120,7 +124,7 @@ func (stmt *CreateTable) Execute(ctx context.Context, e sql.Engine, tx sql.Trans
 type CreateIndex struct {
 	Index       sql.Identifier
 	Table       sql.TableName
-	Key         sql.IndexKey
+	Key         IndexKey
 	IfNotExists bool
 }
 

@@ -423,8 +423,8 @@ func (p *parser) parseCreateTable() evaluate.Stmt {
 	return &s
 }
 
-func (p *parser) parseKey(unique bool) sql.IndexKey {
-	key := sql.IndexKey{
+func (p *parser) parseKey(unique bool) datadef.IndexKey {
+	key := datadef.IndexKey{
 		Unique: unique,
 	}
 
@@ -455,42 +455,34 @@ func (p *parser) parseKey(unique bool) sql.IndexKey {
 	return key
 }
 
-func (p *parser) addKey(s *datadef.CreateTable, nkey sql.IndexKey, primary bool) {
-	if len(s.Primary.Columns) > 0 {
-		if primary {
-			p.error("only one primary key allowed")
-		} else if nkey.Equal(s.Primary) {
-			p.error("duplicate keys not allowed")
-		}
-	}
-
-	for _, key := range s.Indexes {
-		if nkey.Equal(key) {
-			p.error("duplicate keys not allowed")
-		}
-	}
-
-	if primary {
-		s.Primary = nkey
-	} else {
-		s.Indexes = append(s.Indexes, nkey)
-	}
-}
-
 func (p *parser) parseCreateDetails(s *datadef.CreateTable) {
 	/*
 		CREATE TABLE [[database '.'] schema '.'] table
 			'('	(column data_type [column_constraint]
-				| table_constraint) [',' ...] ')'
-		table_constraint = (PRIMARY KEY | UNIQUE) '(' column [ASC | DESC] [',' ...] ')'
+				| [CONSTRAINT constraint] table_constraint) [',' ...] ')'
+		table_constraint =
+			  PRIMARY KEY key_columns
+			| UNIQUE key_columns
+		key_columns = '(' column [ASC | DESC] [',' ...] ')'
 	*/
 
 	for {
+		var cn sql.Identifier
+		if p.optionalReserved(sql.CONSTRAINT) {
+			cn = p.expectIdentifier("expected a constraint name")
+		}
+
 		if p.optionalReserved(sql.PRIMARY) {
 			p.expectReserved(sql.KEY)
-			p.addKey(s, p.parseKey(true), true)
+			key := p.parseKey(true)
+			p.addKeyConstraint(s, sql.PrimaryConstraint, makeKeyConstraintName(cn, key, "primary"),
+				key)
 		} else if p.optionalReserved(sql.UNIQUE) {
-			p.addKey(s, p.parseKey(true), false)
+			key := p.parseKey(true)
+			p.addKeyConstraint(s, sql.UniqueConstraint, makeKeyConstraintName(cn, key, "unique"),
+				key)
+		} else if cn != 0 {
+			p.error("CONSTRAINT name specified without a constraint")
 		} else {
 			p.parseColumn(s)
 		}
@@ -525,11 +517,10 @@ var types = map[sql.Identifier]sql.ColumnType{
 	sql.BIGINT:    {Type: sql.IntegerType, Size: 8},
 }
 
-func (p *parser) parseColumn(s *datadef.CreateTable) {
+func (p *parser) parseColumnType() sql.ColumnType {
 	/*
-		column_constraint = DEFAULT expr | NOT NULL | PRIMARY KEY | UNIQUE
 		data_type =
-			| BINARY ['(' length ')']
+			  BINARY ['(' length ')']
 			| VARBINARY ['(' length ')']
 			| BLOB ['(' length ')']
 			| BYTEA ['(' length ')']
@@ -550,14 +541,6 @@ func (p *parser) parseColumn(s *datadef.CreateTable) {
 			| INT8
 	*/
 
-	nam := p.expectIdentifier("expected a column name")
-	for _, col := range s.Columns {
-		if col == nam {
-			p.error(fmt.Sprintf("duplicate column name: %s", nam))
-		}
-	}
-	s.Columns = append(s.Columns, nam)
-
 	typ := p.expectIdentifier("expected a data type")
 	def, found := types[typ]
 	if !found {
@@ -577,31 +560,130 @@ func (p *parser) parseColumn(s *datadef.CreateTable) {
 		}
 	}
 
+	return ct
+}
+
+func makeKeyConstraintName(cn sql.Identifier, key datadef.IndexKey, suffix string) sql.Identifier {
+	if cn != 0 {
+		return cn
+	}
+
+	var nam string
+	for _, col := range key.Columns {
+		nam += col.String() + "_"
+	}
+
+	return sql.ID(nam + suffix)
+}
+
+func makeConstraintName(cn sql.Identifier, nam sql.Identifier, suffix string) sql.Identifier {
+	if cn != 0 {
+		return cn
+	}
+
+	return sql.ID(nam.String() + "_" + suffix)
+}
+
+func (p *parser) addKeyConstraint(s *datadef.CreateTable, ct sql.ConstraintType,
+	cn sql.Identifier, nkey datadef.IndexKey) {
+
+	for _, c := range s.Constraints {
+		if c.Name == cn {
+			p.error(fmt.Sprintf("duplicate constraint name: %s", cn))
+		}
+		if c.Type == sql.PrimaryConstraint && ct == sql.PrimaryConstraint {
+			p.error("only one primary key allowed")
+		}
+	}
+
+	for _, c := range s.Constraints {
+		if nkey.Equal(c.Key) {
+			p.error("duplicate keys not allowed")
+		}
+	}
+
+	s.Constraints = append(s.Constraints,
+		datadef.Constraint{
+			Type:   ct,
+			Name:   cn,
+			ColNum: -1,
+			Key:    nkey,
+		})
+}
+
+func (p *parser) addColumnConstraint(s *datadef.CreateTable, ct sql.ConstraintType,
+	cn sql.Identifier, colNum int) {
+
+	for _, c := range s.Constraints {
+		if c.Name == cn {
+			p.error(fmt.Sprintf("duplicate constraint name: %s", cn))
+		} else if colNum == c.ColNum && ct == c.Type {
+			p.error(fmt.Sprintf("duplicate %s constraint on %s", ct, s.Columns[colNum]))
+		}
+	}
+
+	s.Constraints = append(s.Constraints,
+		datadef.Constraint{
+			Type:   ct,
+			Name:   cn,
+			ColNum: colNum,
+		})
+}
+
+func (p *parser) parseColumn(s *datadef.CreateTable) {
+	/*
+		column data_type [[CONSTRAINT constraint] column_constraint]
+		column_constraint =
+			  DEFAULT expr
+			| NOT NULL
+			| PRIMARY KEY
+			| UNIQUE
+			| CHECK '(' expr ')'
+			| REFERENCES reftable [ '(' refcolumn ')' ]
+	*/
+
+	nam := p.expectIdentifier("expected a column name")
+	for _, col := range s.Columns {
+		if col == nam {
+			p.error(fmt.Sprintf("duplicate column name: %s", nam))
+		}
+	}
+	s.Columns = append(s.Columns, nam)
+
+	ct := p.parseColumnType()
+
 	for {
+		var cn sql.Identifier
+		if p.optionalReserved(sql.CONSTRAINT) {
+			cn = p.expectIdentifier("expected a constraint name")
+		}
+
 		if p.optionalReserved(sql.DEFAULT) {
-			if ct.Default != nil {
-				p.error("DEFAULT specified more than once per column")
-			}
+			p.addColumnConstraint(s, sql.DefaultConstraint, makeConstraintName(cn, nam, "default"),
+				len(s.Columns)-1)
 			ct.Default = p.parseExpr()
 		} else if p.optionalReserved(sql.NOT) {
 			p.expectReserved(sql.NULL)
-			if ct.NotNull {
-				p.error("NOT NULL specified more than once per column")
-			}
+			p.addColumnConstraint(s, sql.NotNullConstraint,
+				makeConstraintName(cn, nam, "not_null"), len(s.Columns)-1)
 			ct.NotNull = true
 		} else if p.optionalReserved(sql.PRIMARY) {
 			p.expectReserved(sql.KEY)
-			p.addKey(s, sql.IndexKey{
-				Unique:  true,
-				Columns: []sql.Identifier{nam},
-				Reverse: []bool{false},
-			}, true)
+			p.addKeyConstraint(s, sql.PrimaryConstraint, makeConstraintName(cn, nam, "primary"),
+				datadef.IndexKey{
+					Unique:  true,
+					Columns: []sql.Identifier{nam},
+					Reverse: []bool{false},
+				})
 		} else if p.optionalReserved(sql.UNIQUE) {
-			p.addKey(s, sql.IndexKey{
-				Unique:  true,
-				Columns: []sql.Identifier{nam},
-				Reverse: []bool{false},
-			}, false)
+			p.addKeyConstraint(s, sql.UniqueConstraint, makeConstraintName(cn, nam, "unique"),
+				datadef.IndexKey{
+					Unique:  true,
+					Columns: []sql.Identifier{nam},
+					Reverse: []bool{false},
+				})
+		} else if cn != 0 {
+			p.error("CONSTRAINT name specified without a constraint")
 		} else {
 			break
 		}

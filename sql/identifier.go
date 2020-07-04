@@ -55,7 +55,9 @@ const (
 	ATTACH
 	BEGIN
 	BY
+	CHECK
 	COMMIT
+	CONSTRAINT
 	COPY
 	CREATE
 	CROSS
@@ -68,6 +70,7 @@ const (
 	DROP
 	EXISTS
 	FALSE
+	FOREIGN
 	FROM
 	FULL
 	GROUP
@@ -87,6 +90,7 @@ const (
 	ORDER
 	OUTER
 	PRIMARY
+	REFERENCES
 	RIGHT
 	ROLLBACK
 	SCHEMA
@@ -142,7 +146,9 @@ var knownKeywords = map[string]struct {
 	"BYTES":       {BYTES, false},
 	"CHAR":        {CHAR, false},
 	"CHARACTER":   {CHARACTER, false},
+	"CHECK":       {CHECK, true},
 	"COMMIT":      {COMMIT, true},
+	"CONSTRAINT":  {CONSTRAINT, true},
 	"COPY":        {COPY, true},
 	"CREATE":      {CREATE, true},
 	"CROSS":       {CROSS, true},
@@ -156,6 +162,7 @@ var knownKeywords = map[string]struct {
 	"DROP":        {DROP, true},
 	"EXISTS":      {EXISTS, true},
 	"FALSE":       {FALSE, true},
+	"FOREIGN":     {FOREIGN, true},
 	"FROM":        {FROM, true},
 	"FULL":        {FULL, true},
 	"GROUP":       {GROUP, true},
@@ -183,6 +190,7 @@ var knownKeywords = map[string]struct {
 	"PRECISION":   {PRECISION, false},
 	"PRIMARY":     {PRIMARY, true},
 	"REAL":        {REAL, false},
+	"REFERENCES":  {REFERENCES, true},
 	"RIGHT":       {RIGHT, true},
 	"ROLLBACK":    {ROLLBACK, true},
 	"SCHEMA":      {SCHEMA, true},

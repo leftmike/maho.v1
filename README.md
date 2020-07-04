@@ -56,9 +56,6 @@ COMMIT
 
 ```
 CREATE DATABASE database
-    [WITH
-        [PATH ['='] path]
-    ]
 ```
 
 ```
@@ -79,7 +76,7 @@ CREATE TABLE [IF NOT EXISTS] [[database '.'] schema '.'] table
 table_constraint = (PRIMARY KEY | UNIQUE) '(' column [ASC | DESC] [',' ...] ')'
 column_constraint = DEFAULT expr | NOT NULL | PRIMARY KEY | UNIQUE
 data_type =
-	| BINARY ['(' length ')']
+	  BINARY ['(' length ')']
 	| VARBINARY ['(' length ')']
 	| BLOB ['(' length ')']
 	| BYTEA ['(' length ')']
@@ -136,16 +133,20 @@ SELECT select-list
     [GROUP BY expr [',' ...]]
     [HAVING expr]
     [ORDER BY column [ASC | DESC] [',' ...]]
-select-list = '*'
+select-list =
+      '*'
     | select-item [',' ...]
-select-item = table '.' '*'
+select-item =
+      table '.' '*'
     | [table '.' ] column [[AS] column-alias]
     | expr [[AS] column-alias]
-from-item = [[database '.'] schema '.'] table [[AS] alias]
+from-item =
+      [[database '.'] schema '.'] table [[AS] alias]
     | '(' select | values | show ')' [AS] alias ['(' column-alias [',' ...] ')']
     | '(' from-item [',' ...] ')'
     | from-item join-type from-item [ON expr | USING '(' join-column [',' ...] ')']
-join-type = [INNER] JOIN
+join-type =
+      [INNER] JOIN
     | LEFT [OUTER] JOIN
     | RIGHT [OUTER] JOIN
     | FULL [OUTER] JOIN
@@ -184,14 +185,16 @@ VALUES '(' expr [',' ...] ')' [',' ...]
 ```
 
 ```
-expr = literal
+expr =
+      literal
     | '-' expr
     | NOT expr
     | '(' expr | select | values | show ')'
     | expr op expr
     | ref ['.' ref ...]
     | func '(' [expr [',' ...]] ')'
-op = '+' '-' '*' '/' '%'
+op =
+      '+' '-' '*' '/' '%'
     | '=' '==' '!=' '<>' '<' '<=' '>' '>='
     | '<<' '>>' '&' '|'
     | AND | OR

@@ -224,6 +224,10 @@ func TestCreateTable(t *testing.T) {
 						Default: expr.StringLiteral("abcd")},
 					{Type: sql.IntegerType, Size: 4, Default: expr.Int64Literal(123)},
 				},
+				Constraints: []datadef.Constraint{
+					{Type: sql.DefaultConstraint, Name: sql.ID("c1_default"), ColNum: 0},
+					{Type: sql.DefaultConstraint, Name: sql.ID("c2_default"), ColNum: 1},
+				},
 			},
 		},
 		{
@@ -234,6 +238,10 @@ func TestCreateTable(t *testing.T) {
 				ColumnTypes: []sql.ColumnType{
 					{Type: sql.BooleanType, Size: 1, Default: expr.True()},
 					{Type: sql.BooleanType, Size: 1, NotNull: true},
+				},
+				Constraints: []datadef.Constraint{
+					{Type: sql.DefaultConstraint, Name: sql.ID("c1_default"), ColNum: 0},
+					{Type: sql.NotNullConstraint, Name: sql.ID("c2_not_null"), ColNum: 1},
 				},
 			},
 		},
@@ -246,6 +254,12 @@ c2 boolean not null default true)`,
 				ColumnTypes: []sql.ColumnType{
 					{Type: sql.BooleanType, Size: 1, Default: expr.True(), NotNull: true},
 					{Type: sql.BooleanType, Size: 1, NotNull: true, Default: expr.True()},
+				},
+				Constraints: []datadef.Constraint{
+					{Type: sql.DefaultConstraint, Name: sql.ID("c1_default"), ColNum: 0},
+					{Type: sql.NotNullConstraint, Name: sql.ID("c1_not_null"), ColNum: 0},
+					{Type: sql.NotNullConstraint, Name: sql.ID("c2_not_null"), ColNum: 1},
+					{Type: sql.DefaultConstraint, Name: sql.ID("c2_default"), ColNum: 1},
 				},
 			},
 		},
@@ -265,10 +279,17 @@ c2 boolean not null default true)`,
 					{Type: sql.IntegerType, Size: 4},
 					{Type: sql.BooleanType, Size: 1},
 				},
-				Primary: sql.IndexKey{
-					Unique:  true,
-					Columns: []sql.Identifier{sql.ID("c1")},
-					Reverse: []bool{false},
+				Constraints: []datadef.Constraint{
+					{
+						Type:   sql.PrimaryConstraint,
+						Name:   sql.ID("c1_primary"),
+						ColNum: -1,
+						Key: datadef.IndexKey{
+							Unique:  true,
+							Columns: []sql.Identifier{sql.ID("c1")},
+							Reverse: []bool{false},
+						},
+					},
 				},
 			},
 		},
@@ -281,11 +302,16 @@ c2 boolean not null default true)`,
 					{Type: sql.IntegerType, Size: 4},
 					{Type: sql.BooleanType, Size: 1},
 				},
-				Indexes: []sql.IndexKey{
+				Constraints: []datadef.Constraint{
 					{
-						Unique:  true,
-						Columns: []sql.Identifier{sql.ID("c1")},
-						Reverse: []bool{false},
+						Type:   sql.UniqueConstraint,
+						Name:   sql.ID("c1_unique"),
+						ColNum: -1,
+						Key: datadef.IndexKey{
+							Unique:  true,
+							Columns: []sql.Identifier{sql.ID("c1")},
+							Reverse: []bool{false},
+						},
 					},
 				},
 			},
@@ -299,10 +325,17 @@ c2 boolean not null default true)`,
 					{Type: sql.IntegerType, Size: 4},
 					{Type: sql.BooleanType, Size: 1},
 				},
-				Primary: sql.IndexKey{
-					Unique:  true,
-					Columns: []sql.Identifier{sql.ID("c1")},
-					Reverse: []bool{false},
+				Constraints: []datadef.Constraint{
+					{
+						Type:   sql.PrimaryConstraint,
+						Name:   sql.ID("c1_primary"),
+						ColNum: -1,
+						Key: datadef.IndexKey{
+							Unique:  true,
+							Columns: []sql.Identifier{sql.ID("c1")},
+							Reverse: []bool{false},
+						},
+					},
 				},
 			},
 		},
@@ -315,10 +348,17 @@ c2 boolean not null default true)`,
 					{Type: sql.IntegerType, Size: 4},
 					{Type: sql.BooleanType, Size: 1},
 				},
-				Primary: sql.IndexKey{
-					Unique:  true,
-					Columns: []sql.Identifier{sql.ID("c1")},
-					Reverse: []bool{true},
+				Constraints: []datadef.Constraint{
+					{
+						Type:   sql.PrimaryConstraint,
+						Name:   sql.ID("c1_primary"),
+						ColNum: -1,
+						Key: datadef.IndexKey{
+							Unique:  true,
+							Columns: []sql.Identifier{sql.ID("c1")},
+							Reverse: []bool{true},
+						},
+					},
 				},
 			},
 		},
@@ -331,24 +371,148 @@ c2 boolean not null default true)`,
 					{Type: sql.IntegerType, Size: 4},
 					{Type: sql.BooleanType, Size: 1},
 				},
-				Primary: sql.IndexKey{
-					Unique:  true,
-					Columns: []sql.Identifier{sql.ID("c1"), sql.ID("c2")},
-					Reverse: []bool{true, false},
-				},
-				Indexes: []sql.IndexKey{
+				Constraints: []datadef.Constraint{
 					{
-						Unique:  true,
-						Columns: []sql.Identifier{sql.ID("c1")},
-						Reverse: []bool{false},
+						Type:   sql.UniqueConstraint,
+						Name:   sql.ID("c1_unique"),
+						ColNum: -1,
+						Key: datadef.IndexKey{
+							Unique:  true,
+							Columns: []sql.Identifier{sql.ID("c1")},
+							Reverse: []bool{false},
+						},
 					},
 					{
-						Unique:  true,
-						Columns: []sql.Identifier{sql.ID("c2")},
-						Reverse: []bool{false},
+						Type:   sql.UniqueConstraint,
+						Name:   sql.ID("c2_unique"),
+						ColNum: -1,
+						Key: datadef.IndexKey{
+							Unique:  true,
+							Columns: []sql.Identifier{sql.ID("c2")},
+							Reverse: []bool{false},
+						},
+					},
+					{
+						Type:   sql.PrimaryConstraint,
+						Name:   sql.ID("c1_c2_primary"),
+						ColNum: -1,
+						Key: datadef.IndexKey{
+							Unique:  true,
+							Columns: []sql.Identifier{sql.ID("c1"), sql.ID("c2")},
+							Reverse: []bool{true, false},
+						},
 					},
 				},
 			},
+		},
+		{
+			sql: "create table t (c1 int primary key, c2 bool, unique (c2, c1))",
+			stmt: datadef.CreateTable{
+				Table:   sql.TableName{Table: sql.ID("t")},
+				Columns: []sql.Identifier{sql.ID("c1"), sql.ID("c2")},
+				ColumnTypes: []sql.ColumnType{
+					{Type: sql.IntegerType, Size: 4},
+					{Type: sql.BooleanType, Size: 1},
+				},
+				Constraints: []datadef.Constraint{
+					{
+						Type:   sql.PrimaryConstraint,
+						Name:   sql.ID("c1_primary"),
+						ColNum: -1,
+						Key: datadef.IndexKey{
+							Unique:  true,
+							Columns: []sql.Identifier{sql.ID("c1")},
+							Reverse: []bool{false},
+						},
+					},
+					{
+						Type:   sql.UniqueConstraint,
+						Name:   sql.ID("c2_c1_unique"),
+						ColNum: -1,
+						Key: datadef.IndexKey{
+							Unique:  true,
+							Columns: []sql.Identifier{sql.ID("c2"), sql.ID("c1")},
+							Reverse: []bool{false, false},
+						},
+					},
+				},
+			},
+		},
+		{
+			sql: `create table t (c1 int constraint con1 primary key, c2 bool,
+constraint con2 unique (c2, c1))`,
+			stmt: datadef.CreateTable{
+				Table:   sql.TableName{Table: sql.ID("t")},
+				Columns: []sql.Identifier{sql.ID("c1"), sql.ID("c2")},
+				ColumnTypes: []sql.ColumnType{
+					{Type: sql.IntegerType, Size: 4},
+					{Type: sql.BooleanType, Size: 1},
+				},
+				Constraints: []datadef.Constraint{
+					{
+						Type:   sql.PrimaryConstraint,
+						Name:   sql.ID("con1"),
+						ColNum: -1,
+						Key: datadef.IndexKey{
+							Unique:  true,
+							Columns: []sql.Identifier{sql.ID("c1")},
+							Reverse: []bool{false},
+						},
+					},
+					{
+						Type:   sql.UniqueConstraint,
+						Name:   sql.ID("con2"),
+						ColNum: -1,
+						Key: datadef.IndexKey{
+							Unique:  true,
+							Columns: []sql.Identifier{sql.ID("c2"), sql.ID("c1")},
+							Reverse: []bool{false, false},
+						},
+					},
+				},
+			},
+		},
+		{
+			sql: `create table t (c1 int constraint not_null not null,
+c2 bool constraint dflt default true)`,
+			stmt: datadef.CreateTable{
+				Table:   sql.TableName{Table: sql.ID("t")},
+				Columns: []sql.Identifier{sql.ID("c1"), sql.ID("c2")},
+				ColumnTypes: []sql.ColumnType{
+					{Type: sql.IntegerType, Size: 4, NotNull: true},
+					{Type: sql.BooleanType, Size: 1, Default: expr.True()},
+				},
+				Constraints: []datadef.Constraint{
+					{Type: sql.NotNullConstraint, Name: sql.ID("not_null"), ColNum: 0},
+					{Type: sql.DefaultConstraint, Name: sql.ID("dflt"), ColNum: 1},
+				},
+			},
+		},
+		{
+			sql:  "create table t (c1 int not null constraint not_null, c2 bool)",
+			fail: true,
+		},
+		{
+			sql:  "create table t (c1 int, c2 bool not null constraint not_null)",
+			fail: true,
+		},
+		{
+			sql:  "create table t (c1 int constraint c1 constraint c1 not null, c2 bool)",
+			fail: true,
+		},
+		{
+			sql:  "create table t (c1 int constraint c1, c2 bool)",
+			fail: true,
+		},
+		{
+			sql: `create table t (c1 int constraint c2_c1_unique primary key, c2 bool,
+unique (c2, c1))`,
+			fail: true,
+		},
+		{
+			sql: `create table t (c1 int primary key, c2 bool,
+constraint c1_primary unique (c2, c1))`,
+			fail: true,
 		},
 	}
 
@@ -385,7 +549,7 @@ func TestCreateIndex(t *testing.T) {
 			stmt: datadef.CreateIndex{
 				Table: sql.TableName{Table: sql.ID("tbl")},
 				Index: sql.ID("idx"),
-				Key: sql.IndexKey{
+				Key: datadef.IndexKey{
 					Columns: []sql.Identifier{sql.ID("c1"), sql.ID("c2")},
 					Reverse: []bool{true, false},
 				},
@@ -396,7 +560,7 @@ func TestCreateIndex(t *testing.T) {
 			stmt: datadef.CreateIndex{
 				Table: sql.TableName{Table: sql.ID("tbl")},
 				Index: sql.ID("idx"),
-				Key: sql.IndexKey{
+				Key: datadef.IndexKey{
 					Unique:  true,
 					Columns: []sql.Identifier{sql.ID("c1")},
 					Reverse: []bool{false},

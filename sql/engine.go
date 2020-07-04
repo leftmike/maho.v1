@@ -35,7 +35,7 @@ type Engine interface {
 
 	LookupTable(ctx context.Context, tx Transaction, tn TableName) (Table, TableType, error)
 	CreateTable(ctx context.Context, tx Transaction, tn TableName, cols []Identifier,
-		colTypes []ColumnType, primary []ColumnKey, ifNotExists bool) error
+		colTypes []ColumnType, cons []Constraint, ifNotExists bool) error
 	DropTable(ctx context.Context, tx Transaction, tn TableName, ifExists bool) error
 
 	CreateIndex(ctx context.Context, tx Transaction, idxname Identifier, tn TableName, unique bool,

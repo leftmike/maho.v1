@@ -49,16 +49,20 @@ To Do:
 -- engine.Index: IndexRows(...) => engine.IndexRows {Columns, Close, Next, Delete, Update, Row}
 -- move Engine.CreateIndex, DropIndex to Table
 
-- column
--- [CONSTRAINT constraint]
--- UNIQUE
--- CHECK '(' expression ')'
--- REFERENCES foreign-table [ '(' column [',' ...] ')' ]
+-- should Constraint.Check (and ColumnType.Default be CExpr?
+-- change unique constraints into indexes
 
-- table
--- [CONSTRAINT constraint]
--- CHECK '(' expression ')'
--- FOREIGN KEY '(' column  [',' ...] ')' REFERENCES foreign-table [ '(' column [',' ...] ')' ]
+- column constraints
+-- CHECK '(' expression ')' => treat as table level Check constraint
+-- REFERENCES reftable [ '(' refcolumn ')' ] => treat as a foreign key
+
+- table constraints
+-- CHECK '(' expression ')' => list of Check constraints on the table
+-- FOREIGN KEY '(' column  [',' ...] ')' REFERENCES reftable [ '(' refcolumn [',' ...] ')' ]
+   => list of Foreign on the table (and need a list of Refering tables)
+
+- SHOW CONSTRAINTS FROM table
+- update README.md for constraints
 */
 
 import (

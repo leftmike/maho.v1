@@ -1,12 +1,14 @@
-package sql
+package datadef
 
 import (
 	"fmt"
+
+	"github.com/leftmike/maho/sql"
 )
 
 type IndexKey struct {
 	Unique  bool
-	Columns []Identifier
+	Columns []sql.Identifier
 	Reverse []bool // ASC = false, DESC = true
 }
 

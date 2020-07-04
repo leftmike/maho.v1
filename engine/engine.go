@@ -145,7 +145,7 @@ func (e *Engine) LookupTable(ctx context.Context, tx sql.Transaction, tn sql.Tab
 }
 
 func (e *Engine) CreateTable(ctx context.Context, tx sql.Transaction, tn sql.TableName,
-	cols []sql.Identifier, colTypes []sql.ColumnType, primary []sql.ColumnKey,
+	cols []sql.Identifier, colTypes []sql.ColumnType, cons []sql.Constraint,
 	ifNotExists bool) error {
 
 	if tn.Database == sql.SYSTEM {
@@ -153,6 +153,14 @@ func (e *Engine) CreateTable(ctx context.Context, tx sql.Transaction, tn sql.Tab
 	}
 	if tn.Schema == sql.METADATA {
 		return fmt.Errorf("engine: schema %s may not be modified", tn.Schema)
+	}
+
+	var primary []sql.ColumnKey
+	for _, con := range cons {
+		if con.Type == sql.PrimaryConstraint {
+			primary = con.Key
+			break
+		}
 	}
 
 	if len(primary) == 0 {

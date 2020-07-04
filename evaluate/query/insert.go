@@ -94,12 +94,12 @@ func (stmt *InsertValues) Plan(ses *evaluate.Session, tx sql.Transaction) (inter
 			return nil, fmt.Errorf("engine: %s: too many values", stmt.Table)
 		}
 		row := make([]expr.CExpr, len(cols))
-		for i, c := range colTypes {
-			e := c.Default
+		for i, ct := range colTypes {
+			e := ct.Default
 			if c2v[i] < len(r) {
 				e = r[c2v[i]]
 				if e == nil {
-					e = c.Default
+					e = ct.Default
 				}
 			}
 			var ce expr.CExpr
@@ -127,8 +127,6 @@ type insertValuesPlan struct {
 func (plan *insertValuesPlan) Execute(ctx context.Context, e sql.Engine,
 	tx sql.Transaction) (int64, error) {
 
-	var err error
-
 	for _, r := range plan.rows {
 		row := make([]sql.Value, len(plan.cols))
 
@@ -136,6 +134,7 @@ func (plan *insertValuesPlan) Execute(ctx context.Context, e sql.Engine,
 			var v sql.Value
 
 			if ce != nil {
+				var err error
 				v, err = ce.Eval(ctx, nil)
 				if err != nil {
 					return -1, err
