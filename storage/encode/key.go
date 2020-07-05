@@ -5,6 +5,7 @@ import (
 	"math"
 
 	"github.com/leftmike/maho/sql"
+	"github.com/leftmike/maho/util"
 )
 
 const (
@@ -86,7 +87,7 @@ func MakeKey(key []sql.ColumnKey, row []sql.Value) []byte {
 				} else {
 					buf = append(buf, Float64PosKeyTag)
 				}
-				buf = EncodeUint64(buf, u)
+				buf = util.EncodeUint64(buf, u)
 			}
 		case sql.Int64Value:
 			if reverse {
@@ -97,7 +98,7 @@ func MakeKey(key []sql.ColumnKey, row []sql.Value) []byte {
 			} else {
 				buf = append(buf, Int64NotNegKeyTag)
 			}
-			buf = EncodeUint64(buf, uint64(val))
+			buf = util.EncodeUint64(buf, uint64(val))
 		default:
 			if val == nil {
 				buf = append(buf, NullKeyTag)

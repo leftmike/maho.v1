@@ -6,6 +6,7 @@ import (
 	"math"
 
 	"github.com/leftmike/maho/sql"
+	"github.com/leftmike/maho/util"
 )
 
 const (
@@ -17,12 +18,24 @@ const (
 	// Value tags must be less than 16.
 )
 
+func encodeColNumValueTag(buf []byte, colNum int, tag byte) []byte {
+	if colNum == 0 {
+		buf = append(buf, tag)
+	} else if colNum < 16 {
+		buf = append(buf, byte(colNum<<4)|tag)
+	} else {
+		buf = append(buf, 0xF0|tag)
+		buf = util.EncodeVarint(buf, uint64(colNum))
+	}
+	return buf
+}
+
 func EncodeRowValue(row []sql.Value) []byte {
 	if len(row) == 0 {
 		panic("encode row value called with zero length row")
 	}
 
-	buf := EncodeVarint(nil, uint64(len(row)))
+	buf := util.EncodeVarint(nil, uint64(len(row)))
 	for num := range row {
 		val := row[num]
 		if val == nil {
@@ -30,7 +43,7 @@ func EncodeRowValue(row []sql.Value) []byte {
 		}
 		switch val := val.(type) {
 		case sql.BoolValue:
-			buf = EncodeColNumValueTag(buf, num, boolValueTag)
+			buf = encodeColNumValueTag(buf, num, boolValueTag)
 			if val {
 				buf = append(buf, 1)
 			} else {
@@ -38,20 +51,20 @@ func EncodeRowValue(row []sql.Value) []byte {
 			}
 		case sql.StringValue:
 			b := []byte(val)
-			buf = EncodeColNumValueTag(buf, num, stringValueTag)
-			buf = EncodeVarint(buf, uint64(len(b)))
+			buf = encodeColNumValueTag(buf, num, stringValueTag)
+			buf = util.EncodeVarint(buf, uint64(len(b)))
 			buf = append(buf, b...)
 		case sql.BytesValue:
 			b := []byte(val)
-			buf = EncodeColNumValueTag(buf, num, bytesValueTag)
-			buf = EncodeVarint(buf, uint64(len(b)))
+			buf = encodeColNumValueTag(buf, num, bytesValueTag)
+			buf = util.EncodeVarint(buf, uint64(len(b)))
 			buf = append(buf, b...)
 		case sql.Float64Value:
-			buf = EncodeColNumValueTag(buf, num, float64ValueTag)
-			buf = EncodeUint64(buf, math.Float64bits(float64(val)))
+			buf = encodeColNumValueTag(buf, num, float64ValueTag)
+			buf = util.EncodeUint64(buf, math.Float64bits(float64(val)))
 		case sql.Int64Value:
-			buf = EncodeColNumValueTag(buf, num, int64ValueTag)
-			buf = EncodeZigzag64(buf, int64(val))
+			buf = encodeColNumValueTag(buf, num, int64ValueTag)
+			buf = util.EncodeZigzag64(buf, int64(val))
 		default:
 			panic(fmt.Sprintf("unexpected type for sql.Value: %T: %v", val, val))
 		}
@@ -63,7 +76,7 @@ func DecodeRowValue(buf []byte) []sql.Value {
 	var ok bool
 	var u uint64
 
-	buf, u, ok = DecodeVarint(buf)
+	buf, u, ok = util.DecodeVarint(buf)
 	if !ok {
 		return nil
 	}
@@ -74,7 +87,7 @@ func DecodeRowValue(buf []byte) []sql.Value {
 		num := int(buf[0] >> 4)
 		buf = buf[1:]
 		if num == 16 {
-			buf, u, ok = DecodeVarint(buf)
+			buf, u, ok = util.DecodeVarint(buf)
 			if !ok {
 				return nil
 			}
@@ -94,7 +107,7 @@ func DecodeRowValue(buf []byte) []sql.Value {
 			}
 			buf = buf[1:]
 		case stringValueTag:
-			buf, u, ok = DecodeVarint(buf)
+			buf, u, ok = util.DecodeVarint(buf)
 			if !ok {
 				return nil
 			}
@@ -104,7 +117,7 @@ func DecodeRowValue(buf []byte) []sql.Value {
 			val = sql.StringValue(buf[:u])
 			buf = buf[u:]
 		case bytesValueTag:
-			buf, u, ok = DecodeVarint(buf)
+			buf, u, ok = util.DecodeVarint(buf)
 			if !ok {
 				return nil
 			}
@@ -122,7 +135,7 @@ func DecodeRowValue(buf []byte) []sql.Value {
 			buf = buf[8:]
 		case int64ValueTag:
 			var n int64
-			buf, n, ok = DecodeZigzag64(buf)
+			buf, n, ok = util.DecodeZigzag64(buf)
 			if !ok {
 				return nil
 			}

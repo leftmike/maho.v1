@@ -18,6 +18,7 @@ import (
 	"github.com/leftmike/maho/sql"
 	"github.com/leftmike/maho/storage"
 	"github.com/leftmike/maho/storage/encode"
+	"github.com/leftmike/maho/util"
 )
 
 const (
@@ -113,7 +114,7 @@ func getUint64(kv KV, key []byte) (uint64, error) {
 }
 
 func loadTransactions(kv KV) (map[uint64]*TransactionData, error) {
-	it, err := kv.Iterate(encode.EncodeUint64(make([]byte, 0, 8), transactionsMID))
+	it, err := kv.Iterate(util.EncodeUint64(make([]byte, 0, 8), transactionsMID))
 	if err != nil {
 		return nil, err
 	}
@@ -159,7 +160,7 @@ func setTransactionData(upd Updater, tid uint64, td *TransactionData) error {
 		return err
 	}
 	return upd.Set(
-		encode.EncodeUint64(encode.EncodeUint64(make([]byte, 0, 16), transactionsMID), tid), val)
+		util.EncodeUint64(util.EncodeUint64(make([]byte, 0, 16), transactionsMID), tid), val)
 }
 
 func makeStore(kv KV) (*kvStore, bool, error) {
@@ -207,7 +208,7 @@ func makeStore(kv KV) (*kvStore, bool, error) {
 }
 
 func (kvst *kvStore) startupStore(upd Updater) error {
-	err := upd.Set(epochKey, encode.EncodeUint64(make([]byte, 0, 8), kvst.epoch))
+	err := upd.Set(epochKey, util.EncodeUint64(make([]byte, 0, 8), kvst.epoch))
 	if err != nil {
 		return err
 	}
@@ -312,7 +313,7 @@ func (kvst *kvStore) commit(ctx context.Context, tid uint64) error {
 	}
 	err = setTransactionData(upd, tid, td)
 	if err == nil {
-		err = upd.Set(versionKey, encode.EncodeUint64(make([]byte, 0, 8), ver))
+		err = upd.Set(versionKey, util.EncodeUint64(make([]byte, 0, 8), ver))
 		if err == nil {
 			err = upd.Commit()
 		}
@@ -433,7 +434,7 @@ func (kvt *table) getProposedRow(key, val []byte) ([]sql.Value, bool, error) {
 }
 
 func (kvt *table) makeKey(row []sql.Value) []byte {
-	buf := encode.EncodeUint64(make([]byte, 0, 8), uint64(kvt.mid))
+	buf := util.EncodeUint64(make([]byte, 0, 8), uint64(kvt.mid))
 	if row != nil {
 		buf = append(buf, encode.MakeKey(kvt.primary, row)...)
 	}
@@ -524,7 +525,7 @@ func (kvt *table) Rows(ctx context.Context, minRow, maxRow []sql.Value) (sql.Row
 
 func makeKeyVersion(key []byte, ver uint64) []byte {
 	buf := append(make([]byte, 0, len(key)+8), key...)
-	return encode.EncodeUint64(buf, ^ver)
+	return util.EncodeUint64(buf, ^ver)
 }
 
 func (kvt *table) prepareUpdate(upd Updater, updateKey []byte) (*ProposalData, bool, error) {

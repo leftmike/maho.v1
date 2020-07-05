@@ -49,9 +49,8 @@ To Do:
 -- engine.Index: IndexRows(...) => engine.IndexRows {Columns, Close, Next, Delete, Update, Row}
 -- move Engine.CreateIndex, DropIndex to Table
 
-- type.go: encoding and decoding Default CExpr and Check CExpr
-
 - constraints
+-- engine: keep track of Check constraints and test them on Insert and Update
 -- change unique constraints into indexes
 -- column: REFERENCES reftable [ '(' refcolumn ')' ] => treat as a foreign key
 -- table: FOREIGN KEY '(' column  [',' ...] ')' REFERENCES reftable [ '(' refcolumn [',' ...] ')' ]

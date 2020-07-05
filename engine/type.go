@@ -3,13 +3,9 @@ package engine
 //go:generate protoc --go_opt=paths=source_relative --go_out=. metadata.proto
 
 import (
-	"fmt"
-	"strings"
-
 	"github.com/golang/protobuf/proto"
 
 	"github.com/leftmike/maho/evaluate/expr"
-	"github.com/leftmike/maho/parser"
 	"github.com/leftmike/maho/sql"
 )
 
@@ -54,18 +50,15 @@ func (tt *TableType) Encode() ([]byte, error) {
 	var md TableMetadata
 	md.Columns = make([]*ColumnMetadata, 0, len(cols))
 	for cdx := range cols {
-		var dflt string
-		if colTypes[cdx].Default != nil {
-			dflt = colTypes[cdx].Default.String()
-		}
 		md.Columns = append(md.Columns,
 			&ColumnMetadata{
-				Name:    cols[cdx].String(),
-				Type:    DataType(colTypes[cdx].Type),
-				Size:    colTypes[cdx].Size,
-				Fixed:   colTypes[cdx].Fixed,
-				NotNull: colTypes[cdx].NotNull,
-				Default: dflt,
+				Name:        cols[cdx].String(),
+				Type:        DataType(colTypes[cdx].Type),
+				Size:        colTypes[cdx].Size,
+				Fixed:       colTypes[cdx].Fixed,
+				NotNull:     colTypes[cdx].NotNull,
+				Default:     expr.Encode(colTypes[cdx].Default),
+				DefaultExpr: colTypes[cdx].DefaultExpr,
 			})
 	}
 
@@ -93,26 +86,18 @@ func DecodeTableType(tn sql.TableName, buf []byte) (*TableType, error) {
 	colTypes := make([]sql.ColumnType, 0, len(md.Columns))
 	for cdx := range md.Columns {
 		cols = append(cols, sql.QuotedID(md.Columns[cdx].Name))
-		var dflt sql.CExpr
-		if md.Columns[cdx].Default != "" {
-			p := parser.NewParser(strings.NewReader(md.Columns[cdx].Default),
-				fmt.Sprintf("%s metadata", tn))
-			e, err := p.ParseExpr()
-			if err != nil {
-				return nil, err
-			}
-			dflt, err = expr.CompileExpr(e)
-			if err != nil {
-				return nil, err
-			}
+		dflt, err := expr.Decode(md.Columns[cdx].Default)
+		if err != nil {
+			return nil, err
 		}
 		colTypes = append(colTypes,
 			sql.ColumnType{
-				Type:    sql.DataType(md.Columns[cdx].Type),
-				Size:    md.Columns[cdx].Size,
-				Fixed:   md.Columns[cdx].Fixed,
-				NotNull: md.Columns[cdx].NotNull,
-				Default: dflt,
+				Type:        sql.DataType(md.Columns[cdx].Type),
+				Size:        md.Columns[cdx].Size,
+				Fixed:       md.Columns[cdx].Fixed,
+				NotNull:     md.Columns[cdx].NotNull,
+				Default:     dflt,
+				DefaultExpr: md.Columns[cdx].DefaultExpr,
 			})
 	}
 

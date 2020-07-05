@@ -210,8 +210,8 @@ func appendColumns(values [][]sql.Value, tn sql.TableName, cols []sql.Identifier
 
 	for i, ct := range colTypes {
 		var def sql.Value
-		if ct.Default != nil {
-			def = sql.StringValue(ct.Default.String())
+		if ct.DefaultExpr != "" {
+			def = sql.StringValue(ct.DefaultExpr)
 		}
 		isNullable := "yes"
 		if ct.NotNull {

@@ -14,11 +14,12 @@ const (
 )
 
 type Constraint struct {
-	Type   ConstraintType
-	Name   Identifier
-	ColNum int         // Default, NotNull, and Column Check constraints
-	Key    []ColumnKey // Primary and Unique constraints
-	Check  CExpr       // Check constraints
+	Type      ConstraintType
+	Name      Identifier
+	ColNum    int         // Default, NotNull, and Column Check constraints
+	Key       []ColumnKey // Primary and Unique constraints
+	Check     CExpr       // Check constraints
+	CheckExpr string
 }
 
 func (ct ConstraintType) String() string {

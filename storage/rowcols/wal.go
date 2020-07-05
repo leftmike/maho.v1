@@ -10,6 +10,7 @@ import (
 
 	"github.com/leftmike/maho/sql"
 	"github.com/leftmike/maho/storage/encode"
+	"github.com/leftmike/maho/util"
 )
 
 const (
@@ -73,13 +74,13 @@ func decodeCommit(hndlr walHandler, ver uint64, buf []byte) error {
 
 		var ok bool
 		var mid uint64
-		buf, mid, ok = encode.DecodeVarint(buf)
+		buf, mid, ok = util.DecodeVarint(buf)
 		if !ok {
 			return errors.New("rowcols: bad WAL record, mid field")
 		}
 
 		var kbl uint64
-		buf, kbl, ok = encode.DecodeVarint(buf)
+		buf, kbl, ok = util.DecodeVarint(buf)
 		if !ok {
 			return errors.New("rowcols: bad WAL record, key length field")
 		}
@@ -90,7 +91,7 @@ func decodeCommit(hndlr walHandler, ver uint64, buf []byte) error {
 		buf = buf[kbl:]
 
 		var rbl uint64
-		buf, rbl, ok = encode.DecodeVarint(buf)
+		buf, rbl, ok = util.DecodeVarint(buf)
 		if !ok {
 			return errors.New("rowcols: bad WAL record, row length field")
 		}
@@ -171,15 +172,15 @@ func (wal *WAL) ReadWAL(hndlr walHandler) (bool, error) {
 
 func encodeRowItem(buf []byte, ri rowItem) []byte {
 	buf = append(buf, rowRecordType)
-	buf = encode.EncodeVarint(buf, uint64(ri.mid))
-	buf = encode.EncodeVarint(buf, uint64(len(ri.key)))
+	buf = util.EncodeVarint(buf, uint64(ri.mid))
+	buf = util.EncodeVarint(buf, uint64(len(ri.key)))
 	buf = append(buf, ri.key...)
 	if len(ri.row) > 0 {
 		row := encode.EncodeRowValue(ri.row)
-		buf = encode.EncodeVarint(buf, uint64(len(row)))
+		buf = util.EncodeVarint(buf, uint64(len(row)))
 		buf = append(buf, row...)
 	} else {
-		buf = encode.EncodeVarint(buf, 0)
+		buf = util.EncodeVarint(buf, 0)
 	}
 	return buf
 }

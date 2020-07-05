@@ -23,7 +23,8 @@ message ColumnMetadata {
     uint32 Size = 4;
     bool Fixed = 5;
     bool NotNull = 6;
-    string Default = 7;
+    bytes Default = 7;
+    string DefaultExpr = 8;
 }
 
 message ColumnKey {

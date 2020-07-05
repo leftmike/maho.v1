@@ -159,7 +159,7 @@ func TestEval(t *testing.T) {
 		}
 		r, err := expr.CompileExpr(e)
 		if err != nil {
-			t.Errorf("expr.CompileExpr(%q) failed with %s", c.s, err)
+			t.Errorf("CompileExpr(%q) failed with %s", c.s, err)
 			continue
 		}
 		v, err := r.Eval(nil, nil)
@@ -293,7 +293,7 @@ func TestEval(t *testing.T) {
 		}
 		r, err := expr.CompileExpr(e)
 		if err != nil {
-			t.Errorf("expr.CompileExpr(%q) failed with %s", f, err)
+			t.Errorf("CompileExpr(%q) failed with %s", f, err)
 			continue
 		}
 		v, err := r.Eval(nil, nil)
@@ -323,7 +323,7 @@ func compareTest(t *testing.T, m, op, n string, b bool) {
 	}
 	r, err := expr.CompileExpr(e)
 	if err != nil {
-		t.Errorf("expr.CompileExpr(%q) failed with %s", s, err)
+		t.Errorf("CompileExpr(%q) failed with %s", s, err)
 		return
 	}
 	v, err := r.Eval(nil, nil)
@@ -339,5 +339,65 @@ func compareTest(t *testing.T, m, op, n string, b bool) {
 	}
 	if sql.Format(v) != ret {
 		t.Errorf("Eval(%q) got %s want %s", s, sql.Format(v), ret)
+	}
+}
+
+type compileContext struct {
+	idx int
+}
+
+func (cc *compileContext) CompileRef(r expr.Ref) (int, error) {
+	cc.idx += 1
+	return cc.idx, nil
+}
+
+func TestEncode(t *testing.T) {
+	cases := []string{
+		"true",
+		"false",
+		"123",
+		"-123",
+		"123.456",
+		"-123.456",
+		"'abcdefghi'",
+		"''",
+		"abc",
+		"def",
+		"1 + ghi",
+		"a + b * (abs(c) - 130) + -12",
+		"concat('abc', 'def', 1 + a * 2 - b / 3)",
+	}
+
+	ctx := &compileContext{}
+	for _, c := range cases {
+		p := parser.NewParser(strings.NewReader(c), c)
+		e, err := p.ParseExpr()
+		if err != nil {
+			t.Errorf("ParseExpr(%q) failed with %s", c, err)
+		}
+		ce, err := expr.Compile(nil, nil, ctx, e)
+		if err != nil {
+			t.Errorf("Compile(%q) failed with %s", c, err)
+		}
+		b := expr.Encode(ce)
+		de, err := expr.Decode(b)
+		if err != nil {
+			t.Errorf("Decode(%q) failed with %s", c, err)
+		}
+		if !expr.EqualCompiledExpressions(ce, de) {
+			t.Errorf("Decode(%q) got %#v want %#v", c, de, ce)
+		}
+
+		for l := 1; l < len(b); l += 1 {
+			_, err := expr.Decode(b[:l])
+			if err == nil {
+				t.Errorf("Decode(%q) did not fail with buffer[:%d]", c, l)
+			}
+		}
+
+		_, err = expr.Decode(append(b, 0))
+		if err == nil {
+			t.Errorf("Decode(%q) did not fail with too long buffer", c)
+		}
 	}
 }

@@ -136,6 +136,7 @@ func (stmt *CreateTable) Plan(ses *evaluate.Session, tx sql.Transaction) (interf
 		}
 
 		var check sql.CExpr
+		var checkExpr string
 		if con.Check != nil {
 			var err error
 			var cctx expr.CompileContext
@@ -148,33 +149,38 @@ func (stmt *CreateTable) Plan(ses *evaluate.Session, tx sql.Transaction) (interf
 			if err != nil {
 				return nil, err
 			}
+			checkExpr = con.Check.String()
 		}
 
 		stmt.constraints = append(stmt.constraints, sql.Constraint{
-			Type:   con.Type,
-			Name:   con.Name,
-			ColNum: con.ColNum,
-			Key:    key,
-			Check:  check,
+			Type:      con.Type,
+			Name:      con.Name,
+			ColNum:    con.ColNum,
+			Key:       key,
+			Check:     check,
+			CheckExpr: checkExpr,
 		})
 	}
 
 	for _, ct := range stmt.ColumnTypes {
 		var dflt sql.CExpr
+		var dfltExpr string
 		if ct.Default != nil {
 			var err error
 			dflt, err = expr.Compile(ses, tx, nil, ct.Default)
 			if err != nil {
 				return nil, err
 			}
+			dfltExpr = ct.Default.String()
 		}
 		stmt.columnTypes = append(stmt.columnTypes,
 			sql.ColumnType{
-				Type:    ct.Type,
-				Size:    ct.Size,
-				Fixed:   ct.Fixed,
-				NotNull: ct.NotNull,
-				Default: dflt,
+				Type:        ct.Type,
+				Size:        ct.Size,
+				Fixed:       ct.Fixed,
+				NotNull:     ct.NotNull,
+				Default:     dflt,
+				DefaultExpr: dfltExpr,
 			})
 	}
 

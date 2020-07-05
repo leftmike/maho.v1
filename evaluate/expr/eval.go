@@ -2,13 +2,204 @@ package expr
 
 import (
 	"context"
+	"encoding/binary"
 	"errors"
 	"fmt"
 	"io"
+	"math"
 	"sync/atomic"
 
 	"github.com/leftmike/maho/sql"
+	"github.com/leftmike/maho/util"
 )
+
+const (
+	boolLiteralTag    = 1
+	int64LiteralTag   = 2
+	float64LiteralTag = 3
+	stringLiteralTag  = 4
+	bytesLiteralTag   = 5
+	colIndexTag       = 6
+	callTag           = 7
+)
+
+func Encode(ce sql.CExpr) []byte {
+	if ce == nil {
+		return nil
+	}
+	return encode(nil, ce)
+}
+
+func encode(buf []byte, ce sql.CExpr) []byte {
+	switch ce := ce.(type) {
+	case *Literal:
+		switch val := ce.Value.(type) {
+		case sql.BoolValue:
+			buf = append(buf, boolLiteralTag)
+			if val {
+				buf = append(buf, 1)
+			} else {
+				buf = append(buf, 0)
+			}
+		case sql.StringValue:
+			b := []byte(val)
+			buf = append(buf, stringLiteralTag)
+			buf = util.EncodeVarint(buf, uint64(len(b)))
+			buf = append(buf, b...)
+		case sql.BytesValue:
+			b := []byte(val)
+			buf = append(buf, bytesLiteralTag)
+			buf = util.EncodeVarint(buf, uint64(len(b)))
+			buf = append(buf, b...)
+		case sql.Float64Value:
+			buf = append(buf, float64LiteralTag)
+			buf = util.EncodeUint64(buf, math.Float64bits(float64(val)))
+		case sql.Int64Value:
+			buf = append(buf, int64LiteralTag)
+			buf = util.EncodeZigzag64(buf, int64(val))
+		default:
+			panic(fmt.Sprintf("unexpected type for sql.Value: %T: %v", ce, ce))
+		}
+	case colIndex:
+		buf = append(buf, colIndexTag)
+		buf = util.EncodeZigzag64(buf, int64(ce))
+	case *rowsExpr:
+		panic("engine: statement expressions may not be encoded")
+	case *call:
+		buf = append(buf, callTag)
+
+		b := []byte(ce.call.name)
+		buf = util.EncodeVarint(buf, uint64(len(b)))
+		buf = append(buf, b...)
+
+		buf = util.EncodeVarint(buf, uint64(len(ce.args)))
+		for _, a := range ce.args {
+			buf = encode(buf, a)
+		}
+	default:
+		panic(fmt.Sprintf("unexpected type for sql.CExpr: %T: %v", ce, ce))
+	}
+
+	return buf
+}
+
+func Decode(buf []byte) (sql.CExpr, error) {
+	if len(buf) == 0 {
+		return nil, nil
+	}
+	ce, b := decode(buf)
+	if ce == nil || len(b) != 0 {
+		return nil, fmt.Errorf("engine: unable to decode compiled expression: %v", buf)
+	}
+	return ce, nil
+}
+
+func decode(buf []byte) (sql.CExpr, []byte) {
+	if len(buf) == 0 {
+		return nil, nil
+	}
+
+	tag := buf[0]
+	buf = buf[1:]
+	switch tag {
+	case boolLiteralTag:
+		if len(buf) < 1 {
+			return nil, nil
+		}
+		var val sql.Value
+		if buf[0] == 0 {
+			val = sql.BoolValue(false)
+		} else {
+			val = sql.BoolValue(true)
+		}
+		buf = buf[1:]
+		return &Literal{val}, buf
+	case stringLiteralTag:
+		var ok bool
+		var u uint64
+		buf, u, ok = util.DecodeVarint(buf)
+		if !ok {
+			return nil, nil
+		}
+		if len(buf) < int(u) {
+			return nil, nil
+		}
+		val := sql.StringValue(buf[:u])
+		buf = buf[u:]
+		return &Literal{val}, buf
+	case bytesLiteralTag:
+		var ok bool
+		var u uint64
+		buf, u, ok = util.DecodeVarint(buf)
+		if !ok {
+			return nil, nil
+		}
+		if len(buf) < int(u) {
+			return nil, nil
+		}
+		val := sql.BytesValue(buf[:u])
+		buf = buf[u:]
+		return &Literal{val}, buf
+	case float64LiteralTag:
+		if len(buf) < 8 {
+			return nil, nil
+		}
+		u := binary.BigEndian.Uint64(buf)
+		val := sql.Float64Value(math.Float64frombits(u))
+		buf = buf[8:]
+		return &Literal{val}, buf
+	case int64LiteralTag:
+		var n int64
+		var ok bool
+		buf, n, ok = util.DecodeZigzag64(buf)
+		if !ok {
+			return nil, nil
+		}
+		return &Literal{sql.Int64Value(n)}, buf
+	case colIndexTag:
+		var n int64
+		var ok bool
+		buf, n, ok = util.DecodeZigzag64(buf)
+		if !ok {
+			return nil, nil
+		}
+		return colIndex(n), buf
+	case callTag:
+		var ok bool
+		var u uint64
+		buf, u, ok = util.DecodeVarint(buf)
+		if !ok {
+			return nil, nil
+		}
+		if len(buf) < int(u) {
+			return nil, nil
+		}
+		name := string(buf[:u])
+		buf = buf[u:]
+		cf, ok := funcs[name]
+		if !ok {
+			return nil, nil
+		}
+
+		buf, u, ok = util.DecodeVarint(buf)
+		if !ok {
+			return nil, nil
+		}
+		c := &call{
+			call: cf,
+			args: make([]sql.CExpr, u),
+		}
+		for i := range c.args {
+			c.args[i], buf = decode(buf)
+			if c.args[i] == nil {
+				return nil, nil
+			}
+		}
+		return c, buf
+	default:
+		return nil, nil
+	}
+}
 
 func (l *Literal) Eval(ctx context.Context, etx sql.EvalContext) (sql.Value, error) {
 	return l.Value, nil
@@ -17,7 +208,7 @@ func (l *Literal) Eval(ctx context.Context, etx sql.EvalContext) (sql.Value, err
 type colIndex int
 
 func (ci colIndex) String() string {
-	return fmt.Sprintf("row[%d]", ci)
+	return fmt.Sprintf("[%d]", ci)
 }
 
 func (ci colIndex) Eval(ctx context.Context, etx sql.EvalContext) (sql.Value, error) {
@@ -97,6 +288,42 @@ func (c *call) Eval(ctx context.Context, etx sql.EvalContext) (sql.Value, error)
 		}
 	}
 	return c.call.fn(etx, args)
+}
+
+func EqualCompiledExpressions(ce1, ce2 sql.CExpr) bool {
+	switch ce1 := ce1.(type) {
+	case *Literal:
+		ce2, ok := ce2.(*Literal)
+		if !ok {
+			return false
+		}
+		return sql.Compare(ce1.Value, ce2.Value) == 0
+	case colIndex:
+		ce2, ok := ce2.(colIndex)
+		if !ok {
+			return false
+		}
+		return ce1 == ce2
+	case *call:
+		ce2, ok := ce2.(*call)
+		if !ok {
+			return false
+		}
+		if ce1.call != ce2.call {
+			return false
+		}
+		if len(ce1.args) != len(ce2.args) {
+			return false
+		}
+		for adx := range ce1.args {
+			if !EqualCompiledExpressions(ce1.args[adx], ce2.args[adx]) {
+				return false
+			}
+		}
+		return true
+	default:
+		return false
+	}
 }
 
 func numFunc(a0 sql.Value, a1 sql.Value, ifn func(i0, i1 sql.Int64Value) sql.Value,

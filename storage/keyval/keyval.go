@@ -16,6 +16,7 @@ import (
 	"github.com/leftmike/maho/sql"
 	"github.com/leftmike/maho/storage"
 	"github.com/leftmike/maho/storage/encode"
+	"github.com/leftmike/maho/util"
 )
 
 var (
@@ -195,7 +196,7 @@ func (kvst *keyValStore) commit(ctx context.Context, txVer uint64, delta *btree.
 			return true
 		})
 	if err == nil {
-		err = upd.Set(versionKey, encode.EncodeUint64(make([]byte, 0, 8), ver))
+		err = upd.Set(versionKey, util.EncodeUint64(make([]byte, 0, 8), ver))
 	}
 	if err != nil {
 		upd.Rollback()
@@ -248,7 +249,7 @@ func (kvtx *transaction) forWrite() {
 }
 
 func (kvt *table) makeKey(row []sql.Value) []byte {
-	buf := encode.EncodeUint64(make([]byte, 0, 8), uint64(kvt.mid))
+	buf := util.EncodeUint64(make([]byte, 0, 8), uint64(kvt.mid))
 	if row != nil {
 		buf = append(buf, encode.MakeKey(kvt.primary, row)...)
 	}

@@ -1,4 +1,4 @@
-package encode
+package util
 
 func EncodeUint64(buf []byte, u uint64) []byte {
 	// reverse: u = ^u
@@ -56,16 +56,4 @@ func DecodeZigzag64(buf []byte) ([]byte, int64, bool) {
 		return nil, 0, false
 	}
 	return buf, int64((n >> 1) ^ uint64((int64(n&1)<<63)>>63)), true
-}
-
-func EncodeColNumValueTag(buf []byte, colNum int, tag byte) []byte {
-	if colNum == 0 {
-		buf = append(buf, tag)
-	} else if colNum < 16 {
-		buf = append(buf, byte(colNum<<4)|tag)
-	} else {
-		buf = append(buf, 0xF0|tag)
-		buf = EncodeVarint(buf, uint64(colNum))
-	}
-	return buf
 }

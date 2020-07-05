@@ -16,6 +16,7 @@ import (
 	"github.com/leftmike/maho/sql"
 	"github.com/leftmike/maho/storage"
 	"github.com/leftmike/maho/storage/encode"
+	"github.com/leftmike/maho/util"
 )
 
 var (
@@ -159,8 +160,8 @@ func (rcst *rowColsStore) commit(ctx context.Context, txVer uint64, delta *btree
 	rcst.mutex.Unlock()
 
 	ver := rcst.ver + 1
-	buf := encode.EncodeUint32([]byte{commitRecordType}, 0) // Reserve space for length.
-	buf = encode.EncodeUint64(buf, ver)
+	buf := util.EncodeUint32([]byte{commitRecordType}, 0) // Reserve space for length.
+	buf = util.EncodeUint64(buf, ver)
 
 	var err error
 	delta.Ascend(

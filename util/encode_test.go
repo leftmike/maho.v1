@@ -1,4 +1,4 @@
-package encode_test
+package util_test
 
 import (
 	"math"
@@ -6,8 +6,8 @@ import (
 
 	"github.com/golang/protobuf/proto"
 
-	"github.com/leftmike/maho/storage/encode"
 	"github.com/leftmike/maho/testutil"
+	"github.com/leftmike/maho/util"
 )
 
 func TestEncodeVarint(t *testing.T) {
@@ -28,12 +28,12 @@ func TestEncodeVarint(t *testing.T) {
 	}
 
 	for _, n := range numbers {
-		buf := encode.EncodeVarint(nil, n)
+		buf := util.EncodeVarint(nil, n)
 		pbuf := proto.EncodeVarint(n)
 		if !testutil.DeepEqual(buf, pbuf) {
 			t.Errorf("EncodeVarint(%d): got %v want %v", n, buf, pbuf)
 		}
-		ret, r, ok := encode.DecodeVarint(buf)
+		ret, r, ok := util.DecodeVarint(buf)
 		if !ok {
 			t.Errorf("DecodeVarint(%v) failed", buf)
 		} else if len(ret) != 0 {
@@ -75,7 +75,7 @@ func TestEncodeZigzag64(t *testing.T) {
 	}
 
 	for _, n := range numbers {
-		buf := encode.EncodeZigzag64(nil, n)
+		buf := util.EncodeZigzag64(nil, n)
 		enc := proto.NewBuffer(nil)
 		err := enc.EncodeZigzag64(uint64(n))
 		if err != nil {
@@ -86,7 +86,7 @@ func TestEncodeZigzag64(t *testing.T) {
 				t.Errorf("EncodeZigzag64(%d): got %v want %v", n, buf, pbuf)
 			}
 		}
-		ret, r, ok := encode.DecodeZigzag64(buf)
+		ret, r, ok := util.DecodeZigzag64(buf)
 		if !ok {
 			t.Errorf("DecodeZigzag64(%v) failed", buf)
 		} else if len(ret) != 0 {
