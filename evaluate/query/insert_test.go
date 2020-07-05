@@ -8,6 +8,7 @@ import (
 	"github.com/leftmike/maho/evaluate"
 	"github.com/leftmike/maho/evaluate/expr"
 	"github.com/leftmike/maho/evaluate/query"
+	"github.com/leftmike/maho/evaluate/test"
 	"github.com/leftmike/maho/parser"
 	"github.com/leftmike/maho/sql"
 	"github.com/leftmike/maho/testutil"
@@ -190,12 +191,7 @@ func TestInsert(t *testing.T) {
 		t.Errorf("InsertValues{}.String() got %s want %s", s.String(), r)
 	}
 
-	e := startEngine(t)
-	ses := &evaluate.Session{
-		Engine:          e,
-		DefaultDatabase: sql.ID("test"),
-		DefaultSchema:   sql.PUBLIC,
-	}
+	e, ses := test.StartSession(t)
 	testInsert(t, e, ses, sql.TableName{sql.ID("test"), sql.PUBLIC, sql.ID("t")}, insertColumns1,
 		insertColumnTypes1, insertCases1)
 	testInsert(t, e, ses, sql.TableName{sql.ID("test"), sql.PUBLIC, sql.ID("t2")}, insertColumns2,

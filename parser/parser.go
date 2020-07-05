@@ -458,11 +458,12 @@ func (p *parser) parseKey(unique bool) datadef.IndexKey {
 func (p *parser) parseCreateDetails(s *datadef.CreateTable) {
 	/*
 		CREATE TABLE [[database '.'] schema '.'] table
-			'('	(column data_type [column_constraint]
+			'('	(column data_type [column_constraint] ...
 				| [CONSTRAINT constraint] table_constraint) [',' ...] ')'
 		table_constraint =
 			  PRIMARY KEY key_columns
 			| UNIQUE key_columns
+			| CHECK '(' expr ')'
 		key_columns = '(' column [ASC | DESC] [',' ...] ')'
 	*/
 
@@ -481,6 +482,10 @@ func (p *parser) parseCreateDetails(s *datadef.CreateTable) {
 			key := p.parseKey(true)
 			p.addKeyConstraint(s, sql.UniqueConstraint, makeKeyConstraintName(cn, key, "unique"),
 				key)
+		} else if p.optionalReserved(sql.CHECK) {
+			p.expectTokens(token.LParen)
+			p.addCheckConstraint(s, cn, -1, p.parseExpr())
+			p.expectTokens(token.RParen)
 		} else if cn != 0 {
 			p.error("CONSTRAINT name specified without a constraint")
 		} else {
@@ -630,6 +635,40 @@ func (p *parser) addColumnConstraint(s *datadef.CreateTable, ct sql.ConstraintTy
 		})
 }
 
+func duplicateName(cn sql.Identifier, cons []datadef.Constraint) bool {
+	for _, c := range cons {
+		if c.Name == cn {
+			return true
+		}
+	}
+	return false
+}
+
+func (p *parser) addCheckConstraint(s *datadef.CreateTable, cn sql.Identifier, colNum int,
+	e expr.Expr) {
+
+	if cn == 0 {
+		cnt := 1
+		for {
+			cn = sql.ID(fmt.Sprintf("check_%d", cnt))
+			if !duplicateName(cn, s.Constraints) {
+				break
+			}
+			cnt += 1
+		}
+	} else if duplicateName(cn, s.Constraints) {
+		p.error(fmt.Sprintf("duplicate constraint name: %s", cn))
+	}
+
+	s.Constraints = append(s.Constraints,
+		datadef.Constraint{
+			Type:   sql.CheckConstraint,
+			Name:   cn,
+			ColNum: colNum,
+			Check:  e,
+		})
+}
+
 func (p *parser) parseColumn(s *datadef.CreateTable) {
 	/*
 		column data_type [[CONSTRAINT constraint] column_constraint]
@@ -639,7 +678,6 @@ func (p *parser) parseColumn(s *datadef.CreateTable) {
 			| PRIMARY KEY
 			| UNIQUE
 			| CHECK '(' expr ')'
-			| REFERENCES reftable [ '(' refcolumn ')' ]
 	*/
 
 	nam := p.expectIdentifier("expected a column name")
@@ -682,6 +720,10 @@ func (p *parser) parseColumn(s *datadef.CreateTable) {
 					Columns: []sql.Identifier{nam},
 					Reverse: []bool{false},
 				})
+		} else if p.optionalReserved(sql.CHECK) {
+			p.expectTokens(token.LParen)
+			p.addCheckConstraint(s, cn, len(s.Columns)-1, p.parseExpr())
+			p.expectTokens(token.RParen)
 		} else if cn != 0 {
 			p.error("CONSTRAINT name specified without a constraint")
 		} else {

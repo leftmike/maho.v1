@@ -70,11 +70,20 @@ CREATE SCHEMA [database '.'] schema
 ```
 CREATE TABLE [IF NOT EXISTS] [[database '.'] schema '.'] table
     '('
-        ( column data_type [column_constraint]
-        | table_constraint ) [',' ...]
+        ( column data_type [[CONSTRAINT constraint] column_constraint] ...
+        | [CONSTRAINT constraint] table_constraint ) [',' ...]
     ')'
-table_constraint = (PRIMARY KEY | UNIQUE) '(' column [ASC | DESC] [',' ...] ')'
-column_constraint = DEFAULT expr | NOT NULL | PRIMARY KEY | UNIQUE
+table_constraint =
+      PRIMARY KEY key_columns
+    | UNIQUE key_columns
+    | CHECK '(' expr ')'
+key_columns = '(' column [ASC | DESC] [',' ...] ')'
+column_constraint =
+      DEFAULT expr
+    | NOT NULL
+    | PRIMARY KEY
+    | UNIQUE
+    | CHECK '(' expr ')'
 data_type =
 	  BINARY ['(' length ')']
 	| VARBINARY ['(' length ')']

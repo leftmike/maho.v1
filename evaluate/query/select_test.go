@@ -6,6 +6,7 @@ import (
 	"github.com/leftmike/maho/evaluate"
 	"github.com/leftmike/maho/evaluate/expr"
 	"github.com/leftmike/maho/evaluate/query"
+	"github.com/leftmike/maho/evaluate/test"
 	"github.com/leftmike/maho/sql"
 	"github.com/leftmike/maho/testutil"
 )
@@ -93,12 +94,7 @@ func TestSelect(t *testing.T) {
 		},
 	}
 
-	e := startEngine(t)
-	ses := &evaluate.Session{
-		Engine:          e,
-		DefaultDatabase: sql.ID("test"),
-		DefaultSchema:   sql.PUBLIC,
-	}
+	e, ses := test.StartSession(t)
 	for _, c := range cases {
 		tx := e.Begin(0)
 		if c.stmt.String() != c.s {

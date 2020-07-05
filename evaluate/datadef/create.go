@@ -95,6 +95,33 @@ func (stmt *CreateTable) String() string {
 	return s
 }
 
+type tableCheck []sql.Identifier
+
+func (tc tableCheck) CompileRef(r expr.Ref) (int, error) {
+	if len(r) == 1 {
+		for idx, col := range tc {
+			if col == r[0] {
+				return idx, nil
+			}
+		}
+	}
+	return -1, fmt.Errorf("engine: reference %s not found", r)
+}
+
+type columnCheck struct {
+	col    sql.Identifier
+	colNum int
+}
+
+func (cc columnCheck) CompileRef(r expr.Ref) (int, error) {
+	if len(r) == 1 {
+		if cc.col == r[0] {
+			return cc.colNum, nil
+		}
+	}
+	return -1, fmt.Errorf("engine: reference %s not found", r)
+}
+
 func (stmt *CreateTable) Plan(ses *evaluate.Session, tx sql.Transaction) (interface{}, error) {
 	stmt.Table = ses.ResolveTableName(stmt.Table)
 
@@ -104,15 +131,31 @@ func (stmt *CreateTable) Plan(ses *evaluate.Session, tx sql.Transaction) (interf
 			var err error
 			key, err = indexKeyToColumnKeys(con.Key, stmt.Columns)
 			if err != nil {
-				return nil, fmt.Errorf("engine: %s in primary key for table %s", err, stmt.Table)
+				return nil, fmt.Errorf("engine: %s in key for table %s", err, stmt.Table)
 			}
 		}
+
+		var check sql.CExpr
+		if con.Check != nil {
+			var err error
+			var cctx expr.CompileContext
+			if con.ColNum >= 0 {
+				cctx = columnCheck{stmt.Columns[con.ColNum], con.ColNum}
+			} else {
+				cctx = tableCheck(stmt.Columns)
+			}
+			check, err = expr.Compile(ses, tx, cctx, con.Check)
+			if err != nil {
+				return nil, err
+			}
+		}
+
 		stmt.constraints = append(stmt.constraints, sql.Constraint{
 			Type:   con.Type,
 			Name:   con.Name,
 			ColNum: con.ColNum,
 			Key:    key,
-			Check:  nil, // XXX: con.Check,
+			Check:  check,
 		})
 	}
 

@@ -16,8 +16,8 @@ const (
 type Constraint struct {
 	Type   ConstraintType
 	Name   Identifier
-	ColNum int
-	Key    []ColumnKey // Primary and unique constraints
+	ColNum int         // Default, NotNull, and Column Check constraints
+	Key    []ColumnKey // Primary and Unique constraints
 	Check  CExpr       // Check constraints
 }
 

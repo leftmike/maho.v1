@@ -514,6 +514,84 @@ unique (c2, c1))`,
 constraint c1_primary unique (c2, c1))`,
 			fail: true,
 		},
+		{
+			sql: "create table t (c1 int check(c1 > 1), check(c1 < c2), c2 int check(c2 > 2))",
+			stmt: datadef.CreateTable{
+				Table:   sql.TableName{Table: sql.ID("t")},
+				Columns: []sql.Identifier{sql.ID("c1"), sql.ID("c2")},
+				ColumnTypes: []datadef.ColumnType{
+					{Type: sql.IntegerType, Size: 4},
+					{Type: sql.IntegerType, Size: 4},
+				},
+				Constraints: []datadef.Constraint{
+					{
+						Type:   sql.CheckConstraint,
+						Name:   sql.ID("check_1"),
+						ColNum: 0,
+						Check: &expr.Binary{
+							Op:    expr.GreaterThanOp,
+							Left:  expr.Ref{sql.ID("c1")},
+							Right: expr.Int64Literal(1),
+						},
+					},
+					{
+						Type:   sql.CheckConstraint,
+						Name:   sql.ID("check_2"),
+						ColNum: -1,
+						Check: &expr.Binary{
+							Op:    expr.LessThanOp,
+							Left:  expr.Ref{sql.ID("c1")},
+							Right: expr.Ref{sql.ID("c2")},
+						},
+					},
+					{
+						Type:   sql.CheckConstraint,
+						Name:   sql.ID("check_3"),
+						ColNum: 1,
+						Check: &expr.Binary{
+							Op:    expr.GreaterThanOp,
+							Left:  expr.Ref{sql.ID("c2")},
+							Right: expr.Int64Literal(2),
+						},
+					},
+				},
+			},
+		},
+		{
+			sql: `create table t (c1 int constraint check_1 not null constraint check_2 default 1,
+c2 int check(true))`,
+			stmt: datadef.CreateTable{
+				Table:   sql.TableName{Table: sql.ID("t")},
+				Columns: []sql.Identifier{sql.ID("c1"), sql.ID("c2")},
+				ColumnTypes: []datadef.ColumnType{
+					{Type: sql.IntegerType, Size: 4, NotNull: true, Default: expr.Int64Literal(1)},
+					{Type: sql.IntegerType, Size: 4},
+				},
+				Constraints: []datadef.Constraint{
+					{
+						Type:   sql.NotNullConstraint,
+						Name:   sql.ID("check_1"),
+						ColNum: 0,
+					},
+					{
+						Type:   sql.DefaultConstraint,
+						Name:   sql.ID("check_2"),
+						ColNum: 0,
+					},
+					{
+						Type:   sql.CheckConstraint,
+						Name:   sql.ID("check_3"),
+						ColNum: 1,
+						Check:  expr.True(),
+					},
+				},
+			},
+		},
+		{
+			sql: `create table t (c1 int constraint check_1 not null constraint check_2 default 1,
+c2 int constraint check_1 check(true))`,
+			fail: true,
+		},
 	}
 
 	for i, c := range cases {
