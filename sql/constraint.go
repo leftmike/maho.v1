@@ -1,6 +1,8 @@
 package sql
 
-import "fmt"
+import (
+	"fmt"
+)
 
 type ConstraintType int
 

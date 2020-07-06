@@ -13,7 +13,7 @@ import (
 type table struct {
 	tn sql.TableName
 	st sql.Table
-	tt sql.TableType
+	tt *TableType
 }
 
 type rows struct {
@@ -21,7 +21,7 @@ type rows struct {
 	rows sql.Rows
 }
 
-func makeTable(tn sql.TableName, st sql.Table, tt sql.TableType) (*table, sql.TableType, error) {
+func makeTable(tn sql.TableName, st sql.Table, tt *TableType) (*table, sql.TableType, error) {
 	return &table{
 		tn: tn,
 		st: st,
@@ -30,15 +30,15 @@ func makeTable(tn sql.TableName, st sql.Table, tt sql.TableType) (*table, sql.Ta
 }
 
 func (tbl *table) Columns(ctx context.Context) []sql.Identifier {
-	return tbl.tt.Columns()
+	return tbl.tt.cols
 }
 
 func (tbl *table) ColumnTypes(ctx context.Context) []sql.ColumnType {
-	return tbl.tt.ColumnTypes()
+	return tbl.tt.colTypes
 }
 
 func (tbl *table) PrimaryKey(ctx context.Context) []sql.ColumnKey {
-	return tbl.tt.PrimaryKey()
+	return tbl.tt.primary
 }
 
 func (tbl *table) Rows(ctx context.Context, minRow, maxRow []sql.Value) (sql.Rows, error) {
@@ -122,21 +122,42 @@ func convertValue(ct sql.ColumnType, n sql.Identifier, v sql.Value) (sql.Value, 
 	return v, nil
 }
 
+type rowContext []sql.Value
+
+func (rc rowContext) EvalRef(idx int) sql.Value {
+	return rc[idx]
+}
+
 func (tbl *table) Insert(ctx context.Context, row []sql.Value) error {
-	cols := tbl.tt.Columns()
-	for rdx, ct := range tbl.tt.ColumnTypes() {
+	cols := tbl.tt.cols
+	for rdx, ct := range tbl.tt.colTypes {
 		var err error
 		row[rdx], err = convertValue(ct, cols[rdx], row[rdx])
 		if err != nil {
 			return fmt.Errorf("engine: table %s: %s", tbl.tn, err)
 		}
 	}
+
+	if len(tbl.tt.checks) > 0 {
+		for _, chk := range tbl.tt.checks {
+			val, err := chk.check.Eval(ctx, rowContext(row))
+			if err != nil {
+				return fmt.Errorf("engine: table %s: constraint: %s: %s", tbl.tn, chk.name, err)
+			}
+			if val != nil {
+				if b, ok := val.(sql.BoolValue); ok && b == sql.BoolValue(false) {
+					return fmt.Errorf("engine: table %s: check: %s: failed", tbl.tn, chk.name)
+				}
+			}
+		}
+	}
+
 	return tbl.st.Insert(ctx, row)
 }
 
 func (tbl *table) update(ctx context.Context, r sql.Rows, updates []sql.ColumnUpdate) error {
-	cols := tbl.tt.Columns()
-	colTypes := tbl.tt.ColumnTypes()
+	cols := tbl.tt.cols
+	colTypes := tbl.tt.colTypes
 	for _, up := range updates {
 		ct := colTypes[up.Index]
 

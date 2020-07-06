@@ -91,6 +91,7 @@ data_type =
 	| BYTEA ['(' length ')']
 	| BYTES ['(' length ')']
 	| CHAR ['(' length ')']
+	| CHARACTER ['(' length ')']
 	| VARCHAR ['(' length ')']
 	| TEXT ['(' length ')']
 	| BOOL
@@ -100,6 +101,7 @@ data_type =
 	| SMALLINT
 	| INT2
 	| INT
+	| INTEGER
 	| INT4
 	| INTEGER
 	| BIGINT

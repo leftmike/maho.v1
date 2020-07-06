@@ -531,6 +531,7 @@ func (p *parser) parseColumnType() datadef.ColumnType {
 			| BYTEA ['(' length ')']
 			| BYTES ['(' length ')']
 			| CHAR ['(' length ')']
+			| CHARACTER ['(' length ')']
 			| VARCHAR ['(' length ')']
 			| TEXT ['(' length ')']
 			| BOOL
@@ -540,6 +541,7 @@ func (p *parser) parseColumnType() datadef.ColumnType {
 			| SMALLINT
 			| INT2
 			| INT
+			| INTEGER
 			| INT4
 			| INTEGER
 			| BIGINT

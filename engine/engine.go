@@ -190,7 +190,34 @@ func (e *Engine) CreateTable(ctx context.Context, tx sql.Transaction, tn sql.Tab
 		})
 	}
 
-	return e.st.CreateTable(ctx, tx, tn, MakeTableType(cols, colTypes, primary), ifNotExists)
+	tt := MakeTableType(cols, colTypes, primary)
+	for _, con := range cons {
+		if con.Type == sql.CheckConstraint {
+			tt.checks = append(tt.checks,
+				checkConstraint{
+					name:      con.Name,
+					check:     con.Check,
+					checkExpr: con.CheckExpr,
+				})
+		} else if con.Type == sql.ForeignConstraint {
+			// XXX
+		} else if con.Type == sql.UniqueConstraint {
+			// XXX
+		} else {
+			// sql.DefaultConstraint
+			// sql.NotNullConstraint
+			// sql.PrimaryConstraint
+
+			tt.constraints = append(tt.constraints,
+				constraint{
+					name:   con.Name,
+					typ:    con.Type,
+					colNum: con.ColNum,
+				})
+		}
+	}
+
+	return e.st.CreateTable(ctx, tx, tn, tt, ifNotExists)
 }
 
 func (e *Engine) DropTable(ctx context.Context, tx sql.Transaction, tn sql.TableName,

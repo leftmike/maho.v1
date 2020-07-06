@@ -51,11 +51,17 @@ To Do:
 
 - constraints
 -- engine: keep track of Check constraints and test them on Insert and Update
+-- engine: test encoding and decoding of TableType
 -- change unique constraints into indexes
 -- column: REFERENCES reftable [ '(' refcolumn ')' ] => treat as a foreign key
 -- table: FOREIGN KEY '(' column  [',' ...] ')' REFERENCES reftable [ '(' refcolumn [',' ...] ')' ]
    => list of Foreign on the table (and need a list of Refering tables)
 -- SHOW CONSTRAINTS FROM table
+-- drop CHECK constraint: use ALTER TABLE table DROP CONSTRAINT constraint
+-- drop DEFAULT: use ALTER TABLE table ALTER COLUMN column DROP DEFAULT
+-- drop FOREIGN KEY: use ALTER TABLE table DROP CONSTRAINT constraint
+-- drop NOT NULL: use ALTER TABLE table ALTER COLUMN column DROP NOT NULL
+-- drop UNIQUE: use DROP INDEX ...
 */
 
 import (

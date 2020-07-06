@@ -9,11 +9,25 @@ import (
 	"github.com/leftmike/maho/sql"
 )
 
+type constraint struct {
+	name   sql.Identifier
+	typ    sql.ConstraintType
+	colNum int
+}
+
+type checkConstraint struct {
+	name      sql.Identifier
+	check     sql.CExpr
+	checkExpr string
+}
+
 type TableType struct {
-	ver      uint
-	cols     []sql.Identifier
-	colTypes []sql.ColumnType
-	primary  []sql.ColumnKey
+	ver         uint
+	cols        []sql.Identifier
+	colTypes    []sql.ColumnType
+	primary     []sql.ColumnKey
+	constraints []constraint
+	checks      []checkConstraint
 }
 
 func MakeTableType(cols []sql.Identifier, colTypes []sql.ColumnType,
@@ -72,6 +86,26 @@ func (tt *TableType) Encode() ([]byte, error) {
 			})
 	}
 
+	md.Constraints = make([]*ConstraintMetadata, 0, len(tt.constraints))
+	for _, con := range tt.constraints {
+		md.Constraints = append(md.Constraints,
+			&ConstraintMetadata{
+				Name:   con.name.String(),
+				Type:   ConstraintType(con.typ),
+				ColNum: int32(con.colNum),
+			})
+	}
+
+	md.Checks = make([]*CheckConstraint, 0, len(tt.checks))
+	for _, chk := range tt.checks {
+		md.Checks = append(md.Checks,
+			&CheckConstraint{
+				Name:      chk.name.String(),
+				Check:     expr.Encode(chk.check),
+				CheckExpr: chk.checkExpr,
+			})
+	}
+
 	return proto.Marshal(&md)
 }
 
@@ -106,9 +140,35 @@ func DecodeTableType(tn sql.TableName, buf []byte) (*TableType, error) {
 		primary = append(primary, sql.MakeColumnKey(int(pk.Number), pk.Reverse))
 	}
 
+	constraints := make([]constraint, 0, len(md.Constraints))
+	for _, con := range md.Constraints {
+		constraints = append(constraints,
+			constraint{
+				name:   sql.QuotedID(con.Name),
+				typ:    sql.ConstraintType(con.Type),
+				colNum: int(con.ColNum),
+			})
+	}
+
+	checks := make([]checkConstraint, 0, len(md.Checks))
+	for _, chk := range md.Checks {
+		check, err := expr.Decode(chk.Check)
+		if err != nil {
+			return nil, err
+		}
+		checks = append(checks,
+			checkConstraint{
+				name:      sql.QuotedID(chk.Name),
+				check:     check,
+				checkExpr: chk.CheckExpr,
+			})
+	}
+
 	return &TableType{
-		cols:     cols,
-		colTypes: colTypes,
-		primary:  primary,
+		cols:        cols,
+		colTypes:    colTypes,
+		primary:     primary,
+		constraints: constraints,
+		checks:      checks,
 	}, nil
 }

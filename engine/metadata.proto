@@ -5,6 +5,8 @@ option go_package = "./engine";
 message TableMetadata {
     repeated ColumnMetadata Columns = 1;
     repeated ColumnKey Primary = 2;
+    repeated ConstraintMetadata Constraints = 3;
+    repeated CheckConstraint Checks = 4;
 }
 
 // These need to match the values in maho/sql/datatype.go
@@ -19,15 +21,38 @@ enum DataType {
 
 message ColumnMetadata {
     string Name = 1;
-    DataType Type = 3;
-    uint32 Size = 4;
-    bool Fixed = 5;
-    bool NotNull = 6;
-    bytes Default = 7;
-    string DefaultExpr = 8;
+    DataType Type = 2;
+    uint32 Size = 3;
+    bool Fixed = 4;
+    bool NotNull = 5;
+    bytes Default = 6;
+    string DefaultExpr = 7;
 }
 
 message ColumnKey {
     int32 Number = 1;
     bool Reverse = 2;
+}
+
+// These need to match the values in maho/sql/constraint.go
+enum ConstraintType {
+    UnknownConstraint = 0;
+    Default = 1;
+    NotNull = 2;
+    Primary = 3;
+    Unique = 4;
+    Check = 5;
+    Foreign = 6;
+}
+
+message ConstraintMetadata {
+    string Name = 1;
+    ConstraintType Type = 2;
+    int32 ColNum = 3;
+}
+
+message CheckConstraint {
+    string Name = 1;
+    bytes Check = 2;
+    string CheckExpr = 3;
 }
