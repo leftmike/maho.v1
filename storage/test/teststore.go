@@ -64,7 +64,7 @@ type storeCmd struct {
 type transactionState struct {
 	tdx int
 	tx  sql.Transaction
-	tbl sql.Table
+	tbl engine.Table
 }
 
 var (
@@ -73,7 +73,7 @@ var (
 	primary     = []sql.ColumnKey{sql.MakeColumnKey(0, false)}
 )
 
-func allRows(t *testing.T, ctx context.Context, rows sql.Rows,
+func allRows(t *testing.T, ctx context.Context, rows engine.Rows,
 	fln testutil.FileLineNumber) [][]sql.Value {
 
 	t.Helper()
@@ -294,7 +294,7 @@ func testDatabase(t *testing.T, st *storage.Store, dbname sql.Identifier, cmds [
 						break
 					}
 					if i64, ok := dest[0].(sql.Int64Value); ok && int(i64) == cmd.rowID {
-						err = rows.Update(ctx, cmd.updates)
+						err = rows.Update(ctx, cmd.updates, nil)
 						if cmd.fail {
 							if err == nil {
 								t.Errorf("%srows.Update() did not fail", cmd.fln)
@@ -1336,7 +1336,7 @@ func incColumn(t *testing.T, st *storage.Store, tx sql.Transaction, tdx uint64, 
 		if i64, ok := dest[0].(sql.Int64Value); ok && int(i64) == i {
 			v := int(dest[1].(sql.Int64Value))
 			err = rows.Update(ctx,
-				[]sql.ColumnUpdate{{Index: 1, Value: sql.Int64Value(v + 1)}})
+				[]sql.ColumnUpdate{{Index: 1, Value: sql.Int64Value(v + 1)}}, nil)
 			if err == nil {
 				//fmt.Printf("%d: %d -> %d\n", tdx, i, v+1)
 				return true

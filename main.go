@@ -18,6 +18,8 @@ To Do:
 
 - use jackc/pgx or cockroach/pkg/sql/pgwire for client sql interface
 
+- make sure all Rows get properly closed
+
 - indexes: mideng (basic, rowcols, keyvals, kvrows)
 -- unique indexes: all NULL values are considered different from all other NULL values and
    are thus unique (sqlite.org/lang_createindex.html)
@@ -50,7 +52,6 @@ To Do:
 -- move Engine.CreateIndex, DropIndex to Table
 
 - constraints
--- engine: keep track of Check constraints and test them on Insert and Update
 -- engine: test encoding and decoding of TableType
 -- change unique constraints into indexes
 -- column: REFERENCES reftable [ '(' refcolumn ')' ] => treat as a foreign key

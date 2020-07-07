@@ -59,7 +59,7 @@ func NewStore(dataDir string) (*storage.Store, error) {
 }
 
 func (_ *basicStore) Table(ctx context.Context, tx sql.Transaction, tn sql.TableName, mid int64,
-	tt *engine.TableType) (sql.Table, error) {
+	tt *engine.TableType) (engine.Table, error) {
 
 	primary := tt.PrimaryKey()
 	if len(primary) == 0 {
@@ -135,7 +135,7 @@ func (ri rowItem) Less(item btree.Item) bool {
 	return ri.mid == ri2.mid && bytes.Compare(ri.key, ri2.key) < 0
 }
 
-func (bt *table) Rows(ctx context.Context, minRow, maxRow []sql.Value) (sql.Rows, error) {
+func (bt *table) Rows(ctx context.Context, minRow, maxRow []sql.Value) (engine.Rows, error) {
 	br := &rows{
 		tbl: bt,
 		idx: 0,
@@ -204,7 +204,9 @@ func (br *rows) Delete(ctx context.Context) error {
 	return nil
 }
 
-func (br *rows) Update(ctx context.Context, updates []sql.ColumnUpdate) error {
+func (br *rows) Update(ctx context.Context, updates []sql.ColumnUpdate,
+	check func(row []sql.Value) error) error {
+
 	br.tbl.tx.forWrite()
 
 	if br.idx == 0 {
@@ -227,6 +229,13 @@ func (br *rows) Update(ctx context.Context, updates []sql.ColumnUpdate) error {
 			br.rows[br.idx-1][update.Index] = update.Value
 		}
 
+		if check != nil {
+			err := check(br.rows[br.idx-1])
+			if err != nil {
+				return err
+			}
+		}
+
 		return br.tbl.Insert(ctx, br.rows[br.idx-1])
 	}
 
@@ -234,6 +243,14 @@ func (br *rows) Update(ctx context.Context, updates []sql.ColumnUpdate) error {
 	for _, update := range updates {
 		row[update.Index] = update.Value
 	}
+
+	if check != nil {
+		err := check(row)
+		if err != nil {
+			return err
+		}
+	}
+
 	br.tbl.tx.tree.ReplaceOrInsert(br.tbl.toItem(row))
 	return nil
 }

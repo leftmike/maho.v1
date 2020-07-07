@@ -19,7 +19,7 @@ type columnField struct {
 }
 
 type typedTable struct {
-	tbl          sql.Table
+	tbl          engine.Table
 	tn           sql.TableName
 	tt           *engine.TableType
 	rowType      reflect.Type
@@ -30,10 +30,10 @@ type typedTable struct {
 
 type TypedRows struct {
 	ttbl *typedTable
-	rows sql.Rows
+	rows engine.Rows
 }
 
-func MakeTypedTable(tn sql.TableName, tbl sql.Table, tt *engine.TableType) *typedTable {
+func MakeTypedTable(tn sql.TableName, tbl engine.Table, tt *engine.TableType) *typedTable {
 	return &typedTable{
 		tbl: tbl,
 		tn:  tn,
@@ -383,7 +383,7 @@ func (r *TypedRows) Update(ctx context.Context, updateObj interface{}) error {
 		}
 	}
 
-	return r.rows.Update(ctx, updates)
+	return r.rows.Update(ctx, updates, nil)
 }
 
 func NullBoolean(b bool) *bool {

@@ -126,7 +126,7 @@ func newStore(kv KV) (*storage.Store, error) {
 }
 
 func (kvst *keyValStore) Table(ctx context.Context, tx sql.Transaction, tn sql.TableName,
-	mid int64, tt *engine.TableType) (sql.Table, error) {
+	mid int64, tt *engine.TableType) (engine.Table, error) {
 
 	primary := tt.PrimaryKey()
 	if len(primary) == 0 {
@@ -270,7 +270,7 @@ func (ri rowItem) Less(item btree.Item) bool {
 	return bytes.Compare(ri.key, (item.(rowItem)).key) < 0
 }
 
-func (kvt *table) Rows(ctx context.Context, minRow, maxRow []sql.Value) (sql.Rows, error) {
+func (kvt *table) Rows(ctx context.Context, minRow, maxRow []sql.Value) (engine.Rows, error) {
 	minKey := kvt.makeKey(minRow)
 	it, err := kvt.st.kv.Iterate(kvt.tx.ver, minKey)
 	if err != nil {
@@ -441,7 +441,9 @@ func (kvr *rows) Delete(ctx context.Context) error {
 	return nil
 }
 
-func (kvr *rows) Update(ctx context.Context, updates []sql.ColumnUpdate) error {
+func (kvr *rows) Update(ctx context.Context, updates []sql.ColumnUpdate,
+	check func(row []sql.Value) error) error {
+
 	kvr.tbl.tx.forWrite()
 
 	if kvr.curRow == nil {
@@ -460,6 +462,13 @@ func (kvr *rows) Update(ctx context.Context, updates []sql.ColumnUpdate) error {
 	updateRow := append(make([]sql.Value, 0, len(kvr.curRow)), kvr.curRow...)
 	for _, update := range updates {
 		updateRow[update.Index] = update.Value
+	}
+
+	if check != nil {
+		err := check(updateRow)
+		if err != nil {
+			return err
+		}
 	}
 
 	if primaryUpdated {

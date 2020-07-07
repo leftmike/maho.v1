@@ -12,16 +12,16 @@ import (
 
 type table struct {
 	tn sql.TableName
-	st sql.Table
+	st Table
 	tt *TableType
 }
 
 type rows struct {
 	tbl  *table
-	rows sql.Rows
+	rows Rows
 }
 
-func makeTable(tn sql.TableName, st sql.Table, tt *TableType) (*table, sql.TableType, error) {
+func makeTable(tn sql.TableName, st Table, tt *TableType) (*table, sql.TableType, error) {
 	return &table{
 		tn: tn,
 		st: st,
@@ -155,7 +155,7 @@ func (tbl *table) Insert(ctx context.Context, row []sql.Value) error {
 	return tbl.st.Insert(ctx, row)
 }
 
-func (tbl *table) update(ctx context.Context, r sql.Rows, updates []sql.ColumnUpdate) error {
+func (tbl *table) update(ctx context.Context, r Rows, updates []sql.ColumnUpdate) error {
 	cols := tbl.tt.cols
 	colTypes := tbl.tt.colTypes
 	for _, up := range updates {
@@ -167,7 +167,27 @@ func (tbl *table) update(ctx context.Context, r sql.Rows, updates []sql.ColumnUp
 			return fmt.Errorf("engine: table %s: %s", tbl.tn, err)
 		}
 	}
-	return r.Update(ctx, updates)
+
+	if len(tbl.tt.checks) == 0 {
+		return r.Update(ctx, updates, nil)
+	}
+
+	return r.Update(ctx, updates,
+		func(row []sql.Value) error {
+			for _, chk := range tbl.tt.checks {
+				val, err := chk.check.Eval(ctx, rowContext(row))
+				if err != nil {
+					return fmt.Errorf("engine: table %s: constraint: %s: %s", tbl.tn, chk.name,
+						err)
+				}
+				if val != nil {
+					if b, ok := val.(sql.BoolValue); ok && b == sql.BoolValue(false) {
+						return fmt.Errorf("engine: table %s: check: %s: failed", tbl.tn, chk.name)
+					}
+				}
+			}
+			return nil
+		})
 }
 
 func (r *rows) Columns() []sql.Identifier {

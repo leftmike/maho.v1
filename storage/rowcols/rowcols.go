@@ -85,7 +85,7 @@ func NewStore(dataDir string) (*storage.Store, error) {
 }
 
 func (rcst *rowColsStore) Table(ctx context.Context, tx sql.Transaction, tn sql.TableName,
-	mid int64, tt *engine.TableType) (sql.Table, error) {
+	mid int64, tt *engine.TableType) (engine.Table, error) {
 
 	primary := tt.PrimaryKey()
 	if len(primary) == 0 {
@@ -270,7 +270,7 @@ func (rct *table) toItem(row []sql.Value, deleted bool) btree.Item {
 	return ri
 }
 
-func (rct *table) Rows(ctx context.Context, minRow, maxRow []sql.Value) (sql.Rows, error) {
+func (rct *table) Rows(ctx context.Context, minRow, maxRow []sql.Value) (engine.Rows, error) {
 	rcr := &rows{
 		tbl: rct,
 		idx: 0,
@@ -405,7 +405,9 @@ func (rcr *rows) Delete(ctx context.Context) error {
 	return nil
 }
 
-func (rcr *rows) Update(ctx context.Context, updates []sql.ColumnUpdate) error {
+func (rcr *rows) Update(ctx context.Context, updates []sql.ColumnUpdate,
+	check func(row []sql.Value) error) error {
+
 	rcr.tbl.tx.forWrite()
 
 	if rcr.idx == 0 {
@@ -428,12 +430,27 @@ func (rcr *rows) Update(ctx context.Context, updates []sql.ColumnUpdate) error {
 			rcr.rows[rcr.idx-1][update.Index] = update.Value
 		}
 
+		if check != nil {
+			err := check(rcr.rows[rcr.idx-1])
+			if err != nil {
+				return err
+			}
+		}
+
 		return rcr.tbl.Insert(ctx, rcr.rows[rcr.idx-1])
 	}
 
 	for _, update := range updates {
 		rcr.rows[rcr.idx-1][update.Index] = update.Value
 	}
+
+	if check != nil {
+		err := check(rcr.rows[rcr.idx-1])
+		if err != nil {
+			return err
+		}
+	}
+
 	rcr.tbl.tx.delta.ReplaceOrInsert(rcr.tbl.toItem(rcr.rows[rcr.idx-1], false))
 	return nil
 }

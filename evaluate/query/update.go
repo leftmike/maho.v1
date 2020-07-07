@@ -76,6 +76,7 @@ func (up *updatePlan) Execute(ctx context.Context, e sql.Engine, tx sql.Transact
 		}
 		err = up.rows.Update(ctx, updates)
 		if err != nil {
+			up.rows.Close()
 			return -1, err
 		}
 		cnt += 1

@@ -62,7 +62,7 @@ type indexRow struct {
 
 type PersistentStore interface {
 	Table(ctx context.Context, tx sql.Transaction, tn sql.TableName, mid int64,
-		tt *engine.TableType) (sql.Table, error)
+		tt *engine.TableType) (engine.Table, error)
 	Begin(sesid uint64) sql.Transaction
 }
 
@@ -458,8 +458,8 @@ func (st *Store) validTable(ctx context.Context, tx sql.Transaction, tn sql.Tabl
 	return true, nil
 }
 
-func (st *Store) LookupTable(ctx context.Context, tx sql.Transaction, tn sql.TableName) (sql.Table,
-	*engine.TableType, error) {
+func (st *Store) LookupTable(ctx context.Context, tx sql.Transaction,
+	tn sql.TableName) (engine.Table, *engine.TableType, error) {
 
 	rows, err := st.lookupTable(ctx, tx, tn)
 	if err != nil {

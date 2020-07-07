@@ -230,7 +230,7 @@ func (kvst *kvStore) startupStore(upd Updater) error {
 }
 
 func (kvst *kvStore) Table(ctx context.Context, tx sql.Transaction, tn sql.TableName,
-	mid int64, tt *engine.TableType) (sql.Table, error) {
+	mid int64, tt *engine.TableType) (engine.Table, error) {
 
 	primary := tt.PrimaryKey()
 	if len(primary) == 0 {
@@ -441,7 +441,7 @@ func (kvt *table) makeKey(row []sql.Value) []byte {
 	return buf
 }
 
-func (kvt *table) Rows(ctx context.Context, minRow, maxRow []sql.Value) (sql.Rows, error) {
+func (kvt *table) Rows(ctx context.Context, minRow, maxRow []sql.Value) (engine.Rows, error) {
 	minKey := kvt.makeKey(minRow)
 	var maxKey []byte
 	if maxRow != nil {
@@ -694,7 +694,9 @@ func (kvr *rows) Delete(ctx context.Context) error {
 	return upd.Commit()
 }
 
-func (kvr *rows) Update(ctx context.Context, updates []sql.ColumnUpdate) error {
+func (kvr *rows) Update(ctx context.Context, updates []sql.ColumnUpdate,
+	check func(row []sql.Value) error) error {
+
 	if kvr.idx == 0 {
 		panic(fmt.Sprintf("kvrows: table %s no row to update", kvr.tbl.tn))
 	}
@@ -711,6 +713,13 @@ func (kvr *rows) Update(ctx context.Context, updates []sql.ColumnUpdate) error {
 	updateRow := append(make([]sql.Value, 0, len(kvr.rows[kvr.idx-1])), kvr.rows[kvr.idx-1]...)
 	for _, update := range updates {
 		updateRow[update.Index] = update.Value
+	}
+
+	if check != nil {
+		err := check(updateRow)
+		if err != nil {
+			return err
+		}
 	}
 
 	if primaryUpdated {

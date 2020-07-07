@@ -9,6 +9,20 @@ import (
 	"github.com/leftmike/maho/sql"
 )
 
+type Table interface {
+	Rows(ctx context.Context, minRow, maxRow []sql.Value) (Rows, error)
+	Insert(ctx context.Context, row []sql.Value) error
+}
+
+type Rows interface {
+	Columns() []sql.Identifier
+	Close() error
+	Next(ctx context.Context, dest []sql.Value) error
+	Delete(ctx context.Context) error
+	Update(ctx context.Context, updates []sql.ColumnUpdate,
+		check func(row []sql.Value) error) error
+}
+
 type store interface {
 	CreateDatabase(dbname sql.Identifier, options map[sql.Identifier]string) error
 	DropDatabase(dbname sql.Identifier, ifExists bool, options map[sql.Identifier]string) error
@@ -16,8 +30,8 @@ type store interface {
 	CreateSchema(ctx context.Context, tx sql.Transaction, sn sql.SchemaName) error
 	DropSchema(ctx context.Context, tx sql.Transaction, sn sql.SchemaName, ifExists bool) error
 
-	LookupTable(ctx context.Context, tx sql.Transaction, tn sql.TableName) (sql.Table,
-		*TableType, error)
+	LookupTable(ctx context.Context, tx sql.Transaction, tn sql.TableName) (Table, *TableType,
+		error)
 	CreateTable(ctx context.Context, tx sql.Transaction, tn sql.TableName, tt *TableType,
 		ifNotExists bool) error
 	DropTable(ctx context.Context, tx sql.Transaction, tn sql.TableName, ifExists bool) error
