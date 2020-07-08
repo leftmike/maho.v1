@@ -22,7 +22,7 @@ type checkConstraint struct {
 }
 
 type TableType struct {
-	ver         uint
+	ver         uint32
 	cols        []sql.Identifier
 	colTypes    []sql.ColumnType
 	primary     []sql.ColumnKey
@@ -53,7 +53,7 @@ func (tt *TableType) PrimaryKey() []sql.ColumnKey {
 	return tt.primary
 }
 
-func (tt *TableType) Version() uint {
+func (tt *TableType) Version() uint32 {
 	return tt.ver
 }
 
@@ -62,6 +62,7 @@ func (tt *TableType) Encode() ([]byte, error) {
 	colTypes := tt.ColumnTypes()
 
 	var md TableMetadata
+	md.Version = tt.ver
 	md.Columns = make([]*ColumnMetadata, 0, len(cols))
 	for cdx := range cols {
 		md.Columns = append(md.Columns,
@@ -165,6 +166,7 @@ func DecodeTableType(tn sql.TableName, buf []byte) (*TableType, error) {
 	}
 
 	return &TableType{
+		ver:         md.Version,
 		cols:        cols,
 		colTypes:    colTypes,
 		primary:     primary,

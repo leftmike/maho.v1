@@ -290,42 +290,6 @@ func (c *call) Eval(ctx context.Context, etx sql.EvalContext) (sql.Value, error)
 	return c.call.fn(etx, args)
 }
 
-func EqualCompiledExpressions(ce1, ce2 sql.CExpr) bool {
-	switch ce1 := ce1.(type) {
-	case *Literal:
-		ce2, ok := ce2.(*Literal)
-		if !ok {
-			return false
-		}
-		return sql.Compare(ce1.Value, ce2.Value) == 0
-	case colIndex:
-		ce2, ok := ce2.(colIndex)
-		if !ok {
-			return false
-		}
-		return ce1 == ce2
-	case *call:
-		ce2, ok := ce2.(*call)
-		if !ok {
-			return false
-		}
-		if ce1.call != ce2.call {
-			return false
-		}
-		if len(ce1.args) != len(ce2.args) {
-			return false
-		}
-		for adx := range ce1.args {
-			if !EqualCompiledExpressions(ce1.args[adx], ce2.args[adx]) {
-				return false
-			}
-		}
-		return true
-	default:
-		return false
-	}
-}
-
 func numFunc(a0 sql.Value, a1 sql.Value, ifn func(i0, i1 sql.Int64Value) sql.Value,
 	ffn func(f0, f1 sql.Float64Value) sql.Value) (sql.Value, error) {
 

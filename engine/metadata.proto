@@ -3,10 +3,11 @@ syntax = "proto3";
 option go_package = "./engine";
 
 message TableMetadata {
-    repeated ColumnMetadata Columns = 1;
-    repeated ColumnKey Primary = 2;
-    repeated ConstraintMetadata Constraints = 3;
-    repeated CheckConstraint Checks = 4;
+    uint32 Version = 1;
+    repeated ColumnMetadata Columns = 2;
+    repeated ColumnKey Primary = 3;
+    repeated ConstraintMetadata Constraints = 4;
+    repeated CheckConstraint Checks = 5;
 }
 
 // These need to match the values in maho/sql/datatype.go

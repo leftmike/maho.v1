@@ -2,6 +2,7 @@ package expr_test
 
 import (
 	"fmt"
+	"reflect"
 	"strings"
 	"testing"
 
@@ -384,7 +385,7 @@ func TestEncode(t *testing.T) {
 		if err != nil {
 			t.Errorf("Decode(%q) failed with %s", c, err)
 		}
-		if !expr.EqualCompiledExpressions(ce, de) {
+		if !reflect.DeepEqual(ce, de) {
 			t.Errorf("Decode(%q) got %#v want %#v", c, de, ce)
 		}
 

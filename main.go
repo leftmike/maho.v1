@@ -52,7 +52,6 @@ To Do:
 -- move Engine.CreateIndex, DropIndex to Table
 
 - constraints
--- engine: test encoding and decoding of TableType
 -- change unique constraints into indexes
 -- column: REFERENCES reftable [ '(' refcolumn ')' ] => treat as a foreign key
 -- table: FOREIGN KEY '(' column  [',' ...] ')' REFERENCES reftable [ '(' refcolumn [',' ...] ')' ]
