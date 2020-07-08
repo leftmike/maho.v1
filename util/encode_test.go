@@ -2,11 +2,11 @@ package util_test
 
 import (
 	"math"
+	"reflect"
 	"testing"
 
 	"github.com/golang/protobuf/proto"
 
-	"github.com/leftmike/maho/testutil"
 	"github.com/leftmike/maho/util"
 )
 
@@ -30,7 +30,7 @@ func TestEncodeVarint(t *testing.T) {
 	for _, n := range numbers {
 		buf := util.EncodeVarint(nil, n)
 		pbuf := proto.EncodeVarint(n)
-		if !testutil.DeepEqual(buf, pbuf) {
+		if !reflect.DeepEqual(buf, pbuf) {
 			t.Errorf("EncodeVarint(%d): got %v want %v", n, buf, pbuf)
 		}
 		ret, r, ok := util.DecodeVarint(buf)
@@ -82,7 +82,7 @@ func TestEncodeZigzag64(t *testing.T) {
 			t.Errorf("proto.EncodeZigzag64(%d) failed with %s", n, err)
 		} else {
 			pbuf := enc.Bytes()
-			if !testutil.DeepEqual(buf, pbuf) {
+			if !reflect.DeepEqual(buf, pbuf) {
 				t.Errorf("EncodeZigzag64(%d): got %v want %v", n, buf, pbuf)
 			}
 		}

@@ -1,11 +1,11 @@
 package encode_test
 
 import (
+	"reflect"
 	"testing"
 
 	"github.com/leftmike/maho/sql"
 	"github.com/leftmike/maho/storage/encode"
-	"github.com/leftmike/maho/testutil"
 )
 
 func TestRowValues(t *testing.T) {
@@ -58,7 +58,7 @@ func TestRowValues(t *testing.T) {
 		dest := encode.DecodeRowValue(buf)
 		if dest == nil {
 			t.Errorf("DecodeRowValue(%s) failed", c.s)
-		} else if !testutil.DeepEqual(c.row, dest) {
+		} else if !reflect.DeepEqual(c.row, dest) {
 			t.Errorf("DecodeRowValue(%s) got %v want %v", c.s, dest, c.row)
 		}
 

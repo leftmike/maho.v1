@@ -2,6 +2,7 @@ package parser
 
 import (
 	"fmt"
+	"reflect"
 	"strings"
 	"testing"
 
@@ -11,7 +12,6 @@ import (
 	"github.com/leftmike/maho/evaluate/query"
 	"github.com/leftmike/maho/parser/token"
 	"github.com/leftmike/maho/sql"
-	"github.com/leftmike/maho/testutil"
 )
 
 func TestScan(t *testing.T) {
@@ -602,12 +602,11 @@ c2 int constraint check_1 check(true))`,
 				t.Errorf("Parse(%q) did not fail", c.sql)
 			}
 		} else {
-			var trc string
 			if err != nil {
 				t.Errorf("Parse(%q) failed with %s", c.sql, err)
 			} else if cs, ok := cs.(*datadef.CreateTable); !ok ||
-				!testutil.DeepEqual(&c.stmt, cs, &trc) {
-				t.Errorf("Parse(%q) got %s want %s\n%s", c.sql, cs.String(), c.stmt.String(), trc)
+				!reflect.DeepEqual(&c.stmt, cs) {
+				t.Errorf("Parse(%q) got %s want %s", c.sql, cs.String(), c.stmt.String())
 			}
 		}
 	}
@@ -656,12 +655,11 @@ func TestCreateIndex(t *testing.T) {
 				t.Errorf("Parse(%q) did not fail", c.sql)
 			}
 		} else {
-			var trc string
 			if err != nil {
 				t.Errorf("Parse(%q) failed with %s", c.sql, err)
 			} else if cs, ok := cs.(*datadef.CreateIndex); !ok ||
-				!testutil.DeepEqual(&c.stmt, cs, &trc) {
-				t.Errorf("Parse(%q) got %s want %s\n%s", c.sql, cs.String(), c.stmt.String(), trc)
+				!reflect.DeepEqual(&c.stmt, cs) {
+				t.Errorf("Parse(%q) got %s want %s", c.sql, cs.String(), c.stmt.String())
 			}
 		}
 	}
@@ -724,12 +722,11 @@ func TestInsertValues(t *testing.T) {
 				t.Errorf("Parse(%q) did not fail", c.sql)
 			}
 		} else {
-			var trc string
 			if err != nil {
 				t.Errorf("Parse(%q) failed with %s", c.sql, err)
 			} else if is, ok := is.(*query.InsertValues); !ok ||
-				!testutil.DeepEqual(&c.stmt, is, &trc) {
-				t.Errorf("Parse(%q) got %s want %s\n%s", c.sql, is.String(), c.stmt.String(), trc)
+				!reflect.DeepEqual(&c.stmt, is) {
+				t.Errorf("Parse(%q) got %s want %s", c.sql, is.String(), c.stmt.String())
 			}
 		}
 	}
@@ -1240,11 +1237,10 @@ func TestSelect(t *testing.T) {
 				t.Errorf("Parse(%q) did not fail", c.sql)
 			}
 		} else {
-			var trc string
 			if err != nil {
 				t.Errorf("Parse(%q) failed with %s", c.sql, err)
-			} else if ss, ok := ss.(*query.Select); !ok || !testutil.DeepEqual(&c.stmt, ss, &trc) {
-				t.Errorf("Parse(%q) got %s want %s\n%s", c.sql, ss.String(), c.stmt.String(), trc)
+			} else if ss, ok := ss.(*query.Select); !ok || !reflect.DeepEqual(&c.stmt, ss) {
+				t.Errorf("Parse(%q) got %s want %s", c.sql, ss.String(), c.stmt.String())
 			}
 		}
 	}
@@ -1291,12 +1287,10 @@ func TestValues(t *testing.T) {
 				t.Errorf("Parse(%q) did not fail", c.sql)
 			}
 		} else {
-			var trc string
 			if err != nil {
 				t.Errorf("Parse(%q) failed with %s", c.sql, err)
-			} else if vs, ok := vs.(*query.Values); !ok || !testutil.DeepEqual(&c.stmt, vs, &trc) {
-				t.Errorf("Parse(%q) got %s want %s: %s\n", c.sql, vs.String(), c.stmt.String(),
-					trc)
+			} else if vs, ok := vs.(*query.Values); !ok || !reflect.DeepEqual(&c.stmt, vs) {
+				t.Errorf("Parse(%q) got %s want %s", c.sql, vs.String(), c.stmt.String())
 			}
 		}
 	}
@@ -1337,11 +1331,10 @@ func TestDelete(t *testing.T) {
 				t.Errorf("Parse(%q) did not fail", c.sql)
 			}
 		} else {
-			var trc string
 			if err != nil {
 				t.Errorf("Parse(%q) failed with %s", c.sql, err)
-			} else if ds, ok := ds.(*query.Delete); !ok || !testutil.DeepEqual(&c.stmt, ds, &trc) {
-				t.Errorf("Parse(%q) got %s want %s\n%s", c.sql, ds.String(), c.stmt.String(), trc)
+			} else if ds, ok := ds.(*query.Delete); !ok || !reflect.DeepEqual(&c.stmt, ds) {
+				t.Errorf("Parse(%q) got %s want %s", c.sql, ds.String(), c.stmt.String())
 			}
 		}
 	}
@@ -1403,11 +1396,10 @@ func TestUpdate(t *testing.T) {
 				t.Errorf("Parse(%q) did not fail", c.sql)
 			}
 		} else {
-			var trc string
 			if err != nil {
 				t.Errorf("Parse(%q) failed with %s", c.sql, err)
-			} else if us, ok := us.(*query.Update); !ok || !testutil.DeepEqual(&c.stmt, us, &trc) {
-				t.Errorf("Parse(%q) got %s want %s\n%s", c.sql, us.String(), c.stmt.String(), trc)
+			} else if us, ok := us.(*query.Update); !ok || !reflect.DeepEqual(&c.stmt, us) {
+				t.Errorf("Parse(%q) got %s want %s", c.sql, us.String(), c.stmt.String())
 			}
 		}
 	}
@@ -1452,14 +1444,12 @@ func TestCreateDatabase(t *testing.T) {
 				t.Errorf("Parse(%q) did not fail", c.sql)
 			}
 		} else {
-			var trc string
 			if err != nil {
 				t.Errorf("Parse(%q) failed with %s", c.sql, err)
 			} else {
 				cd, ok := cd.(*datadef.CreateDatabase)
-				if !ok || !testutil.DeepEqual(&c.stmt, cd, &trc) {
-					t.Errorf("Parse(%q) got %s want %s\n%s", c.sql, cd.String(), c.stmt.String(),
-						trc)
+				if !ok || !reflect.DeepEqual(&c.stmt, cd) {
+					t.Errorf("Parse(%q) got %s want %s", c.sql, cd.String(), c.stmt.String())
 				}
 			}
 		}

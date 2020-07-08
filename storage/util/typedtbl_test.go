@@ -4,13 +4,13 @@ import (
 	"context"
 	"fmt"
 	"io"
+	"reflect"
 	"testing"
 
 	"github.com/leftmike/maho/engine"
 	"github.com/leftmike/maho/sql"
 	"github.com/leftmike/maho/storage/basic"
 	"github.com/leftmike/maho/storage/util"
-	"github.com/leftmike/maho/testutil"
 )
 
 type testRow struct {
@@ -97,15 +97,15 @@ func TestTypedTable(t *testing.T) {
 	ttbl := util.MakeTypedTable(tn, tbl, tt)
 
 	cols := tt.Columns()
-	if !testutil.DeepEqual(cols, columns) {
+	if !reflect.DeepEqual(cols, columns) {
 		t.Errorf("Columns(): got %v want %v", cols, columns)
 	}
 	colTypes := tt.ColumnTypes()
-	if !testutil.DeepEqual(colTypes, columnTypes) {
+	if !reflect.DeepEqual(colTypes, columnTypes) {
 		t.Errorf("ColumnTypes(): got %v want %v", colTypes, columnTypes)
 	}
 	pkey := tt.PrimaryKey()
-	if !testutil.DeepEqual(pkey, primaryKey) {
+	if !reflect.DeepEqual(pkey, primaryKey) {
 		t.Errorf("PrimaryKey(): got %v want %v", pkey, primaryKey)
 	}
 
@@ -195,7 +195,7 @@ func TestTypedTable(t *testing.T) {
 		if err != nil {
 			t.Errorf("Next() failed with %s", err)
 		}
-		if !testutil.DeepEqual(dest, tr[rdx]) {
+		if !reflect.DeepEqual(dest, tr[rdx]) {
 			t.Errorf("Next(%d): got %v want %v", rdx, dest, tr[rdx])
 		}
 	}

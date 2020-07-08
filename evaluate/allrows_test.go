@@ -4,11 +4,11 @@ import (
 	"context"
 	"errors"
 	"io"
+	"reflect"
 	"testing"
 
 	"github.com/leftmike/maho/evaluate"
 	"github.com/leftmike/maho/sql"
-	"github.com/leftmike/maho/testutil"
 )
 
 type testRows struct {
@@ -78,7 +78,7 @@ func TestAllRows(t *testing.T) {
 		}
 		want := []sql.Value{sql.Int64Value(rdx), sql.Int64Value(rdx * 10),
 			sql.Int64Value(rdx * 100)}
-		if !testutil.DeepEqual(row, want) {
+		if !reflect.DeepEqual(row, want) {
 			t.Errorf("AllRows: row[%d] got %v want %v", idx, row, want)
 		}
 		rdx -= 1

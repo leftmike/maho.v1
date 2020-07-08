@@ -2,6 +2,7 @@ package query_test
 
 import (
 	"io"
+	"reflect"
 	"strings"
 	"testing"
 
@@ -11,7 +12,6 @@ import (
 	"github.com/leftmike/maho/evaluate/test"
 	"github.com/leftmike/maho/parser"
 	"github.com/leftmike/maho/sql"
-	"github.com/leftmike/maho/testutil"
 )
 
 type insertCase struct {
@@ -267,9 +267,8 @@ func testInsert(t *testing.T, e sql.Engine, ses *evaluate.Session, tn sql.TableN
 				t.Errorf("(%s).Rows().Next() failed with %s", tn, err)
 				continue
 			}
-			var trc string
-			if !testutil.DeepEqual(all, c.rows, &trc) {
-				t.Errorf("(%s).Rows() got %v want %v\n%s", tn, all, c.rows, trc)
+			if !reflect.DeepEqual(all, c.rows) {
+				t.Errorf("(%s).Rows() got %v want %v", tn, all, c.rows)
 			}
 		}
 

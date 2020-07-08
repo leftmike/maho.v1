@@ -1,6 +1,7 @@
 package query_test
 
 import (
+	"reflect"
 	"testing"
 
 	"github.com/leftmike/maho/evaluate"
@@ -8,7 +9,6 @@ import (
 	"github.com/leftmike/maho/evaluate/query"
 	"github.com/leftmike/maho/evaluate/test"
 	"github.com/leftmike/maho/sql"
-	"github.com/leftmike/maho/testutil"
 )
 
 func TestSelectString(t *testing.T) {
@@ -112,7 +112,7 @@ func TestSelect(t *testing.T) {
 			continue
 		}
 		cols := rows.Columns()
-		if !testutil.DeepEqual(cols, c.cols) {
+		if !reflect.DeepEqual(cols, c.cols) {
 			t.Errorf("(%v).Plan().Columns() got %v want %v", c.stmt, cols, c.cols)
 			continue
 		}
@@ -120,9 +120,8 @@ func TestSelect(t *testing.T) {
 		if err != nil {
 			t.Errorf("(%v).AllRows() failed with %s", c.stmt, err)
 		}
-		var trc string
-		if !testutil.DeepEqual(all, c.rows, &trc) {
-			t.Errorf("(%v).AllRows() got %v want %v\n%s", c.stmt, all, c.rows, trc)
+		if !reflect.DeepEqual(all, c.rows) {
+			t.Errorf("(%v).AllRows() got %v want %v", c.stmt, all, c.rows)
 		}
 
 		err = tx.Commit(ses.Context())
