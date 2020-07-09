@@ -1368,6 +1368,27 @@ func (p *parser) parseSet() evaluate.Stmt {
 	return &s
 }
 
+func (p *parser) parseShowFromTable() (sql.TableName, *expr.Binary) {
+	tn := p.parseTableName()
+
+	var schemaTest *expr.Binary
+	if tn.Schema == 0 {
+		schemaTest = &expr.Binary{
+			Op:    expr.EqualOp,
+			Left:  expr.Ref{sql.ID("schema_name")},
+			Right: expr.Stmt{&misc.Show{sql.SCHEMA}},
+		}
+	} else {
+		schemaTest = &expr.Binary{
+			Op:    expr.EqualOp,
+			Left:  expr.Ref{sql.ID("schema_name")},
+			Right: expr.StringLiteral(tn.Schema.String()),
+		}
+	}
+
+	return tn, schemaTest
+}
+
 func (p *parser) parseShow() evaluate.Stmt {
 	// SHOW COLUMNS FROM [[database '.'] schema '.'] table
 	// SHOW DATABASE
@@ -1386,22 +1407,8 @@ func (p *parser) parseShow() evaluate.Stmt {
 	switch p.sctx.Identifier {
 	case sql.COLUMNS:
 		p.expectReserved(sql.FROM)
-		tn := p.parseTableName()
+		tn, schemaTest := p.parseShowFromTable()
 
-		var schemaTest *expr.Binary
-		if tn.Schema == 0 {
-			schemaTest = &expr.Binary{
-				Op:    expr.EqualOp,
-				Left:  expr.Ref{sql.ID("schema_name")},
-				Right: expr.Stmt{&misc.Show{sql.SCHEMA}},
-			}
-		} else {
-			schemaTest = &expr.Binary{
-				Op:    expr.EqualOp,
-				Left:  expr.Ref{sql.ID("schema_name")},
-				Right: expr.StringLiteral(tn.Schema.String()),
-			}
-		}
 		return &query.Select{
 			From: query.FromTableAlias{
 				TableName: sql.TableName{
