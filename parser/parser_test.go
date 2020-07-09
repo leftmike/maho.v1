@@ -224,10 +224,6 @@ func TestCreateTable(t *testing.T) {
 						Default: expr.StringLiteral("abcd")},
 					{Type: sql.IntegerType, Size: 4, Default: expr.Int64Literal(123)},
 				},
-				Constraints: []datadef.Constraint{
-					{Type: sql.DefaultConstraint, Name: sql.ID("c1_default"), ColNum: 0},
-					{Type: sql.DefaultConstraint, Name: sql.ID("c2_default"), ColNum: 1},
-				},
 			},
 		},
 		{
@@ -238,10 +234,6 @@ func TestCreateTable(t *testing.T) {
 				ColumnTypes: []datadef.ColumnType{
 					{Type: sql.BooleanType, Size: 1, Default: expr.True()},
 					{Type: sql.BooleanType, Size: 1, NotNull: true},
-				},
-				Constraints: []datadef.Constraint{
-					{Type: sql.DefaultConstraint, Name: sql.ID("c1_default"), ColNum: 0},
-					{Type: sql.NotNullConstraint, Name: sql.ID("c2_not_null"), ColNum: 1},
 				},
 			},
 		},
@@ -254,12 +246,6 @@ c2 boolean not null default true)`,
 				ColumnTypes: []datadef.ColumnType{
 					{Type: sql.BooleanType, Size: 1, Default: expr.True(), NotNull: true},
 					{Type: sql.BooleanType, Size: 1, NotNull: true, Default: expr.True()},
-				},
-				Constraints: []datadef.Constraint{
-					{Type: sql.DefaultConstraint, Name: sql.ID("c1_default"), ColNum: 0},
-					{Type: sql.NotNullConstraint, Name: sql.ID("c1_not_null"), ColNum: 0},
-					{Type: sql.NotNullConstraint, Name: sql.ID("c2_not_null"), ColNum: 1},
-					{Type: sql.DefaultConstraint, Name: sql.ID("c2_default"), ColNum: 1},
 				},
 			},
 		},

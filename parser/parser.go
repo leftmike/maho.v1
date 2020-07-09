@@ -583,14 +583,6 @@ func makeKeyConstraintName(cn sql.Identifier, key datadef.IndexKey, suffix strin
 	return sql.ID(nam + suffix)
 }
 
-func makeConstraintName(cn sql.Identifier, nam sql.Identifier, suffix string) sql.Identifier {
-	if cn != 0 {
-		return cn
-	}
-
-	return sql.ID(nam.String() + "_" + suffix)
-}
-
 func (p *parser) addKeyConstraint(s *datadef.CreateTable, ct sql.ConstraintType,
 	cn sql.Identifier, nkey datadef.IndexKey) {
 
@@ -699,24 +691,40 @@ func (p *parser) parseColumn(s *datadef.CreateTable) {
 		}
 
 		if p.optionalReserved(sql.DEFAULT) {
-			p.addColumnConstraint(s, sql.DefaultConstraint, makeConstraintName(cn, nam, "default"),
-				len(s.Columns)-1)
+			if ct.Default != nil {
+				p.error("DEFAULT specified more than once per column")
+			}
+			if cn != 0 {
+				p.addColumnConstraint(s, sql.DefaultConstraint, cn, len(s.Columns)-1)
+			}
 			ct.Default = p.parseExpr()
 		} else if p.optionalReserved(sql.NOT) {
 			p.expectReserved(sql.NULL)
-			p.addColumnConstraint(s, sql.NotNullConstraint,
-				makeConstraintName(cn, nam, "not_null"), len(s.Columns)-1)
+
+			if ct.NotNull {
+				p.error("NOT NULL specified more than once per column")
+			}
+			if cn != 0 {
+				p.addColumnConstraint(s, sql.NotNullConstraint, cn, len(s.Columns)-1)
+			}
 			ct.NotNull = true
 		} else if p.optionalReserved(sql.PRIMARY) {
 			p.expectReserved(sql.KEY)
-			p.addKeyConstraint(s, sql.PrimaryConstraint, makeConstraintName(cn, nam, "primary"),
+
+			if cn == 0 {
+				cn = sql.ID(nam.String() + "_primary")
+			}
+			p.addKeyConstraint(s, sql.PrimaryConstraint, cn,
 				datadef.IndexKey{
 					Unique:  true,
 					Columns: []sql.Identifier{nam},
 					Reverse: []bool{false},
 				})
 		} else if p.optionalReserved(sql.UNIQUE) {
-			p.addKeyConstraint(s, sql.UniqueConstraint, makeConstraintName(cn, nam, "unique"),
+			if cn == 0 {
+				cn = sql.ID(nam.String() + "_unique")
+			}
+			p.addKeyConstraint(s, sql.UniqueConstraint, cn,
 				datadef.IndexKey{
 					Unique:  true,
 					Columns: []sql.Identifier{nam},
