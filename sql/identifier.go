@@ -20,6 +20,7 @@ const (
 	CHAR
 	CHARACTER
 	COLUMNS
+	CONSTRAINTS
 	COUNT
 	COUNT_ALL
 	DATABASES
@@ -112,19 +113,20 @@ const (
 )
 
 var knownIdentifiers = map[string]Identifier{
-	"columns":   COLUMNS,
-	"count":     COUNT,
-	"count_all": COUNT_ALL,
-	"databases": DATABASES,
-	"indexes":   INDEXES,
-	"info":      INFO,
-	"metadata":  METADATA,
-	"private":   PRIVATE,
-	"public":    PUBLIC,
-	"schemas":   SCHEMAS,
-	"sequences": SEQUENCES,
-	"system":    SYSTEM,
-	"tables":    TABLES,
+	"columns":     COLUMNS,
+	"constraints": CONSTRAINTS,
+	"count":       COUNT,
+	"count_all":   COUNT_ALL,
+	"databases":   DATABASES,
+	"indexes":     INDEXES,
+	"info":        INFO,
+	"metadata":    METADATA,
+	"private":     PRIVATE,
+	"public":      PUBLIC,
+	"schemas":     SCHEMAS,
+	"sequences":   SEQUENCES,
+	"system":      SYSTEM,
+	"tables":      TABLES,
 }
 
 var knownKeywords = map[string]struct {

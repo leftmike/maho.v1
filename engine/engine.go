@@ -69,6 +69,7 @@ func NewEngine(st store) sql.Engine {
 	e.CreateSystemInfoTable(sql.ID("identifiers"), makeIdentifiersTable)
 
 	e.CreateMetadataTable(sql.COLUMNS, e.makeColumnsTable)
+	e.CreateMetadataTable(sql.CONSTRAINTS, e.makeConstraintsTable)
 	e.CreateMetadataTable(sql.SCHEMAS, e.makeSchemasTable)
 	e.CreateMetadataTable(sql.TABLES, e.makeTablesTable)
 

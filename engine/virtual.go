@@ -191,7 +191,7 @@ func (e *Engine) makeTablesTable(ctx context.Context, tx sql.Transaction,
 
 	return MakeVirtualTable(tn,
 		[]sql.Identifier{sql.ID("database_name"), sql.ID("schema_name"), sql.ID("table_name")},
-		[]sql.ColumnType{sql.IdColType, sql.IdColType}, values)
+		[]sql.ColumnType{sql.IdColType, sql.IdColType, sql.IdColType}, values)
 }
 
 var (
@@ -202,6 +202,14 @@ var (
 	columnsColumnTypes = []sql.ColumnType{sql.IdColType, sql.IdColType, sql.IdColType,
 		sql.IdColType, sql.Int32ColType, sql.NullStringColType, sql.StringColType,
 		sql.IdColType,
+	}
+	constraintsColumns = []sql.Identifier{sql.ID("database_name"), sql.ID("schema_name"),
+		sql.ID("table_name"), sql.ID("constraint_name"), sql.ID("constraint_type"),
+		sql.ID("details"),
+	}
+	constraintsColumnTypes = []sql.ColumnType{sql.IdColType, sql.IdColType, sql.IdColType,
+		sql.ColumnType{Type: sql.StringType, Size: sql.MaxIdentifier},
+		sql.IdColType, sql.NullStringColType,
 	}
 )
 
@@ -253,8 +261,10 @@ func (e *Engine) makeColumnsTable(ctx context.Context, tx sql.Transaction,
 
 		for _, tblname := range tblnames {
 			ttn := sql.TableName{tn.Database, scname, tblname}
-			if scname == sql.METADATA && tblname == sql.ID("columns") {
+			if scname == sql.METADATA && tblname == sql.COLUMNS {
 				values = appendColumns(values, ttn, columnsColumns, columnsColumnTypes)
+			} else if scname == sql.METADATA && tblname == sql.CONSTRAINTS {
+				values = appendColumns(values, ttn, constraintsColumns, constraintsColumnTypes)
 			} else {
 				_, tt, err := e.LookupTable(ctx, tx, ttn)
 				if err != nil {
@@ -266,6 +276,127 @@ func (e *Engine) makeColumnsTable(ctx context.Context, tx sql.Transaction,
 	}
 
 	return MakeVirtualTable(tn, columnsColumns, columnsColumnTypes, values)
+}
+
+func columnConstraintName(colNum int, tt *TableType, ct sql.ConstraintType) sql.Value {
+	for _, con := range tt.constraints {
+		if con.colNum == colNum && con.typ == ct {
+			return sql.StringValue(con.name.String())
+		}
+	}
+
+	return nil
+}
+
+func appendConstraints(values [][]sql.Value, tn sql.TableName, tt *TableType) [][]sql.Value {
+	for i, ct := range tt.colTypes {
+		if ct.DefaultExpr != "" {
+			values = append(values,
+				[]sql.Value{
+					sql.StringValue(tn.Database.String()),
+					sql.StringValue(tn.Schema.String()),
+					sql.StringValue(tn.Table.String()),
+					columnConstraintName(i, tt, sql.DefaultConstraint),
+					sql.StringValue("DEFAULT"),
+					sql.StringValue("column " + tt.cols[i].String() + ": " + ct.DefaultExpr),
+				})
+		}
+		if ct.NotNull {
+			values = append(values,
+				[]sql.Value{
+					sql.StringValue(tn.Database.String()),
+					sql.StringValue(tn.Schema.String()),
+					sql.StringValue(tn.Table.String()),
+					columnConstraintName(i, tt, sql.NotNullConstraint),
+					sql.StringValue("NOT NULL"),
+					sql.StringValue("column " + tt.cols[i].String()),
+				})
+		}
+	}
+
+	for _, con := range tt.constraints {
+		if con.typ == sql.DefaultConstraint && con.typ == sql.NotNullConstraint {
+			continue
+		}
+
+		var typ string
+		switch con.typ {
+		case sql.PrimaryConstraint:
+			typ = "PRIMARY KEY"
+		case sql.UniqueConstraint:
+			typ = "UNIQUE"
+		case sql.ForeignConstraint:
+			typ = "FOREIGN KEY"
+		}
+
+		values = append(values,
+			[]sql.Value{
+				sql.StringValue(tn.Database.String()),
+				sql.StringValue(tn.Schema.String()),
+				sql.StringValue(tn.Table.String()),
+				sql.StringValue(con.name.String()),
+				sql.StringValue(typ),
+				nil,
+			})
+
+	}
+
+	for _, chk := range tt.checks {
+		values = append(values,
+			[]sql.Value{
+				sql.StringValue(tn.Database.String()),
+				sql.StringValue(tn.Schema.String()),
+				sql.StringValue(tn.Table.String()),
+				sql.StringValue(chk.name.String()),
+				sql.StringValue("CHECK"),
+				sql.StringValue(chk.checkExpr),
+			})
+
+	}
+
+	return values
+}
+
+func (e *Engine) makeConstraintsTable(ctx context.Context, tx sql.Transaction,
+	tn sql.TableName) (sql.Table, sql.TableType, error) {
+
+	e.mutex.RLock()
+	defer e.mutex.RUnlock()
+
+	values := [][]sql.Value{}
+
+	scnames, err := e.listSchemas(ctx, tx, tn.Database)
+	if err != nil {
+		return nil, nil, err
+	}
+
+	for _, scname := range scnames {
+		tblnames, err := e.listTables(ctx, tx, sql.SchemaName{tn.Database, scname})
+		if err != nil {
+			return nil, nil, err
+		}
+
+		for _, tblname := range tblnames {
+			ttn := sql.TableName{tn.Database, scname, tblname}
+			if scname == sql.METADATA && tblname == sql.COLUMNS {
+				values = appendConstraints(values, ttn,
+					MakeTableType(columnsColumns, columnsColumnTypes, nil))
+			} else if scname == sql.METADATA && tblname == sql.CONSTRAINTS {
+				values = appendConstraints(values, ttn,
+					MakeTableType(constraintsColumns, constraintsColumnTypes, nil))
+			} else {
+				_, tt, err := e.LookupTable(ctx, tx, ttn)
+				if err != nil {
+					return nil, nil, err
+				}
+				if tt, ok := tt.(*TableType); ok {
+					values = appendConstraints(values, ttn, tt)
+				}
+			}
+		}
+	}
+
+	return MakeVirtualTable(tn, constraintsColumns, constraintsColumnTypes, values)
 }
 
 func (e *Engine) makeDatabasesTable(ctx context.Context, tx sql.Transaction,

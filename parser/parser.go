@@ -1399,6 +1399,7 @@ func (p *parser) parseShowFromTable() (sql.TableName, *expr.Binary) {
 
 func (p *parser) parseShow() evaluate.Stmt {
 	// SHOW COLUMNS FROM [[database '.'] schema '.'] table
+	// SHOW CONSTRAINTS FROM [[database '.'] schema '.'] table
 	// SHOW DATABASE
 	// SHOW DATABASES
 	// SHOW SCHEMA
@@ -1408,8 +1409,8 @@ func (p *parser) parseShow() evaluate.Stmt {
 
 	t := p.scan()
 	if t != token.Reserved && t != token.Identifier {
-		p.error(
-			"expected COLUMNS, DATABASE, DATABASES, SCHEMA, SCHEMAS, TABLES, or a config variable")
+		p.error("expected COLUMNS, CONSTRAINTS, DATABASE, DATABASES, SCHEMA, SCHEMAS, TABLES, " +
+			"or a config variable")
 	}
 
 	switch p.sctx.Identifier {
@@ -1423,6 +1424,28 @@ func (p *parser) parseShow() evaluate.Stmt {
 					Database: tn.Database,
 					Schema:   sql.METADATA,
 					Table:    sql.COLUMNS,
+				},
+			},
+			Where: &expr.Binary{
+				Op: expr.AndOp,
+				Left: &expr.Binary{
+					Op:    expr.EqualOp,
+					Left:  expr.Ref{sql.ID("table_name")},
+					Right: expr.StringLiteral(tn.Table.String()),
+				},
+				Right: schemaTest,
+			},
+		}
+	case sql.CONSTRAINTS:
+		p.expectReserved(sql.FROM)
+		tn, schemaTest := p.parseShowFromTable()
+
+		return &query.Select{
+			From: query.FromTableAlias{
+				TableName: sql.TableName{
+					Database: tn.Database,
+					Schema:   sql.METADATA,
+					Table:    sql.CONSTRAINTS,
 				},
 			},
 			Where: &expr.Binary{
