@@ -105,7 +105,8 @@ order by table_name, schema_name, constraint_name`,
    ------------- ----------- ---------- --------------- ---------------                -------
  1      'system'  'metadata'   'tables'            NULL      'NOT NULL' 'column database_name'
  2      'system'  'metadata'   'tables'            NULL      'NOT NULL'   'column schema_name'
-(2 rows)
+ 3      'system'  'metadata'   'tables'            NULL      'NOT NULL'    'column table_name'
+(3 rows)
 `},
 	}
 )

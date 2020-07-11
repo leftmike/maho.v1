@@ -20,10 +20,6 @@ To Do:
 
 - make sure all Rows get properly closed
 
-- indexes: mideng (basic, rowcols, keyvals, kvrows)
--- unique indexes: all NULL values are considered different from all other NULL values and
-   are thus unique (sqlite.org/lang_createindex.html)
-
 - get rid of engine.ListDatabases: only used at startup in main.go
 
 - storage/service might no longer be necessary?
@@ -45,7 +41,16 @@ To Do:
 - subquery expressions: EXISTS, IN, NOT IN, ANY/SOME, ALL
 - conditional expressions: CASE, COALESCE, NULLIF, GREATEST, LEAST
 
+- storage
+-- add indexes field to tables Table; stores mapping of index name to iid as a protobuf
+-- PersistentStore.Table: add indexes map[sql.Identifier]IID (maybe map[sql.Identifier]IndexType)
+-- remove indexes table
+-- move index create / drop to PersistentStore.Table
+
 - indexes
+-- storage: move index operations to table
+-- unique indexes: all NULL values are considered different from all other NULL values and
+   are thus unique (sqlite.org/lang_createindex.html)
 -- based on column numbers
 -- engine.Table: return list of indexes?
 -- engine.Index: IndexRows(...) => engine.IndexRows {Columns, Close, Next, Delete, Update, Row}

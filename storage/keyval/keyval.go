@@ -58,7 +58,7 @@ type transaction struct {
 type table struct {
 	st      *keyValStore
 	tn      sql.TableName
-	mid     int64
+	tid     int64
 	cols    []sql.Identifier
 	primary []sql.ColumnKey
 	tx      *transaction
@@ -126,7 +126,7 @@ func newStore(kv KV) (*storage.Store, error) {
 }
 
 func (kvst *keyValStore) Table(ctx context.Context, tx sql.Transaction, tn sql.TableName,
-	mid int64, tt *engine.TableType) (engine.Table, error) {
+	tid int64, tt *engine.TableType) (engine.Table, error) {
 
 	primary := tt.PrimaryKey()
 	if len(primary) == 0 {
@@ -137,7 +137,7 @@ func (kvst *keyValStore) Table(ctx context.Context, tx sql.Transaction, tn sql.T
 	return &table{
 		st:      etx.st,
 		tn:      tn,
-		mid:     mid,
+		tid:     tid,
 		cols:    tt.Columns(),
 		primary: primary,
 		tx:      etx,
@@ -249,7 +249,7 @@ func (kvtx *transaction) forWrite() {
 }
 
 func (kvt *table) makeKey(row []sql.Value) []byte {
-	buf := util.EncodeUint64(make([]byte, 0, 8), uint64(kvt.mid))
+	buf := util.EncodeUint64(make([]byte, 0, 8), uint64((kvt.tid<<16)|storage.PrimaryIID))
 	if row != nil {
 		buf = append(buf, encode.MakeKey(kvt.primary, row)...)
 	}

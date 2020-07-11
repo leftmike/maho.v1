@@ -315,7 +315,7 @@ func appendConstraints(values [][]sql.Value, tn sql.TableName, tt *TableType) []
 	}
 
 	for _, con := range tt.constraints {
-		if con.typ == sql.DefaultConstraint && con.typ == sql.NotNullConstraint {
+		if con.typ == sql.DefaultConstraint || con.typ == sql.NotNullConstraint {
 			continue
 		}
 

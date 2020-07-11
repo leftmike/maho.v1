@@ -42,7 +42,7 @@ type transaction struct {
 type table struct {
 	st      *rowColsStore
 	tn      sql.TableName
-	mid     int64
+	tid     int64
 	cols    []sql.Identifier
 	primary []sql.ColumnKey
 	reverse uint32
@@ -51,7 +51,7 @@ type table struct {
 }
 
 type rowItem struct {
-	mid int64
+	rid int64
 	ver uint64
 	key []byte
 	row []sql.Value // deleted: row = nil
@@ -85,7 +85,7 @@ func NewStore(dataDir string) (*storage.Store, error) {
 }
 
 func (rcst *rowColsStore) Table(ctx context.Context, tx sql.Transaction, tn sql.TableName,
-	mid int64, tt *engine.TableType) (engine.Table, error) {
+	tid int64, tt *engine.TableType) (engine.Table, error) {
 
 	primary := tt.PrimaryKey()
 	if len(primary) == 0 {
@@ -123,7 +123,7 @@ func (rcst *rowColsStore) Table(ctx context.Context, tx sql.Transaction, tn sql.
 	return &table{
 		st:      etx.st,
 		tn:      tn,
-		mid:     mid,
+		tid:     tid,
 		cols:    cols,
 		primary: primary,
 		reverse: reverse,
@@ -240,9 +240,9 @@ func (rctx *transaction) forWrite() {
 }
 
 func (ri rowItem) compare(ri2 rowItem) int {
-	if ri.mid < ri2.mid {
+	if ri.rid < ri2.rid {
 		return -1
-	} else if ri.mid > ri2.mid {
+	} else if ri.rid > ri2.rid {
 		return 1
 	} else {
 		return bytes.Compare(ri.key, ri2.key)
@@ -259,7 +259,7 @@ func copyRow(row []sql.Value) []sql.Value {
 
 func (rct *table) toItem(row []sql.Value, deleted bool) btree.Item {
 	ri := rowItem{
-		mid: rct.mid,
+		rid: (rct.tid << 16) | storage.PrimaryIID,
 	}
 	if row != nil {
 		ri.key = encode.MakeKey(rct.primary, row)
@@ -281,6 +281,8 @@ func (rct *table) Rows(ctx context.Context, minRow, maxRow []sql.Value) (engine.
 		maxItem = rct.toItem(maxRow, false)
 	}
 
+	rid := (rct.tid << 16) | storage.PrimaryIID
+
 	if rct.tx.delta == nil {
 		rct.tx.tree.AscendGreaterOrEqual(rct.toItem(minRow, false),
 			func(item btree.Item) bool {
@@ -288,7 +290,7 @@ func (rct *table) Rows(ctx context.Context, minRow, maxRow []sql.Value) (engine.
 					return false
 				}
 				ri := item.(rowItem)
-				if ri.mid != rct.mid {
+				if ri.rid != rid {
 					return false
 				}
 				if ri.row != nil {
@@ -306,7 +308,7 @@ func (rct *table) Rows(ctx context.Context, minRow, maxRow []sql.Value) (engine.
 				return false
 			}
 			ri := item.(rowItem)
-			if ri.mid != rct.mid {
+			if ri.rid != rid {
 				return false
 			}
 			deltaRows = append(deltaRows, ri)
@@ -319,7 +321,7 @@ func (rct *table) Rows(ctx context.Context, minRow, maxRow []sql.Value) (engine.
 				return false
 			}
 			ri := item.(rowItem)
-			if ri.mid != rct.mid {
+			if ri.rid != rid {
 				return false
 			}
 

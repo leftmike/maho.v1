@@ -73,10 +73,10 @@ func decodeCommit(hndlr walHandler, ver uint64, buf []byte) error {
 		buf = buf[1:]
 
 		var ok bool
-		var mid uint64
-		buf, mid, ok = util.DecodeVarint(buf)
+		var rid uint64
+		buf, rid, ok = util.DecodeVarint(buf)
 		if !ok {
-			return errors.New("rowcols: bad WAL record, mid field")
+			return errors.New("rowcols: bad WAL record, rid field")
 		}
 
 		var kbl uint64
@@ -111,7 +111,7 @@ func decodeCommit(hndlr walHandler, ver uint64, buf []byte) error {
 
 		err := hndlr.RowItem(
 			rowItem{
-				mid: int64(mid),
+				rid: int64(rid),
 				ver: ver,
 				key: key,
 				row: row,
@@ -172,7 +172,7 @@ func (wal *WAL) ReadWAL(hndlr walHandler) (bool, error) {
 
 func encodeRowItem(buf []byte, ri rowItem) []byte {
 	buf = append(buf, rowRecordType)
-	buf = util.EncodeVarint(buf, uint64(ri.mid))
+	buf = util.EncodeVarint(buf, uint64(ri.rid))
 	buf = util.EncodeVarint(buf, uint64(len(ri.key)))
 	buf = append(buf, ri.key...)
 	if len(ri.row) > 0 {

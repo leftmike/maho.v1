@@ -33,14 +33,14 @@ type transaction struct {
 type table struct {
 	bst     *basicStore
 	tn      sql.TableName
-	mid     int64
+	tid     int64
 	cols    []sql.Identifier
 	primary []sql.ColumnKey
 	tx      *transaction
 }
 
 type rowItem struct {
-	mid int64
+	rid int64
 	key []byte
 	row []sql.Value
 }
@@ -58,7 +58,7 @@ func NewStore(dataDir string) (*storage.Store, error) {
 	return storage.NewStore("basic", bst, true)
 }
 
-func (_ *basicStore) Table(ctx context.Context, tx sql.Transaction, tn sql.TableName, mid int64,
+func (_ *basicStore) Table(ctx context.Context, tx sql.Transaction, tn sql.TableName, tid int64,
 	tt *engine.TableType) (engine.Table, error) {
 
 	primary := tt.PrimaryKey()
@@ -70,7 +70,7 @@ func (_ *basicStore) Table(ctx context.Context, tx sql.Transaction, tn sql.Table
 	return &table{
 		bst:     etx.bst,
 		tn:      tn,
-		mid:     mid,
+		tid:     tid,
 		cols:    tt.Columns(),
 		primary: primary,
 		tx:      etx,
@@ -118,7 +118,7 @@ func (btx *transaction) forWrite() {
 
 func (bt *table) toItem(row []sql.Value) btree.Item {
 	ri := rowItem{
-		mid: bt.mid,
+		rid: (bt.tid << 16) | storage.PrimaryIID,
 	}
 	if row != nil {
 		ri.key = encode.MakeKey(bt.primary, row)
@@ -129,10 +129,10 @@ func (bt *table) toItem(row []sql.Value) btree.Item {
 
 func (ri rowItem) Less(item btree.Item) bool {
 	ri2 := item.(rowItem)
-	if ri.mid < ri2.mid {
+	if ri.rid < ri2.rid {
 		return true
 	}
-	return ri.mid == ri2.mid && bytes.Compare(ri.key, ri2.key) < 0
+	return ri.rid == ri2.rid && bytes.Compare(ri.key, ri2.key) < 0
 }
 
 func (bt *table) Rows(ctx context.Context, minRow, maxRow []sql.Value) (engine.Rows, error) {
@@ -146,13 +146,14 @@ func (bt *table) Rows(ctx context.Context, minRow, maxRow []sql.Value) (engine.R
 		maxItem = bt.toItem(maxRow)
 	}
 
+	rid := (bt.tid << 16) | storage.PrimaryIID
 	bt.tx.tree.AscendGreaterOrEqual(bt.toItem(minRow),
 		func(item btree.Item) bool {
 			if maxItem != nil && maxItem.Less(item) {
 				return false
 			}
 			ri := item.(rowItem)
-			if ri.mid != bt.mid {
+			if ri.rid != rid {
 				return false
 			}
 			br.rows = append(br.rows, append(make([]sql.Value, 0, len(ri.row)), ri.row...))

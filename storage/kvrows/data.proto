@@ -3,7 +3,7 @@ syntax = "proto3";
 option go_package = "./kvrows";
 
 message ProposalData {
-    uint64 TID = 1;
+    uint64 TXID = 1;
     repeated ProposedUpdate Updates = 2;
 }
 
