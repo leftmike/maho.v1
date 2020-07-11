@@ -217,7 +217,12 @@ func (e *Engine) CreateTable(ctx context.Context, tx sql.Transaction, tn sql.Tab
 		} else if con.Type == sql.ForeignConstraint {
 			// XXX
 		} else if con.Type == sql.UniqueConstraint {
-			// XXX
+			tt.indexes = append(tt.indexes,
+				sql.IndexType{
+					Name:   con.Name,
+					Key:    con.Key,
+					Unique: true,
+				})
 		} else {
 			// sql.DefaultConstraint
 			// sql.NotNullConstraint

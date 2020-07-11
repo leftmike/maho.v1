@@ -230,7 +230,7 @@ func (kvst *kvStore) startupStore(upd Updater) error {
 }
 
 func (kvst *kvStore) Table(ctx context.Context, tx sql.Transaction, tn sql.TableName,
-	tid int64, tt *engine.TableType) (engine.Table, error) {
+	tid int64, tt *engine.TableType, its []storage.IndexType) (engine.Table, error) {
 
 	primary := tt.PrimaryKey()
 	if len(primary) == 0 {

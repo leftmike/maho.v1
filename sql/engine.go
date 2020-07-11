@@ -10,10 +10,17 @@ type Transaction interface {
 	NextStmt()
 }
 
+type IndexType struct {
+	Name   Identifier
+	Key    []ColumnKey
+	Unique bool
+}
+
 type TableType interface {
 	Columns() []Identifier
 	ColumnTypes() []ColumnType
 	PrimaryKey() []ColumnKey
+	Indexes() []IndexType
 }
 
 type Table interface {

@@ -41,20 +41,17 @@ To Do:
 - subquery expressions: EXISTS, IN, NOT IN, ANY/SOME, ALL
 - conditional expressions: CASE, COALESCE, NULLIF, GREATEST, LEAST
 
-- storage
--- add indexes field to tables Table; stores mapping of index name to iid as a protobuf
--- PersistentStore.Table: add indexes map[sql.Identifier]IID (maybe map[sql.Identifier]IndexType)
+- storage / engine
+-- change create / drop to operate on TableType and TableInfo
 -- remove indexes table
--- move index create / drop to PersistentStore.Table
 
 - indexes
--- storage: move index operations to table
 -- unique indexes: all NULL values are considered different from all other NULL values and
    are thus unique (sqlite.org/lang_createindex.html)
 -- based on column numbers
--- engine.Table: return list of indexes?
--- engine.Index: IndexRows(...) => engine.IndexRows {Columns, Close, Next, Delete, Update, Row}
--- move Engine.CreateIndex, DropIndex to Table
+-- engine.Table: IndexRows(...) => engine.IndexRows {Columns, Close, Next, Delete, Update, Row}
+-- add unique indexes to metadata.constraints table
+-- add primary key to metadata.constraints table
 
 - constraints
 -- change unique constraints into indexes

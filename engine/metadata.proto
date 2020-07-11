@@ -6,8 +6,9 @@ message TableMetadata {
     uint32 Version = 1;
     repeated ColumnMetadata Columns = 2;
     repeated ColumnKey Primary = 3;
-    repeated ConstraintMetadata Constraints = 4;
-    repeated CheckConstraint Checks = 5;
+    repeated IndexMetadata Indexes = 4;
+    repeated ConstraintMetadata Constraints = 5;
+    repeated CheckConstraint Checks = 6;
 }
 
 // These need to match the values in maho/sql/datatype.go
@@ -33,6 +34,12 @@ message ColumnMetadata {
 message ColumnKey {
     int32 Number = 1;
     bool Reverse = 2;
+}
+
+message IndexMetadata {
+    string Name = 1;
+    repeated ColumnKey Key = 2;
+    bool Unique = 3;
 }
 
 // These need to match the values in maho/sql/constraint.go

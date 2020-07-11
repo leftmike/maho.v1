@@ -47,6 +47,13 @@ func TestEncodeDecode(t *testing.T) {
 			},
 		},
 		primary: []sql.ColumnKey{sql.MakeColumnKey(1, true), sql.MakeColumnKey(0, false)},
+		indexes: []sql.IndexType{
+			{
+				Name:   sql.ID("index_one"),
+				Key:    []sql.ColumnKey{sql.MakeColumnKey(3, true)},
+				Unique: true,
+			},
+		},
 		constraints: []constraint{
 			{
 				name:   sql.ID("col1_not_null"),

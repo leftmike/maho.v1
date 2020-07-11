@@ -3,6 +3,8 @@ package engine
 //go:generate protoc --go_opt=paths=source_relative --go_out=. metadata.proto
 
 import (
+	"fmt"
+
 	"github.com/golang/protobuf/proto"
 
 	"github.com/leftmike/maho/evaluate/expr"
@@ -26,6 +28,7 @@ type TableType struct {
 	cols        []sql.Identifier
 	colTypes    []sql.ColumnType
 	primary     []sql.ColumnKey
+	indexes     []sql.IndexType
 	constraints []constraint
 	checks      []checkConstraint
 }
@@ -53,8 +56,24 @@ func (tt *TableType) PrimaryKey() []sql.ColumnKey {
 	return tt.primary
 }
 
+func (tt *TableType) Indexes() []sql.IndexType {
+	return tt.indexes
+}
+
 func (tt *TableType) Version() uint32 {
 	return tt.ver
+}
+
+func encodeColumnKey(key []sql.ColumnKey) []*ColumnKey {
+	mdk := make([]*ColumnKey, 0, len(key))
+	for _, k := range key {
+		mdk = append(mdk,
+			&ColumnKey{
+				Number:  int32(k.Number()),
+				Reverse: k.Reverse(),
+			})
+	}
+	return mdk
 }
 
 func (tt *TableType) Encode() ([]byte, error) {
@@ -77,13 +96,15 @@ func (tt *TableType) Encode() ([]byte, error) {
 			})
 	}
 
-	primary := tt.PrimaryKey()
-	md.Primary = make([]*ColumnKey, 0, len(primary))
-	for _, pk := range primary {
-		md.Primary = append(md.Primary,
-			&ColumnKey{
-				Number:  int32(pk.Number()),
-				Reverse: pk.Reverse(),
+	md.Primary = encodeColumnKey(tt.primary)
+
+	md.Indexes = make([]*IndexMetadata, 0, len(tt.indexes))
+	for _, it := range tt.indexes {
+		md.Indexes = append(md.Indexes,
+			&IndexMetadata{
+				Name:   it.Name.String(),
+				Key:    encodeColumnKey(it.Key),
+				Unique: it.Unique,
 			})
 	}
 
@@ -110,11 +131,19 @@ func (tt *TableType) Encode() ([]byte, error) {
 	return proto.Marshal(&md)
 }
 
+func decodeColumnKey(mdk []*ColumnKey) []sql.ColumnKey {
+	key := make([]sql.ColumnKey, 0, len(mdk))
+	for _, k := range mdk {
+		key = append(key, sql.MakeColumnKey(int(k.Number), k.Reverse))
+	}
+	return key
+}
+
 func DecodeTableType(tn sql.TableName, buf []byte) (*TableType, error) {
 	var md TableMetadata
 	err := proto.Unmarshal(buf, &md)
 	if err != nil {
-		return nil, err
+		return nil, fmt.Errorf("engine: table %s: %s", tn, err)
 	}
 
 	cols := make([]sql.Identifier, 0, len(md.Columns))
@@ -123,7 +152,7 @@ func DecodeTableType(tn sql.TableName, buf []byte) (*TableType, error) {
 		cols = append(cols, sql.QuotedID(md.Columns[cdx].Name))
 		dflt, err := expr.Decode(md.Columns[cdx].Default)
 		if err != nil {
-			return nil, err
+			return nil, fmt.Errorf("engine: table %s: %s", tn, err)
 		}
 		colTypes = append(colTypes,
 			sql.ColumnType{
@@ -136,9 +165,16 @@ func DecodeTableType(tn sql.TableName, buf []byte) (*TableType, error) {
 			})
 	}
 
-	primary := make([]sql.ColumnKey, 0, len(md.Primary))
-	for _, pk := range md.Primary {
-		primary = append(primary, sql.MakeColumnKey(int(pk.Number), pk.Reverse))
+	primary := decodeColumnKey(md.Primary)
+
+	indexes := make([]sql.IndexType, 0, len(md.Indexes))
+	for _, it := range md.Indexes {
+		indexes = append(indexes,
+			sql.IndexType{
+				Name:   sql.QuotedID(it.Name),
+				Key:    decodeColumnKey(it.Key),
+				Unique: it.Unique,
+			})
 	}
 
 	constraints := make([]constraint, 0, len(md.Constraints))
@@ -155,7 +191,7 @@ func DecodeTableType(tn sql.TableName, buf []byte) (*TableType, error) {
 	for _, chk := range md.Checks {
 		check, err := expr.Decode(chk.Check)
 		if err != nil {
-			return nil, err
+			return nil, fmt.Errorf("engine: table %s: %s", tn, err)
 		}
 		checks = append(checks,
 			checkConstraint{
@@ -170,6 +206,7 @@ func DecodeTableType(tn sql.TableName, buf []byte) (*TableType, error) {
 		cols:        cols,
 		colTypes:    colTypes,
 		primary:     primary,
+		indexes:     indexes,
 		constraints: constraints,
 		checks:      checks,
 	}, nil
