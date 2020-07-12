@@ -41,8 +41,6 @@ To Do:
 - subquery expressions: EXISTS, IN, NOT IN, ANY/SOME, ALL
 - conditional expressions: CASE, COALESCE, NULLIF, GREATEST, LEAST
 
-- rename storage/kvrows/data.* to txmd.* (and the messages in it)
-
 - indexes
 -- unique indexes: all NULL values are considered different from all other NULL values and
    are thus unique (sqlite.org/lang_createindex.html)
