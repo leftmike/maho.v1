@@ -1,6 +1,6 @@
 package engine
 
-//go:generate protoc --go_opt=paths=source_relative --go_out=. metadata.proto
+//go:generate protoc --go_opt=paths=source_relative --go_out=. typemd.proto
 
 import (
 	"fmt"
@@ -80,7 +80,7 @@ func (tt *TableType) Encode() ([]byte, error) {
 	cols := tt.Columns()
 	colTypes := tt.ColumnTypes()
 
-	var md TableMetadata
+	var md TableTypeMetadata
 	md.Version = tt.ver
 	md.Columns = make([]*ColumnMetadata, 0, len(cols))
 	for cdx := range cols {
@@ -140,7 +140,7 @@ func decodeColumnKey(mdk []*ColumnKey) []sql.ColumnKey {
 }
 
 func DecodeTableType(tn sql.TableName, buf []byte) (*TableType, error) {
-	var md TableMetadata
+	var md TableTypeMetadata
 	err := proto.Unmarshal(buf, &md)
 	if err != nil {
 		return nil, fmt.Errorf("engine: table %s: %s", tn, err)

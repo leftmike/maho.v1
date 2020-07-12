@@ -2,7 +2,7 @@ syntax = "proto3";
 
 option go_package = "./engine";
 
-message TableMetadata {
+message TableTypeMetadata {
     uint32 Version = 1;
     repeated ColumnMetadata Columns = 2;
     repeated ColumnKey Primary = 3;

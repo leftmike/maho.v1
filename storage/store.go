@@ -1,6 +1,6 @@
 package storage
 
-//go:generate protoc --go_opt=paths=source_relative --go_out=. info.proto
+//go:generate protoc --go_opt=paths=source_relative --go_out=. layoutmd.proto
 
 import (
 	"context"
@@ -19,7 +19,6 @@ const (
 	databasesTID   = 129
 	schemasTID     = 130
 	tablesTID      = 131
-	indexesTID     = 132
 	maxReservedTID = 2048
 
 	tidSequence = "tid"
@@ -32,7 +31,6 @@ var (
 	databasesTableName = sql.TableName{sql.SYSTEM, sql.PRIVATE, sql.DATABASES}
 	schemasTableName   = sql.TableName{sql.SYSTEM, sql.PRIVATE, sql.SCHEMAS}
 	tablesTableName    = sql.TableName{sql.SYSTEM, sql.PRIVATE, sql.TABLES}
-	indexesTableName   = sql.TableName{sql.SYSTEM, sql.PRIVATE, sql.INDEXES}
 )
 
 type sequenceRow struct {
@@ -51,13 +49,12 @@ type schemaRow struct {
 }
 
 type tableRow struct {
-	Database string
-	Schema   string
-	Table    string
-	TID      int64
-	NextIID  int64
-	Metadata []byte
-	Info     []byte
+	Database       string
+	Schema         string
+	Table          string
+	TID            int64
+	TypeMetadata   []byte
+	LayoutMetadata []byte
 }
 
 type indexRow struct { // XXX: remove
@@ -67,14 +64,14 @@ type indexRow struct { // XXX: remove
 	Index    string
 }
 
-type IndexType struct {
-	sql.IndexType
-	IID int64
+type TableLayout struct {
+	nextIID int64
+	IIDs    []int64
 }
 
 type PersistentStore interface {
 	Table(ctx context.Context, tx sql.Transaction, tn sql.TableName, tid int64,
-		tt *engine.TableType, its []IndexType) (engine.Table, error)
+		tt *engine.TableType, tl *TableLayout) (engine.Table, error)
 	Begin(sesid uint64) sql.Transaction
 }
 
@@ -85,7 +82,6 @@ type Store struct {
 	databases *engine.TableType
 	schemas   *engine.TableType
 	tables    *engine.TableType
-	indexes   *engine.TableType
 }
 
 func NewStore(name string, ps PersistentStore, init bool) (*Store, error) {
@@ -109,19 +105,12 @@ func NewStore(name string, ps PersistentStore, init bool) (*Store, error) {
 
 		tables: engine.MakeTableType(
 			[]sql.Identifier{sql.ID("database"), sql.ID("schema"), sql.ID("table"), sql.ID("tid"),
-				sql.ID("nextiid"), sql.ID("metadata"), sql.ID("info")},
+				sql.ID("typemetadata"), sql.ID("layoutmetadata")},
 			[]sql.ColumnType{sql.IdColType, sql.IdColType, sql.IdColType, sql.Int64ColType,
-				sql.Int64ColType,
 				{Type: sql.BytesType, Fixed: false, Size: sql.MaxColumnSize},
 				{Type: sql.BytesType, Fixed: false, Size: sql.MaxColumnSize}},
 			[]sql.ColumnKey{sql.MakeColumnKey(0, false), sql.MakeColumnKey(1, false),
 				sql.MakeColumnKey(2, false)}),
-
-		indexes: engine.MakeTableType(
-			[]sql.Identifier{sql.ID("database"), sql.ID("schema"), sql.ID("table"), sql.ID("index")},
-			[]sql.ColumnType{sql.IdColType, sql.IdColType, sql.IdColType, sql.IdColType},
-			[]sql.ColumnKey{sql.MakeColumnKey(0, false), sql.MakeColumnKey(1, false),
-				sql.MakeColumnKey(2, false), sql.MakeColumnKey(3, false)}),
 	}
 	if init {
 		ctx := context.Background()
@@ -141,7 +130,8 @@ func NewStore(name string, ps PersistentStore, init bool) (*Store, error) {
 }
 
 func (st *Store) init(ctx context.Context, tx sql.Transaction) error {
-	tbl, err := st.ps.Table(ctx, tx, sequencesTableName, sequencesTID, st.sequences, nil)
+	tbl, err := st.ps.Table(ctx, tx, sequencesTableName, sequencesTID, st.sequences,
+		&TableLayout{})
 	if err != nil {
 		return err
 	}
@@ -155,7 +145,7 @@ func (st *Store) init(ctx context.Context, tx sql.Transaction) error {
 		return err
 	}
 
-	tbl, err = st.ps.Table(ctx, tx, databasesTableName, databasesTID, st.databases, nil)
+	tbl, err = st.ps.Table(ctx, tx, databasesTableName, databasesTID, st.databases, &TableLayout{})
 	if err != nil {
 		return err
 	}
@@ -168,7 +158,7 @@ func (st *Store) init(ctx context.Context, tx sql.Transaction) error {
 		return err
 	}
 
-	tbl, err = st.ps.Table(ctx, tx, schemasTableName, schemasTID, st.schemas, nil)
+	tbl, err = st.ps.Table(ctx, tx, schemasTableName, schemasTID, st.schemas, &TableLayout{})
 	if err != nil {
 		return err
 	}
@@ -207,19 +197,14 @@ func (st *Store) init(ctx context.Context, tx sql.Transaction) error {
 		return err
 	}
 
-	tx.NextStmt()
-	err = st.createTable(ctx, tx, indexesTableName, indexesTID, st.indexes)
-	if err != nil {
-		return err
-	}
-
 	return nil
 }
 
 func (st *Store) createDatabase(ctx context.Context, tx sql.Transaction,
 	dbname sql.Identifier) error {
 
-	tbl, err := st.ps.Table(ctx, tx, databasesTableName, databasesTID, st.databases, nil)
+	tbl, err := st.ps.Table(ctx, tx, databasesTableName, databasesTID, st.databases,
+		&TableLayout{})
 	if err != nil {
 		return err
 	}
@@ -255,7 +240,8 @@ func (st *Store) CreateDatabase(dbname sql.Identifier, options map[sql.Identifie
 func (st *Store) lookupDatabase(ctx context.Context, tx sql.Transaction,
 	dbname sql.Identifier) (*util.TypedRows, error) {
 
-	tbl, err := st.ps.Table(ctx, tx, databasesTableName, databasesTID, st.databases, nil)
+	tbl, err := st.ps.Table(ctx, tx, databasesTableName, databasesTID, st.databases,
+		&TableLayout{})
 	if err != nil {
 		return nil, err
 	}
@@ -348,7 +334,7 @@ func (st *Store) CreateSchema(ctx context.Context, tx sql.Transaction, sn sql.Sc
 		return fmt.Errorf("%s: database %s not found", st.name, sn.Database)
 	}
 
-	tbl, err := st.ps.Table(ctx, tx, schemasTableName, schemasTID, st.schemas, nil)
+	tbl, err := st.ps.Table(ctx, tx, schemasTableName, schemasTID, st.schemas, &TableLayout{})
 	if err != nil {
 		return err
 	}
@@ -365,7 +351,7 @@ func (st *Store) CreateSchema(ctx context.Context, tx sql.Transaction, sn sql.Sc
 func (st *Store) DropSchema(ctx context.Context, tx sql.Transaction, sn sql.SchemaName,
 	ifExists bool) error {
 
-	tbl, err := st.ps.Table(ctx, tx, schemasTableName, schemasTID, st.schemas, nil)
+	tbl, err := st.ps.Table(ctx, tx, schemasTableName, schemasTID, st.schemas, &TableLayout{})
 	if err != nil {
 		return err
 	}
@@ -400,7 +386,7 @@ func (st *Store) DropSchema(ctx context.Context, tx sql.Transaction, sn sql.Sche
 func (st *Store) updateSchema(ctx context.Context, tx sql.Transaction,
 	sn sql.SchemaName, delta int64) error {
 
-	tbl, err := st.ps.Table(ctx, tx, schemasTableName, schemasTID, st.schemas, nil)
+	tbl, err := st.ps.Table(ctx, tx, schemasTableName, schemasTID, st.schemas, &TableLayout{})
 	if err != nil {
 		return err
 	}
@@ -433,7 +419,7 @@ func (st *Store) updateSchema(ctx context.Context, tx sql.Transaction,
 func (st *Store) lookupTable(ctx context.Context, tx sql.Transaction,
 	tn sql.TableName) (*util.TypedRows, error) {
 
-	tbl, err := st.ps.Table(ctx, tx, tablesTableName, tablesTID, st.tables, nil)
+	tbl, err := st.ps.Table(ctx, tx, tablesTableName, tablesTID, st.tables, &TableLayout{})
 	if err != nil {
 		return nil, err
 	}
@@ -472,51 +458,40 @@ func (st *Store) validTable(ctx context.Context, tx sql.Transaction, tn sql.Tabl
 	return true, nil
 }
 
-func encodeTableInfo(tt *engine.TableType) ([]byte, error) {
-	var ti TableInfo
-	ti.Indexes = make([]*IndexInfo, 0, len(tt.Indexes()))
-	for iid, it := range tt.Indexes() {
-		ti.Indexes = append(ti.Indexes,
-			&IndexInfo{
-				Name: it.Name.String(),
-				IID:  int64(iid + 1),
-			})
+func makeTableLayout(tt *engine.TableType) *TableLayout {
+	var tl TableLayout
+	tl.nextIID = int64(PrimaryIID) + 1
+	tl.IIDs = make([]int64, 0, len(tt.Indexes()))
+	for _ = range tt.Indexes() {
+		tl.IIDs = append(tl.IIDs, tl.nextIID)
+		tl.nextIID += 1
 	}
-
-	return proto.Marshal(&ti)
+	return &tl
 }
 
-func findIndex(tt *engine.TableType, nam sql.Identifier) (sql.IndexType, bool) {
-	for _, it := range tt.Indexes() {
-		if it.Name == nam {
-			return it, true
-		}
-	}
-	return sql.IndexType{}, false
+func (tl *TableLayout) encode() ([]byte, error) {
+	return proto.Marshal(&TableLayoutMetadata{
+		NextIID: tl.nextIID,
+		IIDs:    tl.IIDs,
+	})
 }
 
-func decodeTableInfo(tn sql.TableName, tt *engine.TableType, buf []byte) ([]IndexType, error) {
-	var ti TableInfo
-	err := proto.Unmarshal(buf, &ti)
+func (st *Store) decodeTableLayout(tn sql.TableName, tt *engine.TableType,
+	buf []byte) (*TableLayout, error) {
+
+	var md TableLayoutMetadata
+	err := proto.Unmarshal(buf, &md)
 	if err != nil {
-		return nil, fmt.Errorf("storage: table %s: %s", tn, err)
+		return nil, fmt.Errorf("%s: table %s: %s", st.name, tn, err)
+	}
+	if len(md.IIDs) != len(tt.Indexes()) {
+		return nil, fmt.Errorf("%s: table %s: corrupt metadata", st.name, tn)
 	}
 
-	its := make([]IndexType, 0, len(ti.Indexes))
-	for _, it := range ti.Indexes {
-		sit, ok := findIndex(tt, sql.QuotedID(it.Name))
-		if !ok {
-			return nil, fmt.Errorf("storage: table %s: internal error: index %s not found",
-				tn, it.Name)
-		}
-		its = append(its,
-			IndexType{
-				IndexType: sit,
-				IID:       it.IID,
-			})
-	}
-
-	return its, nil
+	return &TableLayout{
+		nextIID: md.NextIID,
+		IIDs:    md.IIDs,
+	}, nil
 }
 
 func (st *Store) LookupTable(ctx context.Context, tx sql.Transaction,
@@ -538,16 +513,16 @@ func (st *Store) LookupTable(ctx context.Context, tx sql.Transaction,
 	}
 	tid := tr.TID
 
-	tt, err := engine.DecodeTableType(tn, tr.Metadata)
+	tt, err := engine.DecodeTableType(tn, tr.TypeMetadata)
 	if err != nil {
 		return nil, nil, err
 	}
-	its, err := decodeTableInfo(tn, tt, tr.Info)
+	tl, err := st.decodeTableLayout(tn, tt, tr.LayoutMetadata)
 	if err != nil {
 		return nil, nil, err
 	}
 
-	tbl, err := st.ps.Table(ctx, tx, tn, tid, tt, its)
+	tbl, err := st.ps.Table(ctx, tx, tn, tid, tt, tl)
 	if err != nil {
 		return nil, nil, err
 	}
@@ -562,17 +537,18 @@ func (st *Store) createTable(ctx context.Context, tx sql.Transaction, tn sql.Tab
 		return err
 	}
 
-	md, err := tt.Encode()
+	typmd, err := tt.Encode()
 	if err != nil {
 		return err
 	}
 
-	ti, err := encodeTableInfo(tt)
+	tl := makeTableLayout(tt)
+	lyomd, err := tl.encode()
 	if err != nil {
 		return err
 	}
 
-	tbl, err := st.ps.Table(ctx, tx, tablesTableName, tablesTID, st.tables, nil)
+	tbl, err := st.ps.Table(ctx, tx, tablesTableName, tablesTID, st.tables, &TableLayout{})
 	if err != nil {
 		return err
 	}
@@ -580,13 +556,12 @@ func (st *Store) createTable(ctx context.Context, tx sql.Transaction, tn sql.Tab
 
 	err = ttbl.Insert(ctx,
 		tableRow{
-			Database: tn.Database.String(),
-			Schema:   tn.Schema.String(),
-			Table:    tn.Table.String(),
-			TID:      tid,
-			NextIID:  int64(len(tt.Indexes()) + 1),
-			Metadata: md,
-			Info:     ti,
+			Database:       tn.Database.String(),
+			Schema:         tn.Schema.String(),
+			Table:          tn.Table.String(),
+			TID:            tid,
+			TypeMetadata:   typmd,
+			LayoutMetadata: lyomd,
 		})
 	if err != nil {
 		return err
@@ -625,7 +600,8 @@ func (st *Store) DropTable(ctx context.Context, tx sql.Transaction, tn sql.Table
 		return err
 	}
 
-	tbl, err := st.ps.Table(ctx, tx, tablesTableName, tablesTID, st.tables, nil)
+	// XXX: use lookupTable?
+	tbl, err := st.ps.Table(ctx, tx, tablesTableName, tablesTID, st.tables, &TableLayout{})
 	if err != nil {
 		return err
 	}
@@ -656,108 +632,87 @@ func (st *Store) DropTable(ctx context.Context, tx sql.Transaction, tn sql.Table
 	return rows.Delete(ctx)
 }
 
-func (st *Store) lookupIndex(ctx context.Context, tx sql.Transaction, tn sql.TableName,
-	idxname sql.Identifier) (bool, error) {
+func (st *Store) updateIndexes(ctx context.Context, tx sql.Transaction, tn sql.TableName,
+	tt *engine.TableType, update func(tl *TableLayout) error) error {
 
-	tbl, err := st.ps.Table(ctx, tx, indexesTableName, indexesTID, st.indexes, nil)
+	rows, err := st.lookupTable(ctx, tx, tn)
 	if err != nil {
-		return false, err
-	}
-	ttbl := util.MakeTypedTable(indexesTableName, tbl, st.indexes)
-
-	keyRow := indexRow{
-		Database: tn.Database.String(),
-		Schema:   tn.Schema.String(),
-		Table:    tn.Table.String(),
-		Index:    idxname.String(),
-	}
-	rows, err := ttbl.Rows(ctx, keyRow, keyRow)
-	if err != nil {
-		return false, err
+		return err
 	}
 	defer rows.Close()
 
-	var ir indexRow
-	err = rows.Next(ctx, &ir)
-	if err == io.EOF {
-		return false, nil
-	} else if err != nil {
-		return false, err
+	var tr tableRow
+	err = rows.Next(ctx, &tr)
+	if err != nil {
+		if err == io.EOF {
+			return fmt.Errorf("%s: table %s not found", st.name, tn)
+		}
+		return err
 	}
 
-	return true, nil
+	ptt, err := engine.DecodeTableType(tn, tr.TypeMetadata)
+	if err != nil {
+		return err
+	}
+	tl, err := st.decodeTableLayout(tn, ptt, tr.LayoutMetadata)
+	if err != nil {
+		return err
+	}
+
+	if ptt.Version() != tt.Version()-1 {
+		return fmt.Errorf("%s: table %s: conflicting metadata update", st.name, tn)
+	}
+
+	err = update(tl)
+	if err != nil {
+		return err
+	}
+
+	typmd, err := tt.Encode()
+	if err != nil {
+		return err
+	}
+
+	lyomd, err := tl.encode()
+	if err != nil {
+		return err
+	}
+
+	return rows.Update(ctx,
+		struct {
+			TypeMetadata   []byte
+			LayoutMetadata []byte
+		}{typmd, lyomd})
 }
 
-func (st *Store) CreateIndex(ctx context.Context, tx sql.Transaction, idxname sql.Identifier,
-	tn sql.TableName, unique bool, keys []sql.ColumnKey, ifNotExists bool) error {
+func (st *Store) AddIndex(ctx context.Context, tx sql.Transaction, tn sql.TableName,
+	tt *engine.TableType) error {
 
-	ok, err := st.lookupIndex(ctx, tx, tn, idxname)
-	if err != nil {
-		return err
-	}
-	if ok {
-		if ifNotExists {
+	return st.updateIndexes(ctx, tx, tn, tt,
+		func(tl *TableLayout) error {
+			tl.IIDs = append(tl.IIDs, tl.nextIID)
+			tl.nextIID += 1
+
 			return nil
-		}
-		return fmt.Errorf("%s: index %s on table %s already exists", st.name, idxname, tn)
-	}
-
-	ok, err = st.validTable(ctx, tx, tn)
-	if err != nil {
-		return err
-	}
-	if !ok {
-		return fmt.Errorf("%s: table %s not found", st.name, tn)
-	}
-
-	tbl, err := st.ps.Table(ctx, tx, indexesTableName, indexesTID, st.indexes, nil)
-	if err != nil {
-		return err
-	}
-	ttbl := util.MakeTypedTable(indexesTableName, tbl, st.indexes)
-
-	return ttbl.Insert(ctx,
-		indexRow{
-			Database: tn.Database.String(),
-			Schema:   tn.Schema.String(),
-			Table:    tn.Table.String(),
-			Index:    idxname.String(),
 		})
 }
 
-func (st *Store) DropIndex(ctx context.Context, tx sql.Transaction, idxname sql.Identifier,
-	tn sql.TableName, ifExists bool) error {
+func (st *Store) RemoveIndex(ctx context.Context, tx sql.Transaction, tn sql.TableName,
+	tt *engine.TableType, rdx int) error {
 
-	tbl, err := st.ps.Table(ctx, tx, indexesTableName, indexesTID, st.indexes, nil)
-	if err != nil {
-		return err
-	}
-	ttbl := util.MakeTypedTable(indexesTableName, tbl, st.indexes)
+	return st.updateIndexes(ctx, tx, tn, tt,
+		func(tl *TableLayout) error {
+			iids := make([]int64, 0, len(tl.IIDs)-1)
+			for idx, iid := range tl.IIDs {
+				if idx == rdx {
+					continue
+				}
+				iids = append(iids, iid)
+			}
+			tl.IIDs = iids
 
-	keyRow := indexRow{
-		Database: tn.Database.String(),
-		Schema:   tn.Schema.String(),
-		Table:    tn.Table.String(),
-		Index:    idxname.String(),
-	}
-	rows, err := ttbl.Rows(ctx, keyRow, keyRow)
-	if err != nil {
-		return err
-	}
-	defer rows.Close()
-
-	var ir indexRow
-	err = rows.Next(ctx, &ir)
-	if err == io.EOF {
-		if ifExists {
 			return nil
-		}
-		return fmt.Errorf("%s: index %s on table %s not found", st.name, idxname, tn)
-	} else if err != nil {
-		return err
-	}
-
-	return rows.Delete(ctx)
+		})
 }
 
 func (st *Store) Begin(sesid uint64) sql.Transaction {
@@ -765,7 +720,8 @@ func (st *Store) Begin(sesid uint64) sql.Transaction {
 }
 
 func (st *Store) ListDatabases(ctx context.Context, tx sql.Transaction) ([]sql.Identifier, error) {
-	tbl, err := st.ps.Table(ctx, tx, databasesTableName, databasesTID, st.databases, nil)
+	tbl, err := st.ps.Table(ctx, tx, databasesTableName, databasesTID, st.databases,
+		&TableLayout{})
 	if err != nil {
 		return nil, err
 	}
@@ -794,7 +750,7 @@ func (st *Store) ListDatabases(ctx context.Context, tx sql.Transaction) ([]sql.I
 func (st *Store) ListSchemas(ctx context.Context, tx sql.Transaction,
 	dbname sql.Identifier) ([]sql.Identifier, error) {
 
-	tbl, err := st.ps.Table(ctx, tx, schemasTableName, schemasTID, st.schemas, nil)
+	tbl, err := st.ps.Table(ctx, tx, schemasTableName, schemasTID, st.schemas, &TableLayout{})
 	if err != nil {
 		return nil, err
 	}
@@ -826,7 +782,7 @@ func (st *Store) ListSchemas(ctx context.Context, tx sql.Transaction,
 func (st *Store) ListTables(ctx context.Context, tx sql.Transaction,
 	sn sql.SchemaName) ([]sql.Identifier, error) {
 
-	tbl, err := st.ps.Table(ctx, tx, tablesTableName, tablesTID, st.tables, nil)
+	tbl, err := st.ps.Table(ctx, tx, tablesTableName, tablesTID, st.tables, &TableLayout{})
 	if err != nil {
 		return nil, err
 	}
@@ -859,7 +815,8 @@ func (st *Store) ListTables(ctx context.Context, tx sql.Transaction,
 func (st *Store) nextSequenceValue(ctx context.Context, tx sql.Transaction,
 	sequence string) (int64, error) {
 
-	tbl, err := st.ps.Table(ctx, tx, sequencesTableName, sequencesTID, st.sequences, nil)
+	tbl, err := st.ps.Table(ctx, tx, sequencesTableName, sequencesTID, st.sequences,
+		&TableLayout{})
 	if err != nil {
 		return 0, err
 	}

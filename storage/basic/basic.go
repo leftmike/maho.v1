@@ -59,7 +59,7 @@ func NewStore(dataDir string) (*storage.Store, error) {
 }
 
 func (_ *basicStore) Table(ctx context.Context, tx sql.Transaction, tn sql.TableName, tid int64,
-	tt *engine.TableType, its []storage.IndexType) (engine.Table, error) {
+	tt *engine.TableType, tl *storage.TableLayout) (engine.Table, error) {
 
 	primary := tt.PrimaryKey()
 	if len(primary) == 0 {

@@ -36,10 +36,9 @@ type store interface {
 		ifNotExists bool) error
 	DropTable(ctx context.Context, tx sql.Transaction, tn sql.TableName, ifExists bool) error
 
-	CreateIndex(ctx context.Context, tx sql.Transaction, idxname sql.Identifier, tn sql.TableName,
-		unique bool, keys []sql.ColumnKey, ifNotExists bool) error
-	DropIndex(ctx context.Context, tx sql.Transaction, idxname sql.Identifier, tn sql.TableName,
-		ifExists bool) error
+	AddIndex(ctx context.Context, tx sql.Transaction, tn sql.TableName, tt *TableType) error
+	RemoveIndex(ctx context.Context, tx sql.Transaction, tn sql.TableName, tt *TableType,
+		rdx int) error
 
 	ListDatabases(ctx context.Context, tx sql.Transaction) ([]sql.Identifier, error)
 	ListSchemas(ctx context.Context, tx sql.Transaction, dbname sql.Identifier) ([]sql.Identifier,
@@ -253,7 +252,7 @@ func (e *Engine) DropTable(ctx context.Context, tx sql.Transaction, tn sql.Table
 }
 
 func (e *Engine) CreateIndex(ctx context.Context, tx sql.Transaction, idxname sql.Identifier,
-	tn sql.TableName, unique bool, keys []sql.ColumnKey, ifNotExists bool) error {
+	tn sql.TableName, unique bool, key []sql.ColumnKey, ifNotExists bool) error {
 
 	if tn.Database == sql.SYSTEM {
 		return fmt.Errorf("engine: database %s may not be modified", tn.Database)
@@ -261,7 +260,30 @@ func (e *Engine) CreateIndex(ctx context.Context, tx sql.Transaction, idxname sq
 	if tn.Schema == sql.METADATA {
 		return fmt.Errorf("engine: schema %s may not be modified", tn.Schema)
 	}
-	return e.st.CreateIndex(ctx, tx, idxname, tn, unique, keys, ifNotExists)
+
+	_, tt, err := e.st.LookupTable(ctx, tx, tn)
+	if err != nil {
+		return err
+	}
+
+	for _, it := range tt.indexes {
+		if it.Name == idxname {
+			if ifNotExists {
+				return nil
+			}
+			return fmt.Errorf("engine: table %s: index %s already exists", tn, idxname)
+		}
+	}
+
+	tt.ver += 1
+	tt.indexes = append(tt.indexes,
+		sql.IndexType{
+			Name:   idxname,
+			Key:    key,
+			Unique: unique,
+		})
+
+	return e.st.AddIndex(ctx, tx, tn, tt)
 }
 
 func (e *Engine) DropIndex(ctx context.Context, tx sql.Transaction, idxname sql.Identifier,
@@ -273,7 +295,33 @@ func (e *Engine) DropIndex(ctx context.Context, tx sql.Transaction, idxname sql.
 	if tn.Schema == sql.METADATA {
 		return fmt.Errorf("engine: schema %s may not be modified", tn.Schema)
 	}
-	return e.st.DropIndex(ctx, tx, idxname, tn, ifExists)
+
+	_, tt, err := e.st.LookupTable(ctx, tx, tn)
+	if err != nil {
+		return err
+	}
+
+	var rdx int
+	indexes := make([]sql.IndexType, 0, len(tt.indexes))
+	for idx, it := range tt.indexes {
+		if it.Name != idxname {
+			indexes = append(indexes, it)
+		} else {
+			rdx = idx
+		}
+	}
+
+	if len(indexes) == len(tt.indexes) {
+		if ifExists {
+			return nil
+		}
+		return fmt.Errorf("engine: table %s: index %s not found", tn, idxname)
+	}
+
+	tt.ver += 1
+	tt.indexes = indexes
+
+	return e.st.RemoveIndex(ctx, tx, tn, tt, rdx)
 }
 
 func (e *Engine) Begin(sesid uint64) sql.Transaction {

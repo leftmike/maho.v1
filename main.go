@@ -41,9 +41,7 @@ To Do:
 - subquery expressions: EXISTS, IN, NOT IN, ANY/SOME, ALL
 - conditional expressions: CASE, COALESCE, NULLIF, GREATEST, LEAST
 
-- storage / engine
--- change create / drop to operate on TableType and TableInfo
--- remove indexes table
+- rename storage/kvrows/data.* to txmd.* (and the messages in it)
 
 - indexes
 -- unique indexes: all NULL values are considered different from all other NULL values and

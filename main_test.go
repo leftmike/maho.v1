@@ -90,13 +90,12 @@ select * from metadata.tables
   4      'system'      'info'   'databases'
   5      'system'   'private'   'databases'
   6      'system'      'info' 'identifiers'
-  7      'system'   'private'     'indexes'
-  8      'system'  'metadata'     'schemas'
-  9      'system'   'private'     'schemas'
- 10      'system'   'private'   'sequences'
- 11      'system'  'metadata'      'tables'
- 12      'system'   'private'      'tables'
-(12 rows)
+  7      'system'  'metadata'     'schemas'
+  8      'system'   'private'     'schemas'
+  9      'system'   'private'   'sequences'
+ 10      'system'  'metadata'      'tables'
+ 11      'system'   'private'      'tables'
+(11 rows)
 `},
 		{`select * from metadata.constraints
 where table_name = 'tables' and schema_name = 'metadata'

@@ -72,17 +72,17 @@ func (st *testStore) DropTable(ctx context.Context, tx sql.Transaction, tn sql.T
 	return nil
 }
 
-func (st *testStore) CreateIndex(ctx context.Context, tx sql.Transaction, idxname sql.Identifier,
-	tn sql.TableName, unique bool, keys []sql.ColumnKey, ifNotExists bool) error {
+func (st *testStore) AddIndex(ctx context.Context, tx sql.Transaction, tn sql.TableName,
+	tt *engine.TableType) error {
 
-	st.t.Error("CreateIndex should never be called")
+	st.t.Error("AddIndex should never be called")
 	return nil
 }
 
-func (st *testStore) DropIndex(ctx context.Context, tx sql.Transaction, idxname sql.Identifier,
-	tn sql.TableName, ifExists bool) error {
+func (st *testStore) RemoveIndex(ctx context.Context, tx sql.Transaction, tn sql.TableName,
+	tt *engine.TableType, rdx int) error {
 
-	st.t.Error("DropIndex should never be called")
+	st.t.Error("RemoveIndex should never be called")
 	return nil
 }
 
