@@ -288,6 +288,30 @@ func columnConstraintName(colNum int, tt *TableType, ct sql.ConstraintType) sql.
 	return nil
 }
 
+func columnKey(tt *TableType, key []sql.ColumnKey) string {
+	s := "("
+	for i, ck := range key {
+		if i > 0 {
+			s += ", "
+		}
+
+		num := ck.Number()
+		if num < len(tt.cols) {
+			s += tt.cols[num].String()
+		} else {
+			s += fmt.Sprintf("<column %d>", num)
+		}
+
+		if ck.Reverse() {
+			s += " DESC"
+		} else {
+			s += " ASC"
+		}
+	}
+
+	return s + ")"
+}
+
 func appendConstraints(values [][]sql.Value, tn sql.TableName, tt *TableType) [][]sql.Value {
 	for i, ct := range tt.colTypes {
 		if ct.DefaultExpr != "" {
@@ -319,14 +343,8 @@ func appendConstraints(values [][]sql.Value, tn sql.TableName, tt *TableType) []
 			continue
 		}
 
-		var typ string
-		switch con.typ {
-		case sql.PrimaryConstraint:
-			typ = "PRIMARY KEY"
-		case sql.UniqueConstraint:
-			typ = "UNIQUE"
-		case sql.ForeignConstraint:
-			typ = "FOREIGN KEY"
+		if con.typ != sql.ForeignConstraint {
+			panic("expected a foreign key constraint")
 		}
 
 		values = append(values,
@@ -335,10 +353,9 @@ func appendConstraints(values [][]sql.Value, tn sql.TableName, tt *TableType) []
 				sql.StringValue(tn.Schema.String()),
 				sql.StringValue(tn.Table.String()),
 				sql.StringValue(con.name.String()),
-				sql.StringValue(typ),
+				sql.StringValue("FOREIGN KEY"),
 				nil,
 			})
-
 	}
 
 	for _, chk := range tt.checks {
@@ -351,7 +368,32 @@ func appendConstraints(values [][]sql.Value, tn sql.TableName, tt *TableType) []
 				sql.StringValue("CHECK"),
 				sql.StringValue(chk.checkExpr),
 			})
+	}
 
+	for _, it := range tt.indexes {
+		if it.Unique {
+			values = append(values,
+				[]sql.Value{
+					sql.StringValue(tn.Database.String()),
+					sql.StringValue(tn.Schema.String()),
+					sql.StringValue(tn.Table.String()),
+					sql.StringValue(it.Name.String()),
+					sql.StringValue("UNIQUE"),
+					sql.StringValue(columnKey(tt, it.Key)),
+				})
+		}
+	}
+
+	if len(tt.primary) > 0 {
+		values = append(values,
+			[]sql.Value{
+				sql.StringValue(tn.Database.String()),
+				sql.StringValue(tn.Schema.String()),
+				sql.StringValue(tn.Table.String()),
+				nil,
+				sql.StringValue("PRIMARY"),
+				sql.StringValue(columnKey(tt, tt.primary)),
+			})
 	}
 
 	return values

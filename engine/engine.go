@@ -222,10 +222,11 @@ func (e *Engine) CreateTable(ctx context.Context, tx sql.Transaction, tn sql.Tab
 					Key:    con.Key,
 					Unique: true,
 				})
+		} else if con.Type == sql.PrimaryConstraint {
+			// Used above; remove from constraints.
 		} else {
 			// sql.DefaultConstraint
 			// sql.NotNullConstraint
-			// sql.PrimaryConstraint
 
 			tt.constraints = append(tt.constraints,
 				constraint{

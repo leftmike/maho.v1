@@ -46,18 +46,15 @@ To Do:
    are thus unique (sqlite.org/lang_createindex.html)
 -- based on column numbers
 -- engine.Table: IndexRows(...) => engine.IndexRows {Columns, Close, Next, Delete, Update, Row}
--- add unique indexes to metadata.constraints table
--- add primary key to metadata.constraints table
 
 - constraints
--- change unique constraints into indexes
 -- column: REFERENCES reftable [ '(' refcolumn ')' ] => treat as a foreign key
 -- table: FOREIGN KEY '(' column  [',' ...] ')' REFERENCES reftable [ '(' refcolumn [',' ...] ')' ]
    => list of Foreign on the table (and need a list of Refering tables)
 -- drop CHECK constraint: use ALTER TABLE table DROP CONSTRAINT constraint
--- drop DEFAULT: use ALTER TABLE table ALTER COLUMN column DROP DEFAULT
+-- drop DEFAULT: use ALTER TABLE table ALTER COLUMN column DROP DEFAULT (or DROP CONSTRAINT)
 -- drop FOREIGN KEY: use ALTER TABLE table DROP CONSTRAINT constraint
--- drop NOT NULL: use ALTER TABLE table ALTER COLUMN column DROP NOT NULL
+-- drop NOT NULL: use ALTER TABLE table ALTER COLUMN column DROP NOT NULL (or DROP CONSTRAINT)
 -- drop UNIQUE: use DROP INDEX ...
 */
 
