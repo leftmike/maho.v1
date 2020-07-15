@@ -11,19 +11,44 @@ import (
 )
 
 type TableLayout struct {
+	tt      *engine.TableType
 	nextIID int64
 	IIDs    []int64
 }
 
 func makeTableLayout(tt *engine.TableType) *TableLayout {
-	var tl TableLayout
-	tl.nextIID = int64(PrimaryIID) + 1
+	tl := TableLayout{
+		tt:      tt,
+		nextIID: int64(PrimaryIID) + 1,
+	}
+
 	tl.IIDs = make([]int64, 0, len(tt.Indexes()))
 	for _ = range tt.Indexes() {
 		tl.IIDs = append(tl.IIDs, tl.nextIID)
 		tl.nextIID += 1
 	}
 	return &tl
+}
+
+func (tl *TableLayout) Columns() []sql.Identifier {
+	return tl.tt.Columns()
+}
+
+func (tl *TableLayout) PrimaryKey() []sql.ColumnKey {
+	return tl.tt.PrimaryKey()
+}
+
+func (tl *TableLayout) PrimaryUpdated(updates []sql.ColumnUpdate) bool {
+	primary := tl.tt.PrimaryKey()
+	for _, update := range updates {
+		for _, ck := range primary {
+			if ck.Number() == update.Index {
+				return true
+			}
+		}
+	}
+
+	return false
 }
 
 func (tl *TableLayout) encode() ([]byte, error) {
@@ -46,6 +71,7 @@ func (st *Store) decodeTableLayout(tn sql.TableName, tt *engine.TableType,
 	}
 
 	return &TableLayout{
+		tt:      tt,
 		nextIID: md.NextIID,
 		IIDs:    md.IIDs,
 	}, nil

@@ -56,12 +56,11 @@ type transaction struct {
 }
 
 type table struct {
-	st      *keyValStore
-	tn      sql.TableName
-	tid     int64
-	cols    []sql.Identifier
-	primary []sql.ColumnKey
-	tx      *transaction
+	st  *keyValStore
+	tl  *storage.TableLayout
+	tn  sql.TableName
+	tid int64
+	tx  *transaction
 }
 
 type rowItem struct {
@@ -128,19 +127,17 @@ func newStore(kv KV) (*storage.Store, error) {
 func (kvst *keyValStore) Table(ctx context.Context, tx sql.Transaction, tn sql.TableName,
 	tid int64, tt *engine.TableType, tl *storage.TableLayout) (engine.Table, error) {
 
-	primary := tt.PrimaryKey()
-	if len(primary) == 0 {
+	if len(tt.PrimaryKey()) == 0 {
 		panic(fmt.Sprintf("keyval: table %s: missing required primary key", tn))
 	}
 
 	etx := tx.(*transaction)
 	return &table{
-		st:      etx.st,
-		tn:      tn,
-		tid:     tid,
-		cols:    tt.Columns(),
-		primary: primary,
-		tx:      etx,
+		st:  etx.st,
+		tl:  tl,
+		tn:  tn,
+		tid: tid,
+		tx:  etx,
 	}, nil
 }
 
@@ -251,7 +248,7 @@ func (kvtx *transaction) forWrite() {
 func (kvt *table) makeKey(row []sql.Value) []byte {
 	buf := util.EncodeUint64(make([]byte, 0, 8), uint64((kvt.tid<<16)|storage.PrimaryIID))
 	if row != nil {
-		buf = append(buf, encode.MakeKey(kvt.primary, row)...)
+		buf = append(buf, encode.MakeKey(kvt.tl.PrimaryKey(), row)...)
 	}
 	return buf
 }
@@ -261,7 +258,7 @@ func (kvt *table) toItem(row []sql.Value, deleted bool) rowItem {
 		key: kvt.makeKey(row),
 	}
 	if row != nil && !deleted {
-		ri.row = append(make([]sql.Value, 0, len(kvt.cols)), row...)
+		ri.row = append(make([]sql.Value, 0, len(kvt.tl.Columns())), row...)
 	}
 	return ri
 }
@@ -336,7 +333,7 @@ func (kvt *table) Insert(ctx context.Context, row []sql.Value) error {
 }
 
 func (kvr *rows) Columns() []sql.Identifier {
-	return kvr.tbl.cols
+	return kvr.tbl.tl.Columns()
 }
 
 func (kvr *rows) Close() error {
@@ -450,16 +447,6 @@ func (kvr *rows) Update(ctx context.Context, updates []sql.ColumnUpdate,
 		panic(fmt.Sprintf("keyval: table %s no row to update", kvr.tbl.tn))
 	}
 
-	var primaryUpdated bool
-	for _, update := range updates {
-		for _, ck := range kvr.tbl.primary {
-			if ck.Number() == update.Index {
-				primaryUpdated = true
-				break
-			}
-		}
-	}
-
 	updateRow := append(make([]sql.Value, 0, len(kvr.curRow)), kvr.curRow...)
 	for _, update := range updates {
 		updateRow[update.Index] = update.Value
@@ -472,7 +459,7 @@ func (kvr *rows) Update(ctx context.Context, updates []sql.ColumnUpdate,
 		}
 	}
 
-	if primaryUpdated {
+	if kvr.tbl.tl.PrimaryUpdated(updates) {
 		kvr.Delete(ctx)
 		return kvr.tbl.Insert(ctx, updateRow)
 	}

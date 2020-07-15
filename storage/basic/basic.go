@@ -31,12 +31,11 @@ type transaction struct {
 }
 
 type table struct {
-	bst     *basicStore
-	tn      sql.TableName
-	tid     int64
-	cols    []sql.Identifier
-	primary []sql.ColumnKey
-	tx      *transaction
+	bst *basicStore
+	tl  *storage.TableLayout
+	tn  sql.TableName
+	tid int64
+	tx  *transaction
 }
 
 type rowItem struct {
@@ -61,19 +60,17 @@ func NewStore(dataDir string) (*storage.Store, error) {
 func (_ *basicStore) Table(ctx context.Context, tx sql.Transaction, tn sql.TableName, tid int64,
 	tt *engine.TableType, tl *storage.TableLayout) (engine.Table, error) {
 
-	primary := tt.PrimaryKey()
-	if len(primary) == 0 {
+	if len(tt.PrimaryKey()) == 0 {
 		panic(fmt.Sprintf("basic: table %s: missing required primary key", tn))
 	}
 
 	etx := tx.(*transaction)
 	return &table{
-		bst:     etx.bst,
-		tn:      tn,
-		tid:     tid,
-		cols:    tt.Columns(),
-		primary: primary,
-		tx:      etx,
+		bst: etx.bst,
+		tl:  tl,
+		tn:  tn,
+		tid: tid,
+		tx:  etx,
 	}, nil
 }
 
@@ -121,8 +118,8 @@ func (bt *table) toItem(row []sql.Value) btree.Item {
 		rid: (bt.tid << 16) | storage.PrimaryIID,
 	}
 	if row != nil {
-		ri.key = encode.MakeKey(bt.primary, row)
-		ri.row = append(make([]sql.Value, 0, len(bt.cols)), row...)
+		ri.key = encode.MakeKey(bt.tl.PrimaryKey(), row)
+		ri.row = append(make([]sql.Value, 0, len(bt.tl.Columns())), row...)
 	}
 	return ri
 }
@@ -174,7 +171,7 @@ func (bt *table) Insert(ctx context.Context, row []sql.Value) error {
 }
 
 func (br *rows) Columns() []sql.Identifier {
-	return br.tbl.cols
+	return br.tbl.tl.Columns()
 }
 
 func (br *rows) Close() error {
@@ -214,17 +211,7 @@ func (br *rows) Update(ctx context.Context, updates []sql.ColumnUpdate,
 		panic(fmt.Sprintf("basic: table %s no row to update", br.tbl.tn))
 	}
 
-	var primaryUpdated bool
-	for _, update := range updates {
-		for _, ck := range br.tbl.primary {
-			if ck.Number() == update.Index {
-				primaryUpdated = true
-				break
-			}
-		}
-	}
-
-	if primaryUpdated {
+	if br.tbl.tl.PrimaryUpdated(updates) {
 		br.Delete(ctx)
 
 		for _, update := range updates {

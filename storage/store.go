@@ -116,7 +116,7 @@ func NewStore(name string, ps PersistentStore, init bool) (*Store, error) {
 
 func (st *Store) init(ctx context.Context, tx sql.Transaction) error {
 	tbl, err := st.ps.Table(ctx, tx, sequencesTableName, sequencesTID, st.sequences,
-		&TableLayout{})
+		makeTableLayout(st.sequences))
 	if err != nil {
 		return err
 	}
@@ -130,7 +130,8 @@ func (st *Store) init(ctx context.Context, tx sql.Transaction) error {
 		return err
 	}
 
-	tbl, err = st.ps.Table(ctx, tx, databasesTableName, databasesTID, st.databases, &TableLayout{})
+	tbl, err = st.ps.Table(ctx, tx, databasesTableName, databasesTID, st.databases,
+		makeTableLayout(st.databases))
 	if err != nil {
 		return err
 	}
@@ -143,7 +144,8 @@ func (st *Store) init(ctx context.Context, tx sql.Transaction) error {
 		return err
 	}
 
-	tbl, err = st.ps.Table(ctx, tx, schemasTableName, schemasTID, st.schemas, &TableLayout{})
+	tbl, err = st.ps.Table(ctx, tx, schemasTableName, schemasTID, st.schemas,
+		makeTableLayout(st.schemas))
 	if err != nil {
 		return err
 	}
@@ -189,7 +191,7 @@ func (st *Store) createDatabase(ctx context.Context, tx sql.Transaction,
 	dbname sql.Identifier) error {
 
 	tbl, err := st.ps.Table(ctx, tx, databasesTableName, databasesTID, st.databases,
-		&TableLayout{})
+		makeTableLayout(st.databases))
 	if err != nil {
 		return err
 	}
@@ -226,7 +228,7 @@ func (st *Store) lookupDatabase(ctx context.Context, tx sql.Transaction,
 	dbname sql.Identifier) (*util.TypedRows, error) {
 
 	tbl, err := st.ps.Table(ctx, tx, databasesTableName, databasesTID, st.databases,
-		&TableLayout{})
+		makeTableLayout(st.databases))
 	if err != nil {
 		return nil, err
 	}
@@ -319,7 +321,8 @@ func (st *Store) CreateSchema(ctx context.Context, tx sql.Transaction, sn sql.Sc
 		return fmt.Errorf("%s: database %s not found", st.name, sn.Database)
 	}
 
-	tbl, err := st.ps.Table(ctx, tx, schemasTableName, schemasTID, st.schemas, &TableLayout{})
+	tbl, err := st.ps.Table(ctx, tx, schemasTableName, schemasTID, st.schemas,
+		makeTableLayout(st.schemas))
 	if err != nil {
 		return err
 	}
@@ -336,7 +339,8 @@ func (st *Store) CreateSchema(ctx context.Context, tx sql.Transaction, sn sql.Sc
 func (st *Store) DropSchema(ctx context.Context, tx sql.Transaction, sn sql.SchemaName,
 	ifExists bool) error {
 
-	tbl, err := st.ps.Table(ctx, tx, schemasTableName, schemasTID, st.schemas, &TableLayout{})
+	tbl, err := st.ps.Table(ctx, tx, schemasTableName, schemasTID, st.schemas,
+		makeTableLayout(st.schemas))
 	if err != nil {
 		return err
 	}
@@ -371,7 +375,8 @@ func (st *Store) DropSchema(ctx context.Context, tx sql.Transaction, sn sql.Sche
 func (st *Store) updateSchema(ctx context.Context, tx sql.Transaction,
 	sn sql.SchemaName, delta int64) error {
 
-	tbl, err := st.ps.Table(ctx, tx, schemasTableName, schemasTID, st.schemas, &TableLayout{})
+	tbl, err := st.ps.Table(ctx, tx, schemasTableName, schemasTID, st.schemas,
+		makeTableLayout(st.schemas))
 	if err != nil {
 		return err
 	}
@@ -404,7 +409,8 @@ func (st *Store) updateSchema(ctx context.Context, tx sql.Transaction,
 func (st *Store) lookupTable(ctx context.Context, tx sql.Transaction,
 	tn sql.TableName) (*util.TypedRows, error) {
 
-	tbl, err := st.ps.Table(ctx, tx, tablesTableName, tablesTID, st.tables, &TableLayout{})
+	tbl, err := st.ps.Table(ctx, tx, tablesTableName, tablesTID, st.tables,
+		makeTableLayout(st.tables))
 	if err != nil {
 		return nil, err
 	}
@@ -497,7 +503,8 @@ func (st *Store) createTable(ctx context.Context, tx sql.Transaction, tn sql.Tab
 		return err
 	}
 
-	tbl, err := st.ps.Table(ctx, tx, tablesTableName, tablesTID, st.tables, &TableLayout{})
+	tbl, err := st.ps.Table(ctx, tx, tablesTableName, tablesTID, st.tables,
+		makeTableLayout(st.tables))
 	if err != nil {
 		return err
 	}
@@ -658,7 +665,7 @@ func (st *Store) Begin(sesid uint64) sql.Transaction {
 
 func (st *Store) ListDatabases(ctx context.Context, tx sql.Transaction) ([]sql.Identifier, error) {
 	tbl, err := st.ps.Table(ctx, tx, databasesTableName, databasesTID, st.databases,
-		&TableLayout{})
+		makeTableLayout(st.databases))
 	if err != nil {
 		return nil, err
 	}
@@ -687,7 +694,8 @@ func (st *Store) ListDatabases(ctx context.Context, tx sql.Transaction) ([]sql.I
 func (st *Store) ListSchemas(ctx context.Context, tx sql.Transaction,
 	dbname sql.Identifier) ([]sql.Identifier, error) {
 
-	tbl, err := st.ps.Table(ctx, tx, schemasTableName, schemasTID, st.schemas, &TableLayout{})
+	tbl, err := st.ps.Table(ctx, tx, schemasTableName, schemasTID, st.schemas,
+		makeTableLayout(st.schemas))
 	if err != nil {
 		return nil, err
 	}
@@ -719,7 +727,8 @@ func (st *Store) ListSchemas(ctx context.Context, tx sql.Transaction,
 func (st *Store) ListTables(ctx context.Context, tx sql.Transaction,
 	sn sql.SchemaName) ([]sql.Identifier, error) {
 
-	tbl, err := st.ps.Table(ctx, tx, tablesTableName, tablesTID, st.tables, &TableLayout{})
+	tbl, err := st.ps.Table(ctx, tx, tablesTableName, tablesTID, st.tables,
+		makeTableLayout(st.tables))
 	if err != nil {
 		return nil, err
 	}
@@ -753,7 +762,7 @@ func (st *Store) nextSequenceValue(ctx context.Context, tx sql.Transaction,
 	sequence string) (int64, error) {
 
 	tbl, err := st.ps.Table(ctx, tx, sequencesTableName, sequencesTID, st.sequences,
-		&TableLayout{})
+		makeTableLayout(st.sequences))
 	if err != nil {
 		return 0, err
 	}

@@ -41,10 +41,9 @@ type transaction struct {
 
 type table struct {
 	st      *rowColsStore
+	tl      *storage.TableLayout
 	tn      sql.TableName
 	tid     int64
-	cols    []sql.Identifier
-	primary []sql.ColumnKey
 	reverse uint32
 	rowCols []int
 	tx      *transaction
@@ -122,10 +121,9 @@ func (rcst *rowColsStore) Table(ctx context.Context, tx sql.Transaction, tn sql.
 	etx := tx.(*transaction)
 	return &table{
 		st:      etx.st,
+		tl:      tl,
 		tn:      tn,
 		tid:     tid,
-		cols:    cols,
-		primary: primary,
 		reverse: reverse,
 		rowCols: rowCols,
 		tx:      etx,
@@ -262,9 +260,9 @@ func (rct *table) toItem(row []sql.Value, deleted bool) btree.Item {
 		rid: (rct.tid << 16) | storage.PrimaryIID,
 	}
 	if row != nil {
-		ri.key = encode.MakeKey(rct.primary, row)
+		ri.key = encode.MakeKey(rct.tl.PrimaryKey(), row)
 		if !deleted {
-			ri.row = append(make([]sql.Value, 0, len(rct.cols)), row...)
+			ri.row = append(make([]sql.Value, 0, len(rct.tl.Columns())), row...)
 		}
 	}
 	return ri
@@ -376,7 +374,7 @@ func (rct *table) Insert(ctx context.Context, row []sql.Value) error {
 }
 
 func (rcr *rows) Columns() []sql.Identifier {
-	return rcr.tbl.cols
+	return rcr.tbl.tl.Columns()
 }
 
 func (rcr *rows) Close() error {
@@ -415,18 +413,7 @@ func (rcr *rows) Update(ctx context.Context, updates []sql.ColumnUpdate,
 	if rcr.idx == 0 {
 		panic(fmt.Sprintf("rowcols: table %s no row to update", rcr.tbl.tn))
 	}
-
-	var primaryUpdated bool
-	for _, update := range updates {
-		for _, ck := range rcr.tbl.primary {
-			if ck.Number() == update.Index {
-				primaryUpdated = true
-				break
-			}
-		}
-	}
-
-	if primaryUpdated {
+	if rcr.tbl.tl.PrimaryUpdated(updates) {
 		rcr.Delete(ctx)
 
 		for _, update := range updates {
