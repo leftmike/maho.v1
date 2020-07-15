@@ -42,6 +42,8 @@ To Do:
 - conditional expressions: CASE, COALESCE, NULLIF, GREATEST, LEAST
 
 - indexes
+-- move Rows.Update() handling into storage/store.go
+-- maybe add storage/store.go Rows{}
 -- unique indexes: all NULL values are considered different from all other NULL values and
    are thus unique (sqlite.org/lang_createindex.html)
 -- based on column numbers

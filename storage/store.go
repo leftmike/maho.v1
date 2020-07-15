@@ -1,13 +1,10 @@
 package storage
 
-//go:generate protoc --go_opt=paths=source_relative --go_out=. layoutmd.proto
-
 import (
 	"context"
 	"fmt"
 	"io"
 
-	"github.com/golang/protobuf/proto"
 	"github.com/leftmike/maho/engine"
 	"github.com/leftmike/maho/sql"
 	"github.com/leftmike/maho/storage/util"
@@ -55,18 +52,6 @@ type tableRow struct {
 	TID            int64
 	TypeMetadata   []byte
 	LayoutMetadata []byte
-}
-
-type indexRow struct { // XXX: remove
-	Database string
-	Schema   string
-	Table    string
-	Index    string
-}
-
-type TableLayout struct {
-	nextIID int64
-	IIDs    []int64
 }
 
 type PersistentStore interface {
@@ -458,42 +443,6 @@ func (st *Store) validTable(ctx context.Context, tx sql.Transaction, tn sql.Tabl
 	return true, nil
 }
 
-func makeTableLayout(tt *engine.TableType) *TableLayout {
-	var tl TableLayout
-	tl.nextIID = int64(PrimaryIID) + 1
-	tl.IIDs = make([]int64, 0, len(tt.Indexes()))
-	for _ = range tt.Indexes() {
-		tl.IIDs = append(tl.IIDs, tl.nextIID)
-		tl.nextIID += 1
-	}
-	return &tl
-}
-
-func (tl *TableLayout) encode() ([]byte, error) {
-	return proto.Marshal(&TableLayoutMetadata{
-		NextIID: tl.nextIID,
-		IIDs:    tl.IIDs,
-	})
-}
-
-func (st *Store) decodeTableLayout(tn sql.TableName, tt *engine.TableType,
-	buf []byte) (*TableLayout, error) {
-
-	var md TableLayoutMetadata
-	err := proto.Unmarshal(buf, &md)
-	if err != nil {
-		return nil, fmt.Errorf("%s: table %s: %s", st.name, tn, err)
-	}
-	if len(md.IIDs) != len(tt.Indexes()) {
-		return nil, fmt.Errorf("%s: table %s: corrupt metadata", st.name, tn)
-	}
-
-	return &TableLayout{
-		nextIID: md.NextIID,
-		IIDs:    md.IIDs,
-	}, nil
-}
-
 func (st *Store) LookupTable(ctx context.Context, tx sql.Transaction,
 	tn sql.TableName) (engine.Table, *engine.TableType, error) {
 
@@ -600,19 +549,7 @@ func (st *Store) DropTable(ctx context.Context, tx sql.Transaction, tn sql.Table
 		return err
 	}
 
-	// XXX: use lookupTable?
-	tbl, err := st.ps.Table(ctx, tx, tablesTableName, tablesTID, st.tables, &TableLayout{})
-	if err != nil {
-		return err
-	}
-	ttbl := util.MakeTypedTable(tablesTableName, tbl, st.tables)
-
-	keyRow := tableRow{
-		Database: tn.Database.String(),
-		Schema:   tn.Schema.String(),
-		Table:    tn.Table.String(),
-	}
-	rows, err := ttbl.Rows(ctx, keyRow, keyRow)
+	rows, err := st.lookupTable(ctx, tx, tn)
 	if err != nil {
 		return err
 	}

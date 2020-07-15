@@ -421,6 +421,7 @@ func (rcr *rows) Update(ctx context.Context, updates []sql.ColumnUpdate,
 		for _, ck := range rcr.tbl.primary {
 			if ck.Number() == update.Index {
 				primaryUpdated = true
+				break
 			}
 		}
 	}

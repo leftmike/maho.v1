@@ -706,6 +706,7 @@ func (kvr *rows) Update(ctx context.Context, updates []sql.ColumnUpdate,
 		for _, ck := range kvr.tbl.primary {
 			if ck.Number() == update.Index {
 				primaryUpdated = true
+				break
 			}
 		}
 	}
