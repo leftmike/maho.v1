@@ -73,7 +73,7 @@ func (st *testStore) DropTable(ctx context.Context, tx sql.Transaction, tn sql.T
 }
 
 func (st *testStore) AddIndex(ctx context.Context, tx sql.Transaction, tn sql.TableName,
-	tt *engine.TableType) error {
+	tt *engine.TableType, it sql.IndexType) error {
 
 	st.t.Error("AddIndex should never be called")
 	return nil

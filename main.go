@@ -42,12 +42,10 @@ To Do:
 - conditional expressions: CASE, COALESCE, NULLIF, GREATEST, LEAST
 
 - indexes
--- move Rows.Update() handling into storage/store.go
--- maybe add storage/store.go Rows{}
+-- store: IndexLayout: populate Columns and map Key to be in terms of Columns
 -- unique indexes: all NULL values are considered different from all other NULL values and
    are thus unique (sqlite.org/lang_createindex.html)
--- based on column numbers
--- engine.Table: IndexRows(...) => engine.IndexRows {Columns, Close, Next, Delete, Update, Row}
+-- engine.Table: IndexRows(...) => engine.IndexRows {Columns, Close, Next, Row}
 
 - constraints
 -- column: REFERENCES reftable [ '(' refcolumn ')' ] => treat as a foreign key

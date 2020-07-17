@@ -630,11 +630,11 @@ func (st *Store) updateIndexes(ctx context.Context, tx sql.Transaction, tn sql.T
 }
 
 func (st *Store) AddIndex(ctx context.Context, tx sql.Transaction, tn sql.TableName,
-	tt *engine.TableType) error {
+	tt *engine.TableType, it sql.IndexType) error {
 
 	return st.updateIndexes(ctx, tx, tn, tt,
 		func(tl *TableLayout) error {
-			tl.IIDs = append(tl.IIDs, tl.nextIID)
+			tl.indexes = append(tl.indexes, makeIndexLayout(tl.nextIID, it))
 			tl.nextIID += 1
 
 			return nil
@@ -646,14 +646,14 @@ func (st *Store) RemoveIndex(ctx context.Context, tx sql.Transaction, tn sql.Tab
 
 	return st.updateIndexes(ctx, tx, tn, tt,
 		func(tl *TableLayout) error {
-			iids := make([]int64, 0, len(tl.IIDs)-1)
-			for idx, iid := range tl.IIDs {
+			indexes := make([]IndexLayout, 0, len(tl.indexes)-1)
+			for idx, il := range tl.indexes {
 				if idx == rdx {
 					continue
 				}
-				iids = append(iids, iid)
+				indexes = append(indexes, il)
 			}
-			tl.IIDs = iids
+			tl.indexes = indexes
 
 			return nil
 		})

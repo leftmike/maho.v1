@@ -30,8 +30,8 @@ type TableLayoutMetadata struct {
 	sizeCache     protoimpl.SizeCache
 	unknownFields protoimpl.UnknownFields
 
-	NextIID int64   `protobuf:"varint,1,opt,name=NextIID,proto3" json:"NextIID,omitempty"`
-	IIDs    []int64 `protobuf:"varint,2,rep,packed,name=IIDs,proto3" json:"IIDs,omitempty"`
+	NextIID int64                  `protobuf:"varint,1,opt,name=NextIID,proto3" json:"NextIID,omitempty"`
+	Indexes []*IndexLayoutMetadata `protobuf:"bytes,2,rep,name=Indexes,proto3" json:"Indexes,omitempty"`
 }
 
 func (x *TableLayoutMetadata) Reset() {
@@ -73,23 +73,162 @@ func (x *TableLayoutMetadata) GetNextIID() int64 {
 	return 0
 }
 
-func (x *TableLayoutMetadata) GetIIDs() []int64 {
+func (x *TableLayoutMetadata) GetIndexes() []*IndexLayoutMetadata {
 	if x != nil {
-		return x.IIDs
+		return x.Indexes
 	}
 	return nil
+}
+
+type IndexKey struct {
+	state         protoimpl.MessageState
+	sizeCache     protoimpl.SizeCache
+	unknownFields protoimpl.UnknownFields
+
+	Number  int32 `protobuf:"varint,1,opt,name=Number,proto3" json:"Number,omitempty"`
+	Reverse bool  `protobuf:"varint,2,opt,name=Reverse,proto3" json:"Reverse,omitempty"`
+}
+
+func (x *IndexKey) Reset() {
+	*x = IndexKey{}
+	if protoimpl.UnsafeEnabled {
+		mi := &file_layoutmd_proto_msgTypes[1]
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		ms.StoreMessageInfo(mi)
+	}
+}
+
+func (x *IndexKey) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*IndexKey) ProtoMessage() {}
+
+func (x *IndexKey) ProtoReflect() protoreflect.Message {
+	mi := &file_layoutmd_proto_msgTypes[1]
+	if protoimpl.UnsafeEnabled && x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use IndexKey.ProtoReflect.Descriptor instead.
+func (*IndexKey) Descriptor() ([]byte, []int) {
+	return file_layoutmd_proto_rawDescGZIP(), []int{1}
+}
+
+func (x *IndexKey) GetNumber() int32 {
+	if x != nil {
+		return x.Number
+	}
+	return 0
+}
+
+func (x *IndexKey) GetReverse() bool {
+	if x != nil {
+		return x.Reverse
+	}
+	return false
+}
+
+type IndexLayoutMetadata struct {
+	state         protoimpl.MessageState
+	sizeCache     protoimpl.SizeCache
+	unknownFields protoimpl.UnknownFields
+
+	IID     int64       `protobuf:"varint,1,opt,name=IID,proto3" json:"IID,omitempty"`
+	Key     []*IndexKey `protobuf:"bytes,2,rep,name=Key,proto3" json:"Key,omitempty"`
+	Columns []int64     `protobuf:"varint,3,rep,packed,name=Columns,proto3" json:"Columns,omitempty"`
+	Unique  bool        `protobuf:"varint,4,opt,name=Unique,proto3" json:"Unique,omitempty"`
+}
+
+func (x *IndexLayoutMetadata) Reset() {
+	*x = IndexLayoutMetadata{}
+	if protoimpl.UnsafeEnabled {
+		mi := &file_layoutmd_proto_msgTypes[2]
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		ms.StoreMessageInfo(mi)
+	}
+}
+
+func (x *IndexLayoutMetadata) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*IndexLayoutMetadata) ProtoMessage() {}
+
+func (x *IndexLayoutMetadata) ProtoReflect() protoreflect.Message {
+	mi := &file_layoutmd_proto_msgTypes[2]
+	if protoimpl.UnsafeEnabled && x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use IndexLayoutMetadata.ProtoReflect.Descriptor instead.
+func (*IndexLayoutMetadata) Descriptor() ([]byte, []int) {
+	return file_layoutmd_proto_rawDescGZIP(), []int{2}
+}
+
+func (x *IndexLayoutMetadata) GetIID() int64 {
+	if x != nil {
+		return x.IID
+	}
+	return 0
+}
+
+func (x *IndexLayoutMetadata) GetKey() []*IndexKey {
+	if x != nil {
+		return x.Key
+	}
+	return nil
+}
+
+func (x *IndexLayoutMetadata) GetColumns() []int64 {
+	if x != nil {
+		return x.Columns
+	}
+	return nil
+}
+
+func (x *IndexLayoutMetadata) GetUnique() bool {
+	if x != nil {
+		return x.Unique
+	}
+	return false
 }
 
 var File_layoutmd_proto protoreflect.FileDescriptor
 
 var file_layoutmd_proto_rawDesc = []byte{
 	0x0a, 0x0e, 0x6c, 0x61, 0x79, 0x6f, 0x75, 0x74, 0x6d, 0x64, 0x2e, 0x70, 0x72, 0x6f, 0x74, 0x6f,
-	0x22, 0x43, 0x0a, 0x13, 0x54, 0x61, 0x62, 0x6c, 0x65, 0x4c, 0x61, 0x79, 0x6f, 0x75, 0x74, 0x4d,
+	0x22, 0x5f, 0x0a, 0x13, 0x54, 0x61, 0x62, 0x6c, 0x65, 0x4c, 0x61, 0x79, 0x6f, 0x75, 0x74, 0x4d,
 	0x65, 0x74, 0x61, 0x64, 0x61, 0x74, 0x61, 0x12, 0x18, 0x0a, 0x07, 0x4e, 0x65, 0x78, 0x74, 0x49,
 	0x49, 0x44, 0x18, 0x01, 0x20, 0x01, 0x28, 0x03, 0x52, 0x07, 0x4e, 0x65, 0x78, 0x74, 0x49, 0x49,
-	0x44, 0x12, 0x12, 0x0a, 0x04, 0x49, 0x49, 0x44, 0x73, 0x18, 0x02, 0x20, 0x03, 0x28, 0x03, 0x52,
-	0x04, 0x49, 0x49, 0x44, 0x73, 0x42, 0x0b, 0x5a, 0x09, 0x2e, 0x2f, 0x73, 0x74, 0x6f, 0x72, 0x61,
-	0x67, 0x65, 0x62, 0x06, 0x70, 0x72, 0x6f, 0x74, 0x6f, 0x33,
+	0x44, 0x12, 0x2e, 0x0a, 0x07, 0x49, 0x6e, 0x64, 0x65, 0x78, 0x65, 0x73, 0x18, 0x02, 0x20, 0x03,
+	0x28, 0x0b, 0x32, 0x14, 0x2e, 0x49, 0x6e, 0x64, 0x65, 0x78, 0x4c, 0x61, 0x79, 0x6f, 0x75, 0x74,
+	0x4d, 0x65, 0x74, 0x61, 0x64, 0x61, 0x74, 0x61, 0x52, 0x07, 0x49, 0x6e, 0x64, 0x65, 0x78, 0x65,
+	0x73, 0x22, 0x3c, 0x0a, 0x08, 0x49, 0x6e, 0x64, 0x65, 0x78, 0x4b, 0x65, 0x79, 0x12, 0x16, 0x0a,
+	0x06, 0x4e, 0x75, 0x6d, 0x62, 0x65, 0x72, 0x18, 0x01, 0x20, 0x01, 0x28, 0x05, 0x52, 0x06, 0x4e,
+	0x75, 0x6d, 0x62, 0x65, 0x72, 0x12, 0x18, 0x0a, 0x07, 0x52, 0x65, 0x76, 0x65, 0x72, 0x73, 0x65,
+	0x18, 0x02, 0x20, 0x01, 0x28, 0x08, 0x52, 0x07, 0x52, 0x65, 0x76, 0x65, 0x72, 0x73, 0x65, 0x22,
+	0x76, 0x0a, 0x13, 0x49, 0x6e, 0x64, 0x65, 0x78, 0x4c, 0x61, 0x79, 0x6f, 0x75, 0x74, 0x4d, 0x65,
+	0x74, 0x61, 0x64, 0x61, 0x74, 0x61, 0x12, 0x10, 0x0a, 0x03, 0x49, 0x49, 0x44, 0x18, 0x01, 0x20,
+	0x01, 0x28, 0x03, 0x52, 0x03, 0x49, 0x49, 0x44, 0x12, 0x1b, 0x0a, 0x03, 0x4b, 0x65, 0x79, 0x18,
+	0x02, 0x20, 0x03, 0x28, 0x0b, 0x32, 0x09, 0x2e, 0x49, 0x6e, 0x64, 0x65, 0x78, 0x4b, 0x65, 0x79,
+	0x52, 0x03, 0x4b, 0x65, 0x79, 0x12, 0x18, 0x0a, 0x07, 0x43, 0x6f, 0x6c, 0x75, 0x6d, 0x6e, 0x73,
+	0x18, 0x03, 0x20, 0x03, 0x28, 0x03, 0x52, 0x07, 0x43, 0x6f, 0x6c, 0x75, 0x6d, 0x6e, 0x73, 0x12,
+	0x16, 0x0a, 0x06, 0x55, 0x6e, 0x69, 0x71, 0x75, 0x65, 0x18, 0x04, 0x20, 0x01, 0x28, 0x08, 0x52,
+	0x06, 0x55, 0x6e, 0x69, 0x71, 0x75, 0x65, 0x42, 0x0b, 0x5a, 0x09, 0x2e, 0x2f, 0x73, 0x74, 0x6f,
+	0x72, 0x61, 0x67, 0x65, 0x62, 0x06, 0x70, 0x72, 0x6f, 0x74, 0x6f, 0x33,
 }
 
 var (
@@ -104,16 +243,20 @@ func file_layoutmd_proto_rawDescGZIP() []byte {
 	return file_layoutmd_proto_rawDescData
 }
 
-var file_layoutmd_proto_msgTypes = make([]protoimpl.MessageInfo, 1)
+var file_layoutmd_proto_msgTypes = make([]protoimpl.MessageInfo, 3)
 var file_layoutmd_proto_goTypes = []interface{}{
 	(*TableLayoutMetadata)(nil), // 0: TableLayoutMetadata
+	(*IndexKey)(nil),            // 1: IndexKey
+	(*IndexLayoutMetadata)(nil), // 2: IndexLayoutMetadata
 }
 var file_layoutmd_proto_depIdxs = []int32{
-	0, // [0:0] is the sub-list for method output_type
-	0, // [0:0] is the sub-list for method input_type
-	0, // [0:0] is the sub-list for extension type_name
-	0, // [0:0] is the sub-list for extension extendee
-	0, // [0:0] is the sub-list for field type_name
+	2, // 0: TableLayoutMetadata.Indexes:type_name -> IndexLayoutMetadata
+	1, // 1: IndexLayoutMetadata.Key:type_name -> IndexKey
+	2, // [2:2] is the sub-list for method output_type
+	2, // [2:2] is the sub-list for method input_type
+	2, // [2:2] is the sub-list for extension type_name
+	2, // [2:2] is the sub-list for extension extendee
+	0, // [0:2] is the sub-list for field type_name
 }
 
 func init() { file_layoutmd_proto_init() }
@@ -134,6 +277,30 @@ func file_layoutmd_proto_init() {
 				return nil
 			}
 		}
+		file_layoutmd_proto_msgTypes[1].Exporter = func(v interface{}, i int) interface{} {
+			switch v := v.(*IndexKey); i {
+			case 0:
+				return &v.state
+			case 1:
+				return &v.sizeCache
+			case 2:
+				return &v.unknownFields
+			default:
+				return nil
+			}
+		}
+		file_layoutmd_proto_msgTypes[2].Exporter = func(v interface{}, i int) interface{} {
+			switch v := v.(*IndexLayoutMetadata); i {
+			case 0:
+				return &v.state
+			case 1:
+				return &v.sizeCache
+			case 2:
+				return &v.unknownFields
+			default:
+				return nil
+			}
+		}
 	}
 	type x struct{}
 	out := protoimpl.TypeBuilder{
@@ -141,7 +308,7 @@ func file_layoutmd_proto_init() {
 			GoPackagePath: reflect.TypeOf(x{}).PkgPath(),
 			RawDescriptor: file_layoutmd_proto_rawDesc,
 			NumEnums:      0,
-			NumMessages:   1,
+			NumMessages:   3,
 			NumExtensions: 0,
 			NumServices:   0,
 		},

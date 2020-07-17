@@ -11,9 +11,10 @@ type Transaction interface {
 }
 
 type IndexType struct {
-	Name   Identifier
-	Key    []ColumnKey
-	Unique bool
+	Name    Identifier
+	Key     []ColumnKey
+	Columns []int
+	Unique  bool
 }
 
 type TableType interface {
