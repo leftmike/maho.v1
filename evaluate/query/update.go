@@ -65,21 +65,27 @@ func (up *updatePlan) Execute(ctx context.Context, e sql.Engine, tx sql.Transact
 		} else if err != nil {
 			return -1, err
 		}
-		for idx := range up.updates {
-			cdx := up.updates[idx].index
-			var val sql.Value
-			val, err = up.updates[idx].expr.Eval(ctx, up)
+
+		updates = updates[:0]
+		for _, update := range up.updates {
+			cdx := update.index
+			val, err := update.expr.Eval(ctx, up)
 			if err != nil {
 				return -1, err
 			}
-			updates[idx] = sql.ColumnUpdate{Index: cdx, Value: val}
+			if sql.Compare(val, up.dest[cdx]) != 0 {
+				updates = append(updates, sql.ColumnUpdate{Index: cdx, Value: val})
+			}
 		}
-		err = up.rows.Update(ctx, updates)
-		if err != nil {
-			up.rows.Close()
-			return -1, err
+
+		if len(updates) > 0 {
+			err = up.rows.Update(ctx, updates)
+			if err != nil {
+				up.rows.Close()
+				return -1, err
+			}
+			cnt += 1
 		}
-		cnt += 1
 	}
 }
 

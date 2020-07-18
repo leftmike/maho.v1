@@ -44,7 +44,6 @@ To Do:
 - change sql.ColumnUpdate.Index to .Column
 
 - indexes
--- fix sid issue in kvrows.go: update doesn't change a value
 -- add Delete tests to unique.sql
 -- add create unique index test to sqltest/
 -- storage tests of indexes

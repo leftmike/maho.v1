@@ -545,12 +545,9 @@ func (kvt *table) prepareUpdate(upd Updater, updateKey []byte) (*ProposalData, b
 
 	pu := pd.Updates[0]
 	if pd.TXID == kvt.tx.txid {
-		// XXX: this causes unique.sql and primary.sql to fail (update doesn't change a value)
-		/*
-			if pu.SID == kvt.tx.sid {
-				return nil, false, fmt.Errorf("kvrows: %s: multiple updates of %v", kvt.tn, updateKey)
-			}
-		*/
+		if pu.SID == kvt.tx.sid {
+			return nil, false, fmt.Errorf("kvrows: %s: multiple updates of %v", kvt.tn, updateKey)
+		}
 		return pd, len(pu.Value) != 0, nil
 	} else {
 		state, ver := kvt.st.getTxState(pd.TXID)
