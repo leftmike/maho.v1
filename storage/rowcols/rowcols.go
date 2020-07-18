@@ -268,6 +268,18 @@ func (rct *table) toItem(row []sql.Value, deleted bool) btree.Item {
 	return ri
 }
 
+func (rct *table) toIndexItem(row []sql.Value, deleted bool, il storage.IndexLayout) btree.Item {
+	ri := rowItem{
+		rid: (rct.tid << 16) | il.IID,
+	}
+	indexRow := il.RowToIndexRow(row)
+	ri.key = encode.MakeKey(il.Key, indexRow)
+	if !deleted {
+		ri.row = indexRow
+	}
+	return ri
+}
+
 func (rct *table) Rows(ctx context.Context, minRow, maxRow []sql.Value) (engine.Rows, error) {
 	rcr := &rows{
 		tbl: rct,
@@ -357,19 +369,35 @@ func (rct *table) Rows(ctx context.Context, minRow, maxRow []sql.Value) (engine.
 	return rcr, nil
 }
 
-func (rct *table) Insert(ctx context.Context, row []sql.Value) error {
-	rct.tx.forWrite()
-
-	ri := rct.toItem(row, false)
+func (rct *table) insertItem(ri btree.Item, idxname sql.Identifier) error {
 	if item := rct.tx.delta.Get(ri); item != nil {
 		if (item.(rowItem)).row != nil {
-			return fmt.Errorf("rowcols: %s: existing row with duplicate primary key", rct.tn)
+			return fmt.Errorf("rowcols: %s: primary index: existing row with duplicate key",
+				rct.tn)
 		}
 	} else if item := rct.tx.tree.Get(ri); item != nil && (item.(rowItem)).row != nil {
-		return fmt.Errorf("rowcols: %s: existing row with duplicate primary key", rct.tn)
+		return fmt.Errorf("rowcols: %s: primary index: existing row with duplicate key", rct.tn)
 	}
 
 	rct.tx.delta.ReplaceOrInsert(ri)
+	return nil
+}
+
+func (rct *table) Insert(ctx context.Context, row []sql.Value) error {
+	rct.tx.forWrite()
+
+	err := rct.insertItem(rct.toItem(row, false), sql.PRIMARY)
+	if err != nil {
+		return err
+	}
+
+	for idx, il := range rct.tl.Indexes() {
+		err = rct.insertItem(rct.toIndexItem(row, false, il), rct.tl.IndexName(idx))
+		if err != nil {
+			return err
+		}
+	}
+
 	return nil
 }
 
@@ -402,6 +430,30 @@ func (rcr *rows) Delete(ctx context.Context) error {
 	}
 
 	rcr.tbl.tx.delta.ReplaceOrInsert(rcr.tbl.toItem(rcr.rows[rcr.idx-1], true))
+
+	for _, il := range rcr.tbl.tl.Indexes() {
+		rcr.tbl.tx.delta.ReplaceOrInsert(rcr.tbl.toIndexItem(rcr.rows[rcr.idx-1], true, il))
+	}
+
+	return nil
+}
+
+func (rct *table) updateIndexes(ctx context.Context, updates []sql.ColumnUpdate,
+	row, updateRow []sql.Value) error {
+
+	indexes, updated := rct.tl.IndexesUpdated(updates)
+	for idx := range indexes {
+		il := indexes[idx]
+		if updated[idx] {
+			rct.tx.delta.ReplaceOrInsert(rct.toIndexItem(row, true, il))
+			err := rct.insertItem(rct.toIndexItem(updateRow, false, il), rct.tl.IndexName(idx))
+			if err != nil {
+				return err
+			}
+		} else {
+			rct.tx.delta.ReplaceOrInsert(rct.toIndexItem(updateRow, false, il))
+		}
+	}
 	return nil
 }
 
@@ -413,34 +465,28 @@ func (rcr *rows) Update(ctx context.Context, updates []sql.ColumnUpdate,
 	if rcr.idx == 0 {
 		panic(fmt.Sprintf("rowcols: table %s no row to update", rcr.tbl.tn))
 	}
-	if rcr.tbl.tl.PrimaryUpdated(updates) {
-		rcr.Delete(ctx)
 
-		for _, update := range updates {
-			rcr.rows[rcr.idx-1][update.Index] = update.Value
-		}
-
-		if check != nil {
-			err := check(rcr.rows[rcr.idx-1])
-			if err != nil {
-				return err
-			}
-		}
-
-		return rcr.tbl.Insert(ctx, rcr.rows[rcr.idx-1])
-	}
-
+	updateRow := append(make([]sql.Value, 0, len(rcr.rows[rcr.idx-1])), rcr.rows[rcr.idx-1]...)
 	for _, update := range updates {
-		rcr.rows[rcr.idx-1][update.Index] = update.Value
+		updateRow[update.Index] = update.Value
 	}
 
 	if check != nil {
-		err := check(rcr.rows[rcr.idx-1])
+		err := check(updateRow)
 		if err != nil {
 			return err
 		}
 	}
 
-	rcr.tbl.tx.delta.ReplaceOrInsert(rcr.tbl.toItem(rcr.rows[rcr.idx-1], false))
-	return nil
+	if rcr.tbl.tl.PrimaryUpdated(updates) {
+		rcr.Delete(ctx)
+		err := rcr.tbl.Insert(ctx, updateRow)
+		if err != nil {
+			return err
+		}
+	} else {
+		rcr.tbl.tx.delta.ReplaceOrInsert(rcr.tbl.toItem(updateRow, false))
+	}
+
+	return rcr.tbl.updateIndexes(ctx, updates, rcr.rows[rcr.idx-1], updateRow)
 }

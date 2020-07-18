@@ -41,10 +41,16 @@ To Do:
 - subquery expressions: EXISTS, IN, NOT IN, ANY/SOME, ALL
 - conditional expressions: CASE, COALESCE, NULLIF, GREATEST, LEAST
 
+- change sql.ColumnUpdate.Index to .Column
+
 - indexes
--- store: IndexLayout: populate Columns and map Key to be in terms of Columns
+-- fix sid issue in kvrows.go: update doesn't change a value
+-- add Delete tests to unique.sql
+-- add create unique index test to sqltest/
+-- storage tests of indexes
 -- unique indexes: all NULL values are considered different from all other NULL values and
-   are thus unique (sqlite.org/lang_createindex.html)
+   are thus unique (sqlite.org/lang_createindex.html): need to include primary key in index key
+-- test unique indexes with NULL values
 -- engine.Table: IndexRows(...) => engine.IndexRows {Columns, Close, Next, Row}
 
 - constraints

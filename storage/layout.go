@@ -11,10 +11,12 @@ import (
 )
 
 type IndexLayout struct {
-	IID     int64
-	Key     []sql.ColumnKey
+	IID int64
+	// Map from index row columns to primary row columns: indexRow[i] = primaryRow[Columns[i]]
 	Columns []int
-	Unique  bool
+	// Key for this index in index row columns, NOT primary row columns
+	Key    []sql.ColumnKey
+	Unique bool
 }
 
 type TableLayout struct {
@@ -86,18 +88,58 @@ func (tl *TableLayout) Indexes() []IndexLayout {
 	return tl.indexes
 }
 
-func (tl *TableLayout) IndexesUpdate(updates []sql.ColumnUpdate) ([]IndexLayout, []bool) {
-	// XXX: also need to know if the key was updated as well
-	return nil, nil
+func (tl *TableLayout) IndexName(idx int) sql.Identifier {
+	return tl.tt.Indexes()[idx].Name
 }
 
-func (il *IndexLayout) RowToIndexRow(row, idxRow []sql.Value) {
+func columnUpdated(cols []int, updates []sql.ColumnUpdate) bool {
+	for _, col := range cols {
+		for _, upd := range updates {
+			if col == upd.Index {
+				return true
+			}
+		}
+	}
+
+	return false
+}
+
+func (il IndexLayout) keyUpdated(updates []sql.ColumnUpdate) bool {
+	for _, update := range updates {
+		for _, ck := range il.Key {
+			if il.Columns[ck.Number()] == update.Index {
+				return true
+			}
+		}
+	}
+
+	return false
+}
+
+func (tl *TableLayout) IndexesUpdated(updates []sql.ColumnUpdate) ([]IndexLayout, []bool) {
+	var indexes []IndexLayout
+	var indexUpdated []bool
+
+	for _, il := range tl.indexes {
+		if columnUpdated(il.Columns, updates) {
+			indexes = append(indexes, il)
+			indexUpdated = append(indexUpdated, il.keyUpdated(updates))
+		}
+	}
+
+	return indexes, indexUpdated
+}
+
+func (il IndexLayout) RowToIndexRow(row []sql.Value) []sql.Value {
+	idxRow := make([]sql.Value, len(il.Columns))
 	for idx, rdx := range il.Columns {
 		idxRow[idx] = row[rdx]
 	}
+
+	return idxRow
 }
 
-func (il *IndexLayout) IndexRowToRow(idxRow, row []sql.Value) {
+func (il IndexLayout) IndexRowToRow(idxRow, row []sql.Value) {
 	for idx, rdx := range il.Columns {
 		row[rdx] = idxRow[idx]
 	}

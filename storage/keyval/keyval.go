@@ -245,20 +245,35 @@ func (kvtx *transaction) forWrite() {
 	}
 }
 
-func (kvt *table) makeKey(row []sql.Value) []byte {
-	buf := util.EncodeUint64(make([]byte, 0, 8), uint64((kvt.tid<<16)|storage.PrimaryIID))
+func (kvt *table) makeKey(key []sql.ColumnKey, iid int64, row []sql.Value) []byte {
+	buf := util.EncodeUint64(make([]byte, 0, 8), uint64((kvt.tid<<16)|iid))
 	if row != nil {
-		buf = append(buf, encode.MakeKey(kvt.tl.PrimaryKey(), row)...)
+		buf = append(buf, encode.MakeKey(key, row)...)
 	}
 	return buf
 }
 
+func (kvt *table) makePrimaryKey(row []sql.Value) []byte {
+	return kvt.makeKey(kvt.tl.PrimaryKey(), storage.PrimaryIID, row)
+}
+
 func (kvt *table) toItem(row []sql.Value, deleted bool) rowItem {
 	ri := rowItem{
-		key: kvt.makeKey(row),
+		key: kvt.makePrimaryKey(row),
 	}
 	if row != nil && !deleted {
 		ri.row = append(make([]sql.Value, 0, len(kvt.tl.Columns())), row...)
+	}
+	return ri
+}
+
+func (kvt *table) toIndexItem(row []sql.Value, deleted bool, il storage.IndexLayout) rowItem {
+	indexRow := il.RowToIndexRow(row)
+	ri := rowItem{
+		key: kvt.makeKey(il.Key, il.IID, indexRow),
+	}
+	if !deleted {
+		ri.row = indexRow
 	}
 	return ri
 }
@@ -268,7 +283,7 @@ func (ri rowItem) Less(item btree.Item) bool {
 }
 
 func (kvt *table) Rows(ctx context.Context, minRow, maxRow []sql.Value) (engine.Rows, error) {
-	minKey := kvt.makeKey(minRow)
+	minKey := kvt.makePrimaryKey(minRow)
 	it, err := kvt.st.kv.Iterate(kvt.tx.ver, minKey)
 	if err != nil {
 		return nil, err
@@ -281,7 +296,7 @@ func (kvt *table) Rows(ctx context.Context, minRow, maxRow []sql.Value) (engine.
 	}
 
 	if maxRow != nil {
-		kvr.maxKey = kvt.makeKey(maxRow)
+		kvr.maxKey = kvt.makePrimaryKey(maxRow)
 	}
 
 	if kvt.tx.delta != nil {
@@ -306,20 +321,18 @@ func (kvt *table) Rows(ctx context.Context, minRow, maxRow []sql.Value) (engine.
 	return kvr, nil
 }
 
-func (kvt *table) Insert(ctx context.Context, row []sql.Value) error {
-	kvt.tx.forWrite()
-
-	ri := kvt.toItem(row, false)
+func (kvt *table) insert(ri rowItem, idxname sql.Identifier) error {
 	if item := kvt.tx.delta.Get(ri); item != nil {
 		if (item.(rowItem)).row != nil {
-			return fmt.Errorf("keyval: %s: existing row with duplicate primary key", kvt.tn)
+			return fmt.Errorf("keyval: %s: %s index: existing row with duplicate key", kvt.tn,
+				idxname)
 		}
 	} else {
 		err := kvt.st.kv.GetAt(kvt.tx.ver, ri.key,
 			func(val []byte, ver uint64) error {
 				if len(val) > 0 {
-					return fmt.Errorf("keyval: %s: existing row with duplicate primary key",
-						kvt.tn)
+					return fmt.Errorf("keyval: %s: %s index: existing row with duplicate key",
+						kvt.tn, idxname)
 				}
 				return nil
 			})
@@ -329,6 +342,24 @@ func (kvt *table) Insert(ctx context.Context, row []sql.Value) error {
 	}
 
 	kvt.tx.delta.ReplaceOrInsert(ri)
+	return nil
+}
+
+func (kvt *table) Insert(ctx context.Context, row []sql.Value) error {
+	kvt.tx.forWrite()
+
+	err := kvt.insert(kvt.toItem(row, false), sql.PRIMARY)
+	if err != nil {
+		return err
+	}
+
+	for idx, il := range kvt.tl.Indexes() {
+		err = kvt.insert(kvt.toIndexItem(row, false, il), kvt.tl.IndexName(idx))
+		if err != nil {
+			return err
+		}
+	}
+
 	return nil
 }
 
@@ -435,6 +466,30 @@ func (kvr *rows) Delete(ctx context.Context) error {
 	}
 
 	kvr.tbl.tx.delta.ReplaceOrInsert(kvr.tbl.toItem(kvr.curRow, true))
+
+	for _, il := range kvr.tbl.tl.Indexes() {
+		kvr.tbl.tx.delta.ReplaceOrInsert(kvr.tbl.toIndexItem(kvr.curRow, true, il))
+	}
+
+	return nil
+}
+
+func (kvt *table) updateIndexes(ctx context.Context, updates []sql.ColumnUpdate,
+	row, updateRow []sql.Value) error {
+
+	indexes, updated := kvt.tl.IndexesUpdated(updates)
+	for idx := range indexes {
+		il := indexes[idx]
+		if updated[idx] {
+			kvt.tx.delta.ReplaceOrInsert(kvt.toIndexItem(row, true, il))
+			err := kvt.insert(kvt.toIndexItem(updateRow, false, il), kvt.tl.IndexName(idx))
+			if err != nil {
+				return err
+			}
+		} else {
+			kvt.tx.delta.ReplaceOrInsert(kvt.toIndexItem(updateRow, false, il))
+		}
+	}
 	return nil
 }
 
@@ -461,9 +516,13 @@ func (kvr *rows) Update(ctx context.Context, updates []sql.ColumnUpdate,
 
 	if kvr.tbl.tl.PrimaryUpdated(updates) {
 		kvr.Delete(ctx)
-		return kvr.tbl.Insert(ctx, updateRow)
+		err := kvr.tbl.Insert(ctx, updateRow)
+		if err != nil {
+			return err
+		}
+	} else {
+		kvr.tbl.tx.delta.ReplaceOrInsert(kvr.tbl.toItem(updateRow, false))
 	}
 
-	kvr.tbl.tx.delta.ReplaceOrInsert(kvr.tbl.toItem(updateRow, false))
-	return nil
+	return kvr.tbl.updateIndexes(ctx, updates, kvr.curRow, updateRow)
 }

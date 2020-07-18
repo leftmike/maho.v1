@@ -124,6 +124,15 @@ func (bt *table) toItem(row []sql.Value) btree.Item {
 	return ri
 }
 
+func (bt *table) toIndexItem(row []sql.Value, il storage.IndexLayout) btree.Item {
+	ri := rowItem{
+		rid: (bt.tid << 16) | il.IID,
+	}
+	ri.row = il.RowToIndexRow(row)
+	ri.key = encode.MakeKey(il.Key, ri.row)
+	return ri
+}
+
 func (ri rowItem) Less(item btree.Item) bool {
 	ri2 := item.(rowItem)
 	if ri.rid < ri2.rid {
@@ -162,11 +171,21 @@ func (bt *table) Rows(ctx context.Context, minRow, maxRow []sql.Value) (engine.R
 func (bt *table) Insert(ctx context.Context, row []sql.Value) error {
 	bt.tx.forWrite()
 
-	if bt.tx.tree.Has(bt.toItem(row)) {
-		return fmt.Errorf("basic: %s: existing row with duplicate primary key", bt.tn)
+	item := bt.toItem(row)
+	if bt.tx.tree.Has(item) {
+		return fmt.Errorf("basic: %s: primary index: existing row with duplicate key", bt.tn)
+	}
+	bt.tx.tree.ReplaceOrInsert(item)
+
+	for idx, il := range bt.tl.Indexes() {
+		item := bt.toIndexItem(row, il)
+		if bt.tx.tree.Has(item) {
+			return fmt.Errorf("basic: %s: %s index: existing row with duplicate key", bt.tn,
+				bt.tl.IndexName(idx))
+		}
+		bt.tx.tree.ReplaceOrInsert(item)
 	}
 
-	bt.tx.tree.ReplaceOrInsert(bt.toItem(row))
 	return nil
 }
 
@@ -195,10 +214,46 @@ func (br *rows) Delete(ctx context.Context) error {
 	br.tbl.tx.forWrite()
 
 	if br.idx == 0 {
-		panic(fmt.Sprintf("basic: table %s no row to delete", br.tbl.tn))
+		panic(fmt.Sprintf("basic: table %s: no row to delete", br.tbl.tn))
 	}
 
-	br.tbl.tx.tree.Delete(br.tbl.toItem(br.rows[br.idx-1]))
+	if br.tbl.tx.tree.Delete(br.tbl.toItem(br.rows[br.idx-1])) == nil {
+		return fmt.Errorf("basic: table %s: internal error: missing row to delete", br.tbl.tn)
+	}
+
+	for idx, il := range br.tbl.tl.Indexes() {
+		if br.tbl.tx.tree.Delete(br.tbl.toIndexItem(br.rows[br.idx-1], il)) == nil {
+			return fmt.Errorf("basic: table %s: %s index: internal error: missing row to delete",
+				br.tbl.tn, br.tbl.tl.IndexName(idx))
+		}
+	}
+
+	return nil
+}
+
+func (bt *table) updateIndexes(ctx context.Context, updates []sql.ColumnUpdate,
+	row, updateRow []sql.Value) error {
+
+	indexes, updated := bt.tl.IndexesUpdated(updates)
+	for idx := range indexes {
+		il := indexes[idx]
+		if updated[idx] {
+			if bt.tx.tree.Delete(bt.toIndexItem(row, il)) == nil {
+				return fmt.Errorf(
+					"basic: table %s: %s index: internal error: missing row to delete",
+					bt.tn, bt.tl.IndexName(idx))
+			}
+
+			item := bt.toIndexItem(updateRow, il)
+			if bt.tx.tree.Has(item) {
+				return fmt.Errorf("basic: %s: %s index: existing row with duplicate key",
+					bt.tn, bt.tl.IndexName(idx))
+			}
+			bt.tx.tree.ReplaceOrInsert(item)
+		} else {
+			bt.tx.tree.ReplaceOrInsert(bt.toIndexItem(updateRow, il))
+		}
+	}
 	return nil
 }
 
@@ -211,35 +266,31 @@ func (br *rows) Update(ctx context.Context, updates []sql.ColumnUpdate,
 		panic(fmt.Sprintf("basic: table %s no row to update", br.tbl.tn))
 	}
 
-	if br.tbl.tl.PrimaryUpdated(updates) {
-		br.Delete(ctx)
-
-		for _, update := range updates {
-			br.rows[br.idx-1][update.Index] = update.Value
-		}
-
-		if check != nil {
-			err := check(br.rows[br.idx-1])
-			if err != nil {
-				return err
-			}
-		}
-
-		return br.tbl.Insert(ctx, br.rows[br.idx-1])
-	}
-
-	row := append(make([]sql.Value, 0, len(br.rows[br.idx-1])), br.rows[br.idx-1]...)
+	updateRow := append(make([]sql.Value, 0, len(br.rows[br.idx-1])), br.rows[br.idx-1]...)
 	for _, update := range updates {
-		row[update.Index] = update.Value
+		updateRow[update.Index] = update.Value
 	}
 
 	if check != nil {
-		err := check(row)
+		err := check(updateRow)
 		if err != nil {
 			return err
 		}
 	}
 
-	br.tbl.tx.tree.ReplaceOrInsert(br.tbl.toItem(row))
-	return nil
+	if br.tbl.tl.PrimaryUpdated(updates) {
+		err := br.Delete(ctx)
+		if err != nil {
+			return err
+		}
+
+		err = br.tbl.Insert(ctx, updateRow)
+		if err != nil {
+			return err
+		}
+	} else {
+		br.tbl.tx.tree.ReplaceOrInsert(br.tbl.toItem(updateRow))
+	}
+
+	return br.tbl.updateIndexes(ctx, updates, br.rows[br.idx-1], updateRow)
 }
