@@ -268,7 +268,7 @@ func (br *rows) Update(ctx context.Context, updates []sql.ColumnUpdate,
 
 	updateRow := append(make([]sql.Value, 0, len(br.rows[br.idx-1])), br.rows[br.idx-1]...)
 	for _, update := range updates {
-		updateRow[update.Index] = update.Value
+		updateRow[update.Column] = update.Value
 	}
 
 	if check != nil {

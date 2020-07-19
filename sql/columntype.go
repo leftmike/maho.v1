@@ -6,8 +6,8 @@ import (
 )
 
 type ColumnUpdate struct {
-	Index int
-	Value Value
+	Column int
+	Value  Value
 }
 
 const (

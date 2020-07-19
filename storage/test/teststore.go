@@ -1149,7 +1149,7 @@ var (
 			{fln: fln(), cmd: cmdBegin},
 			{fln: fln(), cmd: cmdLookupTable, name: sql.ID("tbl3")},
 			{fln: fln(), cmd: cmdUpdate, rowID: 1,
-				updates: []sql.ColumnUpdate{{Index: 1, Value: sql.Int64Value(10)}}},
+				updates: []sql.ColumnUpdate{{Column: 1, Value: sql.Int64Value(10)}}},
 			{fln: fln(), cmd: cmdNextStmt},
 			{fln: fln(), cmd: cmdRows,
 				values: [][]sql.Value{
@@ -1165,7 +1165,7 @@ var (
 			{fln: fln(), cmd: cmdBegin},
 			{fln: fln(), cmd: cmdLookupTable, name: sql.ID("tbl3")},
 			{fln: fln(), cmd: cmdUpdate, rowID: 2,
-				updates: []sql.ColumnUpdate{{Index: 1, Value: sql.Int64Value(40)}}},
+				updates: []sql.ColumnUpdate{{Column: 1, Value: sql.Int64Value(40)}}},
 			{fln: fln(), cmd: cmdNextStmt},
 			{fln: fln(), cmd: cmdRows,
 				values: [][]sql.Value{
@@ -1195,8 +1195,8 @@ var (
 			{fln: fln(), cmd: cmdLookupTable, name: sql.ID("tbl3")},
 			{fln: fln(), cmd: cmdUpdate, rowID: 3,
 				updates: []sql.ColumnUpdate{
-					{Index: 1, Value: sql.Int64Value(90)},
-					{Index: 2, Value: sql.StringValue("3rd row")},
+					{Column: 1, Value: sql.Int64Value(90)},
+					{Column: 2, Value: sql.StringValue("3rd row")},
 				},
 			},
 			{fln: fln(), cmd: cmdCommit},
@@ -1241,7 +1241,7 @@ var (
 			{fln: fln(), cmd: cmdBegin},
 			{fln: fln(), cmd: cmdLookupTable, name: sql.ID("tbl4")},
 			{fln: fln(), cmd: cmdUpdate, rowID: 1,
-				updates: []sql.ColumnUpdate{{Index: 1, Value: sql.Int64Value(40)}}},
+				updates: []sql.ColumnUpdate{{Column: 1, Value: sql.Int64Value(40)}}},
 			{fln: fln(), cmd: cmdCommit},
 		},
 	}
@@ -1295,7 +1295,10 @@ func RunParallelTest(t *testing.T, st *storage.Store) {
 						{fln: fln(), cmd: cmdBegin},
 						{fln: fln(), cmd: cmdLookupTable, name: sql.ID("tbl")},
 						{fln: fln(), cmd: cmdUpdate, rowID: i*r + j,
-							updates: []sql.ColumnUpdate{{Index: 1, Value: sql.Int64Value(j * j)}}},
+							updates: []sql.ColumnUpdate{
+								{Column: 1, Value: sql.Int64Value(j * j)},
+							},
+						},
 						{fln: fln(), cmd: cmdCommit},
 					})
 			}
@@ -1336,7 +1339,7 @@ func incColumn(t *testing.T, st *storage.Store, tx sql.Transaction, tdx uint64, 
 		if i64, ok := dest[0].(sql.Int64Value); ok && int(i64) == i {
 			v := int(dest[1].(sql.Int64Value))
 			err = rows.Update(ctx,
-				[]sql.ColumnUpdate{{Index: 1, Value: sql.Int64Value(v + 1)}}, nil)
+				[]sql.ColumnUpdate{{Column: 1, Value: sql.Int64Value(v + 1)}}, nil)
 			if err == nil {
 				//fmt.Printf("%d: %d -> %d\n", tdx, i, v+1)
 				return true

@@ -159,10 +159,10 @@ func (tbl *table) update(ctx context.Context, r Rows, updates []sql.ColumnUpdate
 	cols := tbl.tt.cols
 	colTypes := tbl.tt.colTypes
 	for _, up := range updates {
-		ct := colTypes[up.Index]
+		ct := colTypes[up.Column]
 
 		var err error
-		up.Value, err = convertValue(ct, cols[up.Index], up.Value)
+		up.Value, err = convertValue(ct, cols[up.Column], up.Value)
 		if err != nil {
 			return fmt.Errorf("engine: table %s: %s", tbl.tn, err)
 		}

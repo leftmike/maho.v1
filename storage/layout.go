@@ -75,7 +75,7 @@ func (tl *TableLayout) PrimaryUpdated(updates []sql.ColumnUpdate) bool {
 	primary := tl.tt.PrimaryKey()
 	for _, update := range updates {
 		for _, ck := range primary {
-			if ck.Number() == update.Index {
+			if ck.Number() == update.Column {
 				return true
 			}
 		}
@@ -95,7 +95,7 @@ func (tl *TableLayout) IndexName(idx int) sql.Identifier {
 func columnUpdated(cols []int, updates []sql.ColumnUpdate) bool {
 	for _, col := range cols {
 		for _, upd := range updates {
-			if col == upd.Index {
+			if col == upd.Column {
 				return true
 			}
 		}
@@ -107,7 +107,7 @@ func columnUpdated(cols []int, updates []sql.ColumnUpdate) bool {
 func (il IndexLayout) keyUpdated(updates []sql.ColumnUpdate) bool {
 	for _, update := range updates {
 		for _, ck := range il.Key {
-			if il.Columns[ck.Number()] == update.Index {
+			if il.Columns[ck.Number()] == update.Column {
 				return true
 			}
 		}

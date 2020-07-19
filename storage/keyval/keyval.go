@@ -504,7 +504,7 @@ func (kvr *rows) Update(ctx context.Context, updates []sql.ColumnUpdate,
 
 	updateRow := append(make([]sql.Value, 0, len(kvr.curRow)), kvr.curRow...)
 	for _, update := range updates {
-		updateRow[update.Index] = update.Value
+		updateRow[update.Column] = update.Value
 	}
 
 	if check != nil {

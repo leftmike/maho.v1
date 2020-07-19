@@ -468,7 +468,7 @@ func (rcr *rows) Update(ctx context.Context, updates []sql.ColumnUpdate,
 
 	updateRow := append(make([]sql.Value, 0, len(rcr.rows[rcr.idx-1])), rcr.rows[rcr.idx-1]...)
 	for _, update := range updates {
-		updateRow[update.Index] = update.Value
+		updateRow[update.Column] = update.Value
 	}
 
 	if check != nil {

@@ -41,8 +41,6 @@ To Do:
 - subquery expressions: EXISTS, IN, NOT IN, ANY/SOME, ALL
 - conditional expressions: CASE, COALESCE, NULLIF, GREATEST, LEAST
 
-- change sql.ColumnUpdate.Index to .Column
-
 - indexes
 -- add Delete tests to unique.sql
 -- add create unique index test to sqltest/

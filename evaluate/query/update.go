@@ -36,8 +36,8 @@ func (stmt *Update) String() string {
 }
 
 type columnUpdate struct {
-	index int
-	expr  sql.CExpr
+	column int
+	expr   sql.CExpr
 }
 
 type updatePlan struct {
@@ -68,13 +68,13 @@ func (up *updatePlan) Execute(ctx context.Context, e sql.Engine, tx sql.Transact
 
 		updates = updates[:0]
 		for _, update := range up.updates {
-			cdx := update.index
+			col := update.column
 			val, err := update.expr.Eval(ctx, up)
 			if err != nil {
 				return -1, err
 			}
-			if sql.Compare(val, up.dest[cdx]) != 0 {
-				updates = append(updates, sql.ColumnUpdate{Index: cdx, Value: val})
+			if sql.Compare(val, up.dest[col]) != 0 {
+				updates = append(updates, sql.ColumnUpdate{Column: col, Value: val})
 			}
 		}
 
@@ -119,11 +119,11 @@ func (stmt *Update) Plan(ses *evaluate.Session, tx sql.Transaction) (interface{}
 		if err != nil {
 			return nil, err
 		}
-		cdx, err := fctx.colIndex(cu.Column, "update")
+		col, err := fctx.colIndex(cu.Column, "update")
 		if err != nil {
 			return nil, err
 		}
-		plan.updates = append(plan.updates, columnUpdate{index: cdx, expr: ce})
+		plan.updates = append(plan.updates, columnUpdate{column: col, expr: ce})
 	}
 	return &plan, nil
 }

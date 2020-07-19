@@ -359,7 +359,7 @@ func (r *TypedRows) Update(ctx context.Context, updateObj interface{}) error {
 
 	updates := make([]sql.ColumnUpdate, len(ttbl.updateFields))
 	for fdx, cf := range ttbl.updateFields {
-		updates[fdx].Index = cf.index
+		updates[fdx].Column = cf.index
 
 		v := updateVal.Field(fdx)
 		if cf.pointer {
