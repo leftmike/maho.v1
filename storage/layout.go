@@ -28,10 +28,10 @@ type TableLayout struct {
 func makeIndexLayout(iid int64, it sql.IndexType) IndexLayout {
 	key := make([]sql.ColumnKey, 0, len(it.Key))
 	for _, ck := range it.Key {
-		num := ck.Number()
-		for idx, col := range it.Columns {
-			if num == col {
-				key = append(key, sql.MakeColumnKey(idx, ck.Reverse()))
+		keyCol := ck.Column()
+		for cdx, col := range it.Columns {
+			if keyCol == col {
+				key = append(key, sql.MakeColumnKey(cdx, ck.Reverse()))
 				break
 			}
 		}
@@ -75,7 +75,7 @@ func (tl *TableLayout) PrimaryUpdated(updates []sql.ColumnUpdate) bool {
 	primary := tl.tt.PrimaryKey()
 	for _, update := range updates {
 		for _, ck := range primary {
-			if ck.Number() == update.Column {
+			if ck.Column() == update.Column {
 				return true
 			}
 		}
@@ -107,7 +107,7 @@ func columnUpdated(cols []int, updates []sql.ColumnUpdate) bool {
 func (il IndexLayout) keyUpdated(updates []sql.ColumnUpdate) bool {
 	for _, update := range updates {
 		for _, ck := range il.Key {
-			if il.Columns[ck.Number()] == update.Column {
+			if il.Columns[ck.Column()] == update.Column {
 				return true
 			}
 		}
@@ -150,7 +150,7 @@ func encodeIndexKey(key []sql.ColumnKey) []*IndexKey {
 	for _, k := range key {
 		mdk = append(mdk,
 			&IndexKey{
-				Number:  int32(k.Number()),
+				Number:  int32(k.Column()),
 				Reverse: k.Reverse(),
 			})
 	}

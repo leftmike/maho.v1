@@ -98,12 +98,12 @@ func (rcst *rowColsStore) Table(ctx context.Context, tx sql.Transaction, tn sql.
 	reverse := uint32(0)
 	rowCols := make([]int, len(cols))
 	vn := len(primary)
-	for cn := range cols {
+	for col := range cols {
 		isValue := true
 
 		for kn, ck := range primary {
-			if ck.Number() == cn {
-				rowCols[kn] = cn
+			if ck.Column() == col {
+				rowCols[kn] = col
 				if ck.Reverse() {
 					reverse |= 1 << kn
 				}
@@ -113,7 +113,7 @@ func (rcst *rowColsStore) Table(ctx context.Context, tx sql.Transaction, tn sql.
 		}
 
 		if isValue {
-			rowCols[vn] = cn
+			rowCols[vn] = col
 			vn += 1
 		}
 	}

@@ -42,12 +42,15 @@ To Do:
 - conditional expressions: CASE, COALESCE, NULLIF, GREATEST, LEAST
 
 - indexes
--- add Delete tests to unique.sql
--- add create unique index test to sqltest/
 -- storage tests of indexes
--- unique indexes: all NULL values are considered different from all other NULL values and
-   are thus unique (sqlite.org/lang_createindex.html): need to include primary key in index key
--- test unique indexes with NULL values
+-- unique indexes
+--- all NULL values are considered different from all other NULL values and are thus unique
+    sqlite.org/lang_createindex.html
+--- include primary key in index key in part of index key is NULL
+--- test unique indexes with NULL values
+--- add create unique index test to sqltest/
+-- non-unique indexes: add primary key to end of index key
+--- add create index test to sqltest/
 -- engine.Table: IndexRows(...) => engine.IndexRows {Columns, Close, Next, Row}
 
 - constraints

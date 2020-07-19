@@ -77,11 +77,11 @@ func addColumn(cols []int, num int) []int {
 func (tt *TableType) addIndex(nam sql.Identifier, key []sql.ColumnKey, unique bool) sql.IndexType {
 	var cols []int
 	for _, ck := range key {
-		cols = append(cols, ck.Number())
+		cols = append(cols, ck.Column())
 	}
 
 	for _, ck := range tt.primary {
-		cols = addColumn(cols, ck.Number())
+		cols = addColumn(cols, ck.Column())
 	}
 
 	it := sql.IndexType{
@@ -100,7 +100,7 @@ func encodeColumnKey(key []sql.ColumnKey) []*ColumnKey {
 	for _, k := range key {
 		mdk = append(mdk,
 			&ColumnKey{
-				Number:  int32(k.Number()),
+				Number:  int32(k.Column()),
 				Reverse: k.Reverse(),
 			})
 	}

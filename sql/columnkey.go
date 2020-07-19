@@ -17,7 +17,7 @@ func (ck ColumnKey) Reverse() bool {
 	return ck < 0
 }
 
-func (ck ColumnKey) Number() int {
+func (ck ColumnKey) Column() int {
 	if ck < 0 {
 		ck = -ck
 	}

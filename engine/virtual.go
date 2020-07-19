@@ -295,11 +295,11 @@ func columnKey(tt *TableType, key []sql.ColumnKey) string {
 			s += ", "
 		}
 
-		num := ck.Number()
-		if num < len(tt.cols) {
-			s += tt.cols[num].String()
+		col := ck.Column()
+		if col < len(tt.cols) {
+			s += tt.cols[col].String()
 		} else {
-			s += fmt.Sprintf("<column %d>", num)
+			s += fmt.Sprintf("<column %d>", col)
 		}
 
 		if ck.Reverse() {

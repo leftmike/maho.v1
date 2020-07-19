@@ -47,7 +47,7 @@ func MakeKey(key []sql.ColumnKey, row []sql.Value) []byte {
 	var buf []byte
 
 	for _, ck := range key {
-		val := row[ck.Number()]
+		val := row[ck.Column()]
 		reverse := ck.Reverse()
 
 		switch val := val.(type) {
