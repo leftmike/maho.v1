@@ -40,13 +40,11 @@ type transaction struct {
 }
 
 type table struct {
-	st      *rowColsStore
-	tl      *storage.TableLayout
-	tn      sql.TableName
-	tid     int64
-	reverse uint32
-	rowCols []int
-	tx      *transaction
+	st  *rowColsStore
+	tl  *storage.TableLayout
+	tn  sql.TableName
+	tid int64
+	tx  *transaction
 }
 
 type rowItem struct {
@@ -86,47 +84,17 @@ func NewStore(dataDir string) (*storage.Store, error) {
 func (rcst *rowColsStore) Table(ctx context.Context, tx sql.Transaction, tn sql.TableName,
 	tid int64, tt *engine.TableType, tl *storage.TableLayout) (engine.Table, error) {
 
-	primary := tt.PrimaryKey()
-	if len(primary) == 0 {
+	if len(tt.PrimaryKey()) == 0 {
 		panic(fmt.Sprintf("rowcols: table %s: missing required primary key", tn))
-	}
-	if len(primary) > 32 {
-		panic(fmt.Sprintf("rowcols: table %s: primary key with too many columns", tn))
-	}
-
-	cols := tt.Columns()
-	reverse := uint32(0)
-	rowCols := make([]int, len(cols))
-	vn := len(primary)
-	for col := range cols {
-		isValue := true
-
-		for kn, ck := range primary {
-			if ck.Column() == col {
-				rowCols[kn] = col
-				if ck.Reverse() {
-					reverse |= 1 << kn
-				}
-				isValue = false
-				break
-			}
-		}
-
-		if isValue {
-			rowCols[vn] = col
-			vn += 1
-		}
 	}
 
 	etx := tx.(*transaction)
 	return &table{
-		st:      etx.st,
-		tl:      tl,
-		tn:      tn,
-		tid:     tid,
-		reverse: reverse,
-		rowCols: rowCols,
-		tx:      etx,
+		st:  etx.st,
+		tl:  tl,
+		tn:  tn,
+		tid: tid,
+		tx:  etx,
 	}, nil
 }
 
