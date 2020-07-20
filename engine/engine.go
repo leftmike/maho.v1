@@ -233,6 +233,18 @@ func (e *Engine) CreateTable(ctx context.Context, tx sql.Transaction, tn sql.Tab
 		}
 	}
 
+	for _, ck := range primary {
+		col := ck.Column()
+		if !colTypes[col].NotNull {
+			colTypes[col].NotNull = true
+			tt.constraints = append(tt.constraints,
+				constraint{
+					typ:    sql.NotNullConstraint,
+					colNum: col,
+				})
+		}
+	}
+
 	return e.st.CreateTable(ctx, tx, tn, tt, ifNotExists)
 }
 

@@ -38,6 +38,8 @@ To Do:
 -- snapshot store and truncate WAL
 -- usda.sql: causes corrupt WAL
 
+- test subquery expressions: '(' select | values | show ')'
+
 - subquery expressions: EXISTS, IN, NOT IN, ANY/SOME, ALL
 - conditional expressions: CASE, COALESCE, NULLIF, GREATEST, LEAST
 
