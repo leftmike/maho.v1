@@ -629,14 +629,60 @@ func (st *Store) updateIndexes(ctx context.Context, tx sql.Transaction, tn sql.T
 		}{typmd, lyomd})
 }
 
+func addColumn(cols []int, num int) []int {
+	for _, col := range cols {
+		if col == num {
+			return cols
+		}
+	}
+
+	return append(cols, num)
+}
+
+func columnInKey(key []sql.ColumnKey, pk sql.ColumnKey) bool {
+	for _, ck := range key {
+		if ck.Column() == pk.Column() {
+			return true
+		}
+	}
+
+	return false
+}
+
+func (st *Store) MakeIndexType(tt *engine.TableType, nam sql.Identifier, key []sql.ColumnKey,
+	unique bool) sql.IndexType {
+
+	if !unique {
+		for _, ck := range tt.PrimaryKey() {
+			if !columnInKey(key, ck) {
+				key = append(key, ck)
+			}
+		}
+	}
+
+	var cols []int
+	for _, ck := range key {
+		cols = append(cols, ck.Column())
+	}
+
+	for _, ck := range tt.PrimaryKey() {
+		cols = addColumn(cols, ck.Column())
+	}
+
+	return sql.IndexType{
+		Name:    nam,
+		Key:     key,
+		Columns: cols,
+		Unique:  unique,
+	}
+}
+
 func (st *Store) AddIndex(ctx context.Context, tx sql.Transaction, tn sql.TableName,
 	tt *engine.TableType, it sql.IndexType) error {
 
 	return st.updateIndexes(ctx, tx, tn, tt,
 		func(tl *TableLayout) error {
-			tl.indexes = append(tl.indexes, makeIndexLayout(tl.nextIID, it))
-			tl.nextIID += 1
-
+			tl.addIndexLayout(it)
 			return nil
 		})
 }

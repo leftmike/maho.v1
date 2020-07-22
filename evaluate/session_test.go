@@ -72,6 +72,13 @@ func (st *testStore) DropTable(ctx context.Context, tx sql.Transaction, tn sql.T
 	return nil
 }
 
+func (st *testStore) MakeIndexType(tt *engine.TableType, nam sql.Identifier, key []sql.ColumnKey,
+	unique bool) sql.IndexType {
+
+	st.t.Error("MakeIndexType should never be called")
+	return sql.IndexType{}
+}
+
 func (st *testStore) AddIndex(ctx context.Context, tx sql.Transaction, tn sql.TableName,
 	tt *engine.TableType, it sql.IndexType) error {
 

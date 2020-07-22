@@ -9,12 +9,6 @@ Maho is a partial implementation of a basic SQL server.
 * Parse and execute SQL statements.
 * Authentication for remote access using SSH.
 
-## Missing
-* Most SQL statements.
-* Persistence.
-* Indexes.
-* Etc.
-
 ## Remote Access
 
 To run an ssh server, maho needs a ssh host key; by default it uses `id_rsa` in the current

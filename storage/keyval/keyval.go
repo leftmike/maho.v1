@@ -270,7 +270,7 @@ func (kvt *table) toItem(row []sql.Value, deleted bool) rowItem {
 func (kvt *table) toIndexItem(row []sql.Value, deleted bool, il storage.IndexLayout) rowItem {
 	indexRow := il.RowToIndexRow(row)
 	ri := rowItem{
-		key: kvt.makeKey(il.Key, il.IID, indexRow),
+		key: il.MakeKey(kvt.makeKey(il.Key, il.IID, indexRow), indexRow),
 	}
 	if !deleted {
 		ri.row = indexRow

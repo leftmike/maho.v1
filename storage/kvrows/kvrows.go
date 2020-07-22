@@ -438,6 +438,10 @@ func (kvt *table) makeKey(key []sql.ColumnKey, iid int64, row []sql.Value) []byt
 	return buf
 }
 
+func (kvt *table) makeIndexKey(il storage.IndexLayout, row []sql.Value) []byte {
+	return il.MakeKey(kvt.makeKey(il.Key, il.IID, row), row)
+}
+
 func (kvt *table) makePrimaryKey(row []sql.Value) []byte {
 	return kvt.makeKey(kvt.tl.PrimaryKey(), storage.PrimaryIID, row)
 }
@@ -657,7 +661,7 @@ func (kvt *table) Insert(ctx context.Context, row []sql.Value) error {
 
 	for _, il := range kvt.tl.Indexes() {
 		indexRow := il.RowToIndexRow(row)
-		err = kvt.proposeUpdate(upd, kvt.makeKey(il.Key, il.IID, indexRow), indexRow, false)
+		err = kvt.proposeUpdate(upd, kvt.makeIndexKey(il, indexRow), indexRow, false)
 		if err != nil {
 			upd.Rollback()
 			return err
@@ -705,7 +709,7 @@ func (kvr *rows) Delete(ctx context.Context) error {
 
 	for _, il := range kvr.tbl.tl.Indexes() {
 		indexRow := il.RowToIndexRow(kvr.rows[kvr.idx-1])
-		err = kvr.tbl.proposeUpdate(upd, kvr.tbl.makeKey(il.Key, il.IID, indexRow), nil, true)
+		err = kvr.tbl.proposeUpdate(upd, kvr.tbl.makeIndexKey(il, indexRow), nil, true)
 		if err != nil {
 			upd.Rollback()
 			return err
@@ -722,22 +726,22 @@ func (kvt *table) updateIndexes(upd Updater, updates []sql.ColumnUpdate,
 	for idx := range indexes {
 		il := indexes[idx]
 		if updated[idx] {
-			err := kvt.proposeUpdate(upd, kvt.makeKey(il.Key, il.IID, il.RowToIndexRow(row)), nil,
+			err := kvt.proposeUpdate(upd, kvt.makeIndexKey(il, il.RowToIndexRow(row)), nil,
 				true)
 			if err != nil {
 				return err
 			}
 
 			indexUpdateRow := il.RowToIndexRow(updateRow)
-			err = kvt.proposeUpdate(upd, kvt.makeKey(il.Key, il.IID, indexUpdateRow),
-				indexUpdateRow, false)
+			err = kvt.proposeUpdate(upd, kvt.makeIndexKey(il, indexUpdateRow), indexUpdateRow,
+				false)
 			if err != nil {
 				return err
 			}
 		} else {
 			indexUpdateRow := il.RowToIndexRow(updateRow)
-			err := kvt.proposeUpdate(upd, kvt.makeKey(il.Key, il.IID, indexUpdateRow),
-				indexUpdateRow, true)
+			err := kvt.proposeUpdate(upd, kvt.makeIndexKey(il, indexUpdateRow), indexUpdateRow,
+				true)
 			if err != nil {
 				return err
 			}

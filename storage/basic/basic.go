@@ -129,7 +129,7 @@ func (bt *table) toIndexItem(row []sql.Value, il storage.IndexLayout) btree.Item
 		rid: (bt.tid << 16) | il.IID,
 	}
 	ri.row = il.RowToIndexRow(row)
-	ri.key = encode.MakeKey(il.Key, ri.row)
+	ri.key = il.MakeKey(encode.MakeKey(il.Key, ri.row), ri.row)
 	return ri
 }
 

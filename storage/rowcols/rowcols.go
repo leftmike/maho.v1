@@ -237,11 +237,11 @@ func (rct *table) toItem(row []sql.Value, deleted bool) btree.Item {
 }
 
 func (rct *table) toIndexItem(row []sql.Value, deleted bool, il storage.IndexLayout) btree.Item {
+	indexRow := il.RowToIndexRow(row)
 	ri := rowItem{
 		rid: (rct.tid << 16) | il.IID,
+		key: il.MakeKey(encode.MakeKey(il.Key, indexRow), indexRow),
 	}
-	indexRow := il.RowToIndexRow(row)
-	ri.key = encode.MakeKey(il.Key, indexRow)
 	if !deleted {
 		ri.row = indexRow
 	}

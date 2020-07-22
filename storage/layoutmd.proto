@@ -15,6 +15,6 @@ message IndexKey {
 message IndexLayoutMetadata {
     int64 IID = 1;
     repeated IndexKey Key = 2;
-    repeated int64 Columns = 3;
-    bool Unique = 4;
+    repeated IndexKey NullKey = 3;
+    repeated int64 Columns = 4;
 }

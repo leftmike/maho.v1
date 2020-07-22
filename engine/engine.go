@@ -36,6 +36,8 @@ type store interface {
 		ifNotExists bool) error
 	DropTable(ctx context.Context, tx sql.Transaction, tn sql.TableName, ifExists bool) error
 
+	MakeIndexType(tt *TableType, nam sql.Identifier, key []sql.ColumnKey,
+		unique bool) sql.IndexType
 	AddIndex(ctx context.Context, tx sql.Transaction, tn sql.TableName, tt *TableType,
 		it sql.IndexType) error
 	RemoveIndex(ctx context.Context, tx sql.Transaction, tn sql.TableName, tt *TableType,
@@ -215,9 +217,10 @@ func (e *Engine) CreateTable(ctx context.Context, tx sql.Transaction, tn sql.Tab
 					checkExpr: con.CheckExpr,
 				})
 		} else if con.Type == sql.ForeignConstraint {
-			// XXX
+			// XXX: sql.ForeignConstraint
 		} else if con.Type == sql.UniqueConstraint {
-			tt.addIndex(con.Name, con.Key, true)
+			it := e.st.MakeIndexType(tt, con.Name, con.Key, true)
+			tt.indexes = append(tt.indexes, it)
 		} else if con.Type == sql.PrimaryConstraint {
 			// Used above; remove from constraints.
 		} else {
@@ -285,7 +288,9 @@ func (e *Engine) CreateIndex(ctx context.Context, tx sql.Transaction, idxname sq
 	}
 
 	tt.ver += 1
-	return e.st.AddIndex(ctx, tx, tn, tt, tt.addIndex(idxname, key, unique))
+	it := e.st.MakeIndexType(tt, idxname, key, unique)
+	tt.indexes = append(tt.indexes, it)
+	return e.st.AddIndex(ctx, tx, tn, tt, it)
 }
 
 func (e *Engine) DropIndex(ctx context.Context, tx sql.Transaction, idxname sql.Identifier,

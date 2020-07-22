@@ -64,37 +64,6 @@ func (tt *TableType) Version() uint32 {
 	return tt.ver
 }
 
-func addColumn(cols []int, num int) []int {
-	for _, col := range cols {
-		if col == num {
-			return cols
-		}
-	}
-
-	return append(cols, num)
-}
-
-func (tt *TableType) addIndex(nam sql.Identifier, key []sql.ColumnKey, unique bool) sql.IndexType {
-	var cols []int
-	for _, ck := range key {
-		cols = append(cols, ck.Column())
-	}
-
-	for _, ck := range tt.primary {
-		cols = addColumn(cols, ck.Column())
-	}
-
-	it := sql.IndexType{
-		Name:    nam,
-		Key:     key,
-		Columns: cols,
-		Unique:  unique,
-	}
-	tt.indexes = append(tt.indexes, it)
-
-	return it
-}
-
 func encodeColumnKey(key []sql.ColumnKey) []*ColumnKey {
 	mdk := make([]*ColumnKey, 0, len(key))
 	for _, k := range key {
@@ -163,6 +132,10 @@ func (tt *TableType) Encode() ([]byte, error) {
 }
 
 func decodeColumnKey(mdk []*ColumnKey) []sql.ColumnKey {
+	if len(mdk) == 0 {
+		return nil
+	}
+
 	key := make([]sql.ColumnKey, 0, len(mdk))
 	for _, k := range mdk {
 		key = append(key, sql.MakeColumnKey(int(k.Number), k.Reverse))

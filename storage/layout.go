@@ -8,6 +8,7 @@ import (
 	"github.com/golang/protobuf/proto"
 	"github.com/leftmike/maho/engine"
 	"github.com/leftmike/maho/sql"
+	"github.com/leftmike/maho/storage/encode"
 )
 
 type IndexLayout struct {
@@ -15,8 +16,9 @@ type IndexLayout struct {
 	// Map from index row columns to primary row columns: indexRow[i] = primaryRow[Columns[i]]
 	Columns []int
 	// Key for this index in index row columns, NOT primary row columns
-	Key    []sql.ColumnKey
-	Unique bool
+	Key []sql.ColumnKey
+	// Optional key to append if any of the index key columns are NULL
+	NullKey []sql.ColumnKey
 }
 
 type TableLayout struct {
@@ -25,28 +27,55 @@ type TableLayout struct {
 	indexes []IndexLayout
 }
 
-func makeIndexLayout(iid int64, it sql.IndexType) IndexLayout {
-	key := make([]sql.ColumnKey, 0, len(it.Key))
-	for _, ck := range it.Key {
+func maybeNullColumns(key []sql.ColumnKey, colTypes []sql.ColumnType) bool {
+	for _, ck := range key {
+		if !colTypes[ck.Column()].NotNull {
+			return true
+		}
+	}
+
+	return false
+}
+
+func asIndexKey(key []sql.ColumnKey, cols []int) []sql.ColumnKey {
+	idxKey := make([]sql.ColumnKey, 0, len(key))
+	for _, ck := range key {
 		keyCol := ck.Column()
-		for cdx, col := range it.Columns {
+		for cdx, col := range cols {
 			if keyCol == col {
-				key = append(key, sql.MakeColumnKey(cdx, ck.Reverse()))
+				idxKey = append(idxKey, sql.MakeColumnKey(cdx, ck.Reverse()))
 				break
 			}
 		}
 	}
 
-	if len(key) != len(it.Key) {
-		panic(fmt.Sprintf("store: failed converting key %v to index key %v", it.Key, key))
+	if len(key) != len(idxKey) {
+		panic(fmt.Sprintf("store: failed converting key %v to index key %v", key, idxKey))
+	}
+	return idxKey
+}
+
+func (tl *TableLayout) addIndexLayout(it sql.IndexType) {
+	var nullKey []sql.ColumnKey
+	if it.Unique && maybeNullColumns(it.Key, tl.tt.ColumnTypes()) {
+		for _, ck := range tl.tt.PrimaryKey() {
+			if !columnInKey(it.Key, ck) {
+				nullKey = append(nullKey, ck)
+			}
+		}
+		if nullKey != nil {
+			nullKey = asIndexKey(nullKey, it.Columns)
+		}
 	}
 
-	return IndexLayout{
-		IID:     iid,
-		Key:     key,
-		Columns: it.Columns,
-		Unique:  it.Unique,
-	}
+	tl.indexes = append(tl.indexes,
+		IndexLayout{
+			IID:     tl.nextIID,
+			Columns: it.Columns,
+			Key:     asIndexKey(it.Key, it.Columns),
+			NullKey: nullKey,
+		})
+	tl.nextIID += 1
 }
 
 func makeTableLayout(tt *engine.TableType) *TableLayout {
@@ -57,8 +86,7 @@ func makeTableLayout(tt *engine.TableType) *TableLayout {
 
 	tl.indexes = make([]IndexLayout, 0, len(tt.Indexes()))
 	for _, it := range tt.Indexes() {
-		tl.indexes = append(tl.indexes, makeIndexLayout(tl.nextIID, it))
-		tl.nextIID += 1
+		tl.addIndexLayout(it)
 	}
 	return &tl
 }
@@ -145,6 +173,23 @@ func (il IndexLayout) IndexRowToRow(idxRow, row []sql.Value) {
 	}
 }
 
+func hasNullKeyColumn(key []sql.ColumnKey, row []sql.Value) bool {
+	for _, ck := range key {
+		if row[ck.Column()] == nil {
+			return true
+		}
+	}
+
+	return false
+}
+
+func (il IndexLayout) MakeKey(key []byte, row []sql.Value) []byte {
+	if il.NullKey != nil && hasNullKeyColumn(il.Key, row) {
+		return append(key, encode.MakeKey(il.NullKey, row)...)
+	}
+	return key
+}
+
 func encodeIndexKey(key []sql.ColumnKey) []*IndexKey {
 	mdk := make([]*IndexKey, 0, len(key))
 	for _, k := range key {
@@ -172,9 +217,9 @@ func (tl *TableLayout) encode() ([]byte, error) {
 		md.Indexes = append(md.Indexes,
 			&IndexLayoutMetadata{
 				IID:     il.IID,
-				Key:     encodeIndexKey(il.Key),
 				Columns: cols,
-				Unique:  il.Unique,
+				Key:     encodeIndexKey(il.Key),
+				NullKey: encodeIndexKey(il.NullKey),
 			})
 	}
 
@@ -182,6 +227,10 @@ func (tl *TableLayout) encode() ([]byte, error) {
 }
 
 func decodeIndexKey(mdk []*IndexKey) []sql.ColumnKey {
+	if len(mdk) == 0 {
+		return nil
+	}
+
 	key := make([]sql.ColumnKey, 0, len(mdk))
 	for _, k := range mdk {
 		key = append(key, sql.MakeColumnKey(int(k.Number), k.Reverse))
@@ -216,9 +265,9 @@ func (st *Store) decodeTableLayout(tn sql.TableName, tt *engine.TableType,
 		tl.indexes = append(tl.indexes,
 			IndexLayout{
 				IID:     imd.IID,
-				Key:     decodeIndexKey(imd.Key),
 				Columns: cols,
-				Unique:  imd.Unique,
+				Key:     decodeIndexKey(imd.Key),
+				NullKey: decodeIndexKey(imd.NullKey),
 			})
 	}
 
