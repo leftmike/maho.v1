@@ -71,13 +71,16 @@ table_constraint =
       PRIMARY KEY key_columns
     | UNIQUE key_columns
     | CHECK '(' expr ')'
+    | FOREIGN KEY columns REFERENCES [[database '.'] schema '.'] table [columns]
 key_columns = '(' column [ASC | DESC] [',' ...] ')'
+columns = '(' column [',' ...] ')'
 column_constraint =
       DEFAULT expr
     | NOT NULL
     | PRIMARY KEY
     | UNIQUE
     | CHECK '(' expr ')'
+    | REFERENCES [[database '.'] schema '.'] table ['(' column ')']
 data_type =
 	  BINARY ['(' length ')']
 	| VARBINARY ['(' length ')']

@@ -578,6 +578,119 @@ c2 int check(true))`,
 c2 int constraint check_1 check(true))`,
 			fail: true,
 		},
+		{
+			sql: "create table t (c1 int references t2, c2 int references t3 (p1))",
+			stmt: datadef.CreateTable{
+				Table:   sql.TableName{Table: sql.ID("t")},
+				Columns: []sql.Identifier{sql.ID("c1"), sql.ID("c2")},
+				ColumnTypes: []datadef.ColumnType{
+					{Type: sql.IntegerType, Size: 4},
+					{Type: sql.IntegerType, Size: 4},
+				},
+				Constraints: []datadef.Constraint{
+					{
+						Type: sql.ForeignConstraint,
+						Name: sql.ID("foreign_1"),
+						ForeignKey: datadef.ForeignKey{
+							KeyColumns: []sql.Identifier{sql.ID("c1")},
+							RefTable:   sql.TableName{Table: sql.ID("t2")},
+						},
+					},
+					{
+						Type: sql.ForeignConstraint,
+						Name: sql.ID("foreign_2"),
+						ForeignKey: datadef.ForeignKey{
+							KeyColumns: []sql.Identifier{sql.ID("c2")},
+							RefTable:   sql.TableName{Table: sql.ID("t3")},
+							RefColumns: []sql.Identifier{sql.ID("p1")},
+						},
+					},
+				},
+			},
+		},
+		{
+			sql: `create table t (c1 int, c2 int, c3 int, c4 int constraint foreign_1 not null,
+foreign key (c1, c2) references t2,
+constraint fkey foreign key (c3, c4, c2) references t3 (p1, p2, p3))`,
+			stmt: datadef.CreateTable{
+				Table:   sql.TableName{Table: sql.ID("t")},
+				Columns: []sql.Identifier{sql.ID("c1"), sql.ID("c2"), sql.ID("c3"), sql.ID("c4")},
+				ColumnTypes: []datadef.ColumnType{
+					{Type: sql.IntegerType, Size: 4},
+					{Type: sql.IntegerType, Size: 4},
+					{Type: sql.IntegerType, Size: 4},
+					{Type: sql.IntegerType, Size: 4, NotNull: true},
+				},
+				Constraints: []datadef.Constraint{
+					{
+						Type:   sql.NotNullConstraint,
+						Name:   sql.ID("foreign_1"),
+						ColNum: 3,
+					},
+					{
+						Type: sql.ForeignConstraint,
+						Name: sql.ID("foreign_2"),
+						ForeignKey: datadef.ForeignKey{
+							KeyColumns: []sql.Identifier{sql.ID("c1"), sql.ID("c2")},
+							RefTable:   sql.TableName{Table: sql.ID("t2")},
+						},
+					},
+					{
+						Type: sql.ForeignConstraint,
+						Name: sql.ID("fkey"),
+						ForeignKey: datadef.ForeignKey{
+							KeyColumns: []sql.Identifier{sql.ID("c3"), sql.ID("c4"), sql.ID("c2")},
+							RefTable:   sql.TableName{Table: sql.ID("t3")},
+							RefColumns: []sql.Identifier{sql.ID("p1"), sql.ID("p2"), sql.ID("p3")},
+						},
+					},
+				},
+			},
+		},
+		{
+			sql:  "create table t (c1 int, c2 int, c3 int, foreign key c1 references t2)",
+			fail: true,
+		},
+		{
+			sql:  "create table t (c1 int, c2 int, c3 int, foreign key (c1,) references t2)",
+			fail: true,
+		},
+		{
+			sql:  "create table t (c1 int, c2 int, c3 int, foreign key () references t2)",
+			fail: true,
+		},
+		{
+			sql:  "create table t (c1 int, c2 int, c3 int, foreign key references t2)",
+			fail: true,
+		},
+		{
+			sql: `create table t (c1 int, c2 int, c3 int,
+foreign key (c1, c2) references t2 p1)`,
+			fail: true,
+		},
+		{
+			sql: `create table t (c1 int, c2 int, c3 int,
+foreign key (c1, c2) references t2 (p1,))`,
+			fail: true,
+		},
+		{
+			sql: `create table t (c1 int, c2 int, c3 int,
+foreign key (c1, c2) t2 (p1, p2))`,
+			fail: true,
+		},
+		{
+			sql: `create table t (c1 int, c2 int, c3 int,
+foreign (c1, c2) references t2 (p1, p2))`,
+			fail: true,
+		},
+		{
+			sql:  "create table t (c1 int references t2 p1, c2 int, c3 int)",
+			fail: true,
+		},
+		{
+			sql:  "create table t (c1 int references t2 (p1, p2), c2 int, c3 int)",
+			fail: true,
+		},
 	}
 
 	for i, c := range cases {

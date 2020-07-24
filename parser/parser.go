@@ -464,7 +464,9 @@ func (p *parser) parseCreateDetails(s *datadef.CreateTable) {
 			  PRIMARY KEY key_columns
 			| UNIQUE key_columns
 			| CHECK '(' expr ')'
+			| FOREIGN KEY columns REFERENCES [[database '.'] schema '.'] table [columns]
 		key_columns = '(' column [ASC | DESC] [',' ...] ')'
+		columns = '(' column [',' ...] ')'
 	*/
 
 	for {
@@ -484,8 +486,51 @@ func (p *parser) parseCreateDetails(s *datadef.CreateTable) {
 				key)
 		} else if p.optionalReserved(sql.CHECK) {
 			p.expectTokens(token.LParen)
-			p.addCheckConstraint(s, cn, -1, p.parseExpr())
+			s.Constraints = append(s.Constraints,
+				datadef.Constraint{
+					Type:   sql.CheckConstraint,
+					Name:   p.makeConstraintName(cn, s.Constraints, "check_"),
+					ColNum: -1,
+					Check:  p.parseExpr(),
+				})
 			p.expectTokens(token.RParen)
+		} else if p.optionalReserved(sql.FOREIGN) {
+			p.expectReserved(sql.KEY)
+
+			var cols []sql.Identifier
+			p.expectTokens(token.LParen)
+			for {
+				cols = append(cols, p.expectIdentifier("expected a column name"))
+				if p.maybeToken(token.RParen) {
+					break
+				}
+				p.expectTokens(token.Comma)
+			}
+
+			p.expectReserved(sql.REFERENCES)
+
+			rtn := p.parseTableName()
+			var rcols []sql.Identifier
+			if p.maybeToken(token.LParen) {
+				for {
+					rcols = append(rcols, p.expectIdentifier("expected a column name"))
+					if p.maybeToken(token.RParen) {
+						break
+					}
+					p.expectTokens(token.Comma)
+				}
+			}
+
+			s.Constraints = append(s.Constraints,
+				datadef.Constraint{
+					Type: sql.ForeignConstraint,
+					Name: p.makeConstraintName(cn, s.Constraints, "foreign_"),
+					ForeignKey: datadef.ForeignKey{
+						KeyColumns: cols,
+						RefTable:   rtn,
+						RefColumns: rcols,
+					},
+				})
 		} else if cn != 0 {
 			p.error("CONSTRAINT name specified without a constraint")
 		} else {
@@ -638,29 +683,23 @@ func duplicateName(cn sql.Identifier, cons []datadef.Constraint) bool {
 	return false
 }
 
-func (p *parser) addCheckConstraint(s *datadef.CreateTable, cn sql.Identifier, colNum int,
-	e expr.Expr) {
+func (p *parser) makeConstraintName(cn sql.Identifier, cons []datadef.Constraint,
+	base string) sql.Identifier {
 
 	if cn == 0 {
 		cnt := 1
 		for {
-			cn = sql.ID(fmt.Sprintf("check_%d", cnt))
-			if !duplicateName(cn, s.Constraints) {
+			cn = sql.ID(fmt.Sprintf("%s%d", base, cnt))
+			if !duplicateName(cn, cons) {
 				break
 			}
 			cnt += 1
 		}
-	} else if duplicateName(cn, s.Constraints) {
+	} else if duplicateName(cn, cons) {
 		p.error(fmt.Sprintf("duplicate constraint name: %s", cn))
 	}
 
-	s.Constraints = append(s.Constraints,
-		datadef.Constraint{
-			Type:   sql.CheckConstraint,
-			Name:   cn,
-			ColNum: colNum,
-			Check:  e,
-		})
+	return cn
 }
 
 func (p *parser) parseColumn(s *datadef.CreateTable) {
@@ -672,6 +711,7 @@ func (p *parser) parseColumn(s *datadef.CreateTable) {
 			| PRIMARY KEY
 			| UNIQUE
 			| CHECK '(' expr ')'
+			| REFERENCES [[database '.'] schema '.'] table ['(' column ')']
 	*/
 
 	nam := p.expectIdentifier("expected a column name")
@@ -732,8 +772,32 @@ func (p *parser) parseColumn(s *datadef.CreateTable) {
 				})
 		} else if p.optionalReserved(sql.CHECK) {
 			p.expectTokens(token.LParen)
-			p.addCheckConstraint(s, cn, len(s.Columns)-1, p.parseExpr())
+			s.Constraints = append(s.Constraints,
+				datadef.Constraint{
+					Type:   sql.CheckConstraint,
+					Name:   p.makeConstraintName(cn, s.Constraints, "check_"),
+					ColNum: len(s.Columns) - 1,
+					Check:  p.parseExpr(),
+				})
 			p.expectTokens(token.RParen)
+		} else if p.optionalReserved(sql.REFERENCES) {
+			rtn := p.parseTableName()
+			var rcols []sql.Identifier
+			if p.maybeToken(token.LParen) {
+				rcols = []sql.Identifier{p.expectIdentifier("expected a column name")}
+				p.expectTokens(token.RParen)
+			}
+
+			s.Constraints = append(s.Constraints,
+				datadef.Constraint{
+					Type: sql.ForeignConstraint,
+					Name: p.makeConstraintName(cn, s.Constraints, "foreign_"),
+					ForeignKey: datadef.ForeignKey{
+						KeyColumns: []sql.Identifier{nam},
+						RefTable:   rtn,
+						RefColumns: rcols,
+					},
+				})
 		} else if cn != 0 {
 			p.error("CONSTRAINT name specified without a constraint")
 		} else {

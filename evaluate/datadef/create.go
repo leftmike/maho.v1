@@ -32,12 +32,19 @@ func indexKeyToColumnKeys(ik IndexKey, columns []sql.Identifier) ([]sql.ColumnKe
 	return colKeys, nil
 }
 
+type ForeignKey struct {
+	KeyColumns []sql.Identifier
+	RefTable   sql.TableName
+	RefColumns []sql.Identifier
+}
+
 type Constraint struct {
-	Type   sql.ConstraintType
-	Name   sql.Identifier
-	ColNum int
-	Key    IndexKey
-	Check  expr.Expr
+	Type       sql.ConstraintType
+	Name       sql.Identifier
+	ColNum     int
+	Key        IndexKey
+	Check      expr.Expr
+	ForeignKey ForeignKey
 }
 
 type ColumnType struct {
