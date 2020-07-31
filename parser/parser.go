@@ -246,7 +246,6 @@ func (p *parser) expectEndOfStatement() {
 
 func (p *parser) parseStmt() evaluate.Stmt {
 	switch p.expectReserved(
-		sql.ATTACH,
 		sql.BEGIN,
 		sql.COMMIT,
 		sql.COPY,

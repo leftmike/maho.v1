@@ -24,6 +24,8 @@ To Do:
 
 - storage/service might no longer be necessary?
 
+- select: ORDER BY: column(s) can have [table '.']
+
 - tests with 1000s to 100000s of rows
 -- generate rows
 -- use sample databases
@@ -31,7 +33,6 @@ To Do:
 - kvrows
 -- cleanup proposals
 -- consider making Rows() incremental, maybe as blocks of rows
--- badger: iso-3166.sql: can't select from country
 -- badger: usda.sql: can't load largest table; can't select from tables
 
 - rowcols
@@ -44,10 +45,15 @@ To Do:
 - conditional expressions: CASE, COALESCE, NULLIF, GREATEST, LEAST
 
 - indexes
+-- parse (and ignore) USING type to CREATE INDEX
 -- storage tests of indexes
 -- add create unique index test to sqltest/
 -- add create index test to sqltest/
 -- engine.Table: IndexRows(...) => engine.IndexRows {Columns, Close, Next, Row}
+
+- foreign keys
+-- ALTER TABLE ONLY table ADD CONSTRAINT constraint FOREIGN KEY ...
+-- check foreign keys on update, insert, and delete
 
 - constraints
 -- drop CHECK constraint: use ALTER TABLE table DROP CONSTRAINT constraint

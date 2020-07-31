@@ -9,6 +9,41 @@ import (
 	"github.com/leftmike/maho/sql"
 )
 
+type IndexKey struct {
+	Unique  bool
+	Columns []sql.Identifier
+	Reverse []bool // ASC = false, DESC = true
+}
+
+func (ik IndexKey) String() string {
+	s := "("
+	for i := range ik.Columns {
+		if i > 0 {
+			s += ", "
+		}
+		if ik.Reverse[i] {
+			s += fmt.Sprintf("%s DESC", ik.Columns[i])
+		} else {
+			s += fmt.Sprintf("%s ASC", ik.Columns[i])
+		}
+	}
+	s += ")"
+	return s
+}
+
+func (ik IndexKey) Equal(oik IndexKey) bool {
+	if len(ik.Columns) != len(oik.Columns) {
+		return false
+	}
+
+	for cdx := range ik.Columns {
+		if ik.Columns[cdx] != oik.Columns[cdx] || ik.Reverse[cdx] != oik.Reverse[cdx] {
+			return false
+		}
+	}
+	return true
+}
+
 func columnNumber(nam sql.Identifier, columns []sql.Identifier) (int, bool) {
 	for num, col := range columns {
 		if nam == col {
@@ -38,6 +73,25 @@ type ForeignKey struct {
 	RefColumns []sql.Identifier
 }
 
+func (fk ForeignKey) String() string {
+	s := "FOREIGN KEY ("
+	for i, c := range fk.KeyColumns {
+		if i > 0 {
+			s += ", "
+		}
+		s += c.String()
+	}
+	s += fmt.Sprintf(") REFERENCES %s (", fk.RefTable)
+	for i, c := range fk.RefColumns {
+		if i > 0 {
+			s += ", "
+		}
+		s += c.String()
+	}
+	s += ")"
+	return s
+}
+
 type Constraint struct {
 	Type       sql.ConstraintType
 	Name       sql.Identifier
@@ -45,6 +99,30 @@ type Constraint struct {
 	Key        IndexKey
 	Check      expr.Expr
 	ForeignKey ForeignKey
+}
+
+func (c Constraint) String() string {
+	switch c.Type {
+	case sql.DefaultConstraint:
+	case sql.NotNullConstraint:
+	case sql.PrimaryConstraint:
+		return fmt.Sprintf(", CONSTRAINT %s PRIMARY KEY %s", c.Name, c.Key)
+	case sql.UniqueConstraint:
+		return fmt.Sprintf(", CONSTRAINT %s UNIQUE %s", c.Name, c.Key)
+	case sql.CheckConstraint:
+		return fmt.Sprintf(", CONSTRAINT %s CHECK (%s)", c.Name, c.Check)
+	case sql.ForeignConstraint:
+		return fmt.Sprintf(", CONSTRAINT %s %s", c.Name, c.ForeignKey.String())
+	default:
+		panic(fmt.Sprintf("unexpected constraint type: %d", c.Type))
+	}
+
+	return ""
+}
+
+type foreignConstraint struct {
+	name       sql.Identifier
+	foreignKey ForeignKey
 }
 
 type ColumnType struct {
@@ -56,13 +134,14 @@ type ColumnType struct {
 }
 
 type CreateTable struct {
-	Table       sql.TableName
-	Columns     []sql.Identifier
-	ColumnTypes []ColumnType
-	columnTypes []sql.ColumnType
-	IfNotExists bool
-	Constraints []Constraint
-	constraints []sql.Constraint
+	Table              sql.TableName
+	Columns            []sql.Identifier
+	ColumnTypes        []ColumnType
+	columnTypes        []sql.ColumnType
+	IfNotExists        bool
+	Constraints        []Constraint
+	constraints        []sql.Constraint
+	foreignConstraints []foreignConstraint
 }
 
 func (stmt *CreateTable) String() string {
@@ -85,18 +164,7 @@ func (stmt *CreateTable) String() string {
 		}
 	}
 	for _, c := range stmt.Constraints {
-		switch c.Type {
-		case sql.DefaultConstraint:
-		case sql.NotNullConstraint:
-		case sql.PrimaryConstraint:
-			s += fmt.Sprintf(", PRIMARY KEY %s", c.Key)
-		case sql.UniqueConstraint:
-			s += fmt.Sprintf(", UNIQUE %s", c.Key)
-		case sql.CheckConstraint:
-		case sql.ForeignConstraint:
-		default:
-			panic(fmt.Sprintf("unexpected constraint type: %d", c.Type))
-		}
+		s += c.String()
 	}
 	s += ")"
 	return s
@@ -133,40 +201,53 @@ func (stmt *CreateTable) Plan(ses *evaluate.Session, tx sql.Transaction) (interf
 	stmt.Table = ses.ResolveTableName(stmt.Table)
 
 	for _, con := range stmt.Constraints {
-		var key []sql.ColumnKey
-		if len(con.Key.Columns) > 0 {
-			var err error
-			key, err = indexKeyToColumnKeys(con.Key, stmt.Columns)
-			if err != nil {
-				return nil, fmt.Errorf("engine: %s in key for table %s", err, stmt.Table)
-			}
-		}
+		if con.Type == sql.ForeignConstraint {
+			fk := con.ForeignKey
+			fk.RefTable = ses.ResolveTableName(fk.RefTable)
+			stmt.foreignConstraints = append(stmt.foreignConstraints,
+				foreignConstraint{
+					name:       con.Name,
+					foreignKey: fk,
+				})
+		} else {
+			var key []sql.ColumnKey
+			var check sql.CExpr
+			var checkExpr string
 
-		var check sql.CExpr
-		var checkExpr string
-		if con.Check != nil {
-			var err error
-			var cctx expr.CompileContext
-			if con.ColNum >= 0 {
-				cctx = columnCheck{stmt.Columns[con.ColNum], con.ColNum}
-			} else {
-				cctx = tableCheck(stmt.Columns)
+			switch con.Type {
+			case sql.PrimaryConstraint:
+				fallthrough
+			case sql.UniqueConstraint:
+				var err error
+				key, err = indexKeyToColumnKeys(con.Key, stmt.Columns)
+				if err != nil {
+					return nil, fmt.Errorf("engine: %s in key for table %s", err, stmt.Table)
+				}
+			case sql.CheckConstraint:
+				var err error
+				var cctx expr.CompileContext
+				if con.ColNum >= 0 {
+					cctx = columnCheck{stmt.Columns[con.ColNum], con.ColNum}
+				} else {
+					cctx = tableCheck(stmt.Columns)
+				}
+				check, err = expr.Compile(ses, tx, cctx, con.Check)
+				if err != nil {
+					return nil, err
+				}
+				checkExpr = con.Check.String()
 			}
-			check, err = expr.Compile(ses, tx, cctx, con.Check)
-			if err != nil {
-				return nil, err
-			}
-			checkExpr = con.Check.String()
-		}
 
-		stmt.constraints = append(stmt.constraints, sql.Constraint{
-			Type:      con.Type,
-			Name:      con.Name,
-			ColNum:    con.ColNum,
-			Key:       key,
-			Check:     check,
-			CheckExpr: checkExpr,
-		})
+			stmt.constraints = append(stmt.constraints,
+				sql.Constraint{
+					Type:      con.Type,
+					Name:      con.Name,
+					ColNum:    con.ColNum,
+					Key:       key,
+					Check:     check,
+					CheckExpr: checkExpr,
+				})
+		}
 	}
 
 	for _, ct := range stmt.ColumnTypes {
@@ -194,8 +275,74 @@ func (stmt *CreateTable) Plan(ses *evaluate.Session, tx sql.Transaction) (interf
 	return stmt, nil
 }
 
+func (stmt *CreateTable) prepareForeignConstraint(ctx context.Context, e sql.Engine,
+	tx sql.Transaction, fc foreignConstraint) error {
+
+	fk := fc.foreignKey
+	_, tt, err := e.LookupTable(ctx, tx, fk.RefTable)
+	if err != nil {
+		return err
+	}
+
+	var refCols []int
+	if len(fk.RefColumns) == 0 {
+		for _, ck := range tt.PrimaryKey() {
+			refCols = append(refCols, ck.Column())
+		}
+	} else {
+		refColumns := tt.Columns()
+		for _, col := range fk.RefColumns {
+			num, ok := columnNumber(col, refColumns)
+			if !ok {
+				return fmt.Errorf("engine: table %s: reference column %s to table %s not found",
+					stmt.Table, col, fk.RefTable)
+			}
+			refCols = append(refCols, num)
+		}
+	}
+
+	if len(refCols) != len(fk.KeyColumns) {
+		return fmt.Errorf("engine: table %s: foreign constraint %s: different column counts",
+			stmt.Table, fc.name)
+	}
+
+	var keyCols []int
+	refColTypes := tt.ColumnTypes()
+	for idx, col := range fk.KeyColumns {
+		num, ok := columnNumber(col, stmt.Columns)
+		if !ok {
+			return fmt.Errorf("engine: table %s: foreign key column %s not found", stmt.Table, col)
+		}
+		if stmt.columnTypes[num].Type != refColTypes[refCols[idx]].Type {
+			return fmt.Errorf(
+				"engine: table %s: foreign key column %s and reference column %s type mismatch",
+				stmt.Table, col, tt.Columns()[refCols[idx]])
+		}
+		keyCols = append(keyCols, num)
+	}
+
+	stmt.constraints = append(stmt.constraints,
+		sql.Constraint{
+			Type: sql.ForeignConstraint,
+			Name: fc.name,
+			ForeignKey: sql.ForeignKey{
+				KeyColumns: keyCols,
+				RefTable:   fk.RefTable,
+				RefColumns: refCols,
+			},
+		})
+	return nil
+}
+
 func (stmt *CreateTable) Execute(ctx context.Context, e sql.Engine, tx sql.Transaction) (int64,
 	error) {
+
+	for _, fc := range stmt.foreignConstraints {
+		err := stmt.prepareForeignConstraint(ctx, e, tx, fc)
+		if err != nil {
+			return -1, err
+		}
+	}
 
 	err := e.CreateTable(ctx, tx, stmt.Table, stmt.Columns, stmt.columnTypes, stmt.constraints,
 		stmt.IfNotExists)

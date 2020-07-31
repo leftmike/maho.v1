@@ -11,16 +11,63 @@ import (
 )
 
 func TestCreateTableString(t *testing.T) {
-	s := datadef.CreateTable{
-		Table: sql.TableName{
-			Database: sql.ID("xyz"),
-			Schema:   sql.ID("mno"),
-			Table:    sql.ID("abc"),
+	cases := []struct {
+		stmt datadef.CreateTable
+		sql  string
+	}{
+		{
+			stmt: datadef.CreateTable{
+				Table: sql.TableName{
+					Database: sql.ID("xyz"),
+					Schema:   sql.ID("mno"),
+					Table:    sql.ID("abc"),
+				},
+			},
+			sql: "CREATE TABLE xyz.mno.abc ()",
+		},
+		{
+			stmt: datadef.CreateTable{
+				Table:   sql.TableName{Table: sql.ID("t")},
+				Columns: []sql.Identifier{sql.ID("c1"), sql.ID("c2"), sql.ID("c3"), sql.ID("c4")},
+				ColumnTypes: []datadef.ColumnType{
+					{Type: sql.IntegerType, Size: 4},
+					{Type: sql.IntegerType, Size: 4},
+					{Type: sql.IntegerType, Size: 4},
+					{Type: sql.IntegerType, Size: 4, NotNull: true},
+				},
+				Constraints: []datadef.Constraint{
+					{
+						Type:   sql.NotNullConstraint,
+						Name:   sql.ID("foreign_1"),
+						ColNum: 3,
+					},
+					{
+						Type: sql.ForeignConstraint,
+						Name: sql.ID("foreign_2"),
+						ForeignKey: datadef.ForeignKey{
+							KeyColumns: []sql.Identifier{sql.ID("c1"), sql.ID("c2")},
+							RefTable:   sql.TableName{Table: sql.ID("t2")},
+						},
+					},
+					{
+						Type: sql.ForeignConstraint,
+						Name: sql.ID("fkey"),
+						ForeignKey: datadef.ForeignKey{
+							KeyColumns: []sql.Identifier{sql.ID("c3"), sql.ID("c4"), sql.ID("c2")},
+							RefTable:   sql.TableName{Table: sql.ID("t3")},
+							RefColumns: []sql.Identifier{sql.ID("p1"), sql.ID("p2"), sql.ID("p3")},
+						},
+					},
+				},
+			},
+			sql: "CREATE TABLE t (c1 INT, c2 INT, c3 INT, c4 INT NOT NULL, CONSTRAINT foreign_2 FOREIGN KEY (c1, c2) REFERENCES t2 (), CONSTRAINT fkey FOREIGN KEY (c3, c4, c2) REFERENCES t3 (p1, p2, p3))",
 		},
 	}
-	r := "CREATE TABLE xyz.mno.abc ()"
-	if s.String() != r {
-		t.Errorf("CreateTable{}.String() got %s want %s", s.String(), r)
+
+	for _, c := range cases {
+		if c.stmt.String() != c.sql {
+			t.Errorf("CreateTable{}.String() got %s want %s", c.stmt.String(), c.sql)
+		}
 	}
 }
 

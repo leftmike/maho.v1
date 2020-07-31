@@ -53,7 +53,6 @@ const (
 	AND Identifier = -(iota + 1)
 	AS
 	ASC
-	ATTACH
 	BEGIN
 	BY
 	CHECK
@@ -136,7 +135,6 @@ var knownKeywords = map[string]struct {
 	"AND":         {AND, true},
 	"AS":          {AS, true},
 	"ASC":         {ASC, true},
-	"ATTACH":      {ATTACH, true},
 	"BEGIN":       {BEGIN, true},
 	"BY":          {BY, true},
 	"BIGINT":      {BIGINT, false},

@@ -15,13 +15,20 @@ const (
 	ForeignConstraint
 )
 
+type ForeignKey struct {
+	KeyColumns []int
+	RefTable   TableName
+	RefColumns []int
+}
+
 type Constraint struct {
-	Type      ConstraintType
-	Name      Identifier
-	ColNum    int         // Default, NotNull, and Column Check constraints
-	Key       []ColumnKey // Primary and Unique constraints
-	Check     CExpr       // Check constraints
-	CheckExpr string
+	Type       ConstraintType
+	Name       Identifier
+	ColNum     int         // Default, NotNull, and Column Check constraints
+	Key        []ColumnKey // Primary and Unique constraints
+	Check      CExpr       // Check constraints
+	CheckExpr  string
+	ForeignKey ForeignKey
 }
 
 func (ct ConstraintType) String() string {
