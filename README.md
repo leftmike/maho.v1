@@ -54,6 +54,7 @@ CREATE DATABASE database
 
 ```
 CREATE [UNIQUE] INDEX [IF NOT EXISTS] index ON table
+    [USING btree]
     '(' column [ASC | DESC] [, ...] ')'
 ```
 

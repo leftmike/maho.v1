@@ -15,6 +15,7 @@ const (
 	BLOB
 	BOOL
 	BOOLEAN
+	BTREE
 	BYTEA
 	BYTES
 	CHAR
@@ -112,6 +113,7 @@ const (
 )
 
 var knownIdentifiers = map[string]Identifier{
+	"btree":       BTREE,
 	"columns":     COLUMNS,
 	"constraints": CONSTRAINTS,
 	"count":       COUNT,

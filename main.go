@@ -45,7 +45,6 @@ To Do:
 - conditional expressions: CASE, COALESCE, NULLIF, GREATEST, LEAST
 
 - indexes
--- parse (and ignore) USING type to CREATE INDEX
 -- storage tests of indexes
 -- add create unique index test to sqltest/
 -- add create index test to sqltest/

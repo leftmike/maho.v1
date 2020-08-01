@@ -720,6 +720,8 @@ func TestCreateIndex(t *testing.T) {
 		{sql: "create index unique idx on tbl (c1)", fail: true},
 		{sql: "create index idx tbl (c1)", fail: true},
 		{sql: "create index tbl (c1)", fail: true},
+		{sql: "create index idx on tbl using (c1 DESC, c2)", fail: true},
+		{sql: "create index idx on tbl using tree (c1 DESC, c2)", fail: true},
 		{
 			sql: "create index idx on tbl (c1 DESC, c2)",
 			stmt: datadef.CreateIndex{
@@ -732,7 +734,7 @@ func TestCreateIndex(t *testing.T) {
 			},
 		},
 		{
-			sql: "create unique index if not exists idx on tbl (c1)",
+			sql: "create unique index if not exists idx on tbl using btree (c1)",
 			stmt: datadef.CreateIndex{
 				Table: sql.TableName{Table: sql.ID("tbl")},
 				Index: sql.ID("idx"),

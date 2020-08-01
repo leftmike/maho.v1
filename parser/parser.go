@@ -808,7 +808,9 @@ func (p *parser) parseColumn(s *datadef.CreateTable) {
 }
 
 func (p *parser) parseCreateIndex(unique bool) evaluate.Stmt {
-	// CREATE [UNIQUE] INDEX [IF NOT EXISTS] index ON table '(' column [ASC | DESC] [, ...] ')'
+	// CREATE [UNIQUE] INDEX [IF NOT EXISTS] index ON table
+	//    [USING btree]
+	//     '(' column [ASC | DESC] [, ...] ')'
 	var s datadef.CreateIndex
 
 	if p.optionalReserved(sql.IF) {
@@ -819,6 +821,13 @@ func (p *parser) parseCreateIndex(unique bool) evaluate.Stmt {
 	s.Index = p.expectIdentifier("expected an index")
 	p.expectReserved(sql.ON)
 	s.Table = p.parseTableName()
+
+	if p.optionalReserved(sql.USING) {
+		if p.expectIdentifier("expected btree") != sql.BTREE {
+			p.error(fmt.Sprintf("expected btree, got %s", p.got()))
+		}
+	}
+
 	s.Key = p.parseKey(unique)
 	return &s
 }
