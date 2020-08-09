@@ -29,8 +29,9 @@ type typedTable struct {
 }
 
 type TypedRows struct {
-	ttbl *typedTable
-	rows engine.Rows
+	ttbl   *typedTable
+	rows   engine.Rows
+	curRow []sql.Value
 }
 
 func MakeTypedTable(tn sql.TableName, tbl engine.Table, tt *engine.TableType) *typedTable {
@@ -236,9 +237,10 @@ func (r *TypedRows) Next(ctx context.Context, destObj interface{}) error {
 		ttbl.rowType = rowType
 	}
 
-	dest := make([]sql.Value, len(ttbl.rowFields))
-	err := r.rows.Next(ctx, dest)
+	var err error
+	r.curRow, err = r.rows.Next(ctx)
 	if err != nil {
+		r.curRow = nil
 		return err
 	}
 
@@ -248,14 +250,14 @@ func (r *TypedRows) Next(ctx context.Context, destObj interface{}) error {
 		}
 
 		v := rowVal.Field(cf.index)
-		if dest[cdx] == nil {
+		if r.curRow[cdx] == nil {
 			v.Set(reflect.Zero(v.Type()))
 			continue
 		}
 
 		switch cf.dataType {
 		case sql.BooleanType:
-			bv, ok := dest[cdx].(sql.BoolValue)
+			bv, ok := r.curRow[cdx].(sql.BoolValue)
 			if ok {
 				b := bool(bv)
 				if cf.pointer {
@@ -265,7 +267,7 @@ func (r *TypedRows) Next(ctx context.Context, destObj interface{}) error {
 				}
 			}
 		case sql.StringType:
-			sv, ok := dest[cdx].(sql.StringValue)
+			sv, ok := r.curRow[cdx].(sql.StringValue)
 			if ok {
 				s := string(sv)
 				if cf.pointer {
@@ -275,12 +277,12 @@ func (r *TypedRows) Next(ctx context.Context, destObj interface{}) error {
 				}
 			}
 		case sql.BytesType:
-			b, ok := dest[cdx].(sql.BytesValue)
+			b, ok := r.curRow[cdx].(sql.BytesValue)
 			if ok {
 				v.SetBytes([]byte(b))
 			}
 		case sql.FloatType:
-			fv, ok := dest[cdx].(sql.Float64Value)
+			fv, ok := r.curRow[cdx].(sql.Float64Value)
 			if ok {
 				f := float64(fv)
 				if cf.pointer {
@@ -290,7 +292,7 @@ func (r *TypedRows) Next(ctx context.Context, destObj interface{}) error {
 				}
 			}
 		case sql.IntegerType:
-			iv, ok := dest[cdx].(sql.Int64Value)
+			iv, ok := r.curRow[cdx].(sql.Int64Value)
 			if ok {
 				i := int64(iv)
 				if cf.pointer {
@@ -357,10 +359,9 @@ func (r *TypedRows) Update(ctx context.Context, updateObj interface{}) error {
 		ttbl.updateType = updateType
 	}
 
+	updateRow := append(make([]sql.Value, 0, len(r.curRow)), r.curRow...)
 	updates := make([]sql.ColumnUpdate, len(ttbl.updateFields))
 	for fdx, cf := range ttbl.updateFields {
-		updates[fdx].Column = cf.index
-
 		v := updateVal.Field(fdx)
 		if cf.pointer {
 			if v.IsNil() {
@@ -369,21 +370,26 @@ func (r *TypedRows) Update(ctx context.Context, updateObj interface{}) error {
 			v = v.Elem()
 		}
 
+		var val sql.Value
 		switch cf.dataType {
 		case sql.BooleanType:
-			updates[fdx].Value = sql.BoolValue(v.Bool())
+			val = sql.BoolValue(v.Bool())
 		case sql.StringType:
-			updates[fdx].Value = sql.StringValue(v.String())
+			val = sql.StringValue(v.String())
 		case sql.BytesType:
-			updates[fdx].Value = sql.BytesValue(v.Bytes())
+			val = sql.BytesValue(v.Bytes())
 		case sql.FloatType:
-			updates[fdx].Value = sql.Float64Value(v.Float())
+			val = sql.Float64Value(v.Float())
 		case sql.IntegerType:
-			updates[fdx].Value = sql.Int64Value(v.Int())
+			val = sql.Int64Value(v.Int())
 		}
+
+		updates[fdx].Column = cf.index
+		updates[fdx].Value = val
+		updateRow[cf.index] = val
 	}
 
-	return r.rows.Update(ctx, updates, nil)
+	return r.rows.Update(ctx, updates, updateRow)
 }
 
 func NullBoolean(b bool) *bool {

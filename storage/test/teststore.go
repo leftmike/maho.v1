@@ -81,15 +81,17 @@ func allRows(t *testing.T, ctx context.Context, rows engine.Rows,
 	all := [][]sql.Value{}
 	l := len(rows.Columns())
 	for {
-		dest := make([]sql.Value, l)
-		err := rows.Next(ctx, dest)
+		dest, err := rows.Next(ctx)
 		if err == io.EOF {
 			break
 		} else if err != nil {
 			t.Errorf("%srows.Next(): failed with %s", fln, err)
 			return nil
 		}
-		all = append(all, dest)
+		if l != len(dest) {
+			fmt.Printf("l: %d len(dest): %d\n", l, len(dest))
+		}
+		all = append(all, append(make([]sql.Value, 0, l), dest...))
 	}
 
 	err := rows.Close()
@@ -97,6 +99,17 @@ func allRows(t *testing.T, ctx context.Context, rows engine.Rows,
 		t.Errorf("%srows.Close(): failed with %s", fln, err)
 	}
 	return all
+}
+
+func rowUpdate(ctx context.Context, rows engine.Rows, updates []sql.ColumnUpdate,
+	curRow []sql.Value) error {
+
+	updateRow := append(make([]sql.Value, 0, len(curRow)), curRow...)
+	for _, update := range updates {
+		updateRow[update.Column] = update.Value
+	}
+
+	return rows.Update(ctx, updates, updateRow)
 }
 
 func testDatabase(t *testing.T, st *storage.Store, dbname sql.Identifier, cmds []storeCmd) {
@@ -284,9 +297,8 @@ func testDatabase(t *testing.T, st *storage.Store, dbname sql.Identifier, cmds [
 			if err != nil {
 				t.Errorf("%stable.Rows() failed with %s", cmd.fln, err)
 			} else {
-				dest := make([]sql.Value, len(rows.Columns()))
 				for {
-					err = rows.Next(ctx, dest)
+					dest, err := rows.Next(ctx)
 					if err != nil {
 						if !cmd.fail {
 							t.Errorf("%srows.Next() failed with %s", cmd.fln, err)
@@ -294,7 +306,7 @@ func testDatabase(t *testing.T, st *storage.Store, dbname sql.Identifier, cmds [
 						break
 					}
 					if i64, ok := dest[0].(sql.Int64Value); ok && int(i64) == cmd.rowID {
-						err = rows.Update(ctx, cmd.updates, nil)
+						err = rowUpdate(ctx, rows, cmd.updates, dest)
 						if cmd.fail {
 							if err == nil {
 								t.Errorf("%srows.Update() did not fail", cmd.fln)
@@ -316,9 +328,8 @@ func testDatabase(t *testing.T, st *storage.Store, dbname sql.Identifier, cmds [
 			if err != nil {
 				t.Errorf("%stable.Rows() failed with %s", cmd.fln, err)
 			} else {
-				dest := make([]sql.Value, len(rows.Columns()))
 				for {
-					err = rows.Next(ctx, dest)
+					dest, err := rows.Next(ctx)
 					if err != nil {
 						if !cmd.fail {
 							t.Errorf("%srows.Next() failed with %s", cmd.fln, err)
@@ -1327,9 +1338,8 @@ func incColumn(t *testing.T, st *storage.Store, tx sql.Transaction, tdx uint64, 
 		}
 	}()
 
-	dest := make([]sql.Value, len(rows.Columns()))
 	for {
-		err = rows.Next(ctx, dest)
+		dest, err := rows.Next(ctx)
 		if err != nil {
 			if err != io.EOF {
 				t.Errorf("rows.Next() failed with %s", err)
@@ -1338,8 +1348,8 @@ func incColumn(t *testing.T, st *storage.Store, tx sql.Transaction, tdx uint64, 
 		}
 		if i64, ok := dest[0].(sql.Int64Value); ok && int(i64) == i {
 			v := int(dest[1].(sql.Int64Value))
-			err = rows.Update(ctx,
-				[]sql.ColumnUpdate{{Column: 1, Value: sql.Int64Value(v + 1)}}, nil)
+			err = rowUpdate(ctx, rows,
+				[]sql.ColumnUpdate{{Column: 1, Value: sql.Int64Value(v + 1)}}, dest)
 			if err == nil {
 				//fmt.Printf("%d: %d -> %d\n", tdx, i, v+1)
 				return true

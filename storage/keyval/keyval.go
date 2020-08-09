@@ -378,7 +378,7 @@ func (kvr *rows) Close() error {
 	return nil
 }
 
-func (kvr *rows) Next(ctx context.Context, dest []sql.Value) error {
+func (kvr *rows) Next(ctx context.Context) ([]sql.Value, error) {
 	kvr.curRow = nil
 	for kvr.curRow == nil {
 		if kvr.it != nil {
@@ -413,7 +413,7 @@ func (kvr *rows) Next(ctx context.Context, dest []sql.Value) error {
 					kvr.it = nil
 					break
 				} else if err != nil {
-					return err
+					return nil, err
 				}
 			}
 		}
@@ -450,12 +450,11 @@ func (kvr *rows) Next(ctx context.Context, dest []sql.Value) error {
 			kvr.itRow = nil
 			kvr.itKey = nil
 		} else {
-			return io.EOF
+			return nil, io.EOF
 		}
 	}
 
-	copy(dest, kvr.curRow)
-	return nil
+	return kvr.curRow, nil
 }
 
 func (kvr *rows) Delete(ctx context.Context) error {
@@ -494,24 +493,12 @@ func (kvt *table) updateIndexes(ctx context.Context, updates []sql.ColumnUpdate,
 }
 
 func (kvr *rows) Update(ctx context.Context, updates []sql.ColumnUpdate,
-	check func(row []sql.Value) error) error {
+	updateRow []sql.Value) error {
 
 	kvr.tbl.tx.forWrite()
 
 	if kvr.curRow == nil {
 		panic(fmt.Sprintf("keyval: table %s no row to update", kvr.tbl.tn))
-	}
-
-	updateRow := append(make([]sql.Value, 0, len(kvr.curRow)), kvr.curRow...)
-	for _, update := range updates {
-		updateRow[update.Column] = update.Value
-	}
-
-	if check != nil {
-		err := check(updateRow)
-		if err != nil {
-			return err
-		}
 	}
 
 	if kvr.tbl.tl.PrimaryUpdated(updates) {

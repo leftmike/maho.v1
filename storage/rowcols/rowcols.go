@@ -380,14 +380,13 @@ func (rcr *rows) Close() error {
 	return nil
 }
 
-func (rcr *rows) Next(ctx context.Context, dest []sql.Value) error {
+func (rcr *rows) Next(ctx context.Context) ([]sql.Value, error) {
 	if rcr.idx == len(rcr.rows) {
-		return io.EOF
+		return nil, io.EOF
 	}
 
-	copy(dest, rcr.rows[rcr.idx])
 	rcr.idx += 1
-	return nil
+	return rcr.rows[rcr.idx-1], nil
 }
 
 func (rcr *rows) Delete(ctx context.Context) error {
@@ -426,24 +425,12 @@ func (rct *table) updateIndexes(ctx context.Context, updates []sql.ColumnUpdate,
 }
 
 func (rcr *rows) Update(ctx context.Context, updates []sql.ColumnUpdate,
-	check func(row []sql.Value) error) error {
+	updateRow []sql.Value) error {
 
 	rcr.tbl.tx.forWrite()
 
 	if rcr.idx == 0 {
 		panic(fmt.Sprintf("rowcols: table %s no row to update", rcr.tbl.tn))
-	}
-
-	updateRow := append(make([]sql.Value, 0, len(rcr.rows[rcr.idx-1])), rcr.rows[rcr.idx-1]...)
-	for _, update := range updates {
-		updateRow[update.Column] = update.Value
-	}
-
-	if check != nil {
-		err := check(updateRow)
-		if err != nil {
-			return err
-		}
 	}
 
 	if rcr.tbl.tl.PrimaryUpdated(updates) {

@@ -200,14 +200,13 @@ func (br *rows) Close() error {
 	return nil
 }
 
-func (br *rows) Next(ctx context.Context, dest []sql.Value) error {
+func (br *rows) Next(ctx context.Context) ([]sql.Value, error) {
 	if br.idx == len(br.rows) {
-		return io.EOF
+		return nil, io.EOF
 	}
 
-	copy(dest, br.rows[br.idx])
 	br.idx += 1
-	return nil
+	return br.rows[br.idx-1], nil
 }
 
 func (br *rows) Delete(ctx context.Context) error {
@@ -258,24 +257,12 @@ func (bt *table) updateIndexes(ctx context.Context, updates []sql.ColumnUpdate,
 }
 
 func (br *rows) Update(ctx context.Context, updates []sql.ColumnUpdate,
-	check func(row []sql.Value) error) error {
+	updateRow []sql.Value) error {
 
 	br.tbl.tx.forWrite()
 
 	if br.idx == 0 {
 		panic(fmt.Sprintf("basic: table %s no row to update", br.tbl.tn))
-	}
-
-	updateRow := append(make([]sql.Value, 0, len(br.rows[br.idx-1])), br.rows[br.idx-1]...)
-	for _, update := range updates {
-		updateRow[update.Column] = update.Value
-	}
-
-	if check != nil {
-		err := check(updateRow)
-		if err != nil {
-			return err
-		}
 	}
 
 	if br.tbl.tl.PrimaryUpdated(updates) {

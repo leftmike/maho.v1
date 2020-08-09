@@ -17,10 +17,9 @@ type Table interface {
 type Rows interface {
 	Columns() []sql.Identifier
 	Close() error
-	Next(ctx context.Context, dest []sql.Value) error
+	Next(ctx context.Context) ([]sql.Value, error)
 	Delete(ctx context.Context) error
-	Update(ctx context.Context, updates []sql.ColumnUpdate,
-		check func(row []sql.Value) error) error
+	Update(ctx context.Context, updates []sql.ColumnUpdate, updateRow []sql.Value) error
 }
 
 type store interface {

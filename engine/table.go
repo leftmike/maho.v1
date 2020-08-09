@@ -17,8 +17,9 @@ type table struct {
 }
 
 type rows struct {
-	tbl  *table
-	rows Rows
+	tbl    *table
+	rows   Rows
+	curRow []sql.Value
 }
 
 func makeTable(tn sql.TableName, st Table, tt *TableType) (*table, sql.TableType, error) {
@@ -155,7 +156,9 @@ func (tbl *table) Insert(ctx context.Context, row []sql.Value) error {
 	return tbl.st.Insert(ctx, row)
 }
 
-func (tbl *table) update(ctx context.Context, r Rows, updates []sql.ColumnUpdate) error {
+func (tbl *table) update(ctx context.Context, r Rows, updates []sql.ColumnUpdate,
+	curRow []sql.Value) error {
+
 	cols := tbl.tt.cols
 	colTypes := tbl.tt.colTypes
 	for _, up := range updates {
@@ -168,26 +171,25 @@ func (tbl *table) update(ctx context.Context, r Rows, updates []sql.ColumnUpdate
 		}
 	}
 
-	if len(tbl.tt.checks) == 0 {
-		return r.Update(ctx, updates, nil)
+	updateRow := append(make([]sql.Value, 0, len(curRow)), curRow...)
+	for _, update := range updates {
+		updateRow[update.Column] = update.Value
 	}
 
-	return r.Update(ctx, updates,
-		func(row []sql.Value) error {
-			for _, chk := range tbl.tt.checks {
-				val, err := chk.check.Eval(ctx, rowContext(row))
-				if err != nil {
-					return fmt.Errorf("engine: table %s: constraint: %s: %s", tbl.tn, chk.name,
-						err)
-				}
-				if val != nil {
-					if b, ok := val.(sql.BoolValue); ok && b == sql.BoolValue(false) {
-						return fmt.Errorf("engine: table %s: check: %s: failed", tbl.tn, chk.name)
-					}
-				}
+	for _, chk := range tbl.tt.checks {
+		val, err := chk.check.Eval(ctx, rowContext(updateRow))
+		if err != nil {
+			return fmt.Errorf("engine: table %s: constraint: %s: %s", tbl.tn, chk.name,
+				err)
+		}
+		if val != nil {
+			if b, ok := val.(sql.BoolValue); ok && b == sql.BoolValue(false) {
+				return fmt.Errorf("engine: table %s: check: %s: failed", tbl.tn, chk.name)
 			}
-			return nil
-		})
+		}
+	}
+
+	return r.Update(ctx, updates, updateRow)
 }
 
 func (r *rows) Columns() []sql.Identifier {
@@ -201,7 +203,14 @@ func (r *rows) Close() error {
 }
 
 func (r *rows) Next(ctx context.Context, dest []sql.Value) error {
-	return r.rows.Next(ctx, dest)
+	var err error
+	r.curRow, err = r.rows.Next(ctx)
+	if err != nil {
+		r.curRow = nil
+		return err
+	}
+	copy(dest, r.curRow)
+	return nil
 }
 
 func (r *rows) Delete(ctx context.Context) error {
@@ -209,5 +218,9 @@ func (r *rows) Delete(ctx context.Context) error {
 }
 
 func (r *rows) Update(ctx context.Context, updates []sql.ColumnUpdate) error {
-	return r.tbl.update(ctx, r.rows, updates)
+	if r.curRow == nil {
+		panic(fmt.Sprintf("engine: table %s no row to update", r.tbl.tn))
+	}
+
+	return r.tbl.update(ctx, r.rows, updates, r.curRow)
 }

@@ -682,13 +682,13 @@ func (kvr *rows) Close() error {
 	return nil
 }
 
-func (kvr *rows) Next(ctx context.Context, dest []sql.Value) error {
+func (kvr *rows) Next(ctx context.Context) ([]sql.Value, error) {
 	if kvr.idx == len(kvr.rows) {
-		return io.EOF
+		return nil, io.EOF
 	}
-	copy(dest, kvr.rows[kvr.idx])
+
 	kvr.idx += 1
-	return nil
+	return kvr.rows[kvr.idx-1], nil
 }
 
 func (kvr *rows) Delete(ctx context.Context) error {
@@ -752,22 +752,10 @@ func (kvt *table) updateIndexes(upd Updater, updates []sql.ColumnUpdate,
 }
 
 func (kvr *rows) Update(ctx context.Context, updates []sql.ColumnUpdate,
-	check func(row []sql.Value) error) error {
+	updateRow []sql.Value) error {
 
 	if kvr.idx == 0 {
 		panic(fmt.Sprintf("kvrows: table %s no row to update", kvr.tbl.tn))
-	}
-
-	updateRow := append(make([]sql.Value, 0, len(kvr.rows[kvr.idx-1])), kvr.rows[kvr.idx-1]...)
-	for _, update := range updates {
-		updateRow[update.Column] = update.Value
-	}
-
-	if check != nil {
-		err := check(updateRow)
-		if err != nil {
-			return err
-		}
 	}
 
 	upd, err := kvr.tbl.st.kv.Update()
