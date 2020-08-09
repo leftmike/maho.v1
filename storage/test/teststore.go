@@ -105,11 +105,13 @@ func rowUpdate(ctx context.Context, rows engine.Rows, updates []sql.ColumnUpdate
 	curRow []sql.Value) error {
 
 	updateRow := append(make([]sql.Value, 0, len(curRow)), curRow...)
+	updatedCols := make([]int, 0, len(updates))
 	for _, update := range updates {
 		updateRow[update.Column] = update.Value
+		updatedCols = append(updatedCols, update.Column)
 	}
 
-	return rows.Update(ctx, updates, updateRow)
+	return rows.Update(ctx, updatedCols, updateRow)
 }
 
 func testDatabase(t *testing.T, st *storage.Store, dbname sql.Identifier, cmds []storeCmd) {

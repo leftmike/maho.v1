@@ -405,10 +405,10 @@ func (rcr *rows) Delete(ctx context.Context) error {
 	return nil
 }
 
-func (rct *table) updateIndexes(ctx context.Context, updates []sql.ColumnUpdate,
+func (rct *table) updateIndexes(ctx context.Context, updatedCols []int,
 	row, updateRow []sql.Value) error {
 
-	indexes, updated := rct.tl.IndexesUpdated(updates)
+	indexes, updated := rct.tl.IndexesUpdated(updatedCols)
 	for idx := range indexes {
 		il := indexes[idx]
 		if updated[idx] {
@@ -424,16 +424,14 @@ func (rct *table) updateIndexes(ctx context.Context, updates []sql.ColumnUpdate,
 	return nil
 }
 
-func (rcr *rows) Update(ctx context.Context, updates []sql.ColumnUpdate,
-	updateRow []sql.Value) error {
-
+func (rcr *rows) Update(ctx context.Context, updatedCols []int, updateRow []sql.Value) error {
 	rcr.tbl.tx.forWrite()
 
 	if rcr.idx == 0 {
 		panic(fmt.Sprintf("rowcols: table %s no row to update", rcr.tbl.tn))
 	}
 
-	if rcr.tbl.tl.PrimaryUpdated(updates) {
+	if rcr.tbl.tl.PrimaryUpdated(updatedCols) {
 		rcr.Delete(ctx)
 		err := rcr.tbl.Insert(ctx, updateRow)
 		if err != nil {
@@ -443,5 +441,5 @@ func (rcr *rows) Update(ctx context.Context, updates []sql.ColumnUpdate,
 		rcr.tbl.tx.delta.ReplaceOrInsert(rcr.tbl.toItem(updateRow, false))
 	}
 
-	return rcr.tbl.updateIndexes(ctx, updates, rcr.rows[rcr.idx-1], updateRow)
+	return rcr.tbl.updateIndexes(ctx, updatedCols, rcr.rows[rcr.idx-1], updateRow)
 }

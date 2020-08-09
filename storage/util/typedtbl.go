@@ -360,7 +360,7 @@ func (r *TypedRows) Update(ctx context.Context, updateObj interface{}) error {
 	}
 
 	updateRow := append(make([]sql.Value, 0, len(r.curRow)), r.curRow...)
-	updates := make([]sql.ColumnUpdate, len(ttbl.updateFields))
+	updatedCols := make([]int, 0, len(ttbl.updateFields))
 	for fdx, cf := range ttbl.updateFields {
 		v := updateVal.Field(fdx)
 		if cf.pointer {
@@ -384,12 +384,11 @@ func (r *TypedRows) Update(ctx context.Context, updateObj interface{}) error {
 			val = sql.Int64Value(v.Int())
 		}
 
-		updates[fdx].Column = cf.index
-		updates[fdx].Value = val
+		updatedCols = append(updatedCols, cf.index)
 		updateRow[cf.index] = val
 	}
 
-	return r.rows.Update(ctx, updates, updateRow)
+	return r.rows.Update(ctx, updatedCols, updateRow)
 }
 
 func NullBoolean(b bool) *bool {

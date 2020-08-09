@@ -172,8 +172,10 @@ func (tbl *table) update(ctx context.Context, r Rows, updates []sql.ColumnUpdate
 	}
 
 	updateRow := append(make([]sql.Value, 0, len(curRow)), curRow...)
+	updatedCols := make([]int, 0, len(updates))
 	for _, update := range updates {
 		updateRow[update.Column] = update.Value
+		updatedCols = append(updatedCols, update.Column)
 	}
 
 	for _, chk := range tbl.tt.checks {
@@ -189,7 +191,7 @@ func (tbl *table) update(ctx context.Context, r Rows, updates []sql.ColumnUpdate
 		}
 	}
 
-	return r.Update(ctx, updates, updateRow)
+	return r.Update(ctx, updatedCols, updateRow)
 }
 
 func (r *rows) Columns() []sql.Identifier {

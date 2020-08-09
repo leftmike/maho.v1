@@ -719,10 +719,10 @@ func (kvr *rows) Delete(ctx context.Context) error {
 	return upd.Commit()
 }
 
-func (kvt *table) updateIndexes(upd Updater, updates []sql.ColumnUpdate,
+func (kvt *table) updateIndexes(upd Updater, updatedCols []int,
 	row, updateRow []sql.Value) error {
 
-	indexes, updated := kvt.tl.IndexesUpdated(updates)
+	indexes, updated := kvt.tl.IndexesUpdated(updatedCols)
 	for idx := range indexes {
 		il := indexes[idx]
 		if updated[idx] {
@@ -751,9 +751,7 @@ func (kvt *table) updateIndexes(upd Updater, updates []sql.ColumnUpdate,
 	return nil
 }
 
-func (kvr *rows) Update(ctx context.Context, updates []sql.ColumnUpdate,
-	updateRow []sql.Value) error {
-
+func (kvr *rows) Update(ctx context.Context, updatedCols []int, updateRow []sql.Value) error {
 	if kvr.idx == 0 {
 		panic(fmt.Sprintf("kvrows: table %s no row to update", kvr.tbl.tn))
 	}
@@ -763,7 +761,7 @@ func (kvr *rows) Update(ctx context.Context, updates []sql.ColumnUpdate,
 		return err
 	}
 
-	if kvr.tbl.tl.PrimaryUpdated(updates) {
+	if kvr.tbl.tl.PrimaryUpdated(updatedCols) {
 		err = kvr.tbl.proposeUpdate(upd, kvr.tbl.makePrimaryKey(kvr.rows[kvr.idx-1]), nil, true)
 		if err != nil {
 			upd.Rollback()
@@ -783,7 +781,7 @@ func (kvr *rows) Update(ctx context.Context, updates []sql.ColumnUpdate,
 		}
 	}
 
-	err = kvr.tbl.updateIndexes(upd, updates, kvr.rows[kvr.idx-1], updateRow)
+	err = kvr.tbl.updateIndexes(upd, updatedCols, kvr.rows[kvr.idx-1], updateRow)
 	if err != nil {
 		upd.Rollback()
 		return err

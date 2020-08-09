@@ -473,10 +473,10 @@ func (kvr *rows) Delete(ctx context.Context) error {
 	return nil
 }
 
-func (kvt *table) updateIndexes(ctx context.Context, updates []sql.ColumnUpdate,
+func (kvt *table) updateIndexes(ctx context.Context, updatedCols []int,
 	row, updateRow []sql.Value) error {
 
-	indexes, updated := kvt.tl.IndexesUpdated(updates)
+	indexes, updated := kvt.tl.IndexesUpdated(updatedCols)
 	for idx := range indexes {
 		il := indexes[idx]
 		if updated[idx] {
@@ -492,16 +492,14 @@ func (kvt *table) updateIndexes(ctx context.Context, updates []sql.ColumnUpdate,
 	return nil
 }
 
-func (kvr *rows) Update(ctx context.Context, updates []sql.ColumnUpdate,
-	updateRow []sql.Value) error {
-
+func (kvr *rows) Update(ctx context.Context, updatedCols []int, updateRow []sql.Value) error {
 	kvr.tbl.tx.forWrite()
 
 	if kvr.curRow == nil {
 		panic(fmt.Sprintf("keyval: table %s no row to update", kvr.tbl.tn))
 	}
 
-	if kvr.tbl.tl.PrimaryUpdated(updates) {
+	if kvr.tbl.tl.PrimaryUpdated(updatedCols) {
 		kvr.Delete(ctx)
 		err := kvr.tbl.Insert(ctx, updateRow)
 		if err != nil {
@@ -511,5 +509,5 @@ func (kvr *rows) Update(ctx context.Context, updates []sql.ColumnUpdate,
 		kvr.tbl.tx.delta.ReplaceOrInsert(kvr.tbl.toItem(updateRow, false))
 	}
 
-	return kvr.tbl.updateIndexes(ctx, updates, kvr.curRow, updateRow)
+	return kvr.tbl.updateIndexes(ctx, updatedCols, kvr.curRow, updateRow)
 }

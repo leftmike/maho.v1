@@ -230,10 +230,10 @@ func (br *rows) Delete(ctx context.Context) error {
 	return nil
 }
 
-func (bt *table) updateIndexes(ctx context.Context, updates []sql.ColumnUpdate,
+func (bt *table) updateIndexes(ctx context.Context, updatedCols []int,
 	row, updateRow []sql.Value) error {
 
-	indexes, updated := bt.tl.IndexesUpdated(updates)
+	indexes, updated := bt.tl.IndexesUpdated(updatedCols)
 	for idx := range indexes {
 		il := indexes[idx]
 		if updated[idx] {
@@ -256,16 +256,14 @@ func (bt *table) updateIndexes(ctx context.Context, updates []sql.ColumnUpdate,
 	return nil
 }
 
-func (br *rows) Update(ctx context.Context, updates []sql.ColumnUpdate,
-	updateRow []sql.Value) error {
-
+func (br *rows) Update(ctx context.Context, updatedCols []int, updateRow []sql.Value) error {
 	br.tbl.tx.forWrite()
 
 	if br.idx == 0 {
 		panic(fmt.Sprintf("basic: table %s no row to update", br.tbl.tn))
 	}
 
-	if br.tbl.tl.PrimaryUpdated(updates) {
+	if br.tbl.tl.PrimaryUpdated(updatedCols) {
 		err := br.Delete(ctx)
 		if err != nil {
 			return err
@@ -279,5 +277,5 @@ func (br *rows) Update(ctx context.Context, updates []sql.ColumnUpdate,
 		br.tbl.tx.tree.ReplaceOrInsert(br.tbl.toItem(updateRow))
 	}
 
-	return br.tbl.updateIndexes(ctx, updates, br.rows[br.idx-1], updateRow)
+	return br.tbl.updateIndexes(ctx, updatedCols, br.rows[br.idx-1], updateRow)
 }

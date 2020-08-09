@@ -99,11 +99,11 @@ func (tl *TableLayout) PrimaryKey() []sql.ColumnKey {
 	return tl.tt.PrimaryKey()
 }
 
-func (tl *TableLayout) PrimaryUpdated(updates []sql.ColumnUpdate) bool {
+func (tl *TableLayout) PrimaryUpdated(updatedCols []int) bool {
 	primary := tl.tt.PrimaryKey()
-	for _, update := range updates {
+	for _, col := range updatedCols {
 		for _, ck := range primary {
-			if ck.Column() == update.Column {
+			if ck.Column() == col {
 				return true
 			}
 		}
@@ -120,10 +120,10 @@ func (tl *TableLayout) IndexName(idx int) sql.Identifier {
 	return tl.tt.Indexes()[idx].Name
 }
 
-func columnUpdated(cols []int, updates []sql.ColumnUpdate) bool {
+func columnUpdated(cols []int, updatedCols []int) bool {
 	for _, col := range cols {
-		for _, upd := range updates {
-			if col == upd.Column {
+		for _, upd := range updatedCols {
+			if col == upd {
 				return true
 			}
 		}
@@ -132,10 +132,10 @@ func columnUpdated(cols []int, updates []sql.ColumnUpdate) bool {
 	return false
 }
 
-func (il IndexLayout) keyUpdated(updates []sql.ColumnUpdate) bool {
-	for _, update := range updates {
+func (il IndexLayout) keyUpdated(updatedCols []int) bool {
+	for _, upd := range updatedCols {
 		for _, ck := range il.Key {
-			if il.Columns[ck.Column()] == update.Column {
+			if il.Columns[ck.Column()] == upd {
 				return true
 			}
 		}
@@ -144,14 +144,14 @@ func (il IndexLayout) keyUpdated(updates []sql.ColumnUpdate) bool {
 	return false
 }
 
-func (tl *TableLayout) IndexesUpdated(updates []sql.ColumnUpdate) ([]IndexLayout, []bool) {
+func (tl *TableLayout) IndexesUpdated(updatedCols []int) ([]IndexLayout, []bool) {
 	var indexes []IndexLayout
 	var indexUpdated []bool
 
 	for _, il := range tl.indexes {
-		if columnUpdated(il.Columns, updates) {
+		if columnUpdated(il.Columns, updatedCols) {
 			indexes = append(indexes, il)
-			indexUpdated = append(indexUpdated, il.keyUpdated(updates))
+			indexUpdated = append(indexUpdated, il.keyUpdated(updatedCols))
 		}
 	}
 

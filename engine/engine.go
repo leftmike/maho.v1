@@ -19,7 +19,7 @@ type Rows interface {
 	Close() error
 	Next(ctx context.Context) ([]sql.Value, error)
 	Delete(ctx context.Context) error
-	Update(ctx context.Context, updates []sql.ColumnUpdate, updateRow []sql.Value) error
+	Update(ctx context.Context, updatedCols []int, updateRow []sql.Value) error
 }
 
 type store interface {
