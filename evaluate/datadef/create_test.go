@@ -56,7 +56,7 @@ func TestCreateTableString(t *testing.T) {
 					},
 				},
 			},
-			sql: "CREATE TABLE t (c1 INT, c2 INT, c3 INT, c4 INT NOT NULL, CONSTRAINT foreign_2 FOREIGN KEY (c1, c2) REFERENCES t2 (), CONSTRAINT fkey FOREIGN KEY (c3, c4, c2) REFERENCES t3 (p1, p2, p3))",
+			sql: "CREATE TABLE t (c1 INT, c2 INT, c3 INT, c4 INT NOT NULL, CONSTRAINT foreign_2 FOREIGN KEY (c1, c2) REFERENCES t2, CONSTRAINT fkey FOREIGN KEY (c3, c4, c2) REFERENCES t3 (p1, p2, p3))",
 		},
 	}
 

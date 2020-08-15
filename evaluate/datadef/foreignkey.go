@@ -24,14 +24,17 @@ func (fk ForeignKey) String() string {
 		}
 		s += c.String()
 	}
-	s += fmt.Sprintf(") REFERENCES %s (", fk.IncomingTable)
-	for i, c := range fk.IncomingCols {
-		if i > 0 {
-			s += ", "
+	s += fmt.Sprintf(") REFERENCES %s", fk.IncomingTable)
+	if len(fk.IncomingCols) > 0 {
+		s += " ("
+		for i, c := range fk.IncomingCols {
+			if i > 0 {
+				s += ", "
+			}
+			s += c.String()
 		}
-		s += c.String()
+		s += ")"
 	}
-	s += ")"
 	return s
 }
 
@@ -110,8 +113,96 @@ func (stmt *CreateTable) prepareForeignConstraint(ctx context.Context, e sql.Eng
 }
 */
 
+func (fk *ForeignKey) Prepare(ott, itt sql.TableType, ofkr *sql.OutgoingFKRef,
+	ifkr *sql.IncomingFKRef) error {
+
+	var inCols []int
+	var outCols []int
+	var index sql.Identifier
+	if len(fk.IncomingCols) == 0 {
+		pk := itt.PrimaryKey()
+		if len(pk) != len(fk.OutgoingCols) {
+			return fmt.Errorf(
+				"engine: table %s: foreign key constraint %s: different column counts",
+				fk.OutgoingTable, fk.Name)
+		}
+
+		for _, ck := range pk {
+			inCols = append(inCols, ck.Column())
+		}
+
+		for _, col := range fk.OutgoingCols {
+			num, ok := columnNumber(col, ott.Columns())
+			if !ok {
+				return fmt.Errorf("engine: table %s: foreign key column %s not found",
+					fk.OutgoingTable, col)
+			}
+			outCols = append(outCols, num)
+		}
+	} else {
+		panic("not implemented yet")
+		/*
+			if len(fk.OutgoingCols) != len(fk.IncomingCols) {
+				return -1, fmt.Errorf(
+					"engine: table %s: foreign key constraint %s: different column counts",
+					fk.OutgoingTable, fk.Name)
+			}
+
+			for _, it := range itt.Indexes() {
+				if len(it.Key) != len(fk.IncomingCols) {
+					continue
+				}
+
+			}
+			_ = index
+		*/
+	}
+
+	*ofkr = sql.OutgoingFKRef{
+		Name:    fk.Name,
+		Columns: outCols,
+		Table:   fk.IncomingTable,
+		Index:   index,
+	}
+
+	*ifkr = sql.IncomingFKRef{
+		Name:         fk.Name,
+		OutgoingCols: outCols,
+		Table:        fk.OutgoingTable,
+		IncomingCols: inCols,
+	}
+
+	return nil
+}
+
 func (fk *ForeignKey) Execute(ctx context.Context, e sql.Engine, tx sql.Transaction) (int64,
 	error) {
+
+	_, ott, err := e.LookupTable(ctx, tx, fk.OutgoingTable)
+	if err != nil {
+		return -1, err
+	}
+	_, itt, err := e.LookupTable(ctx, tx, fk.IncomingTable)
+	if err != nil {
+		return -1, err
+	}
+
+	var ofkr sql.OutgoingFKRef
+	var ifkr sql.IncomingFKRef
+	err = fk.Prepare(ott, itt, &ofkr, &ifkr)
+	if err != nil {
+		return -1, err
+	}
+
+	err = e.AddOutgoingFKRef(ctx, tx, fk.OutgoingTable, ofkr)
+	if err != nil {
+		return -1, err
+	}
+
+	err = e.AddIncomingFKRef(ctx, tx, fk.IncomingTable, ifkr)
+	if err != nil {
+		return -1, err
+	}
 
 	return -1, nil
 }
