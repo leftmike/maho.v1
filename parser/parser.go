@@ -508,7 +508,7 @@ func (p *parser) parseCreateDetails(s *datadef.CreateTable) {
 
 			p.expectReserved(sql.REFERENCES)
 
-			rtn := p.parseTableName()
+			ttn := p.parseTableName()
 			var rcols []sql.Identifier
 			if p.maybeToken(token.LParen) {
 				for {
@@ -525,9 +525,9 @@ func (p *parser) parseCreateDetails(s *datadef.CreateTable) {
 					Type: sql.ForeignConstraint,
 					Name: p.makeConstraintName(cn, s.Constraints, "foreign_"),
 					ForeignKey: datadef.ForeignKey{
-						KeyColumns: cols,
-						RefTable:   rtn,
-						RefColumns: rcols,
+						FromColumns: cols,
+						Table:       ttn,
+						ToColumns:   rcols,
 					},
 				})
 		} else if cn != 0 {
@@ -780,7 +780,7 @@ func (p *parser) parseColumn(s *datadef.CreateTable) {
 				})
 			p.expectTokens(token.RParen)
 		} else if p.optionalReserved(sql.REFERENCES) {
-			rtn := p.parseTableName()
+			ttn := p.parseTableName()
 			var rcols []sql.Identifier
 			if p.maybeToken(token.LParen) {
 				rcols = []sql.Identifier{p.expectIdentifier("expected a column name")}
@@ -792,9 +792,9 @@ func (p *parser) parseColumn(s *datadef.CreateTable) {
 					Type: sql.ForeignConstraint,
 					Name: p.makeConstraintName(cn, s.Constraints, "foreign_"),
 					ForeignKey: datadef.ForeignKey{
-						KeyColumns: []sql.Identifier{nam},
-						RefTable:   rtn,
-						RefColumns: rcols,
+						FromColumns: []sql.Identifier{nam},
+						Table:       ttn,
+						ToColumns:   rcols,
 					},
 				})
 		} else if cn != 0 {

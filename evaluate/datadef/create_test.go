@@ -45,17 +45,17 @@ func TestCreateTableString(t *testing.T) {
 						Type: sql.ForeignConstraint,
 						Name: sql.ID("foreign_2"),
 						ForeignKey: datadef.ForeignKey{
-							KeyColumns: []sql.Identifier{sql.ID("c1"), sql.ID("c2")},
-							RefTable:   sql.TableName{Table: sql.ID("t2")},
+							FromColumns: []sql.Identifier{sql.ID("c1"), sql.ID("c2")},
+							Table:       sql.TableName{Table: sql.ID("t2")},
 						},
 					},
 					{
 						Type: sql.ForeignConstraint,
 						Name: sql.ID("fkey"),
 						ForeignKey: datadef.ForeignKey{
-							KeyColumns: []sql.Identifier{sql.ID("c3"), sql.ID("c4"), sql.ID("c2")},
-							RefTable:   sql.TableName{Table: sql.ID("t3")},
-							RefColumns: []sql.Identifier{sql.ID("p1"), sql.ID("p2"), sql.ID("p3")},
+							FromColumns: []sql.Identifier{sql.ID("c3"), sql.ID("c4"), sql.ID("c2")},
+							Table:       sql.TableName{Table: sql.ID("t3")},
+							ToColumns:   []sql.Identifier{sql.ID("p1"), sql.ID("p2"), sql.ID("p3")},
 						},
 					},
 				},

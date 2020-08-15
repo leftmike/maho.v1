@@ -68,21 +68,21 @@ func indexKeyToColumnKeys(ik IndexKey, columns []sql.Identifier) ([]sql.ColumnKe
 }
 
 type ForeignKey struct {
-	KeyColumns []sql.Identifier
-	RefTable   sql.TableName
-	RefColumns []sql.Identifier
+	FromColumns []sql.Identifier
+	Table       sql.TableName
+	ToColumns   []sql.Identifier
 }
 
 func (fk ForeignKey) String() string {
 	s := "FOREIGN KEY ("
-	for i, c := range fk.KeyColumns {
+	for i, c := range fk.FromColumns {
 		if i > 0 {
 			s += ", "
 		}
 		s += c.String()
 	}
-	s += fmt.Sprintf(") REFERENCES %s (", fk.RefTable)
-	for i, c := range fk.RefColumns {
+	s += fmt.Sprintf(") REFERENCES %s (", fk.Table)
+	for i, c := range fk.ToColumns {
 		if i > 0 {
 			s += ", "
 		}
@@ -203,7 +203,7 @@ func (stmt *CreateTable) Plan(ses *evaluate.Session, tx sql.Transaction) (interf
 	for _, con := range stmt.Constraints {
 		if con.Type == sql.ForeignConstraint {
 			fk := con.ForeignKey
-			fk.RefTable = ses.ResolveTableName(fk.RefTable)
+			fk.Table = ses.ResolveTableName(fk.Table)
 			stmt.foreignConstraints = append(stmt.foreignConstraints,
 				foreignConstraint{
 					name:       con.Name,
@@ -279,36 +279,36 @@ func (stmt *CreateTable) prepareForeignConstraint(ctx context.Context, e sql.Eng
 	tx sql.Transaction, fc foreignConstraint) error {
 
 	fk := fc.foreignKey
-	_, tt, err := e.LookupTable(ctx, tx, fk.RefTable)
+	_, tt, err := e.LookupTable(ctx, tx, fk.Table)
 	if err != nil {
 		return err
 	}
 
 	var refCols []int
-	if len(fk.RefColumns) == 0 {
+	if len(fk.ToColumns) == 0 {
 		for _, ck := range tt.PrimaryKey() {
 			refCols = append(refCols, ck.Column())
 		}
 	} else {
 		refColumns := tt.Columns()
-		for _, col := range fk.RefColumns {
+		for _, col := range fk.ToColumns {
 			num, ok := columnNumber(col, refColumns)
 			if !ok {
 				return fmt.Errorf("engine: table %s: reference column %s to table %s not found",
-					stmt.Table, col, fk.RefTable)
+					stmt.Table, col, fk.Table)
 			}
 			refCols = append(refCols, num)
 		}
 	}
 
-	if len(refCols) != len(fk.KeyColumns) {
+	if len(refCols) != len(fk.FromColumns) {
 		return fmt.Errorf("engine: table %s: foreign constraint %s: different column counts",
 			stmt.Table, fc.name)
 	}
 
 	var keyCols []int
 	refColTypes := tt.ColumnTypes()
-	for idx, col := range fk.KeyColumns {
+	for idx, col := range fk.FromColumns {
 		num, ok := columnNumber(col, stmt.Columns)
 		if !ok {
 			return fmt.Errorf("engine: table %s: foreign key column %s not found", stmt.Table, col)
@@ -326,9 +326,9 @@ func (stmt *CreateTable) prepareForeignConstraint(ctx context.Context, e sql.Eng
 			Type: sql.ForeignConstraint,
 			Name: fc.name,
 			ForeignKey: sql.ForeignKey{
-				KeyColumns: keyCols,
-				RefTable:   fk.RefTable,
-				RefColumns: refCols,
+				FromColumns: keyCols,
+				Table:       fk.Table,
+				ToColumns:   refCols,
 			},
 		})
 	return nil

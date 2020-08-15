@@ -576,7 +576,13 @@ func (st *Store) DropTable(ctx context.Context, tx sql.Transaction, tn sql.Table
 	return rows.Delete(ctx)
 }
 
-func (st *Store) updateIndexes(ctx context.Context, tx sql.Transaction, tn sql.TableName,
+func (st *Store) UpdateType(ctx context.Context, tx sql.Transaction, tn sql.TableName,
+	tt *engine.TableType) error {
+
+	return st.updateLayout(ctx, tx, tn, tt, nil)
+}
+
+func (st *Store) updateLayout(ctx context.Context, tx sql.Transaction, tn sql.TableName,
 	tt *engine.TableType, update func(tl *TableLayout) error) error {
 
 	rows, err := st.lookupTable(ctx, tx, tn)
@@ -607,9 +613,11 @@ func (st *Store) updateIndexes(ctx context.Context, tx sql.Transaction, tn sql.T
 		return fmt.Errorf("%s: table %s: conflicting metadata update", st.name, tn)
 	}
 
-	err = update(tl)
-	if err != nil {
-		return err
+	if update != nil {
+		err = update(tl)
+		if err != nil {
+			return err
+		}
 	}
 
 	typmd, err := tt.Encode()
@@ -680,7 +688,7 @@ func (st *Store) MakeIndexType(tt *engine.TableType, nam sql.Identifier, key []s
 func (st *Store) AddIndex(ctx context.Context, tx sql.Transaction, tn sql.TableName,
 	tt *engine.TableType, it sql.IndexType) error {
 
-	return st.updateIndexes(ctx, tx, tn, tt,
+	return st.updateLayout(ctx, tx, tn, tt,
 		func(tl *TableLayout) error {
 			tl.addIndexLayout(it)
 			return nil
@@ -690,7 +698,7 @@ func (st *Store) AddIndex(ctx context.Context, tx sql.Transaction, tn sql.TableN
 func (st *Store) RemoveIndex(ctx context.Context, tx sql.Transaction, tn sql.TableName,
 	tt *engine.TableType, rdx int) error {
 
-	return st.updateIndexes(ctx, tx, tn, tt,
+	return st.updateLayout(ctx, tx, tn, tt,
 		func(tl *TableLayout) error {
 			indexes := make([]IndexLayout, 0, len(tl.indexes)-1)
 			for idx, il := range tl.indexes {

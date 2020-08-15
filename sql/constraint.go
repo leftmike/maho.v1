@@ -16,9 +16,9 @@ const (
 )
 
 type ForeignKey struct {
-	KeyColumns []int
-	RefTable   TableName
-	RefColumns []int
+	FromColumns []int
+	Table       TableName
+	ToColumns   []int
 }
 
 type Constraint struct {

@@ -34,6 +34,7 @@ type store interface {
 	CreateTable(ctx context.Context, tx sql.Transaction, tn sql.TableName, tt *TableType,
 		ifNotExists bool) error
 	DropTable(ctx context.Context, tx sql.Transaction, tn sql.TableName, ifExists bool) error
+	UpdateType(ctx context.Context, tx sql.Transaction, tn sql.TableName, tt *TableType) error
 
 	MakeIndexType(tt *TableType, nam sql.Identifier, key []sql.ColumnKey,
 		unique bool) sql.IndexType
