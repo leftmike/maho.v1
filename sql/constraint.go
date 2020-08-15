@@ -12,23 +12,29 @@ const (
 	PrimaryConstraint
 	UniqueConstraint
 	CheckConstraint
-	ForeignConstraint
 )
 
-type ForeignKey struct {
-	FromColumns []int
-	Table       TableName
-	ToColumns   []int
+type OutgoingFKRef struct {
+	Name    Identifier
+	Columns []int      // Foreign key columns in the outgoing table, ordered to match the index
+	Table   TableName  // Incoming table
+	Index   Identifier // Referenced index on the incoming table; 0 indicates primary
+}
+
+type IncomingFKRef struct {
+	Name         Identifier // Name of the constraint in the outgoing table
+	OutgoingCols []int      // Foreign key columns in the outgoing table
+	Table        TableName  // Outgoing table
+	IncomingCols []int      // Referenced columns in the incoming table
 }
 
 type Constraint struct {
-	Type       ConstraintType
-	Name       Identifier
-	ColNum     int         // Default, NotNull, and Column Check constraints
-	Key        []ColumnKey // Primary and Unique constraints
-	Check      CExpr       // Check constraints
-	CheckExpr  string
-	ForeignKey ForeignKey
+	Type      ConstraintType
+	Name      Identifier
+	ColNum    int         // Default, NotNull, and Column Check constraints
+	Key       []ColumnKey // Primary and Unique constraints
+	Check     CExpr       // Check constraints
+	CheckExpr string
 }
 
 func (ct ConstraintType) String() string {
@@ -43,8 +49,6 @@ func (ct ConstraintType) String() string {
 		return "UNIQUE"
 	case CheckConstraint:
 		return "CHECK"
-	case ForeignConstraint:
-		return "FOREIGN KEY"
 	default:
 		panic(fmt.Sprintf("unexpected constraint type: %d", ct))
 	}

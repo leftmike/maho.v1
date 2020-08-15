@@ -488,7 +488,7 @@ func (p *parser) parseCreateDetails(s *datadef.CreateTable) {
 			s.Constraints = append(s.Constraints,
 				datadef.Constraint{
 					Type:   sql.CheckConstraint,
-					Name:   p.makeConstraintName(cn, s.Constraints, "check_"),
+					Name:   p.makeConstraintName(cn, s, "check_"),
 					ColNum: -1,
 					Check:  p.parseExpr(),
 				})
@@ -509,10 +509,10 @@ func (p *parser) parseCreateDetails(s *datadef.CreateTable) {
 			p.expectReserved(sql.REFERENCES)
 
 			ttn := p.parseTableName()
-			var rcols []sql.Identifier
+			var incols []sql.Identifier
 			if p.maybeToken(token.LParen) {
 				for {
-					rcols = append(rcols, p.expectIdentifier("expected a column name"))
+					incols = append(incols, p.expectIdentifier("expected a column name"))
 					if p.maybeToken(token.RParen) {
 						break
 					}
@@ -520,15 +520,12 @@ func (p *parser) parseCreateDetails(s *datadef.CreateTable) {
 				}
 			}
 
-			s.Constraints = append(s.Constraints,
-				datadef.Constraint{
-					Type: sql.ForeignConstraint,
-					Name: p.makeConstraintName(cn, s.Constraints, "foreign_"),
-					ForeignKey: datadef.ForeignKey{
-						FromColumns: cols,
-						Table:       ttn,
-						ToColumns:   rcols,
-					},
+			s.ForeignKeys = append(s.ForeignKeys,
+				datadef.ForeignKey{
+					Name:          p.makeConstraintName(cn, s, "foreign_"),
+					OutgoingCols:  cols,
+					IncomingTable: ttn,
+					IncomingCols:  incols,
 				})
 		} else if cn != 0 {
 			p.error("CONSTRAINT name specified without a constraint")
@@ -673,28 +670,33 @@ func (p *parser) addColumnConstraint(s *datadef.CreateTable, ct sql.ConstraintTy
 		})
 }
 
-func duplicateName(cn sql.Identifier, cons []datadef.Constraint) bool {
-	for _, c := range cons {
+func duplicateName(cn sql.Identifier, s *datadef.CreateTable) bool {
+	for _, c := range s.Constraints {
 		if c.Name == cn {
+			return true
+		}
+	}
+	for _, fk := range s.ForeignKeys {
+		if fk.Name == cn {
 			return true
 		}
 	}
 	return false
 }
 
-func (p *parser) makeConstraintName(cn sql.Identifier, cons []datadef.Constraint,
+func (p *parser) makeConstraintName(cn sql.Identifier, s *datadef.CreateTable,
 	base string) sql.Identifier {
 
 	if cn == 0 {
 		cnt := 1
 		for {
 			cn = sql.ID(fmt.Sprintf("%s%d", base, cnt))
-			if !duplicateName(cn, cons) {
+			if !duplicateName(cn, s) {
 				break
 			}
 			cnt += 1
 		}
-	} else if duplicateName(cn, cons) {
+	} else if duplicateName(cn, s) {
 		p.error(fmt.Sprintf("duplicate constraint name: %s", cn))
 	}
 
@@ -774,28 +776,25 @@ func (p *parser) parseColumn(s *datadef.CreateTable) {
 			s.Constraints = append(s.Constraints,
 				datadef.Constraint{
 					Type:   sql.CheckConstraint,
-					Name:   p.makeConstraintName(cn, s.Constraints, "check_"),
+					Name:   p.makeConstraintName(cn, s, "check_"),
 					ColNum: len(s.Columns) - 1,
 					Check:  p.parseExpr(),
 				})
 			p.expectTokens(token.RParen)
 		} else if p.optionalReserved(sql.REFERENCES) {
 			ttn := p.parseTableName()
-			var rcols []sql.Identifier
+			var incols []sql.Identifier
 			if p.maybeToken(token.LParen) {
-				rcols = []sql.Identifier{p.expectIdentifier("expected a column name")}
+				incols = []sql.Identifier{p.expectIdentifier("expected a column name")}
 				p.expectTokens(token.RParen)
 			}
 
-			s.Constraints = append(s.Constraints,
-				datadef.Constraint{
-					Type: sql.ForeignConstraint,
-					Name: p.makeConstraintName(cn, s.Constraints, "foreign_"),
-					ForeignKey: datadef.ForeignKey{
-						FromColumns: []sql.Identifier{nam},
-						Table:       ttn,
-						ToColumns:   rcols,
-					},
+			s.ForeignKeys = append(s.ForeignKeys,
+				datadef.ForeignKey{
+					Name:          p.makeConstraintName(cn, s, "foreign_"),
+					OutgoingCols:  []sql.Identifier{nam},
+					IncomingTable: ttn,
+					IncomingCols:  incols,
 				})
 		} else if cn != 0 {
 			p.error("CONSTRAINT name specified without a constraint")

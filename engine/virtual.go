@@ -338,26 +338,6 @@ func appendConstraints(values [][]sql.Value, tn sql.TableName, tt *TableType) []
 		}
 	}
 
-	for _, con := range tt.constraints {
-		if con.typ == sql.DefaultConstraint || con.typ == sql.NotNullConstraint {
-			continue
-		}
-
-		if con.typ != sql.ForeignConstraint {
-			panic("expected a foreign key constraint")
-		}
-
-		values = append(values,
-			[]sql.Value{
-				sql.StringValue(tn.Database.String()),
-				sql.StringValue(tn.Schema.String()),
-				sql.StringValue(tn.Table.String()),
-				sql.StringValue(con.name.String()),
-				sql.StringValue("FOREIGN KEY"),
-				nil,
-			})
-	}
-
 	for _, chk := range tt.checks {
 		values = append(values,
 			[]sql.Value{

@@ -216,8 +216,6 @@ func (e *Engine) CreateTable(ctx context.Context, tx sql.Transaction, tn sql.Tab
 					check:     con.Check,
 					checkExpr: con.CheckExpr,
 				})
-		} else if con.Type == sql.ForeignConstraint {
-			// XXX: sql.ForeignConstraint
 		} else if con.Type == sql.UniqueConstraint {
 			it := e.st.MakeIndexType(tt, con.Name, con.Key, true)
 			tt.indexes = append(tt.indexes, it)
@@ -261,6 +259,20 @@ func (e *Engine) DropTable(ctx context.Context, tx sql.Transaction, tn sql.Table
 		return fmt.Errorf("engine: schema %s may not be modified", tn.Schema)
 	}
 	return e.st.DropTable(ctx, tx, tn, ifExists)
+}
+
+func (e *Engine) AddOutgoingFKRef(ctx context.Context, tx sql.Transaction, tn sql.TableName,
+	ofkr sql.OutgoingFKRef) error {
+
+	// XXX
+	return nil
+}
+
+func (e *Engine) AddIncomingFKRef(ctx context.Context, tx sql.Transaction, tn sql.TableName,
+	ifkr sql.IncomingFKRef) error {
+
+	// XXX
+	return nil
 }
 
 func (e *Engine) CreateIndex(ctx context.Context, tx sql.Transaction, idxname sql.Identifier,
