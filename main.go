@@ -52,12 +52,7 @@ To Do:
 -- engine.Table: IndexRows(...) => engine.IndexRows {Columns, Close, Next, Row}
 
 - foreign keys
--- referenced columns must be the columns of a unique or primary key constraint in the referenced
-   table
--- need to pass column names for foreign key into engine.go: otherwise, will need to lookup table
-   type to build SQL statement for checks and updates
--- maybe move column type checks into engine.go
--- create SQL (as structs) to check and update foreign key relations
+-- make create SQL (as structs) to check and update foreign key relations
 -- tests to verify that the structs match expected SQL
 -- ALTER TABLE ONLY table ADD CONSTRAINT constraint FOREIGN KEY ...
 -- check foreign keys on update, insert, and delete

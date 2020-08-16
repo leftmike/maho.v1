@@ -171,7 +171,7 @@ func (cc columnCheck) CompileRef(r expr.Ref) (int, error) {
 
 func (stmt *CreateTable) Plan(ses *evaluate.Session, tx sql.Transaction) (interface{}, error) {
 	for _, fk := range stmt.ForeignKeys {
-		fk.OutgoingTable = stmt.Table
+		fk.FKTable = stmt.Table
 		pfk, err := fk.Plan(ses, tx)
 		if err != nil {
 			return nil, err
@@ -255,6 +255,7 @@ func (stmt *CreateTable) Execute(ctx context.Context, e sql.Engine, tx sql.Trans
 	}
 
 	for _, fk := range stmt.foreignKeys {
+		tx.NextStmt()
 		_, err = fk.Execute(ctx, e, tx)
 		if err != nil {
 			return -1, err

@@ -261,15 +261,8 @@ func (e *Engine) DropTable(ctx context.Context, tx sql.Transaction, tn sql.Table
 	return e.st.DropTable(ctx, tx, tn, ifExists)
 }
 
-func (e *Engine) AddOutgoingFKRef(ctx context.Context, tx sql.Transaction, tn sql.TableName,
-	ofkr sql.OutgoingFKRef) error {
-
-	// XXX
-	return nil
-}
-
-func (e *Engine) AddIncomingFKRef(ctx context.Context, tx sql.Transaction, tn sql.TableName,
-	ifkr sql.IncomingFKRef) error {
+func (e *Engine) AddForeignKey(ctx context.Context, tx sql.Transaction, con sql.Identifier,
+	fktn sql.TableName, fkCols []int, rtn sql.TableName, ridx sql.Identifier) error {
 
 	// XXX
 	return nil

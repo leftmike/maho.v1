@@ -44,15 +44,15 @@ func TestCreateTableString(t *testing.T) {
 				},
 				ForeignKeys: []datadef.ForeignKey{
 					{
-						Name:          sql.ID("foreign_2"),
-						OutgoingCols:  []sql.Identifier{sql.ID("c1"), sql.ID("c2")},
-						IncomingTable: sql.TableName{Table: sql.ID("t2")},
+						Name:     sql.ID("foreign_2"),
+						FKCols:   []sql.Identifier{sql.ID("c1"), sql.ID("c2")},
+						RefTable: sql.TableName{Table: sql.ID("t2")},
 					},
 					{
-						Name:          sql.ID("fkey"),
-						OutgoingCols:  []sql.Identifier{sql.ID("c3"), sql.ID("c4"), sql.ID("c2")},
-						IncomingTable: sql.TableName{Table: sql.ID("t3")},
-						IncomingCols:  []sql.Identifier{sql.ID("p1"), sql.ID("p2"), sql.ID("p3")},
+						Name:     sql.ID("fkey"),
+						FKCols:   []sql.Identifier{sql.ID("c3"), sql.ID("c4"), sql.ID("c2")},
+						RefTable: sql.TableName{Table: sql.ID("t3")},
+						RefCols:  []sql.Identifier{sql.ID("p1"), sql.ID("p2"), sql.ID("p3")},
 					},
 				},
 			},

@@ -14,20 +14,6 @@ const (
 	CheckConstraint
 )
 
-type OutgoingFKRef struct {
-	Name    Identifier
-	Columns []int      // Foreign key columns in the outgoing table, ordered to match the index
-	Table   TableName  // Incoming table
-	Index   Identifier // Referenced index on the incoming table; 0 indicates primary
-}
-
-type IncomingFKRef struct {
-	Name         Identifier // Name of the constraint in the outgoing table
-	OutgoingCols []int      // Foreign key columns in the outgoing table
-	Table        TableName  // Outgoing table
-	IncomingCols []int      // Referenced columns in the incoming table
-}
-
 type Constraint struct {
 	Type      ConstraintType
 	Name      Identifier

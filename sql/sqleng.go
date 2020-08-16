@@ -45,8 +45,8 @@ type Engine interface {
 	CreateTable(ctx context.Context, tx Transaction, tn TableName, cols []Identifier,
 		colTypes []ColumnType, cons []Constraint, ifNotExists bool) error
 	DropTable(ctx context.Context, tx Transaction, tn TableName, ifExists bool) error
-	AddOutgoingFKRef(ctx context.Context, tx Transaction, tn TableName, ofkr OutgoingFKRef) error
-	AddIncomingFKRef(ctx context.Context, tx Transaction, tn TableName, ifkr IncomingFKRef) error
+	AddForeignKey(ctx context.Context, tx Transaction, con Identifier, fktn TableName,
+		fkCols []int, rtn TableName, ridx Identifier) error
 
 	CreateIndex(ctx context.Context, tx Transaction, idxname Identifier, tn TableName, unique bool,
 		keys []ColumnKey, ifNotExists bool) error

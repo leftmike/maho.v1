@@ -9,25 +9,25 @@ import (
 )
 
 type ForeignKey struct {
-	Name          sql.Identifier
-	OutgoingTable sql.TableName
-	OutgoingCols  []sql.Identifier
-	IncomingTable sql.TableName
-	IncomingCols  []sql.Identifier
+	Name     sql.Identifier
+	FKTable  sql.TableName
+	FKCols   []sql.Identifier
+	RefTable sql.TableName
+	RefCols  []sql.Identifier
 }
 
 func (fk ForeignKey) String() string {
 	s := fmt.Sprintf("CONSTRAINT %s FOREIGN KEY (", fk.Name)
-	for i, c := range fk.OutgoingCols {
+	for i, c := range fk.FKCols {
 		if i > 0 {
 			s += ", "
 		}
 		s += c.String()
 	}
-	s += fmt.Sprintf(") REFERENCES %s", fk.IncomingTable)
-	if len(fk.IncomingCols) > 0 {
+	s += fmt.Sprintf(") REFERENCES %s", fk.RefTable)
+	if len(fk.RefCols) > 0 {
 		s += " ("
-		for i, c := range fk.IncomingCols {
+		for i, c := range fk.RefCols {
 			if i > 0 {
 				s += ", "
 			}
@@ -40,169 +40,136 @@ func (fk ForeignKey) String() string {
 
 func (fk ForeignKey) Plan(ses *evaluate.Session, tx sql.Transaction) (interface{}, error) {
 
-	fk.OutgoingTable = ses.ResolveTableName(fk.OutgoingTable)
-	fk.IncomingTable = ses.ResolveTableName(fk.IncomingTable)
+	fk.FKTable = ses.ResolveTableName(fk.FKTable)
+	fk.RefTable = ses.ResolveTableName(fk.RefTable)
 
-	if fk.OutgoingTable.Database != fk.IncomingTable.Database {
+	if fk.FKTable.Database != fk.RefTable.Database {
 		return nil, fmt.Errorf(
 			"engine: table %s: foreign key reference not within same database: %s",
-			fk.OutgoingTable, fk.IncomingTable)
+			fk.FKTable, fk.RefTable)
 	}
 
 	return &fk, nil
 }
 
-/*
-func (stmt *CreateTable) prepareForeignConstraint(ctx context.Context, e sql.Engine,
-	tx sql.Transaction, fc foreignConstraint) error {
-
-	fk := fc.foreignKey
-	_, tt, err := e.LookupTable(ctx, tx, fk.Table)
-	if err != nil {
-		return err
-	}
-
-	var refCols []int
-	if len(fk.IncomingCols) == 0 {
-		for _, ck := range tt.PrimaryKey() {
-			refCols = append(refCols, ck.Column())
-		}
-	} else {
-		refColumns := tt.Columns()
-		for _, col := range fk.IncomingCols {
-			num, ok := columnNumber(col, refColumns)
-			if !ok {
-				return fmt.Errorf("engine: table %s: reference column %s to table %s not found",
-					stmt.Table, col, fk.Table)
-			}
-			refCols = append(refCols, num)
+func hasColumn(id sql.Identifier, cols []sql.Identifier) bool {
+	for _, col := range cols {
+		if id == col {
+			return true
 		}
 	}
-
-	if len(refCols) != len(fk.OutgoingCols) {
-		return fmt.Errorf("engine: table %s: foreign constraint %s: different column counts",
-			stmt.Table, fc.name)
-	}
-
-	var keyCols []int
-	refColTypes := tt.ColumnTypes()
-	for idx, col := range fk.OutgoingCols {
-		num, ok := columnNumber(col, stmt.Columns)
-		if !ok {
-			return fmt.Errorf("engine: table %s: foreign key column %s not found", stmt.Table, col)
-		}
-		if stmt.columnTypes[num].Type != refColTypes[refCols[idx]].Type {
-			return fmt.Errorf(
-				"engine: table %s: foreign key column %s and reference column %s type mismatch",
-				stmt.Table, col, tt.Columns()[refCols[idx]])
-		}
-		keyCols = append(keyCols, num)
-	}
-
-		stmt.constraints = append(stmt.constraints,
-			sql.Constraint{
-				Type: sql.ForeignConstraint,
-				Name: fc.name,
-				ForeignKey: sql.ForeignKey{
-					OutgoingCols: keyCols,
-					Table:       fk.Table,
-					IncomingCols:   refCols,
-				},
-			})
-	return nil
+	return false
 }
-*/
 
-func (fk *ForeignKey) Prepare(ott, itt sql.TableType, ofkr *sql.OutgoingFKRef,
-	ifkr *sql.IncomingFKRef) error {
+func matchIndexKey(cols []sql.Identifier, key []sql.ColumnKey, refCols []sql.Identifier) bool {
+	for _, ck := range key {
+		if !hasColumn(cols[ck.Column()], refCols) {
+			return false
+		}
+	}
+	return true
+}
 
-	var inCols []int
-	var outCols []int
-	var index sql.Identifier
-	if len(fk.IncomingCols) == 0 {
-		pk := itt.PrimaryKey()
-		if len(pk) != len(fk.OutgoingCols) {
-			return fmt.Errorf(
-				"engine: table %s: foreign key constraint %s: different column counts",
-				fk.OutgoingTable, fk.Name)
+func findIndex(rtt sql.TableType, refCols []sql.Identifier) (sql.IndexType, bool) {
+	for _, it := range rtt.Indexes() {
+		if !it.Unique || len(it.Key) != len(refCols) {
+			continue
 		}
 
-		for _, ck := range pk {
-			inCols = append(inCols, ck.Column())
+		if matchIndexKey(rtt.Columns(), it.Key, refCols) {
+			return it, true
 		}
+	}
 
-		for _, col := range fk.OutgoingCols {
-			num, ok := columnNumber(col, ott.Columns())
-			if !ok {
-				return fmt.Errorf("engine: table %s: foreign key column %s not found",
-					fk.OutgoingTable, col)
-			}
-			outCols = append(outCols, num)
+	return sql.IndexType{}, false
+}
+
+func orderFKCols(fkCols []int, rkey []sql.ColumnKey, refColIDs, refCols []sql.Identifier) []int {
+	nfkCols := make([]int, len(fkCols))
+	for rdx, ck := range rkey {
+		rcol := refColIDs[ck.Column()]
+		idx, ok := columnNumber(rcol, refCols)
+		if !ok {
+			panic("engine: internal error: missing reference column in key")
 		}
+		nfkCols[rdx] = fkCols[idx]
+	}
+
+	return nfkCols
+}
+
+func (fk *ForeignKey) Prepare(fktt, rtt sql.TableType) ([]int, sql.Identifier, error) {
+	var ridx sql.Identifier
+	var rkey []sql.ColumnKey
+	if len(fk.RefCols) == 0 {
+		rkey = rtt.PrimaryKey()
+	} else if matchIndexKey(rtt.Columns(), rtt.PrimaryKey(), fk.RefCols) {
+		rkey = rtt.PrimaryKey()
 	} else {
-		panic("not implemented yet")
-		/*
-			if len(fk.OutgoingCols) != len(fk.IncomingCols) {
-				return -1, fmt.Errorf(
-					"engine: table %s: foreign key constraint %s: different column counts",
-					fk.OutgoingTable, fk.Name)
-			}
+		it, ok := findIndex(rtt, fk.RefCols)
+		if !ok {
+			return nil, 0,
+				fmt.Errorf("engine: table %s: no unique index for foreign key reference to %s",
+					fk.FKTable, fk.RefTable)
+		}
 
-			for _, it := range itt.Indexes() {
-				if len(it.Key) != len(fk.IncomingCols) {
-					continue
-				}
-
-			}
-			_ = index
-		*/
+		ridx = it.Name
+		rkey = it.Key
 	}
 
-	*ofkr = sql.OutgoingFKRef{
-		Name:    fk.Name,
-		Columns: outCols,
-		Table:   fk.IncomingTable,
-		Index:   index,
+	if len(rkey) != len(fk.FKCols) {
+		return nil, 0,
+			fmt.Errorf("engine: table %s: foreign key constraint %s: different column counts",
+				fk.FKTable, fk.Name)
 	}
 
-	*ifkr = sql.IncomingFKRef{
-		Name:         fk.Name,
-		OutgoingCols: outCols,
-		Table:        fk.OutgoingTable,
-		IncomingCols: inCols,
+	var fkCols []int
+	fkColIDs := fktt.Columns()
+	for _, col := range fk.FKCols {
+		num, ok := columnNumber(col, fkColIDs)
+		if !ok {
+			return nil, 0,
+				fmt.Errorf("engine: table %s: foreign key column %s not found", fk.FKTable,
+					col)
+		}
+		fkCols = append(fkCols, num)
 	}
 
-	return nil
+	if len(fk.RefCols) > 1 {
+		fkCols = orderFKCols(fkCols, rkey, rtt.Columns(), fk.RefCols)
+	}
+
+	fkColTypes := fktt.ColumnTypes()
+	refColTypes := rtt.ColumnTypes()
+	for cdx, num := range fkCols {
+		fkct := fkColTypes[num]
+		rct := refColTypes[rkey[cdx].Column()]
+		if fkct.Type != rct.Type {
+			return nil, 0,
+				fmt.Errorf("engine: table %s: foreign key column type mismatch: %s and %s",
+					fk.FKTable, fktt.Columns()[num], rtt.Columns()[rkey[cdx].Column()])
+		}
+	}
+
+	return fkCols, ridx, nil
 }
 
 func (fk *ForeignKey) Execute(ctx context.Context, e sql.Engine, tx sql.Transaction) (int64,
 	error) {
 
-	_, ott, err := e.LookupTable(ctx, tx, fk.OutgoingTable)
+	_, fktt, err := e.LookupTable(ctx, tx, fk.FKTable)
 	if err != nil {
 		return -1, err
 	}
-	_, itt, err := e.LookupTable(ctx, tx, fk.IncomingTable)
-	if err != nil {
-		return -1, err
-	}
-
-	var ofkr sql.OutgoingFKRef
-	var ifkr sql.IncomingFKRef
-	err = fk.Prepare(ott, itt, &ofkr, &ifkr)
+	_, rtt, err := e.LookupTable(ctx, tx, fk.RefTable)
 	if err != nil {
 		return -1, err
 	}
 
-	err = e.AddOutgoingFKRef(ctx, tx, fk.OutgoingTable, ofkr)
+	fkCols, ridx, err := fk.Prepare(fktt, rtt)
 	if err != nil {
 		return -1, err
 	}
 
-	err = e.AddIncomingFKRef(ctx, tx, fk.IncomingTable, ifkr)
-	if err != nil {
-		return -1, err
-	}
-
-	return -1, nil
+	return -1, e.AddForeignKey(ctx, tx, fk.Name, fk.FKTable, fkCols, fk.RefTable, ridx)
 }

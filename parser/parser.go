@@ -508,11 +508,11 @@ func (p *parser) parseCreateDetails(s *datadef.CreateTable) {
 
 			p.expectReserved(sql.REFERENCES)
 
-			ttn := p.parseTableName()
-			var incols []sql.Identifier
+			rtn := p.parseTableName()
+			var refCols []sql.Identifier
 			if p.maybeToken(token.LParen) {
 				for {
-					incols = append(incols, p.expectIdentifier("expected a column name"))
+					refCols = append(refCols, p.expectIdentifier("expected a column name"))
 					if p.maybeToken(token.RParen) {
 						break
 					}
@@ -522,10 +522,10 @@ func (p *parser) parseCreateDetails(s *datadef.CreateTable) {
 
 			s.ForeignKeys = append(s.ForeignKeys,
 				datadef.ForeignKey{
-					Name:          p.makeConstraintName(cn, s, "foreign_"),
-					OutgoingCols:  cols,
-					IncomingTable: ttn,
-					IncomingCols:  incols,
+					Name:     p.makeConstraintName(cn, s, "foreign_"),
+					FKCols:   cols,
+					RefTable: rtn,
+					RefCols:  refCols,
 				})
 		} else if cn != 0 {
 			p.error("CONSTRAINT name specified without a constraint")
@@ -782,19 +782,19 @@ func (p *parser) parseColumn(s *datadef.CreateTable) {
 				})
 			p.expectTokens(token.RParen)
 		} else if p.optionalReserved(sql.REFERENCES) {
-			ttn := p.parseTableName()
-			var incols []sql.Identifier
+			rtn := p.parseTableName()
+			var refCols []sql.Identifier
 			if p.maybeToken(token.LParen) {
-				incols = []sql.Identifier{p.expectIdentifier("expected a column name")}
+				refCols = []sql.Identifier{p.expectIdentifier("expected a column name")}
 				p.expectTokens(token.RParen)
 			}
 
 			s.ForeignKeys = append(s.ForeignKeys,
 				datadef.ForeignKey{
-					Name:          p.makeConstraintName(cn, s, "foreign_"),
-					OutgoingCols:  []sql.Identifier{nam},
-					IncomingTable: ttn,
-					IncomingCols:  incols,
+					Name:     p.makeConstraintName(cn, s, "foreign_"),
+					FKCols:   []sql.Identifier{nam},
+					RefTable: rtn,
+					RefCols:  refCols,
 				})
 		} else if cn != 0 {
 			p.error("CONSTRAINT name specified without a constraint")
