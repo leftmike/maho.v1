@@ -61,7 +61,11 @@ func (ses *Session) Rollback() error {
 
 func (ses *Session) Run(stmt Stmt, run func(tx sql.Transaction, stmt Stmt) error) error {
 	if ses.tx != nil {
-		ses.tx.NextStmt()
+		err := ses.tx.NextStmt(ses.Context())
+		if err != nil {
+			return err
+		}
+
 		return run(ses.tx, stmt)
 	}
 	if _, ok := stmt.(*Begin); ok {

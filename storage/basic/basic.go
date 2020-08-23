@@ -57,7 +57,7 @@ func NewStore(dataDir string) (*storage.Store, error) {
 	return storage.NewStore("basic", bst, true)
 }
 
-func (_ *basicStore) Table(ctx context.Context, tx sql.Transaction, tn sql.TableName, tid int64,
+func (_ *basicStore) Table(ctx context.Context, tx engine.Transaction, tn sql.TableName, tid int64,
 	tt *engine.TableType, tl *storage.TableLayout) (engine.Table, error) {
 
 	if len(tt.PrimaryKey()) == 0 {
@@ -74,7 +74,7 @@ func (_ *basicStore) Table(ctx context.Context, tx sql.Transaction, tn sql.Table
 	}, nil
 }
 
-func (bst *basicStore) Begin(sesid uint64) sql.Transaction {
+func (bst *basicStore) Begin(sesid uint64) engine.Transaction {
 	bst.mutex.Lock()
 	return &transaction{
 		bst:  bst,

@@ -12,7 +12,7 @@ import (
 )
 
 type table struct {
-	tx   sql.Transaction
+	tx   *transaction
 	st   store
 	tn   sql.TableName
 	stbl Table
@@ -25,7 +25,7 @@ type rows struct {
 	curRow []sql.Value
 }
 
-func makeTable(tx sql.Transaction, st store, tn sql.TableName, stbl Table, tt *TableType) (*table,
+func makeTable(tx *transaction, st store, tn sql.TableName, stbl Table, tt *TableType) (*table,
 	sql.TableType, error) {
 
 	return &table{
@@ -161,7 +161,7 @@ func (tbl *table) Insert(ctx context.Context, row []sql.Value) error {
 	for _, fk := range tbl.tt.foreignKeys {
 		// XXX: check if any fk.keyCols are null and continue
 
-		rtbl, rtt, err := tbl.st.LookupTable(ctx, tbl.tx, fk.refTable)
+		rtbl, rtt, err := tbl.st.LookupTable(ctx, tbl.tx.tx, fk.refTable)
 		if err != nil {
 			return err
 		}

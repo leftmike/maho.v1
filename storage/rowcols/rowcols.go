@@ -81,7 +81,7 @@ func NewStore(dataDir string) (*storage.Store, error) {
 	return storage.NewStore("rowcols", rcst, init)
 }
 
-func (rcst *rowColsStore) Table(ctx context.Context, tx sql.Transaction, tn sql.TableName,
+func (rcst *rowColsStore) Table(ctx context.Context, tx engine.Transaction, tn sql.TableName,
 	tid int64, tt *engine.TableType, tl *storage.TableLayout) (engine.Table, error) {
 
 	if len(tt.PrimaryKey()) == 0 {
@@ -98,7 +98,7 @@ func (rcst *rowColsStore) Table(ctx context.Context, tx sql.Transaction, tn sql.
 	}, nil
 }
 
-func (rcst *rowColsStore) Begin(sesid uint64) sql.Transaction {
+func (rcst *rowColsStore) Begin(sesid uint64) engine.Transaction {
 	rcst.mutex.Lock()
 	defer rcst.mutex.Unlock()
 

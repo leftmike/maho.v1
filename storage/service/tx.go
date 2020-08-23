@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"sync"
 
+	"github.com/leftmike/maho/engine"
 	"github.com/leftmike/maho/sql"
 )
 
@@ -132,6 +133,6 @@ func (tx *Transaction) getContext(d Database) interface{} {
 	return tctx
 }
 
-func GetTxContext(tx sql.Transaction, d Database) interface{} {
+func GetTxContext(tx engine.Transaction, d Database) interface{} {
 	return tx.(*Transaction).getContext(d)
 }

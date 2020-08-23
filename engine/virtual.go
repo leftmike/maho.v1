@@ -90,7 +90,7 @@ func (e *Engine) listSchemas(ctx context.Context, tx sql.Transaction,
 	dbname sql.Identifier) ([]sql.Identifier, error) {
 
 	if dbname == sql.SYSTEM {
-		dbnames, err := e.st.ListDatabases(ctx, tx)
+		dbnames, err := e.st.ListDatabases(ctx, tx.(*transaction).tx)
 		if err != nil {
 			return nil, err
 		}
@@ -106,7 +106,7 @@ func (e *Engine) listSchemas(ctx context.Context, tx sql.Transaction,
 		}
 	}
 
-	scnames, err := e.st.ListSchemas(ctx, tx, dbname)
+	scnames, err := e.st.ListSchemas(ctx, tx.(*transaction).tx, dbname)
 	if err != nil {
 		return nil, err
 	}
@@ -158,7 +158,7 @@ func (e *Engine) listTables(ctx context.Context, tx sql.Transaction,
 		}
 		return tblnames, nil
 	}
-	return e.st.ListTables(ctx, tx, sn)
+	return e.st.ListTables(ctx, tx.(*transaction).tx, sn)
 }
 
 func (e *Engine) makeTablesTable(ctx context.Context, tx sql.Transaction,
@@ -424,7 +424,7 @@ func (e *Engine) makeConstraintsTable(ctx context.Context, tx sql.Transaction,
 func (e *Engine) makeDatabasesTable(ctx context.Context, tx sql.Transaction,
 	tn sql.TableName) (sql.Table, sql.TableType, error) {
 
-	dbnames, err := e.st.ListDatabases(ctx, tx)
+	dbnames, err := e.st.ListDatabases(ctx, tx.(*transaction).tx)
 	if err != nil {
 		return nil, nil, err
 	}

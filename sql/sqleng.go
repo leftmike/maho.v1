@@ -7,7 +7,7 @@ import (
 type Transaction interface {
 	Commit(ctx context.Context) error
 	Rollback() error
-	NextStmt()
+	NextStmt(ctx context.Context) error
 }
 
 type IndexType struct {

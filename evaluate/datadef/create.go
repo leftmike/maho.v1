@@ -255,7 +255,11 @@ func (stmt *CreateTable) Execute(ctx context.Context, e sql.Engine, tx sql.Trans
 	}
 
 	for _, fk := range stmt.foreignKeys {
-		tx.NextStmt()
+		err = tx.NextStmt(ctx)
+		if err != nil {
+			return -1, err
+		}
+
 		_, err = fk.Execute(ctx, e, tx)
 		if err != nil {
 			return -1, err

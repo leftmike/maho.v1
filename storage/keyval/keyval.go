@@ -124,7 +124,7 @@ func newStore(kv KV) (*storage.Store, error) {
 	return storage.NewStore("keyval", kvst, init)
 }
 
-func (kvst *keyValStore) Table(ctx context.Context, tx sql.Transaction, tn sql.TableName,
+func (kvst *keyValStore) Table(ctx context.Context, tx engine.Transaction, tn sql.TableName,
 	tid int64, tt *engine.TableType, tl *storage.TableLayout) (engine.Table, error) {
 
 	if len(tt.PrimaryKey()) == 0 {
@@ -141,7 +141,7 @@ func (kvst *keyValStore) Table(ctx context.Context, tx sql.Transaction, tn sql.T
 	}, nil
 }
 
-func (kvst *keyValStore) Begin(sesid uint64) sql.Transaction {
+func (kvst *keyValStore) Begin(sesid uint64) engine.Transaction {
 	kvst.mutex.Lock()
 	defer kvst.mutex.Unlock()
 

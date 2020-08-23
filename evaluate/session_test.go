@@ -37,42 +37,42 @@ func (st *testStore) DropDatabase(dbname sql.Identifier, ifExists bool,
 	return nil
 }
 
-func (st *testStore) CreateSchema(ctx context.Context, tx sql.Transaction,
+func (st *testStore) CreateSchema(ctx context.Context, tx engine.Transaction,
 	sn sql.SchemaName) error {
 
 	st.t.Error("CreateSchema should never be called")
 	return nil
 }
 
-func (st *testStore) DropSchema(ctx context.Context, tx sql.Transaction, sn sql.SchemaName,
+func (st *testStore) DropSchema(ctx context.Context, tx engine.Transaction, sn sql.SchemaName,
 	ifExists bool) error {
 
 	st.t.Error("DropSchema should never be called")
 	return nil
 }
 
-func (st *testStore) LookupTable(ctx context.Context, tx sql.Transaction,
+func (st *testStore) LookupTable(ctx context.Context, tx engine.Transaction,
 	tn sql.TableName) (engine.Table, *engine.TableType, error) {
 
 	st.t.Error("LookupTable should never be called")
 	return nil, nil, nil
 }
 
-func (st *testStore) CreateTable(ctx context.Context, tx sql.Transaction, tn sql.TableName,
+func (st *testStore) CreateTable(ctx context.Context, tx engine.Transaction, tn sql.TableName,
 	tt *engine.TableType, ifNotExists bool) error {
 
 	st.t.Error("CreateTable should never be called")
 	return nil
 }
 
-func (st *testStore) DropTable(ctx context.Context, tx sql.Transaction, tn sql.TableName,
+func (st *testStore) DropTable(ctx context.Context, tx engine.Transaction, tn sql.TableName,
 	ifExists bool) error {
 
 	st.t.Error("DropTable should never be called")
 	return nil
 }
 
-func (st *testStore) UpdateType(ctx context.Context, tx sql.Transaction, tn sql.TableName,
+func (st *testStore) UpdateType(ctx context.Context, tx engine.Transaction, tn sql.TableName,
 	tt *engine.TableType) error {
 
 	st.t.Error("UpdateType should never be called")
@@ -86,21 +86,21 @@ func (st *testStore) MakeIndexType(tt *engine.TableType, nam sql.Identifier, key
 	return sql.IndexType{}
 }
 
-func (st *testStore) AddIndex(ctx context.Context, tx sql.Transaction, tn sql.TableName,
+func (st *testStore) AddIndex(ctx context.Context, tx engine.Transaction, tn sql.TableName,
 	tt *engine.TableType, it sql.IndexType) error {
 
 	st.t.Error("AddIndex should never be called")
 	return nil
 }
 
-func (st *testStore) RemoveIndex(ctx context.Context, tx sql.Transaction, tn sql.TableName,
+func (st *testStore) RemoveIndex(ctx context.Context, tx engine.Transaction, tn sql.TableName,
 	tt *engine.TableType, rdx int) error {
 
 	st.t.Error("RemoveIndex should never be called")
 	return nil
 }
 
-func (st *testStore) Begin(sesid uint64) sql.Transaction {
+func (st *testStore) Begin(sesid uint64) engine.Transaction {
 	if len(st.transactions) == 0 {
 		st.t.Error("Begin called too many times on engine")
 	}
@@ -111,21 +111,21 @@ func (st *testStore) Begin(sesid uint64) sql.Transaction {
 	return &tx
 }
 
-func (st *testStore) ListDatabases(ctx context.Context, tx sql.Transaction) ([]sql.Identifier,
+func (st *testStore) ListDatabases(ctx context.Context, tx engine.Transaction) ([]sql.Identifier,
 	error) {
 
 	st.t.Error("ListDatabases should never be called")
 	return nil, nil
 }
 
-func (st *testStore) ListSchemas(ctx context.Context, tx sql.Transaction,
+func (st *testStore) ListSchemas(ctx context.Context, tx engine.Transaction,
 	dbname sql.Identifier) ([]sql.Identifier, error) {
 
 	st.t.Error("ListSchemas should never be called")
 	return nil, nil
 }
 
-func (st *testStore) ListTables(ctx context.Context, tx sql.Transaction,
+func (st *testStore) ListTables(ctx context.Context, tx engine.Transaction,
 	sn sql.SchemaName) ([]sql.Identifier, error) {
 
 	st.t.Error("ListTables should never be called")

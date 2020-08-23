@@ -228,7 +228,7 @@ func (kvst *kvStore) startupStore(upd Updater) error {
 	return nil
 }
 
-func (kvst *kvStore) Table(ctx context.Context, tx sql.Transaction, tn sql.TableName,
+func (kvst *kvStore) Table(ctx context.Context, tx engine.Transaction, tn sql.TableName,
 	tid int64, tt *engine.TableType, tl *storage.TableLayout) (engine.Table, error) {
 
 	if len(tt.PrimaryKey()) == 0 {
@@ -258,7 +258,7 @@ func (kvst *kvStore) setTransactionData(txid uint64, td *TransactionData) error 
 	return upd.Commit()
 }
 
-func (kvst *kvStore) Begin(sesid uint64) sql.Transaction {
+func (kvst *kvStore) Begin(sesid uint64) engine.Transaction {
 	kvst.mutex.Lock()
 	kvst.lastTXID += 1
 	txid := kvst.lastTXID

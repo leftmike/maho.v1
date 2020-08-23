@@ -9,6 +9,12 @@ import (
 	"github.com/leftmike/maho/sql"
 )
 
+type Transaction interface {
+	Commit(ctx context.Context) error
+	Rollback() error
+	NextStmt()
+}
+
 type Table interface {
 	Rows(ctx context.Context, minRow, maxRow []sql.Value) (Rows, error)
 	Insert(ctx context.Context, row []sql.Value) error
@@ -26,30 +32,30 @@ type store interface {
 	CreateDatabase(dbname sql.Identifier, options map[sql.Identifier]string) error
 	DropDatabase(dbname sql.Identifier, ifExists bool, options map[sql.Identifier]string) error
 
-	CreateSchema(ctx context.Context, tx sql.Transaction, sn sql.SchemaName) error
-	DropSchema(ctx context.Context, tx sql.Transaction, sn sql.SchemaName, ifExists bool) error
+	CreateSchema(ctx context.Context, tx Transaction, sn sql.SchemaName) error
+	DropSchema(ctx context.Context, tx Transaction, sn sql.SchemaName, ifExists bool) error
 
-	LookupTable(ctx context.Context, tx sql.Transaction, tn sql.TableName) (Table, *TableType,
+	LookupTable(ctx context.Context, tx Transaction, tn sql.TableName) (Table, *TableType,
 		error)
-	CreateTable(ctx context.Context, tx sql.Transaction, tn sql.TableName, tt *TableType,
+	CreateTable(ctx context.Context, tx Transaction, tn sql.TableName, tt *TableType,
 		ifNotExists bool) error
-	DropTable(ctx context.Context, tx sql.Transaction, tn sql.TableName, ifExists bool) error
-	UpdateType(ctx context.Context, tx sql.Transaction, tn sql.TableName, tt *TableType) error
+	DropTable(ctx context.Context, tx Transaction, tn sql.TableName, ifExists bool) error
+	UpdateType(ctx context.Context, tx Transaction, tn sql.TableName, tt *TableType) error
 
 	MakeIndexType(tt *TableType, nam sql.Identifier, key []sql.ColumnKey,
 		unique bool) sql.IndexType
-	AddIndex(ctx context.Context, tx sql.Transaction, tn sql.TableName, tt *TableType,
+	AddIndex(ctx context.Context, tx Transaction, tn sql.TableName, tt *TableType,
 		it sql.IndexType) error
-	RemoveIndex(ctx context.Context, tx sql.Transaction, tn sql.TableName, tt *TableType,
+	RemoveIndex(ctx context.Context, tx Transaction, tn sql.TableName, tt *TableType,
 		rdx int) error
 
-	ListDatabases(ctx context.Context, tx sql.Transaction) ([]sql.Identifier, error)
-	ListSchemas(ctx context.Context, tx sql.Transaction, dbname sql.Identifier) ([]sql.Identifier,
+	ListDatabases(ctx context.Context, tx Transaction) ([]sql.Identifier, error)
+	ListSchemas(ctx context.Context, tx Transaction, dbname sql.Identifier) ([]sql.Identifier,
 		error)
-	ListTables(ctx context.Context, tx sql.Transaction, sn sql.SchemaName) ([]sql.Identifier,
+	ListTables(ctx context.Context, tx Transaction, sn sql.SchemaName) ([]sql.Identifier,
 		error)
 
-	Begin(sesid uint64) sql.Transaction
+	Begin(sesid uint64) Transaction
 }
 
 type Engine struct {
@@ -57,6 +63,10 @@ type Engine struct {
 	st               store
 	systemInfoTables map[sql.Identifier]sql.MakeVirtual
 	metadataTables   map[sql.Identifier]sql.MakeVirtual
+}
+
+type transaction struct {
+	tx Transaction
 }
 
 func NewEngine(st store) sql.Engine {
@@ -121,7 +131,7 @@ func (e *Engine) CreateSchema(ctx context.Context, tx sql.Transaction, sn sql.Sc
 	if sn.Schema == sql.METADATA {
 		return fmt.Errorf("engine: schema %s already exists", sn)
 	}
-	return e.st.CreateSchema(ctx, tx, sn)
+	return e.st.CreateSchema(ctx, tx.(*transaction).tx, sn)
 }
 
 func (e *Engine) DropSchema(ctx context.Context, tx sql.Transaction, sn sql.SchemaName,
@@ -133,7 +143,7 @@ func (e *Engine) DropSchema(ctx context.Context, tx sql.Transaction, sn sql.Sche
 	if sn.Schema == sql.METADATA {
 		return fmt.Errorf("engine: schema %s may not be dropped", sn)
 	}
-	return e.st.DropSchema(ctx, tx, sn, ifExists)
+	return e.st.DropSchema(ctx, tx.(*transaction).tx, sn, ifExists)
 }
 
 func (e *Engine) LookupTable(ctx context.Context, tx sql.Transaction, tn sql.TableName) (sql.Table,
@@ -154,11 +164,11 @@ func (e *Engine) LookupTable(ctx context.Context, tx sql.Transaction, tn sql.Tab
 		return nil, nil, fmt.Errorf("engine: table %s not found", tn)
 	}
 
-	stbl, tt, err := e.st.LookupTable(ctx, tx, tn)
+	stbl, tt, err := e.st.LookupTable(ctx, tx.(*transaction).tx, tn)
 	if err != nil {
 		return nil, nil, err
 	}
-	return makeTable(tx, e.st, tn, stbl, tt)
+	return makeTable(tx.(*transaction), e.st, tn, stbl, tt)
 }
 
 func (e *Engine) CreateTable(ctx context.Context, tx sql.Transaction, tn sql.TableName,
@@ -246,7 +256,7 @@ func (e *Engine) CreateTable(ctx context.Context, tx sql.Transaction, tn sql.Tab
 		}
 	}
 
-	return e.st.CreateTable(ctx, tx, tn, tt, ifNotExists)
+	return e.st.CreateTable(ctx, tx.(*transaction).tx, tn, tt, ifNotExists)
 }
 
 func (e *Engine) DropTable(ctx context.Context, tx sql.Transaction, tn sql.TableName,
@@ -258,7 +268,7 @@ func (e *Engine) DropTable(ctx context.Context, tx sql.Transaction, tn sql.Table
 	if tn.Schema == sql.METADATA {
 		return fmt.Errorf("engine: schema %s may not be modified", tn.Schema)
 	}
-	return e.st.DropTable(ctx, tx, tn, ifExists)
+	return e.st.DropTable(ctx, tx.(*transaction).tx, tn, ifExists)
 }
 
 func (e *Engine) AddForeignKey(ctx context.Context, tx sql.Transaction, con sql.Identifier,
@@ -271,7 +281,7 @@ func (e *Engine) AddForeignKey(ctx context.Context, tx sql.Transaction, con sql.
 		return fmt.Errorf("engine: schema %s may not be modified", fktn.Schema)
 	}
 
-	_, fktt, err := e.st.LookupTable(ctx, tx, fktn)
+	_, fktt, err := e.st.LookupTable(ctx, tx.(*transaction).tx, fktn)
 	if err != nil {
 		return err
 	}
@@ -284,7 +294,7 @@ func (e *Engine) AddForeignKey(ctx context.Context, tx sql.Transaction, con sql.
 			refIndex: ridx,
 		})
 	fktt.ver += 1
-	err = e.st.UpdateType(ctx, tx, fktn, fktt)
+	err = e.st.UpdateType(ctx, tx.(*transaction).tx, fktn, fktt)
 	if err != nil {
 		return err
 	}
@@ -317,7 +327,7 @@ func (e *Engine) CreateIndex(ctx context.Context, tx sql.Transaction, idxname sq
 		return fmt.Errorf("engine: schema %s may not be modified", tn.Schema)
 	}
 
-	_, tt, err := e.st.LookupTable(ctx, tx, tn)
+	_, tt, err := e.st.LookupTable(ctx, tx.(*transaction).tx, tn)
 	if err != nil {
 		return err
 	}
@@ -334,7 +344,7 @@ func (e *Engine) CreateIndex(ctx context.Context, tx sql.Transaction, idxname sq
 	tt.ver += 1
 	it := e.st.MakeIndexType(tt, idxname, key, unique)
 	tt.indexes = append(tt.indexes, it)
-	return e.st.AddIndex(ctx, tx, tn, tt, it)
+	return e.st.AddIndex(ctx, tx.(*transaction).tx, tn, tt, it)
 }
 
 func (e *Engine) DropIndex(ctx context.Context, tx sql.Transaction, idxname sql.Identifier,
@@ -347,7 +357,7 @@ func (e *Engine) DropIndex(ctx context.Context, tx sql.Transaction, idxname sql.
 		return fmt.Errorf("engine: schema %s may not be modified", tn.Schema)
 	}
 
-	_, tt, err := e.st.LookupTable(ctx, tx, tn)
+	_, tt, err := e.st.LookupTable(ctx, tx.(*transaction).tx, tn)
 	if err != nil {
 		return err
 	}
@@ -372,13 +382,28 @@ func (e *Engine) DropIndex(ctx context.Context, tx sql.Transaction, idxname sql.
 	tt.ver += 1
 	tt.indexes = indexes
 
-	return e.st.RemoveIndex(ctx, tx, tn, tt, rdx)
+	return e.st.RemoveIndex(ctx, tx.(*transaction).tx, tn, tt, rdx)
 }
 
 func (e *Engine) Begin(sesid uint64) sql.Transaction {
-	return e.st.Begin(sesid)
+	return &transaction{
+		tx: e.st.Begin(sesid),
+	}
 }
 
 func (e *Engine) ListDatabases(ctx context.Context, tx sql.Transaction) ([]sql.Identifier, error) {
-	return e.st.ListDatabases(ctx, tx)
+	return e.st.ListDatabases(ctx, tx.(*transaction).tx)
+}
+
+func (tx *transaction) Commit(ctx context.Context) error {
+	return tx.tx.Commit(ctx)
+}
+
+func (tx *transaction) Rollback() error {
+	return tx.tx.Rollback()
+}
+
+func (tx *transaction) NextStmt(ctx context.Context) error {
+	tx.tx.NextStmt()
+	return nil
 }

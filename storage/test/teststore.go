@@ -63,7 +63,7 @@ type storeCmd struct {
 
 type transactionState struct {
 	tdx int
-	tx  sql.Transaction
+	tx  engine.Transaction
 	tbl engine.Table
 }
 
@@ -1320,7 +1320,7 @@ func RunParallelTest(t *testing.T, st *storage.Store) {
 	wg.Wait()
 }
 
-func incColumn(t *testing.T, st *storage.Store, tx sql.Transaction, tdx uint64, i int,
+func incColumn(t *testing.T, st *storage.Store, tx engine.Transaction, tdx uint64, i int,
 	tn sql.TableName) bool {
 
 	var ctx context.Context

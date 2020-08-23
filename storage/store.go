@@ -55,9 +55,9 @@ type tableRow struct {
 }
 
 type PersistentStore interface {
-	Table(ctx context.Context, tx sql.Transaction, tn sql.TableName, tid int64,
+	Table(ctx context.Context, tx engine.Transaction, tn sql.TableName, tid int64,
 		tt *engine.TableType, tl *TableLayout) (engine.Table, error)
-	Begin(sesid uint64) sql.Transaction
+	Begin(sesid uint64) engine.Transaction
 }
 
 type Store struct {
@@ -114,7 +114,7 @@ func NewStore(name string, ps PersistentStore, init bool) (*Store, error) {
 	return st, nil
 }
 
-func (st *Store) init(ctx context.Context, tx sql.Transaction) error {
+func (st *Store) init(ctx context.Context, tx engine.Transaction) error {
 	tbl, err := st.ps.Table(ctx, tx, sequencesTableName, sequencesTID, st.sequences,
 		makeTableLayout(st.sequences))
 	if err != nil {
@@ -187,7 +187,7 @@ func (st *Store) init(ctx context.Context, tx sql.Transaction) error {
 	return nil
 }
 
-func (st *Store) createDatabase(ctx context.Context, tx sql.Transaction,
+func (st *Store) createDatabase(ctx context.Context, tx engine.Transaction,
 	dbname sql.Identifier) error {
 
 	tbl, err := st.ps.Table(ctx, tx, databasesTableName, databasesTID, st.databases,
@@ -224,7 +224,7 @@ func (st *Store) CreateDatabase(dbname sql.Identifier, options map[sql.Identifie
 	return tx.Commit(ctx)
 }
 
-func (st *Store) lookupDatabase(ctx context.Context, tx sql.Transaction,
+func (st *Store) lookupDatabase(ctx context.Context, tx engine.Transaction,
 	dbname sql.Identifier) (*util.TypedRows, error) {
 
 	tbl, err := st.ps.Table(ctx, tx, databasesTableName, databasesTID, st.databases,
@@ -252,7 +252,7 @@ func (st *Store) lookupDatabase(ctx context.Context, tx sql.Transaction,
 	return rows, nil
 }
 
-func (st *Store) validDatabase(ctx context.Context, tx sql.Transaction,
+func (st *Store) validDatabase(ctx context.Context, tx engine.Transaction,
 	dbname sql.Identifier) (bool, error) {
 
 	rows, err := st.lookupDatabase(ctx, tx, dbname)
@@ -266,7 +266,7 @@ func (st *Store) validDatabase(ctx context.Context, tx sql.Transaction,
 	return true, nil
 }
 
-func (st *Store) dropDatabase(ctx context.Context, tx sql.Transaction,
+func (st *Store) dropDatabase(ctx context.Context, tx engine.Transaction,
 	dbname sql.Identifier, ifExists bool) error {
 
 	rows, err := st.lookupDatabase(ctx, tx, dbname)
@@ -312,7 +312,9 @@ func (st *Store) DropDatabase(dbname sql.Identifier, ifExists bool,
 	return tx.Commit(ctx)
 }
 
-func (st *Store) CreateSchema(ctx context.Context, tx sql.Transaction, sn sql.SchemaName) error {
+func (st *Store) CreateSchema(ctx context.Context, tx engine.Transaction,
+	sn sql.SchemaName) error {
+
 	ok, err := st.validDatabase(ctx, tx, sn.Database)
 	if err != nil {
 		return err
@@ -336,7 +338,7 @@ func (st *Store) CreateSchema(ctx context.Context, tx sql.Transaction, sn sql.Sc
 		})
 }
 
-func (st *Store) DropSchema(ctx context.Context, tx sql.Transaction, sn sql.SchemaName,
+func (st *Store) DropSchema(ctx context.Context, tx engine.Transaction, sn sql.SchemaName,
 	ifExists bool) error {
 
 	tbl, err := st.ps.Table(ctx, tx, schemasTableName, schemasTID, st.schemas,
@@ -372,7 +374,7 @@ func (st *Store) DropSchema(ctx context.Context, tx sql.Transaction, sn sql.Sche
 	return rows.Delete(ctx)
 }
 
-func (st *Store) updateSchema(ctx context.Context, tx sql.Transaction,
+func (st *Store) updateSchema(ctx context.Context, tx engine.Transaction,
 	sn sql.SchemaName, delta int64) error {
 
 	tbl, err := st.ps.Table(ctx, tx, schemasTableName, schemasTID, st.schemas,
@@ -406,7 +408,7 @@ func (st *Store) updateSchema(ctx context.Context, tx sql.Transaction,
 		}{sr.Tables + delta})
 }
 
-func (st *Store) lookupTable(ctx context.Context, tx sql.Transaction,
+func (st *Store) lookupTable(ctx context.Context, tx engine.Transaction,
 	tn sql.TableName) (*util.TypedRows, error) {
 
 	tbl, err := st.ps.Table(ctx, tx, tablesTableName, tablesTID, st.tables,
@@ -428,7 +430,7 @@ func (st *Store) lookupTable(ctx context.Context, tx sql.Transaction,
 	return rows, nil
 }
 
-func (st *Store) validTable(ctx context.Context, tx sql.Transaction, tn sql.TableName) (bool,
+func (st *Store) validTable(ctx context.Context, tx engine.Transaction, tn sql.TableName) (bool,
 	error) {
 
 	rows, err := st.lookupTable(ctx, tx, tn)
@@ -449,7 +451,7 @@ func (st *Store) validTable(ctx context.Context, tx sql.Transaction, tn sql.Tabl
 	return true, nil
 }
 
-func (st *Store) LookupTable(ctx context.Context, tx sql.Transaction,
+func (st *Store) LookupTable(ctx context.Context, tx engine.Transaction,
 	tn sql.TableName) (engine.Table, *engine.TableType, error) {
 
 	rows, err := st.lookupTable(ctx, tx, tn)
@@ -484,8 +486,8 @@ func (st *Store) LookupTable(ctx context.Context, tx sql.Transaction,
 	return tbl, tt, err
 }
 
-func (st *Store) createTable(ctx context.Context, tx sql.Transaction, tn sql.TableName, tid int64,
-	tt *engine.TableType) error {
+func (st *Store) createTable(ctx context.Context, tx engine.Transaction, tn sql.TableName,
+	tid int64, tt *engine.TableType) error {
 
 	err := st.updateSchema(ctx, tx, tn.SchemaName(), 1)
 	if err != nil {
@@ -526,7 +528,7 @@ func (st *Store) createTable(ctx context.Context, tx sql.Transaction, tn sql.Tab
 	return nil
 }
 
-func (st *Store) CreateTable(ctx context.Context, tx sql.Transaction, tn sql.TableName,
+func (st *Store) CreateTable(ctx context.Context, tx engine.Transaction, tn sql.TableName,
 	tt *engine.TableType, ifNotExists bool) error {
 
 	ok, err := st.validTable(ctx, tx, tn)
@@ -548,7 +550,7 @@ func (st *Store) CreateTable(ctx context.Context, tx sql.Transaction, tn sql.Tab
 	return st.createTable(ctx, tx, tn, tid, tt)
 }
 
-func (st *Store) DropTable(ctx context.Context, tx sql.Transaction, tn sql.TableName,
+func (st *Store) DropTable(ctx context.Context, tx engine.Transaction, tn sql.TableName,
 	ifExists bool) error {
 
 	err := st.updateSchema(ctx, tx, tn.SchemaName(), -1)
@@ -576,13 +578,13 @@ func (st *Store) DropTable(ctx context.Context, tx sql.Transaction, tn sql.Table
 	return rows.Delete(ctx)
 }
 
-func (st *Store) UpdateType(ctx context.Context, tx sql.Transaction, tn sql.TableName,
+func (st *Store) UpdateType(ctx context.Context, tx engine.Transaction, tn sql.TableName,
 	tt *engine.TableType) error {
 
 	return st.updateLayout(ctx, tx, tn, tt, nil)
 }
 
-func (st *Store) updateLayout(ctx context.Context, tx sql.Transaction, tn sql.TableName,
+func (st *Store) updateLayout(ctx context.Context, tx engine.Transaction, tn sql.TableName,
 	tt *engine.TableType, update func(tl *TableLayout) error) error {
 
 	rows, err := st.lookupTable(ctx, tx, tn)
@@ -685,7 +687,7 @@ func (st *Store) MakeIndexType(tt *engine.TableType, nam sql.Identifier, key []s
 	}
 }
 
-func (st *Store) AddIndex(ctx context.Context, tx sql.Transaction, tn sql.TableName,
+func (st *Store) AddIndex(ctx context.Context, tx engine.Transaction, tn sql.TableName,
 	tt *engine.TableType, it sql.IndexType) error {
 
 	return st.updateLayout(ctx, tx, tn, tt,
@@ -695,7 +697,7 @@ func (st *Store) AddIndex(ctx context.Context, tx sql.Transaction, tn sql.TableN
 		})
 }
 
-func (st *Store) RemoveIndex(ctx context.Context, tx sql.Transaction, tn sql.TableName,
+func (st *Store) RemoveIndex(ctx context.Context, tx engine.Transaction, tn sql.TableName,
 	tt *engine.TableType, rdx int) error {
 
 	return st.updateLayout(ctx, tx, tn, tt,
@@ -713,11 +715,13 @@ func (st *Store) RemoveIndex(ctx context.Context, tx sql.Transaction, tn sql.Tab
 		})
 }
 
-func (st *Store) Begin(sesid uint64) sql.Transaction {
+func (st *Store) Begin(sesid uint64) engine.Transaction {
 	return st.ps.Begin(sesid)
 }
 
-func (st *Store) ListDatabases(ctx context.Context, tx sql.Transaction) ([]sql.Identifier, error) {
+func (st *Store) ListDatabases(ctx context.Context, tx engine.Transaction) ([]sql.Identifier,
+	error) {
+
 	tbl, err := st.ps.Table(ctx, tx, databasesTableName, databasesTID, st.databases,
 		makeTableLayout(st.databases))
 	if err != nil {
@@ -745,7 +749,7 @@ func (st *Store) ListDatabases(ctx context.Context, tx sql.Transaction) ([]sql.I
 	return dbnames, nil
 }
 
-func (st *Store) ListSchemas(ctx context.Context, tx sql.Transaction,
+func (st *Store) ListSchemas(ctx context.Context, tx engine.Transaction,
 	dbname sql.Identifier) ([]sql.Identifier, error) {
 
 	tbl, err := st.ps.Table(ctx, tx, schemasTableName, schemasTID, st.schemas,
@@ -778,7 +782,7 @@ func (st *Store) ListSchemas(ctx context.Context, tx sql.Transaction,
 	return scnames, nil
 }
 
-func (st *Store) ListTables(ctx context.Context, tx sql.Transaction,
+func (st *Store) ListTables(ctx context.Context, tx engine.Transaction,
 	sn sql.SchemaName) ([]sql.Identifier, error) {
 
 	tbl, err := st.ps.Table(ctx, tx, tablesTableName, tablesTID, st.tables,
@@ -812,7 +816,7 @@ func (st *Store) ListTables(ctx context.Context, tx sql.Transaction,
 	return tblnames, nil
 }
 
-func (st *Store) nextSequenceValue(ctx context.Context, tx sql.Transaction,
+func (st *Store) nextSequenceValue(ctx context.Context, tx engine.Transaction,
 	sequence string) (int64, error) {
 
 	tbl, err := st.ps.Table(ctx, tx, sequencesTableName, sequencesTID, st.sequences,
