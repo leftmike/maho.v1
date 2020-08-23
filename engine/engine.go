@@ -154,11 +154,11 @@ func (e *Engine) LookupTable(ctx context.Context, tx sql.Transaction, tn sql.Tab
 		return nil, nil, fmt.Errorf("engine: table %s not found", tn)
 	}
 
-	st, tt, err := e.st.LookupTable(ctx, tx, tn)
+	stbl, tt, err := e.st.LookupTable(ctx, tx, tn)
 	if err != nil {
 		return nil, nil, err
 	}
-	return makeTable(tn, st, tt)
+	return makeTable(tx, e.st, tn, stbl, tt)
 }
 
 func (e *Engine) CreateTable(ctx context.Context, tx sql.Transaction, tn sql.TableName,
@@ -264,7 +264,46 @@ func (e *Engine) DropTable(ctx context.Context, tx sql.Transaction, tn sql.Table
 func (e *Engine) AddForeignKey(ctx context.Context, tx sql.Transaction, con sql.Identifier,
 	fktn sql.TableName, fkCols []int, rtn sql.TableName, ridx sql.Identifier) error {
 
+	if fktn.Database == sql.SYSTEM {
+		return fmt.Errorf("engine: database %s may not be modified", fktn.Database)
+	}
+	if fktn.Schema == sql.METADATA {
+		return fmt.Errorf("engine: schema %s may not be modified", fktn.Schema)
+	}
+
+	_, fktt, err := e.st.LookupTable(ctx, tx, fktn)
+	if err != nil {
+		return err
+	}
+
+	fktt.foreignKeys = append(fktt.foreignKeys,
+		foreignKey{
+			name:     con,
+			keyCols:  fkCols,
+			refTable: rtn,
+			refIndex: ridx,
+		})
+	fktt.ver += 1
+	err = e.st.UpdateType(ctx, tx, fktn, fktt)
+	if err != nil {
+		return err
+	}
+
+	if rtn.Database == sql.SYSTEM {
+		return fmt.Errorf("engine: database %s may not be modified", rtn.Database)
+	}
+	if rtn.Schema == sql.METADATA {
+		return fmt.Errorf("engine: schema %s may not be modified", rtn.Schema)
+	}
+
+	/*
+		_, rtt, err := e.st.LookupTable(ctx, tx, rtn)
+		if err != nil {
+			return err
+		}
+	*/
 	// XXX
+
 	return nil
 }
 

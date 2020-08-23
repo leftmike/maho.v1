@@ -220,9 +220,13 @@ var knownKeywords = map[string]struct {
 
 var (
 	lastIdentifier = Identifier(0)
-	identifiers    = make(map[string]Identifier)
-	keywords       = make(map[string]Identifier)
-	Names          = make(map[Identifier]string)
+	identifiers    = map[string]Identifier{
+		"": Identifier(0),
+	}
+	keywords = map[string]Identifier{}
+	Names    = map[Identifier]string{
+		Identifier(0): "",
+	}
 )
 
 func ID(s string) Identifier {

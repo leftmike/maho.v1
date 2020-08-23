@@ -53,11 +53,14 @@ To Do:
 
 - foreign keys
 -- make create SQL (as structs) to check and update foreign key relations
+-- sqlite: fkey IS NULL OR EXISTS(SELECT 1 FROM reftbl WHERE fkey=refkey)
 -- tests to verify that the structs match expected SQL
 -- ALTER TABLE ONLY table ADD CONSTRAINT constraint FOREIGN KEY ...
 -- check foreign keys on update, insert, and delete
+-- need read lock for referenced keys
 
 - constraints
+-- DROP TABLE: CASCADE: to remove foreign key constraint of another table
 -- drop CHECK constraint: use ALTER TABLE table DROP CONSTRAINT constraint
 -- drop DEFAULT: use ALTER TABLE table ALTER COLUMN column DROP DEFAULT (or DROP CONSTRAINT)
 -- drop FOREIGN KEY: use ALTER TABLE table DROP CONSTRAINT constraint

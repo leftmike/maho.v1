@@ -23,6 +23,13 @@ type checkConstraint struct {
 	checkExpr string
 }
 
+type foreignKey struct {
+	name     sql.Identifier
+	keyCols  []int
+	refTable sql.TableName
+	refIndex sql.Identifier
+}
+
 type TableType struct {
 	ver         uint32
 	cols        []sql.Identifier
@@ -31,6 +38,7 @@ type TableType struct {
 	indexes     []sql.IndexType
 	constraints []constraint
 	checks      []checkConstraint
+	foreignKeys []foreignKey
 }
 
 func MakeTableType(cols []sql.Identifier, colTypes []sql.ColumnType,
@@ -128,6 +136,25 @@ func (tt *TableType) Encode() ([]byte, error) {
 			})
 	}
 
+	md.ForeignKeys = make([]*ForeignKey, 0, len(tt.foreignKeys))
+	for _, fk := range tt.foreignKeys {
+		keyCols := make([]int32, 0, len(fk.keyCols))
+		for _, col := range fk.keyCols {
+			keyCols = append(keyCols, int32(col))
+		}
+		md.ForeignKeys = append(md.ForeignKeys,
+			&ForeignKey{
+				Name:       fk.name.String(),
+				KeyColumns: keyCols,
+				ReferenceTable: &TableName{
+					Database: fk.refTable.Database.String(),
+					Schema:   fk.refTable.Schema.String(),
+					Table:    fk.refTable.Table.String(),
+				},
+				ReferenceIndex: fk.refIndex.String(),
+			})
+	}
+
 	return proto.Marshal(&md)
 }
 
@@ -205,6 +232,24 @@ func DecodeTableType(tn sql.TableName, buf []byte) (*TableType, error) {
 			})
 	}
 
+	foreignKeys := make([]foreignKey, 0, len(md.ForeignKeys))
+	for _, fk := range md.ForeignKeys {
+		keyCols := make([]int, 0, len(fk.KeyColumns))
+		for _, col := range fk.KeyColumns {
+			keyCols = append(keyCols, int(col))
+		}
+		foreignKeys = append(foreignKeys,
+			foreignKey{
+				name:    sql.QuotedID(fk.Name),
+				keyCols: keyCols,
+				refTable: sql.TableName{
+					Database: sql.QuotedID(fk.ReferenceTable.Database),
+					Schema:   sql.QuotedID(fk.ReferenceTable.Schema),
+					Table:    sql.QuotedID(fk.ReferenceTable.Table),
+				},
+				refIndex: sql.QuotedID(fk.ReferenceIndex),
+			})
+	}
 	return &TableType{
 		ver:         md.Version,
 		cols:        cols,
@@ -213,5 +258,6 @@ func DecodeTableType(tn sql.TableName, buf []byte) (*TableType, error) {
 		indexes:     indexes,
 		constraints: constraints,
 		checks:      checks,
+		foreignKeys: foreignKeys,
 	}, nil
 }

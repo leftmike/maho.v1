@@ -9,6 +9,7 @@ message TableTypeMetadata {
     repeated IndexMetadata Indexes = 4;
     repeated ConstraintMetadata Constraints = 5;
     repeated CheckConstraint Checks = 6;
+    repeated ForeignKey ForeignKeys = 7;
 }
 
 // These need to match the values in maho/sql/datatype.go
@@ -63,4 +64,17 @@ message CheckConstraint {
     string Name = 1;
     bytes Check = 2;
     string CheckExpr = 3;
+}
+
+message TableName {
+    string Database = 1;
+    string Schema = 2;
+    string Table = 3;
+}
+
+message ForeignKey {
+    string Name = 1;
+    repeated int32 KeyColumns = 2;
+    TableName ReferenceTable = 3;
+    string ReferenceIndex = 4;
 }

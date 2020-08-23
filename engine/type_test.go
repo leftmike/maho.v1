@@ -82,6 +82,7 @@ func TestEncodeDecode(t *testing.T) {
 				checkExpr: "123 > 456",
 			},
 		},
+		foreignKeys: []foreignKey{},
 	}
 
 	buf, err := tt.Encode()

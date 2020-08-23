@@ -3,6 +3,7 @@ package engine
 import (
 	"context"
 	"fmt"
+	"io"
 	"strconv"
 	"strings"
 	"unicode/utf8"
@@ -11,9 +12,11 @@ import (
 )
 
 type table struct {
-	tn sql.TableName
-	st Table
-	tt *TableType
+	tx   sql.Transaction
+	st   store
+	tn   sql.TableName
+	stbl Table
+	tt   *TableType
 }
 
 type rows struct {
@@ -22,11 +25,15 @@ type rows struct {
 	curRow []sql.Value
 }
 
-func makeTable(tn sql.TableName, st Table, tt *TableType) (*table, sql.TableType, error) {
+func makeTable(tx sql.Transaction, st store, tn sql.TableName, stbl Table, tt *TableType) (*table,
+	sql.TableType, error) {
+
 	return &table{
-		tn: tn,
-		st: st,
-		tt: tt,
+		tx:   tx,
+		st:   st,
+		tn:   tn,
+		stbl: stbl,
+		tt:   tt,
 	}, tt, nil
 }
 
@@ -43,7 +50,7 @@ func (tbl *table) PrimaryKey(ctx context.Context) []sql.ColumnKey {
 }
 
 func (tbl *table) Rows(ctx context.Context, minRow, maxRow []sql.Value) (sql.Rows, error) {
-	r, err := tbl.st.Rows(ctx, minRow, maxRow)
+	r, err := tbl.stbl.Rows(ctx, minRow, maxRow)
 	if err != nil {
 		return nil, err
 	}
@@ -139,21 +146,50 @@ func (tbl *table) Insert(ctx context.Context, row []sql.Value) error {
 		}
 	}
 
-	if len(tbl.tt.checks) > 0 {
-		for _, chk := range tbl.tt.checks {
-			val, err := chk.check.Eval(ctx, rowContext(row))
-			if err != nil {
-				return fmt.Errorf("engine: table %s: constraint: %s: %s", tbl.tn, chk.name, err)
-			}
-			if val != nil {
-				if b, ok := val.(sql.BoolValue); ok && b == sql.BoolValue(false) {
-					return fmt.Errorf("engine: table %s: check: %s: failed", tbl.tn, chk.name)
-				}
+	for _, chk := range tbl.tt.checks {
+		val, err := chk.check.Eval(ctx, rowContext(row))
+		if err != nil {
+			return fmt.Errorf("engine: table %s: constraint: %s: %s", tbl.tn, chk.name, err)
+		}
+		if val != nil {
+			if b, ok := val.(sql.BoolValue); ok && b == sql.BoolValue(false) {
+				return fmt.Errorf("engine: table %s: check: %s: failed", tbl.tn, chk.name)
 			}
 		}
 	}
 
-	return tbl.st.Insert(ctx, row)
+	for _, fk := range tbl.tt.foreignKeys {
+		// XXX: check if any fk.keyCols are null and continue
+
+		rtbl, rtt, err := tbl.st.LookupTable(ctx, tbl.tx, fk.refTable)
+		if err != nil {
+			return err
+		}
+
+		if fk.refIndex == 0 {
+			keyRow := make([]sql.Value, len(rtt.Columns()))
+			for cdx, ck := range rtt.PrimaryKey() {
+				keyRow[ck.Column()] = row[fk.keyCols[cdx]]
+			}
+
+			r, err := rtbl.Rows(ctx, keyRow, keyRow)
+			if err != nil {
+				return err
+			}
+			_, err = r.Next(ctx)
+			r.Close()
+			if err == io.EOF {
+				return fmt.Errorf("engine: table %s: insert violates foreign key constraint: %s",
+					tbl.tn, fk.name)
+			} else if err != nil {
+				return err
+			}
+		} else {
+			// XXX: lookup and use the index
+		}
+	}
+
+	return tbl.stbl.Insert(ctx, row)
 }
 
 func (tbl *table) update(ctx context.Context, r Rows, updates []sql.ColumnUpdate,
