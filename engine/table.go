@@ -25,12 +25,11 @@ type rows struct {
 	curRow []sql.Value
 }
 
-func makeTable(tx *transaction, st store, tn sql.TableName, stbl Table, tt *TableType) (*table,
+func makeTable(tx *transaction, tn sql.TableName, stbl Table, tt *TableType) (*table,
 	sql.TableType, error) {
 
 	return &table{
 		tx:   tx,
-		st:   st,
 		tn:   tn,
 		stbl: stbl,
 		tt:   tt,
@@ -136,6 +135,48 @@ func (rc rowContext) EvalRef(idx int) sql.Value {
 	return rc[idx]
 }
 
+type foreignKeyAction struct {
+	tn   sql.TableName
+	fk   foreignKey
+	keys [][]sql.Value
+}
+
+func (fka *foreignKeyAction) execute(ctx context.Context, e *Engine, tx *transaction) (int64,
+	error) {
+
+	rtbl, rtt, err := e.st.LookupTable(ctx, tx.tx, fka.fk.refTable)
+	if err != nil {
+		return -1, err
+	}
+
+	if fka.fk.refIndex == 0 {
+		for _, key := range fka.keys {
+			keyRow := make([]sql.Value, len(rtt.Columns()))
+			for cdx, ck := range rtt.PrimaryKey() {
+				keyRow[ck.Column()] = key[cdx]
+			}
+
+			r, err := rtbl.Rows(ctx, keyRow, keyRow)
+			if err != nil {
+				return -1, err
+			}
+			_, err = r.Next(ctx)
+			r.Close()
+			if err == io.EOF {
+				return -1,
+					fmt.Errorf("engine: table %s: insert violates foreign key constraint: %s",
+						fka.tn, fka.fk.name)
+			} else if err != nil {
+				return -1, err
+			}
+		}
+	} else {
+		// XXX: lookup and use the index
+	}
+
+	return -1, nil
+}
+
 func (tbl *table) Insert(ctx context.Context, row []sql.Value) error {
 	cols := tbl.tt.cols
 	for rdx, ct := range tbl.tt.colTypes {
@@ -161,32 +202,21 @@ func (tbl *table) Insert(ctx context.Context, row []sql.Value) error {
 	for _, fk := range tbl.tt.foreignKeys {
 		// XXX: check if any fk.keyCols are null and continue
 
-		rtbl, rtt, err := tbl.st.LookupTable(ctx, tbl.tx.tx, fk.refTable)
-		if err != nil {
-			return err
-		}
-
-		if fk.refIndex == 0 {
-			keyRow := make([]sql.Value, len(rtt.Columns()))
-			for cdx, ck := range rtt.PrimaryKey() {
-				keyRow[ck.Column()] = row[fk.keyCols[cdx]]
-			}
-
-			r, err := rtbl.Rows(ctx, keyRow, keyRow)
-			if err != nil {
-				return err
-			}
-			_, err = r.Next(ctx)
-			r.Close()
-			if err == io.EOF {
-				return fmt.Errorf("engine: table %s: insert violates foreign key constraint: %s",
-					tbl.tn, fk.name)
-			} else if err != nil {
-				return err
-			}
-		} else {
-			// XXX: lookup and use the index
-		}
+		tbl.tx.addAction(tbl.tn, fk.name,
+			func() action {
+				return &foreignKeyAction{
+					tn: tbl.tn,
+					fk: fk,
+				}
+			},
+			func(act action) {
+				key := make([]sql.Value, len(fk.keyCols))
+				for cdx, col := range fk.keyCols {
+					key[cdx] = row[col]
+				}
+				fka := act.(*foreignKeyAction)
+				fka.keys = append(fka.keys, key)
+			})
 	}
 
 	return tbl.stbl.Insert(ctx, row)

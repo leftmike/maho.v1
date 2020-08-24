@@ -51,8 +51,15 @@ To Do:
 -- add create index test to sqltest/
 -- engine.Table: IndexRows(...) => engine.IndexRows {Columns, Close, Next, Row}
 
+- SELECT, INSERT, UPDATE, DELETE
+-- make plans reusable
+-- change ses.Engine to ses.e (ie. don't make it exported)
+-- keep track of tables and type versions used
+-- prepared statements
+
 - foreign keys
 -- make create SQL (as structs) to check and update foreign key relations
+-- use prepared statements so only has to be planned once, but executed multiple times
 -- sqlite: fkey IS NULL OR EXISTS(SELECT 1 FROM reftbl WHERE fkey=refkey)
 -- tests to verify that the structs match expected SQL
 -- ALTER TABLE ONLY table ADD CONSTRAINT constraint FOREIGN KEY ...

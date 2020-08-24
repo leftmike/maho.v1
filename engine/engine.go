@@ -65,10 +65,6 @@ type Engine struct {
 	metadataTables   map[sql.Identifier]sql.MakeVirtual
 }
 
-type transaction struct {
-	tx Transaction
-}
-
 func NewEngine(st store) sql.Engine {
 	e := &Engine{
 		st:               st,
@@ -168,7 +164,7 @@ func (e *Engine) LookupTable(ctx context.Context, tx sql.Transaction, tn sql.Tab
 	if err != nil {
 		return nil, nil, err
 	}
-	return makeTable(tx.(*transaction), e.st, tn, stbl, tt)
+	return makeTable(tx.(*transaction), tn, stbl, tt)
 }
 
 func (e *Engine) CreateTable(ctx context.Context, tx sql.Transaction, tn sql.TableName,
@@ -385,25 +381,6 @@ func (e *Engine) DropIndex(ctx context.Context, tx sql.Transaction, idxname sql.
 	return e.st.RemoveIndex(ctx, tx.(*transaction).tx, tn, tt, rdx)
 }
 
-func (e *Engine) Begin(sesid uint64) sql.Transaction {
-	return &transaction{
-		tx: e.st.Begin(sesid),
-	}
-}
-
 func (e *Engine) ListDatabases(ctx context.Context, tx sql.Transaction) ([]sql.Identifier, error) {
 	return e.st.ListDatabases(ctx, tx.(*transaction).tx)
-}
-
-func (tx *transaction) Commit(ctx context.Context) error {
-	return tx.tx.Commit(ctx)
-}
-
-func (tx *transaction) Rollback() error {
-	return tx.tx.Rollback()
-}
-
-func (tx *transaction) NextStmt(ctx context.Context) error {
-	tx.tx.NextStmt()
-	return nil
 }
