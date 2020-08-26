@@ -42,6 +42,11 @@ func replSQL(ses *evaluate.Session, p parser.Parser, w io.Writer) {
 					if cnt >= 0 {
 						fmt.Fprintf(w, "%d rows updated\n", cnt)
 					}
+				} else if cmd, ok := ret.(evaluate.Commander); ok {
+					err2 = cmd.Command(ses)
+					if err2 != nil {
+						return err2
+					}
 				} else if rows, ok := ret.(sql.Rows); ok {
 					w := tabwriter.NewWriter(w, 0, 0, 1, ' ', tabwriter.AlignRight)
 
