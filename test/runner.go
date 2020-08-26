@@ -50,13 +50,8 @@ func (run *Runner) RunExec(tst *sqltestdb.Test) (int64, error) {
 					if err2 != nil {
 						return err2
 					}
-				} else if cmd, ok := ret.(evaluate.Commander); ok {
-					err2 = cmd.Command(run.ses)
-					if err2 != nil {
-						return err2
-					}
 				} else {
-					panic("expected Executor or Commander")
+					panic("expected Executor")
 				}
 
 				return nil
