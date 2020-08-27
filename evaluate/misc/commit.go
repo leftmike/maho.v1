@@ -13,7 +13,7 @@ func (stmt *Commit) String() string {
 	return "COMMIT"
 }
 
-func (stmt *Commit) Plan(ses *evaluate.Session, ctx context.Context, pe evaluate.PlanEngine,
+func (stmt *Commit) Plan(ctx context.Context, ses *evaluate.Session, pe evaluate.PlanEngine,
 	tx sql.Transaction) (evaluate.Plan, error) {
 
 	return stmt, nil
@@ -23,6 +23,6 @@ func (stmt *Commit) Explain() string {
 	return stmt.String()
 }
 
-func (stmt *Commit) Command(ses *evaluate.Session) error {
+func (stmt *Commit) Command(ctx context.Context, ses *evaluate.Session) error {
 	return ses.Commit()
 }

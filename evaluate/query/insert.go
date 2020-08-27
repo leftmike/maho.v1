@@ -54,7 +54,7 @@ func (stmt *InsertValues) String() string {
 	return s
 }
 
-func (stmt *InsertValues) Plan(ses *evaluate.Session, ctx context.Context, pe evaluate.PlanEngine,
+func (stmt *InsertValues) Plan(ctx context.Context, ses *evaluate.Session, pe evaluate.PlanEngine,
 	tx sql.Transaction) (evaluate.Plan, error) {
 
 	tbl, tt, err := ses.Engine.LookupTable(ses.Context(), tx, ses.ResolveTableName(stmt.Table))

@@ -28,7 +28,7 @@ func replSQL(ses *evaluate.Session, p parser.Parser, w io.Writer) {
 
 		err = ses.Run(stmt,
 			func(tx sql.Transaction, stmt evaluate.Stmt) error {
-				plan, err := stmt.Plan(ses, ses.Context(), ses.Engine, tx)
+				plan, err := stmt.Plan(ses.Context(), ses, ses.Engine, tx)
 				if err != nil {
 					return err
 				}
@@ -43,7 +43,7 @@ func replSQL(ses *evaluate.Session, p parser.Parser, w io.Writer) {
 						fmt.Fprintf(w, "%d rows updated\n", cnt)
 					}
 				} else if cmdPlan, ok := plan.(evaluate.CmdPlan); ok {
-					err = cmdPlan.Command(ses)
+					err = cmdPlan.Command(ses.Context(), ses)
 					if err != nil {
 						return err
 					}

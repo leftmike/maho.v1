@@ -41,7 +41,7 @@ func (run *Runner) RunExec(tst *sqltestdb.Test) (int64, error) {
 
 		err = run.ses.Run(stmt,
 			func(tx sql.Transaction, stmt evaluate.Stmt) error {
-				plan, err := stmt.Plan(run.ses, run.ses.Context(), run.Engine, tx)
+				plan, err := stmt.Plan(run.ses.Context(), run.ses, run.Engine, tx)
 				if err != nil {
 					return err
 				}
@@ -51,7 +51,7 @@ func (run *Runner) RunExec(tst *sqltestdb.Test) (int64, error) {
 						return err
 					}
 				} else if cmdPlan, ok := plan.(evaluate.CmdPlan); ok {
-					err = cmdPlan.Command(run.ses)
+					err = cmdPlan.Command(run.ses.Context(), run.ses)
 					if err != nil {
 						return err
 					}
@@ -87,7 +87,7 @@ func (run *Runner) RunQuery(tst *sqltestdb.Test) ([]string, [][]string, error) {
 	var results [][]string
 	err = run.ses.Run(stmt,
 		func(tx sql.Transaction, stmt evaluate.Stmt) error {
-			plan, err := stmt.Plan(run.ses, run.ses.Context(), run.Engine, tx)
+			plan, err := stmt.Plan(run.ses.Context(), run.ses, run.Engine, tx)
 			if err != nil {
 				return err
 			}

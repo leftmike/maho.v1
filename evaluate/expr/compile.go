@@ -122,7 +122,7 @@ func compile(ses *evaluate.Session, tx sql.Transaction, cctx CompileContext, e E
 		if ses == nil || tx == nil {
 			return nil, fmt.Errorf("engine: expression statements not allowed here: %s", e.Stmt)
 		}
-		plan, err := e.Stmt.Plan(ses, ses.Context(), ses.Engine, tx)
+		plan, err := e.Stmt.Plan(ses.Context(), ses, ses.Engine, tx)
 		if err != nil {
 			return nil, err
 		}

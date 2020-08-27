@@ -12,7 +12,7 @@ func (stmt *Begin) String() string {
 	return "BEGIN"
 }
 
-func (stmt *Begin) Plan(ses *Session, ctx context.Context, pe PlanEngine,
+func (stmt *Begin) Plan(ctx context.Context, ses *Session, pe PlanEngine,
 	tx sql.Transaction) (Plan, error) {
 
 	panic("do not call; begin handled by session")

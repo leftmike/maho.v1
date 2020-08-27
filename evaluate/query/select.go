@@ -114,7 +114,7 @@ func (stmt *Select) String() string {
 	return s
 }
 
-func (stmt *Select) Plan(ses *evaluate.Session, ctx context.Context, pe evaluate.PlanEngine,
+func (stmt *Select) Plan(ctx context.Context, ses *evaluate.Session, pe evaluate.PlanEngine,
 	tx sql.Transaction) (evaluate.Plan, error) {
 
 	var rows sql.Rows

@@ -17,7 +17,7 @@ func (stmt *Set) String() string {
 	return fmt.Sprintf("SET %s TO %s", stmt.Variable, stmt.Value)
 }
 
-func (stmt *Set) Plan(ses *evaluate.Session, ctx context.Context, pe evaluate.PlanEngine,
+func (stmt *Set) Plan(ctx context.Context, ses *evaluate.Session, pe evaluate.PlanEngine,
 	tx sql.Transaction) (evaluate.Plan, error) {
 
 	return stmt, nil
@@ -27,6 +27,6 @@ func (stmt *Set) Explain() string {
 	return stmt.String()
 }
 
-func (stmt *Set) Command(ses *evaluate.Session) error {
+func (stmt *Set) Command(ctx context.Context, ses *evaluate.Session) error {
 	return ses.Set(stmt.Variable, stmt.Value)
 }

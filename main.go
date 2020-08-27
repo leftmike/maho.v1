@@ -52,14 +52,15 @@ To Do:
 -- engine.Table: IndexRows(...) => engine.IndexRows {Columns, Close, Next, Row}
 
 - SELECT, INSERT, UPDATE, DELETE
--- change PlanEngine to just have LookupTableType
--- engine.LookupTable should take a type rather than returning one
--- move sql.Engine to evaluate.Engine for StmtPlan.Execute and RowsPlan.Rows
 -- remove ses.Context
 -- change ses.Engine to ses.e (ie. don't make it exported)
--- look at move sql.Transaction to execute.Transaction, etc
+-- engine.LookupTable should take a type rather than returning one
+-- change PlanEngine to just have LookupTableType
+-- move sql.Engine to evaluate.Engine for StmtPlan.Execute and RowsPlan.Rows
+-- change selects to use a plan
 -- make plans reusable
 -- keep track of tables and type versions used
+-- look at move sql.Transaction to execute.Transaction, etc
 -- prepared statements
 
 - foreign keys

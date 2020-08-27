@@ -103,7 +103,7 @@ func TestCreateTablePlan(t *testing.T) {
 			t.Fatal(err)
 		}
 		tx := e.Begin(0)
-		_, err = stmt.Plan(ses, ses.Context(), e, tx)
+		_, err = stmt.Plan(ses.Context(), ses, e, tx)
 		if err == nil {
 			if c.fail {
 				t.Errorf("Plan(%q) did not fail", c.sql)

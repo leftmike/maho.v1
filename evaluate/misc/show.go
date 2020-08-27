@@ -17,7 +17,7 @@ func (stmt *Show) String() string {
 	return fmt.Sprintf("SHOW %s", stmt.Variable)
 }
 
-func (stmt *Show) Plan(ses *evaluate.Session, ctx context.Context, pe evaluate.PlanEngine,
+func (stmt *Show) Plan(ctx context.Context, ses *evaluate.Session, pe evaluate.PlanEngine,
 	tx sql.Transaction) (evaluate.Plan, error) {
 
 	return query.RowsPlan(ses.Show(stmt.Variable))

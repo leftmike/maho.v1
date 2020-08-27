@@ -38,7 +38,7 @@ func (fk ForeignKey) String() string {
 	return s
 }
 
-func (fk ForeignKey) Plan(ses *evaluate.Session, ctx context.Context, pe evaluate.PlanEngine,
+func (fk ForeignKey) Plan(ctx context.Context, ses *evaluate.Session, pe evaluate.PlanEngine,
 	tx sql.Transaction) (evaluate.Plan, error) {
 
 	fk.FKTable = ses.ResolveTableName(fk.FKTable)
