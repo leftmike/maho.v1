@@ -27,7 +27,9 @@ func (stmt *DropTable) String() string {
 	return s
 }
 
-func (stmt *DropTable) Plan(ses *evaluate.Session, tx sql.Transaction) (evaluate.Plan, error) {
+func (stmt *DropTable) Plan(ses *evaluate.Session, ctx context.Context, pe evaluate.PlanEngine,
+	tx sql.Transaction) (evaluate.Plan, error) {
+
 	for idx, tn := range stmt.Tables {
 		stmt.Tables[idx] = ses.ResolveTableName(tn)
 	}
@@ -65,7 +67,9 @@ func (stmt *DropIndex) String() string {
 	return s
 }
 
-func (stmt *DropIndex) Plan(ses *evaluate.Session, tx sql.Transaction) (evaluate.Plan, error) {
+func (stmt *DropIndex) Plan(ses *evaluate.Session, ctx context.Context, pe evaluate.PlanEngine,
+	tx sql.Transaction) (evaluate.Plan, error) {
+
 	stmt.Table = ses.ResolveTableName(stmt.Table)
 	return stmt, nil
 }
@@ -101,7 +105,9 @@ func (stmt *DropDatabase) String() string {
 	return s
 }
 
-func (stmt *DropDatabase) Plan(ses *evaluate.Session, tx sql.Transaction) (evaluate.Plan, error) {
+func (stmt *DropDatabase) Plan(ses *evaluate.Session, ctx context.Context, pe evaluate.PlanEngine,
+	tx sql.Transaction) (evaluate.Plan, error) {
+
 	return stmt, nil
 }
 
@@ -128,7 +134,9 @@ func (stmt *DropSchema) String() string {
 	return s + stmt.Schema.String()
 }
 
-func (stmt *DropSchema) Plan(ses *evaluate.Session, tx sql.Transaction) (evaluate.Plan, error) {
+func (stmt *DropSchema) Plan(ses *evaluate.Session, ctx context.Context, pe evaluate.PlanEngine,
+	tx sql.Transaction) (evaluate.Plan, error) {
+
 	stmt.Schema = ses.ResolveSchemaName(stmt.Schema)
 	return stmt, nil
 }

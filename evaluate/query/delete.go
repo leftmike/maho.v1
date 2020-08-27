@@ -27,7 +27,9 @@ type deletePlan struct {
 	rows sql.Rows
 }
 
-func (stmt *Delete) Plan(ses *evaluate.Session, tx sql.Transaction) (evaluate.Plan, error) {
+func (stmt *Delete) Plan(ses *evaluate.Session, ctx context.Context, pe evaluate.PlanEngine,
+	tx sql.Transaction) (evaluate.Plan, error) {
+
 	rows, err := lookupRows(ses, tx, stmt.Table)
 	if err != nil {
 		return nil, err

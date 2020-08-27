@@ -29,27 +29,27 @@ func CompileRef(idx int) sql.CExpr {
 	return colIndex(idx)
 }
 
-func Compile(ses *evaluate.Session, tx sql.Transaction, ctx CompileContext, e Expr) (sql.CExpr,
+func Compile(ses *evaluate.Session, tx sql.Transaction, cctx CompileContext, e Expr) (sql.CExpr,
 	error) {
 
-	return compile(ses, tx, ctx, e, false)
+	return compile(ses, tx, cctx, e, false)
 }
 
-func CompileAggregator(ses *evaluate.Session, tx sql.Transaction, ctx CompileContext,
+func CompileAggregator(ses *evaluate.Session, tx sql.Transaction, cctx CompileContext,
 	e Expr) (sql.CExpr, error) {
 
-	return compile(ses, tx, ctx, e, true)
+	return compile(ses, tx, cctx, e, true)
 }
 
 func CompileExpr(e Expr) (sql.CExpr, error) {
 	return compile(nil, nil, nil, e, false)
 }
 
-func compile(ses *evaluate.Session, tx sql.Transaction, ctx CompileContext, e Expr,
+func compile(ses *evaluate.Session, tx sql.Transaction, cctx CompileContext, e Expr,
 	agg bool) (sql.CExpr, error) {
 
 	if agg {
-		idx, ok := ctx.(AggregatorContext).MaybeRefExpr(e)
+		idx, ok := cctx.(AggregatorContext).MaybeRefExpr(e)
 		if ok {
 			return colIndex(idx), nil
 		}
@@ -59,30 +59,30 @@ func compile(ses *evaluate.Session, tx sql.Transaction, ctx CompileContext, e Ex
 		return e, nil
 	case *Unary:
 		if e.Op == NoOp {
-			return compile(ses, tx, ctx, e.Expr, agg)
+			return compile(ses, tx, cctx, e.Expr, agg)
 		}
 		cf := opFuncs[e.Op]
-		a1, err := compile(ses, tx, ctx, e.Expr, agg)
+		a1, err := compile(ses, tx, cctx, e.Expr, agg)
 		if err != nil {
 			return nil, err
 		}
 		return &call{cf, []sql.CExpr{a1}}, nil
 	case *Binary:
 		cf := opFuncs[e.Op]
-		a1, err := compile(ses, tx, ctx, e.Left, agg)
+		a1, err := compile(ses, tx, cctx, e.Left, agg)
 		if err != nil {
 			return nil, err
 		}
-		a2, err := compile(ses, tx, ctx, e.Right, agg)
+		a2, err := compile(ses, tx, cctx, e.Right, agg)
 		if err != nil {
 			return nil, err
 		}
 		return &call{cf, []sql.CExpr{a1, a2}}, nil
 	case Ref:
-		if ctx == nil {
+		if cctx == nil {
 			return nil, fmt.Errorf("engine: %s not found", e)
 		}
-		idx, err := ctx.CompileRef(e)
+		idx, err := cctx.CompileRef(e)
 		if err != nil {
 			return nil, err
 		}
@@ -102,7 +102,7 @@ func compile(ses *evaluate.Session, tx sql.Transaction, ctx CompileContext, e Ex
 		}
 		if cf.makeAggregator != nil {
 			if agg {
-				return colIndex(ctx.(AggregatorContext).CompileAggregator(e, cf.makeAggregator)),
+				return colIndex(cctx.(AggregatorContext).CompileAggregator(e, cf.makeAggregator)),
 					nil
 			} else {
 				return nil, &ContextError{e.Name}
@@ -112,7 +112,7 @@ func compile(ses *evaluate.Session, tx sql.Transaction, ctx CompileContext, e Ex
 		args := make([]sql.CExpr, len(e.Args))
 		for i, a := range e.Args {
 			var err error
-			args[i], err = compile(ses, tx, ctx, a, agg)
+			args[i], err = compile(ses, tx, cctx, a, agg)
 			if err != nil {
 				return nil, err
 			}
@@ -122,7 +122,7 @@ func compile(ses *evaluate.Session, tx sql.Transaction, ctx CompileContext, e Ex
 		if ses == nil || tx == nil {
 			return nil, fmt.Errorf("engine: expression statements not allowed here: %s", e.Stmt)
 		}
-		plan, err := e.Stmt.Plan(ses, tx)
+		plan, err := e.Stmt.Plan(ses, ses.Context(), ses.Engine, tx)
 		if err != nil {
 			return nil, err
 		}
@@ -142,7 +142,7 @@ func compile(ses *evaluate.Session, tx sql.Transaction, ctx CompileContext, e Ex
 }
 
 type callFunc struct {
-	fn             func(ctx sql.EvalContext, args []sql.Value) (sql.Value, error)
+	fn             func(etx sql.EvalContext, args []sql.Value) (sql.Value, error)
 	minArgs        int16
 	maxArgs        int16
 	name           string

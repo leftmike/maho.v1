@@ -72,7 +72,7 @@ func (fs FromStmt) String() string {
 func (fs FromStmt) rows(ses *evaluate.Session, tx sql.Transaction) (sql.Rows, *fromContext,
 	error) {
 
-	plan, err := fs.Stmt.Plan(ses, tx)
+	plan, err := fs.Stmt.Plan(ses, ses.Context(), ses.Engine, tx)
 	if err != nil {
 		return nil, nil, err
 	}

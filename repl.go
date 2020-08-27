@@ -28,7 +28,7 @@ func replSQL(ses *evaluate.Session, p parser.Parser, w io.Writer) {
 
 		err = ses.Run(stmt,
 			func(tx sql.Transaction, stmt evaluate.Stmt) error {
-				plan, err := stmt.Plan(ses, tx)
+				plan, err := stmt.Plan(ses, ses.Context(), ses.Engine, tx)
 				if err != nil {
 					return err
 				}

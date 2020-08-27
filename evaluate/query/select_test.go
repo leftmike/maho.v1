@@ -101,7 +101,7 @@ func TestSelect(t *testing.T) {
 			t.Errorf("(%v).String() got %q want %q", c.stmt, c.stmt.String(), c.s)
 			continue
 		}
-		plan, err := c.stmt.Plan(ses, tx)
+		plan, err := c.stmt.Plan(ses, ses.Context(), e, tx)
 		if err != nil {
 			t.Errorf("(%v).Plan() failed with %s", c.stmt, err)
 			continue

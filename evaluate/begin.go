@@ -1,6 +1,8 @@
 package evaluate
 
 import (
+	"context"
+
 	"github.com/leftmike/maho/sql"
 )
 
@@ -10,7 +12,9 @@ func (stmt *Begin) String() string {
 	return "BEGIN"
 }
 
-func (stmt *Begin) Plan(ses *Session, tx sql.Transaction) (Plan, error) {
+func (stmt *Begin) Plan(ses *Session, ctx context.Context, pe PlanEngine,
+	tx sql.Transaction) (Plan, error) {
+
 	panic("do not call; begin handled by session")
 	return nil, nil
 }

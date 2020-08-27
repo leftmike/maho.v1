@@ -9,7 +9,7 @@ import (
 
 type Stmt interface {
 	fmt.Stringer
-	Plan(ses *Session, tx sql.Transaction) (Plan, error)
+	Plan(ses *Session, ctx context.Context, pe PlanEngine, tx sql.Transaction) (Plan, error)
 }
 
 type Plan interface {
@@ -30,3 +30,5 @@ type RowsPlan interface {
 	Plan
 	Rows(ctx context.Context, e sql.Engine, tx sql.Transaction) (sql.Rows, error)
 }
+
+type PlanEngine sql.Engine

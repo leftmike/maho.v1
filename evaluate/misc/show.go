@@ -1,6 +1,7 @@
 package misc
 
 import (
+	"context"
 	"fmt"
 
 	"github.com/leftmike/maho/evaluate"
@@ -16,6 +17,8 @@ func (stmt *Show) String() string {
 	return fmt.Sprintf("SHOW %s", stmt.Variable)
 }
 
-func (stmt *Show) Plan(ses *evaluate.Session, tx sql.Transaction) (evaluate.Plan, error) {
+func (stmt *Show) Plan(ses *evaluate.Session, ctx context.Context, pe evaluate.PlanEngine,
+	tx sql.Transaction) (evaluate.Plan, error) {
+
 	return query.RowsPlan(ses.Show(stmt.Variable))
 }

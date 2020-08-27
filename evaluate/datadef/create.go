@@ -169,10 +169,12 @@ func (cc columnCheck) CompileRef(r expr.Ref) (int, error) {
 	return -1, fmt.Errorf("engine: reference %s not found", r)
 }
 
-func (stmt *CreateTable) Plan(ses *evaluate.Session, tx sql.Transaction) (evaluate.Plan, error) {
+func (stmt *CreateTable) Plan(ses *evaluate.Session, ctx context.Context, pe evaluate.PlanEngine,
+	tx sql.Transaction) (evaluate.Plan, error) {
+
 	for _, fk := range stmt.ForeignKeys {
 		fk.FKTable = stmt.Table
-		pfk, err := fk.Plan(ses, tx)
+		pfk, err := fk.Plan(ses, ctx, pe, tx)
 		if err != nil {
 			return nil, err
 		}
@@ -293,7 +295,9 @@ func (stmt *CreateIndex) String() string {
 	return s
 }
 
-func (stmt *CreateIndex) Plan(ses *evaluate.Session, tx sql.Transaction) (evaluate.Plan, error) {
+func (stmt *CreateIndex) Plan(ses *evaluate.Session, ctx context.Context, pe evaluate.PlanEngine,
+	tx sql.Transaction) (evaluate.Plan, error) {
+
 	stmt.Table = ses.ResolveTableName(stmt.Table)
 	return stmt, nil
 }
@@ -335,8 +339,8 @@ func (stmt *CreateDatabase) String() string {
 	return s
 }
 
-func (stmt *CreateDatabase) Plan(ses *evaluate.Session, tx sql.Transaction) (evaluate.Plan,
-	error) {
+func (stmt *CreateDatabase) Plan(ses *evaluate.Session, ctx context.Context,
+	pe evaluate.PlanEngine, tx sql.Transaction) (evaluate.Plan, error) {
 
 	return stmt, nil
 }
@@ -359,7 +363,9 @@ func (stmt *CreateSchema) String() string {
 	return fmt.Sprintf("CREATE SCHEMA %s", stmt.Schema)
 }
 
-func (stmt *CreateSchema) Plan(ses *evaluate.Session, tx sql.Transaction) (evaluate.Plan, error) {
+func (stmt *CreateSchema) Plan(ses *evaluate.Session, ctx context.Context, pe evaluate.PlanEngine,
+	tx sql.Transaction) (evaluate.Plan, error) {
+
 	stmt.Schema = ses.ResolveSchemaName(stmt.Schema)
 	return stmt, nil
 }

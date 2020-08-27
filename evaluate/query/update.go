@@ -51,7 +51,9 @@ func (up *updatePlan) EvalRef(idx int) sql.Value {
 	return up.dest[idx]
 }
 
-func (stmt *Update) Plan(ses *evaluate.Session, tx sql.Transaction) (evaluate.Plan, error) {
+func (stmt *Update) Plan(ses *evaluate.Session, ctx context.Context, pe evaluate.PlanEngine,
+	tx sql.Transaction) (evaluate.Plan, error) {
+
 	tbl, tt, err := ses.Engine.LookupTable(ses.Context(), tx, ses.ResolveTableName(stmt.Table))
 	if err != nil {
 		return nil, err

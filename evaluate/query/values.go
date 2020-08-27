@@ -80,7 +80,9 @@ func (_ *exprValues) Update(ctx context.Context, updates []sql.ColumnUpdate) err
 	return fmt.Errorf("values: rows may not be updated")
 }
 
-func (stmt *Values) Plan(ses *evaluate.Session, tx sql.Transaction) (evaluate.Plan, error) {
+func (stmt *Values) Plan(ses *evaluate.Session, ctx context.Context, pe evaluate.PlanEngine,
+	tx sql.Transaction) (evaluate.Plan, error) {
+
 	columns := make([]sql.Identifier, len(stmt.Expressions[0]))
 	for i := 0; i < len(columns); i++ {
 		columns[i] = sql.ID(fmt.Sprintf("column%d", i+1))
