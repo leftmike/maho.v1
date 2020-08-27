@@ -80,7 +80,7 @@ func (_ *exprValues) Update(ctx context.Context, updates []sql.ColumnUpdate) err
 	return fmt.Errorf("values: rows may not be updated")
 }
 
-func (stmt *Values) Plan(ses *evaluate.Session, tx sql.Transaction) (interface{}, error) {
+func (stmt *Values) Plan(ses *evaluate.Session, tx sql.Transaction) (evaluate.Plan, error) {
 	columns := make([]sql.Identifier, len(stmt.Expressions[0]))
 	for i := 0; i < len(columns); i++ {
 		columns[i] = sql.ID(fmt.Sprintf("column%d", i+1))
@@ -102,4 +102,15 @@ func (stmt *Values) Plan(ses *evaluate.Session, tx sql.Transaction) (interface{}
 		columns: columns,
 		rows:    rows,
 	}, nil
+}
+
+func (ev *exprValues) Explain() string {
+	// XXX: exprValues.Explain
+	return ""
+}
+
+func (ev *exprValues) Rows(ctx context.Context, e sql.Engine, tx sql.Transaction) (sql.Rows,
+	error) {
+
+	return ev, nil
 }

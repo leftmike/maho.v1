@@ -41,19 +41,19 @@ func (run *Runner) RunExec(tst *sqltestdb.Test) (int64, error) {
 
 		err = run.ses.Run(stmt,
 			func(tx sql.Transaction, stmt evaluate.Stmt) error {
-				ret, err2 := stmt.Plan(run.ses, tx)
-				if err2 != nil {
-					return err2
+				plan, err := stmt.Plan(run.ses, tx)
+				if err != nil {
+					return err
 				}
-				if exec, ok := ret.(evaluate.Executor); ok {
-					n, err2 = exec.Execute(run.ses.Context(), run.ses.Engine, tx)
-					if err2 != nil {
-						return err2
+				if stmtPlan, ok := plan.(evaluate.StmtPlan); ok {
+					n, err = stmtPlan.Execute(run.ses.Context(), run.ses.Engine, tx)
+					if err != nil {
+						return err
 					}
-				} else if cmd, ok := ret.(evaluate.Commander); ok {
-					err2 = cmd.Command(run.ses)
-					if err2 != nil {
-						return err2
+				} else if cmdPlan, ok := plan.(evaluate.CmdPlan); ok {
+					err = cmdPlan.Command(run.ses)
+					if err != nil {
+						return err
 					}
 				} else {
 					panic("expected Executor or Commander")
@@ -87,13 +87,17 @@ func (run *Runner) RunQuery(tst *sqltestdb.Test) ([]string, [][]string, error) {
 	var results [][]string
 	err = run.ses.Run(stmt,
 		func(tx sql.Transaction, stmt evaluate.Stmt) error {
-			ret, err2 := stmt.Plan(run.ses, tx)
-			if err2 != nil {
-				return err2
+			plan, err := stmt.Plan(run.ses, tx)
+			if err != nil {
+				return err
 			}
-			rows, ok := ret.(sql.Rows)
+			rowsPlan, ok := plan.(evaluate.RowsPlan)
 			if !ok {
 				return fmt.Errorf("%s:%d: expected a query", tst.Filename, tst.LineNumber)
+			}
+			rows, err := rowsPlan.Rows(run.ses.Context(), run.ses.Engine, tx)
+			if err != nil {
+				return err
 			}
 
 			cols := rows.Columns()
@@ -105,11 +109,11 @@ func (run *Runner) RunQuery(tst *sqltestdb.Test) ([]string, [][]string, error) {
 
 			dest := make([]sql.Value, lenCols)
 			for {
-				err2 = rows.Next(run.ses.Context(), dest)
-				if err2 == io.EOF {
+				err = rows.Next(run.ses.Context(), dest)
+				if err == io.EOF {
 					break
-				} else if err2 != nil {
-					return err2
+				} else if err != nil {
+					return err
 				}
 				row := make([]string, 0, lenCols)
 				for _, v := range dest {

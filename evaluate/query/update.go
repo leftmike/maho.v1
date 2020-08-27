@@ -51,45 +51,7 @@ func (up *updatePlan) EvalRef(idx int) sql.Value {
 	return up.dest[idx]
 }
 
-func (up *updatePlan) Execute(ctx context.Context, e sql.Engine, tx sql.Transaction) (int64,
-	error) {
-
-	up.dest = make([]sql.Value, len(up.rows.Columns()))
-	cnt := int64(0)
-	updates := make([]sql.ColumnUpdate, len(up.updates))
-
-	for {
-		err := up.rows.Next(ctx, up.dest)
-		if err == io.EOF {
-			return cnt, nil
-		} else if err != nil {
-			return -1, err
-		}
-
-		updates = updates[:0]
-		for _, update := range up.updates {
-			col := update.column
-			val, err := update.expr.Eval(ctx, up)
-			if err != nil {
-				return -1, err
-			}
-			if sql.Compare(val, up.dest[col]) != 0 {
-				updates = append(updates, sql.ColumnUpdate{Column: col, Value: val})
-			}
-		}
-
-		if len(updates) > 0 {
-			err = up.rows.Update(ctx, updates)
-			if err != nil {
-				up.rows.Close()
-				return -1, err
-			}
-			cnt += 1
-		}
-	}
-}
-
-func (stmt *Update) Plan(ses *evaluate.Session, tx sql.Transaction) (interface{}, error) {
+func (stmt *Update) Plan(ses *evaluate.Session, tx sql.Transaction) (evaluate.Plan, error) {
 	tbl, tt, err := ses.Engine.LookupTable(ses.Context(), tx, ses.ResolveTableName(stmt.Table))
 	if err != nil {
 		return nil, err
@@ -126,4 +88,47 @@ func (stmt *Update) Plan(ses *evaluate.Session, tx sql.Transaction) (interface{}
 		plan.updates = append(plan.updates, columnUpdate{column: col, expr: ce})
 	}
 	return &plan, nil
+}
+
+func (up *updatePlan) Explain() string {
+	// XXX: updatePlan.Explain
+	return ""
+}
+
+func (up *updatePlan) Execute(ctx context.Context, e sql.Engine, tx sql.Transaction) (int64,
+	error) {
+
+	up.dest = make([]sql.Value, len(up.rows.Columns()))
+	cnt := int64(0)
+	updates := make([]sql.ColumnUpdate, len(up.updates))
+
+	for {
+		err := up.rows.Next(ctx, up.dest)
+		if err == io.EOF {
+			return cnt, nil
+		} else if err != nil {
+			return -1, err
+		}
+
+		updates = updates[:0]
+		for _, update := range up.updates {
+			col := update.column
+			val, err := update.expr.Eval(ctx, up)
+			if err != nil {
+				return -1, err
+			}
+			if sql.Compare(val, up.dest[col]) != 0 {
+				updates = append(updates, sql.ColumnUpdate{Column: col, Value: val})
+			}
+		}
+
+		if len(updates) > 0 {
+			err = up.rows.Update(ctx, updates)
+			if err != nil {
+				up.rows.Close()
+				return -1, err
+			}
+			cnt += 1
+		}
+	}
 }

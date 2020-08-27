@@ -109,7 +109,7 @@ type CreateTable struct {
 	Constraints []Constraint
 	constraints []sql.Constraint
 	ForeignKeys []ForeignKey
-	foreignKeys []evaluate.Executor
+	foreignKeys []evaluate.StmtPlan
 }
 
 func (stmt *CreateTable) String() string {
@@ -169,14 +169,14 @@ func (cc columnCheck) CompileRef(r expr.Ref) (int, error) {
 	return -1, fmt.Errorf("engine: reference %s not found", r)
 }
 
-func (stmt *CreateTable) Plan(ses *evaluate.Session, tx sql.Transaction) (interface{}, error) {
+func (stmt *CreateTable) Plan(ses *evaluate.Session, tx sql.Transaction) (evaluate.Plan, error) {
 	for _, fk := range stmt.ForeignKeys {
 		fk.FKTable = stmt.Table
 		pfk, err := fk.Plan(ses, tx)
 		if err != nil {
 			return nil, err
 		}
-		stmt.foreignKeys = append(stmt.foreignKeys, pfk.(evaluate.Executor))
+		stmt.foreignKeys = append(stmt.foreignKeys, pfk.(evaluate.StmtPlan))
 	}
 
 	stmt.Table = ses.ResolveTableName(stmt.Table)
@@ -245,6 +245,10 @@ func (stmt *CreateTable) Plan(ses *evaluate.Session, tx sql.Transaction) (interf
 	return stmt, nil
 }
 
+func (stmt *CreateTable) Explain() string {
+	return stmt.String()
+}
+
 func (stmt *CreateTable) Execute(ctx context.Context, e sql.Engine, tx sql.Transaction) (int64,
 	error) {
 
@@ -289,9 +293,13 @@ func (stmt *CreateIndex) String() string {
 	return s
 }
 
-func (stmt *CreateIndex) Plan(ses *evaluate.Session, tx sql.Transaction) (interface{}, error) {
+func (stmt *CreateIndex) Plan(ses *evaluate.Session, tx sql.Transaction) (evaluate.Plan, error) {
 	stmt.Table = ses.ResolveTableName(stmt.Table)
 	return stmt, nil
+}
+
+func (stmt *CreateIndex) Explain() string {
+	return stmt.String()
 }
 
 func (stmt *CreateIndex) Execute(ctx context.Context, e sql.Engine, tx sql.Transaction) (int64,
@@ -327,8 +335,14 @@ func (stmt *CreateDatabase) String() string {
 	return s
 }
 
-func (stmt *CreateDatabase) Plan(ses *evaluate.Session, tx sql.Transaction) (interface{}, error) {
+func (stmt *CreateDatabase) Plan(ses *evaluate.Session, tx sql.Transaction) (evaluate.Plan,
+	error) {
+
 	return stmt, nil
+}
+
+func (stmt *CreateDatabase) Explain() string {
+	return stmt.String()
 }
 
 func (stmt *CreateDatabase) Command(ses *evaluate.Session) error {
@@ -343,9 +357,13 @@ func (stmt *CreateSchema) String() string {
 	return fmt.Sprintf("CREATE SCHEMA %s", stmt.Schema)
 }
 
-func (stmt *CreateSchema) Plan(ses *evaluate.Session, tx sql.Transaction) (interface{}, error) {
+func (stmt *CreateSchema) Plan(ses *evaluate.Session, tx sql.Transaction) (evaluate.Plan, error) {
 	stmt.Schema = ses.ResolveSchemaName(stmt.Schema)
 	return stmt, nil
+}
+
+func (stmt *CreateSchema) Explain() string {
+	return stmt.String()
 }
 
 func (stmt *CreateSchema) Execute(ctx context.Context, e sql.Engine, tx sql.Transaction) (int64,

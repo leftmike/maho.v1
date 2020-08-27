@@ -114,7 +114,7 @@ func (stmt *Select) String() string {
 	return s
 }
 
-func (stmt *Select) Plan(ses *evaluate.Session, tx sql.Transaction) (interface{}, error) {
+func (stmt *Select) Plan(ses *evaluate.Session, tx sql.Transaction) (evaluate.Plan, error) {
 	var rows sql.Rows
 	var fctx *fromContext
 	var err error
@@ -135,13 +135,35 @@ func (stmt *Select) Plan(ses *evaluate.Session, tx sql.Transaction) (interface{}
 	if stmt.GroupBy == nil && stmt.Having == nil {
 		rrows, err := results(ses, tx, rows, fctx, stmt.Results)
 		if err == nil {
-			return order(rrows, fctx, stmt.OrderBy)
+			return RowsPlan(order(rrows, fctx, stmt.OrderBy))
 		} else if _, ok := err.(*expr.ContextError); !ok {
 			return nil, err
 		}
 		// Aggregrate function used in SELECT results causes an implicit GROUP BY
 	}
-	return group(ses, tx, rows, fctx, stmt.Results, stmt.GroupBy, stmt.Having, stmt.OrderBy)
+	return RowsPlan(group(ses, tx, rows, fctx, stmt.Results, stmt.GroupBy, stmt.Having,
+		stmt.OrderBy))
+}
+
+func RowsPlan(rows sql.Rows, err error) (evaluate.RowsPlan, error) {
+	if err != nil {
+		return nil, err
+	}
+
+	return rowsPlan{rows}, nil
+}
+
+type rowsPlan struct {
+	rows sql.Rows
+}
+
+func (re rowsPlan) Explain() string {
+	// XXX: rowsPlan.Explain
+	return ""
+}
+
+func (re rowsPlan) Rows(ctx context.Context, e sql.Engine, tx sql.Transaction) (sql.Rows, error) {
+	return re.rows, nil
 }
 
 type orderBy struct {

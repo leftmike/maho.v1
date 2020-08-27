@@ -36,7 +36,7 @@ func (stmt *Copy) String() string {
 	return s
 }
 
-func (stmt *Copy) Plan(ses *evaluate.Session, tx sql.Transaction) (interface{}, error) {
+func (stmt *Copy) Plan(ses *evaluate.Session, tx sql.Transaction) (evaluate.Plan, error) {
 	tbl, tt, err := ses.Engine.LookupTable(ses.Context(), tx, ses.ResolveTableName(stmt.Table))
 	if err != nil {
 		return nil, err
@@ -90,6 +90,11 @@ type copyPlan struct {
 	fromToRow  []int
 	defaultRow []sql.CExpr
 	delimiter  rune
+}
+
+func (plan *copyPlan) Explain() string {
+	// XXX: copyPlan.Explain
+	return ""
 }
 
 func (plan *copyPlan) Execute(ctx context.Context, e sql.Engine, tx sql.Transaction) (int64,

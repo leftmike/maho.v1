@@ -52,10 +52,9 @@ To Do:
 -- engine.Table: IndexRows(...) => engine.IndexRows {Columns, Close, Next, Row}
 
 - SELECT, INSERT, UPDATE, DELETE
--- Plan(ses *Session, ctx context.Context, pe PlanEngine, tx sql.Transaction) (Executor, error)
--- Executor: add fmt.Stringer, IsExecutor()
--- StmtExecutor, RowsExecutor
+-- Plan: change e sql.Engine to pe PlanEngine
 -- move sql.Engine to execute.PlanEngine and execute.Engine
+-- Command: add e Engine argument
 -- look at move sql.Transaction to execute.Transaction, etc
 -- make plans reusable
 -- change ses.Engine to ses.e (ie. don't make it exported)

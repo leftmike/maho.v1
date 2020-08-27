@@ -101,16 +101,22 @@ func TestSelect(t *testing.T) {
 			t.Errorf("(%v).String() got %q want %q", c.stmt, c.stmt.String(), c.s)
 			continue
 		}
-		ret, err := c.stmt.Plan(ses, tx)
+		plan, err := c.stmt.Plan(ses, tx)
 		if err != nil {
 			t.Errorf("(%v).Plan() failed with %s", c.stmt, err)
 			continue
 		}
-		rows, ok := ret.(sql.Rows)
+		rowsPlan, ok := plan.(evaluate.RowsPlan)
 		if !ok {
 			t.Errorf("(%v).Plan() did not return Rows", c.stmt)
 			continue
 		}
+		rows, err := rowsPlan.Rows(ses.Context(), e, tx)
+		if err != nil {
+			t.Errorf("(%v).Rows() failed with %s", c.stmt, err)
+			continue
+		}
+
 		cols := rows.Columns()
 		if !reflect.DeepEqual(cols, c.cols) {
 			t.Errorf("(%v).Plan().Columns() got %v want %v", c.stmt, cols, c.cols)

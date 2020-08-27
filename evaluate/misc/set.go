@@ -16,8 +16,12 @@ func (stmt *Set) String() string {
 	return fmt.Sprintf("SET %s TO %s", stmt.Variable, stmt.Value)
 }
 
-func (stmt *Set) Plan(ses *evaluate.Session, tx sql.Transaction) (interface{}, error) {
+func (stmt *Set) Plan(ses *evaluate.Session, tx sql.Transaction) (evaluate.Plan, error) {
 	return stmt, nil
+}
+
+func (stmt *Set) Explain() string {
+	return stmt.String()
 }
 
 func (stmt *Set) Command(ses *evaluate.Session) error {

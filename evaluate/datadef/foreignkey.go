@@ -154,6 +154,11 @@ func (fk *ForeignKey) Prepare(fktt, rtt sql.TableType) ([]int, sql.Identifier, e
 	return fkCols, ridx, nil
 }
 
+func (fk *ForeignKey) Explain() string {
+	// XXX: ForeignKey.Explain
+	return ""
+}
+
 func (fk *ForeignKey) Execute(ctx context.Context, e sql.Engine, tx sql.Transaction) (int64,
 	error) {
 

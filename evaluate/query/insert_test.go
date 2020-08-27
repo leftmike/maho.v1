@@ -206,11 +206,12 @@ func statement(ses *evaluate.Session, tx sql.Transaction, s string) error {
 	if err != nil {
 		return err
 	}
-	ret, err := stmt.Plan(ses, tx)
+	plan, err := stmt.Plan(ses, tx)
 	if err != nil {
 		return err
 	}
-	_, err = ret.(evaluate.Executor).Execute(ses.Context(), ses.Engine, tx)
+	stmtPlan := plan.(evaluate.StmtPlan)
+	_, err = stmtPlan.Execute(ses.Context(), ses.Engine, tx)
 	return err
 }
 

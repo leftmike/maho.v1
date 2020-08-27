@@ -122,13 +122,18 @@ func compile(ses *evaluate.Session, tx sql.Transaction, ctx CompileContext, e Ex
 		if ses == nil || tx == nil {
 			return nil, fmt.Errorf("engine: expression statements not allowed here: %s", e.Stmt)
 		}
-		ret, err := e.Stmt.Plan(ses, tx)
+		plan, err := e.Stmt.Plan(ses, tx)
 		if err != nil {
 			return nil, err
 		}
-		rows, ok := ret.(sql.Rows)
+
+		rowsPlan, ok := plan.(evaluate.RowsPlan)
 		if !ok {
 			return nil, fmt.Errorf("engine: expected rows: %s", e.Stmt)
+		}
+		rows, err := rowsPlan.Rows(ses.Context(), ses.Engine, tx)
+		if err != nil {
+			return nil, err
 		}
 		return &rowsExpr{rows: rows}, nil
 	default:

@@ -27,6 +27,27 @@ type deletePlan struct {
 	rows sql.Rows
 }
 
+func (stmt *Delete) Plan(ses *evaluate.Session, tx sql.Transaction) (evaluate.Plan, error) {
+	rows, err := lookupRows(ses, tx, stmt.Table)
+	if err != nil {
+		return nil, err
+	}
+	if stmt.Where != nil {
+		ce, err := expr.Compile(ses, tx, makeFromContext(stmt.Table.Table, rows.Columns()),
+			stmt.Where)
+		if err != nil {
+			return nil, err
+		}
+		rows = &filterRows{rows: rows, cond: ce}
+	}
+	return &deletePlan{rows: rows}, nil
+}
+
+func (dp *deletePlan) Explain() string {
+	// XXX: deletePlan.Explain
+	return ""
+}
+
 func (dp *deletePlan) Execute(ctx context.Context, e sql.Engine, tx sql.Transaction) (int64,
 	error) {
 
@@ -45,20 +66,4 @@ func (dp *deletePlan) Execute(ctx context.Context, e sql.Engine, tx sql.Transact
 		}
 		cnt += 1
 	}
-}
-
-func (stmt *Delete) Plan(ses *evaluate.Session, tx sql.Transaction) (interface{}, error) {
-	rows, err := lookupRows(ses, tx, stmt.Table)
-	if err != nil {
-		return nil, err
-	}
-	if stmt.Where != nil {
-		ce, err := expr.Compile(ses, tx, makeFromContext(stmt.Table.Table, rows.Columns()),
-			stmt.Where)
-		if err != nil {
-			return nil, err
-		}
-		rows = &filterRows{rows: rows, cond: ce}
-	}
-	return &deletePlan{rows: rows}, nil
 }

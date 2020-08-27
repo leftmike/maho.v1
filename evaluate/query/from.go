@@ -72,11 +72,16 @@ func (fs FromStmt) String() string {
 func (fs FromStmt) rows(ses *evaluate.Session, tx sql.Transaction) (sql.Rows, *fromContext,
 	error) {
 
-	ret, err := fs.Stmt.Plan(ses, tx)
+	plan, err := fs.Stmt.Plan(ses, tx)
 	if err != nil {
 		return nil, nil, err
 	}
-	rows := ret.(sql.Rows)
+	rowsPlan := plan.(evaluate.RowsPlan)
+	rows, err := rowsPlan.Rows(ses.Context(), ses.Engine, tx)
+	if err != nil {
+		return nil, nil, err
+	}
+
 	cols := rows.Columns()
 	if fs.ColumnAliases != nil {
 		if len(fs.ColumnAliases) != len(cols) {

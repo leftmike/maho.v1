@@ -54,7 +54,7 @@ func (stmt *InsertValues) String() string {
 	return s
 }
 
-func (stmt *InsertValues) Plan(ses *evaluate.Session, tx sql.Transaction) (interface{}, error) {
+func (stmt *InsertValues) Plan(ses *evaluate.Session, tx sql.Transaction) (evaluate.Plan, error) {
 	tbl, tt, err := ses.Engine.LookupTable(ses.Context(), tx, ses.ResolveTableName(stmt.Table))
 	if err != nil {
 		return nil, err
@@ -122,6 +122,11 @@ type insertValuesPlan struct {
 	tbl  sql.Table
 	cols []sql.Identifier
 	rows [][]sql.CExpr
+}
+
+func (plan *insertValuesPlan) Explain() string {
+	// XXX: insertValuePlan.Explain
+	return ""
 }
 
 func (plan *insertValuesPlan) Execute(ctx context.Context, e sql.Engine,

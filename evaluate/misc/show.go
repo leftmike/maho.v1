@@ -4,6 +4,7 @@ import (
 	"fmt"
 
 	"github.com/leftmike/maho/evaluate"
+	"github.com/leftmike/maho/evaluate/query"
 	"github.com/leftmike/maho/sql"
 )
 
@@ -15,6 +16,6 @@ func (stmt *Show) String() string {
 	return fmt.Sprintf("SHOW %s", stmt.Variable)
 }
 
-func (stmt *Show) Plan(ses *evaluate.Session, tx sql.Transaction) (interface{}, error) {
-	return ses.Show(stmt.Variable)
+func (stmt *Show) Plan(ses *evaluate.Session, tx sql.Transaction) (evaluate.Plan, error) {
+	return query.RowsPlan(ses.Show(stmt.Variable))
 }
