@@ -345,8 +345,10 @@ func (stmt *CreateDatabase) Explain() string {
 	return stmt.String()
 }
 
-func (stmt *CreateDatabase) Command(ses *evaluate.Session) error {
-	return ses.Engine.CreateDatabase(stmt.Database, stmt.Options)
+func (stmt *CreateDatabase) Execute(ctx context.Context, e sql.Engine, tx sql.Transaction) (int64,
+	error) {
+
+	return -1, e.CreateDatabase(stmt.Database, stmt.Options)
 }
 
 type CreateSchema struct {

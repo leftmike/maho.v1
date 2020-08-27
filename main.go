@@ -54,7 +54,7 @@ To Do:
 - SELECT, INSERT, UPDATE, DELETE
 -- Plan: change e sql.Engine to pe PlanEngine
 -- move sql.Engine to execute.PlanEngine and execute.Engine
--- Command: add e Engine argument
+-- ses.Context: remove?
 -- look at move sql.Transaction to execute.Transaction, etc
 -- make plans reusable
 -- change ses.Engine to ses.e (ie. don't make it exported)

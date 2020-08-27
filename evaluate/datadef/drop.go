@@ -109,8 +109,10 @@ func (stmt *DropDatabase) Explain() string {
 	return stmt.String()
 }
 
-func (stmt *DropDatabase) Command(ses *evaluate.Session) error {
-	return ses.Engine.DropDatabase(stmt.Database, stmt.IfExists, stmt.Options)
+func (stmt *DropDatabase) Execute(ctx context.Context, e sql.Engine, tx sql.Transaction) (int64,
+	error) {
+
+	return -1, e.DropDatabase(stmt.Database, stmt.IfExists, stmt.Options)
 }
 
 type DropSchema struct {
