@@ -142,29 +142,57 @@ func (e *Engine) DropSchema(ctx context.Context, tx sql.Transaction, sn sql.Sche
 	return e.st.DropSchema(ctx, tx.(*transaction).tx, sn, ifExists)
 }
 
-func (e *Engine) LookupTable(ctx context.Context, tx sql.Transaction, tn sql.TableName) (sql.Table,
-	sql.TableType, error) {
+func (e *Engine) lookupVirtualTable(ctx context.Context, tx sql.Transaction,
+	tn sql.TableName) (sql.Table, sql.TableType, error, bool) {
 
 	e.mutex.RLock()
 	defer e.mutex.RUnlock()
 
 	if tn.Schema == sql.METADATA {
 		if maker, ok := e.metadataTables[tn.Table]; ok {
-			return maker(ctx, tx, tn)
+			tbl, tt, err := maker(ctx, tx, tn)
+			return tbl, tt, err, true
 		}
-		return nil, nil, fmt.Errorf("engine: table %s not found", tn)
+		return nil, nil, fmt.Errorf("engine: table %s not found", tn), true
 	} else if tn.Database == sql.SYSTEM && tn.Schema == sql.INFO {
 		if maker, ok := e.systemInfoTables[tn.Table]; ok {
-			return maker(ctx, tx, tn)
+			tbl, tt, err := maker(ctx, tx, tn)
+			return tbl, tt, err, true
 		}
-		return nil, nil, fmt.Errorf("engine: table %s not found", tn)
+		return nil, nil, fmt.Errorf("engine: table %s not found", tn), true
 	}
 
-	stbl, tt, err := e.st.LookupTable(ctx, tx.(*transaction).tx, tn)
+	return nil, nil, nil, false
+}
+
+func (e *Engine) LookupTableType(ctx context.Context, tx sql.Transaction,
+	tn sql.TableName) (sql.TableType, error) {
+
+	_, tt, err, ok := e.lookupVirtualTable(ctx, tx, tn)
+	if ok {
+		return tt, err
+	}
+
+	_, tt, err = e.st.LookupTable(ctx, tx.(*transaction).tx, tn)
+	if err != nil {
+		return nil, err
+	}
+	return tt, err
+}
+
+func (e *Engine) LookupTable(ctx context.Context, tx sql.Transaction, tn sql.TableName) (sql.Table,
+	sql.TableType, error) {
+
+	tbl, tt, err, ok := e.lookupVirtualTable(ctx, tx, tn)
+	if ok {
+		return tbl, tt, err
+	}
+
+	stbl, ett, err := e.st.LookupTable(ctx, tx.(*transaction).tx, tn)
 	if err != nil {
 		return nil, nil, err
 	}
-	return makeTable(tx.(*transaction), tn, stbl, tt)
+	return makeTable(tx.(*transaction), tn, stbl, ett)
 }
 
 func (e *Engine) CreateTable(ctx context.Context, tx sql.Transaction, tn sql.TableName,

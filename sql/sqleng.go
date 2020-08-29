@@ -41,6 +41,7 @@ type Engine interface {
 	CreateSchema(ctx context.Context, tx Transaction, sn SchemaName) error
 	DropSchema(ctx context.Context, tx Transaction, sn SchemaName, ifExists bool) error
 
+	LookupTableType(ctx context.Context, tx Transaction, tn TableName) (TableType, error)
 	LookupTable(ctx context.Context, tx Transaction, tn TableName) (Table, TableType, error)
 	CreateTable(ctx context.Context, tx Transaction, tn TableName, cols []Identifier,
 		colTypes []ColumnType, cons []Constraint, ifNotExists bool) error

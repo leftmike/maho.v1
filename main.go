@@ -62,6 +62,7 @@ To Do:
 -- make plans reusable
 -- keep track of tables and type versions used
 -- look at move sql.Transaction to execute.Transaction, etc
+-- maybe get rid of Rows.Columns()
 -- prepared statements
 
 - foreign keys

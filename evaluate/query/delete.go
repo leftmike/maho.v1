@@ -24,7 +24,8 @@ func (stmt *Delete) String() string {
 }
 
 type deletePlan struct {
-	rows sql.Rows
+	tn    sql.TableName
+	where sql.CExpr
 }
 
 func (stmt *Delete) Resolve(ses *evaluate.Session) {
@@ -34,19 +35,20 @@ func (stmt *Delete) Resolve(ses *evaluate.Session) {
 func (stmt *Delete) Plan(ctx context.Context, pe evaluate.PlanEngine,
 	tx sql.Transaction) (evaluate.Plan, error) {
 
-	rows, err := lookupRows(ctx, pe, tx, stmt.Table)
+	tt, err := pe.LookupTableType(ctx, tx, stmt.Table)
 	if err != nil {
 		return nil, err
 	}
+
+	var where sql.CExpr
 	if stmt.Where != nil {
-		ce, err := expr.Compile(ctx, pe, tx, makeFromContext(stmt.Table.Table, rows.Columns()),
+		where, err = expr.Compile(ctx, pe, tx, makeFromContext(stmt.Table.Table, tt.Columns()),
 			stmt.Where)
 		if err != nil {
 			return nil, err
 		}
-		rows = &filterRows{rows: rows, cond: ce}
 	}
-	return &deletePlan{rows: rows}, nil
+	return &deletePlan{stmt.Table, where}, nil
 }
 
 func (dp *deletePlan) Explain() string {
@@ -57,16 +59,29 @@ func (dp *deletePlan) Explain() string {
 func (dp *deletePlan) Execute(ctx context.Context, e sql.Engine, tx sql.Transaction) (int64,
 	error) {
 
-	dest := make([]sql.Value, len(dp.rows.Columns()))
-	cnt := int64(0)
+	tbl, _, err := e.LookupTable(ctx, tx, dp.tn)
+	if err != nil {
+		return -1, err
+	}
+	rows, err := tbl.Rows(ctx, nil, nil)
+	if err != nil {
+		return -1, err
+	}
+	if dp.where != nil {
+		rows = &filterRows{rows: rows, cond: dp.where}
+	}
+	defer rows.Close()
+
+	dest := make([]sql.Value, len(rows.Columns()))
+	var cnt int64
 	for {
-		err := dp.rows.Next(ctx, dest)
+		err := rows.Next(ctx, dest)
 		if err == io.EOF {
 			return cnt, nil
 		} else if err != nil {
 			return cnt, err
 		}
-		err = dp.rows.Delete(ctx)
+		err = rows.Delete(ctx)
 		if err != nil {
 			return cnt, err
 		}

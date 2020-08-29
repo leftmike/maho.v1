@@ -319,7 +319,7 @@ func (stmt *CreateIndex) Explain() string {
 func (stmt *CreateIndex) Execute(ctx context.Context, e sql.Engine, tx sql.Transaction) (int64,
 	error) {
 
-	_, tt, err := e.LookupTable(ctx, tx, stmt.Table)
+	tt, err := e.LookupTableType(ctx, tx, stmt.Table)
 	if err != nil {
 		return -1, err
 	}

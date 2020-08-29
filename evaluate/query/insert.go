@@ -61,7 +61,7 @@ func (stmt *InsertValues) Resolve(ses *evaluate.Session) {
 func (stmt *InsertValues) Plan(ctx context.Context, pe evaluate.PlanEngine,
 	tx sql.Transaction) (evaluate.Plan, error) {
 
-	tbl, tt, err := pe.LookupTable(ctx, tx, stmt.Table)
+	tt, err := pe.LookupTableType(ctx, tx, stmt.Table)
 	if err != nil {
 		return nil, err
 	}
@@ -121,11 +121,11 @@ func (stmt *InsertValues) Plan(ctx context.Context, pe evaluate.PlanEngine,
 		rows = append(rows, row)
 	}
 
-	return &insertValuesPlan{tbl, cols, rows}, nil
+	return &insertValuesPlan{stmt.Table, cols, rows}, nil
 }
 
 type insertValuesPlan struct {
-	tbl  sql.Table
+	tn   sql.TableName
 	cols []sql.Identifier
 	rows [][]sql.CExpr
 }
@@ -137,6 +137,11 @@ func (plan *insertValuesPlan) Explain() string {
 
 func (plan *insertValuesPlan) Execute(ctx context.Context, e sql.Engine,
 	tx sql.Transaction) (int64, error) {
+
+	tbl, _, err := e.LookupTable(ctx, tx, plan.tn)
+	if err != nil {
+		return -1, err
+	}
 
 	for _, r := range plan.rows {
 		row := make([]sql.Value, len(plan.cols))
@@ -155,7 +160,7 @@ func (plan *insertValuesPlan) Execute(ctx context.Context, e sql.Engine,
 			row[i] = v
 		}
 
-		err := plan.tbl.Insert(ctx, row)
+		err := tbl.Insert(ctx, row)
 		if err != nil {
 			return -1, err
 		}

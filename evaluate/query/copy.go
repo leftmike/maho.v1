@@ -43,7 +43,7 @@ func (stmt *Copy) Resolve(ses *evaluate.Session) {
 func (stmt *Copy) Plan(ctx context.Context, pe evaluate.PlanEngine,
 	tx sql.Transaction) (evaluate.Plan, error) {
 
-	tbl, tt, err := pe.LookupTable(ctx, tx, stmt.Table)
+	tt, err := pe.LookupTableType(ctx, tx, stmt.Table)
 	if err != nil {
 		return nil, err
 	}
@@ -80,7 +80,7 @@ func (stmt *Copy) Plan(ctx context.Context, pe evaluate.PlanEngine,
 	}
 
 	return &copyPlan{
-		tbl:        tbl,
+		tn:         stmt.Table,
 		cols:       cols,
 		from:       copy.NewReader("stdin", stmt.From, stmt.FromLine),
 		fromToRow:  fromToRow,
@@ -90,7 +90,7 @@ func (stmt *Copy) Plan(ctx context.Context, pe evaluate.PlanEngine,
 }
 
 type copyPlan struct {
-	tbl        sql.Table
+	tn         sql.TableName
 	cols       []sql.Identifier
 	from       *copy.Reader
 	fromToRow  []int
@@ -106,9 +106,13 @@ func (plan *copyPlan) Explain() string {
 func (plan *copyPlan) Execute(ctx context.Context, e sql.Engine, tx sql.Transaction) (int64,
 	error) {
 
-	var cnt int64
+	tbl, _, err := e.LookupTable(ctx, tx, plan.tn)
+	if err != nil {
+		return -1, err
+	}
 
-	err := copy.CopyFromText(plan.from, len(plan.fromToRow), plan.delimiter,
+	var cnt int64
+	err = copy.CopyFromText(plan.from, len(plan.fromToRow), plan.delimiter,
 		func(vals []sql.Value) error {
 			row := make([]sql.Value, len(plan.cols))
 			for cdx, ce := range plan.defaultRow {
@@ -127,7 +131,7 @@ func (plan *copyPlan) Execute(ctx context.Context, e sql.Engine, tx sql.Transact
 				row[plan.fromToRow[fdx]] = val
 			}
 			cnt += 1
-			return plan.tbl.Insert(ctx, row)
+			return tbl.Insert(ctx, row)
 		})
 	if err != nil {
 		return -1, err

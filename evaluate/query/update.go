@@ -41,9 +41,9 @@ type columnUpdate struct {
 }
 
 type updatePlan struct {
-	columns []sql.Identifier
+	tn      sql.TableName
+	where   sql.CExpr
 	dest    []sql.Value
-	rows    sql.Rows
 	updates []columnUpdate
 }
 
@@ -58,27 +58,24 @@ func (stmt *Update) Resolve(ses *evaluate.Session) {
 func (stmt *Update) Plan(ctx context.Context, pe evaluate.PlanEngine,
 	tx sql.Transaction) (evaluate.Plan, error) {
 
-	tbl, tt, err := pe.LookupTable(ctx, tx, stmt.Table)
-	if err != nil {
-		return nil, err
-	}
-	rows, err := tbl.Rows(ctx, nil, nil)
+	tt, err := pe.LookupTableType(ctx, tx, stmt.Table)
 	if err != nil {
 		return nil, err
 	}
 
-	fctx := makeFromContext(stmt.Table.Table, rows.Columns())
+	fctx := makeFromContext(stmt.Table.Table, tt.Columns())
+	var where sql.CExpr
 	if stmt.Where != nil {
-		ce, err := expr.Compile(ctx, pe, tx, fctx, stmt.Where)
+		where, err = expr.Compile(ctx, pe, tx, fctx, stmt.Where)
 		if err != nil {
 			return nil, err
 		}
-		rows = &filterRows{rows: rows, cond: ce}
 	}
 
 	plan := updatePlan{
-		columns: tt.Columns(),
-		rows:    rows,
+		tn:      stmt.Table,
+		where:   where,
+		dest:    make([]sql.Value, len(tt.Columns())),
 		updates: make([]columnUpdate, 0, len(stmt.ColumnUpdates)),
 	}
 
@@ -104,12 +101,23 @@ func (up *updatePlan) Explain() string {
 func (up *updatePlan) Execute(ctx context.Context, e sql.Engine, tx sql.Transaction) (int64,
 	error) {
 
-	up.dest = make([]sql.Value, len(up.rows.Columns()))
-	cnt := int64(0)
-	updates := make([]sql.ColumnUpdate, len(up.updates))
+	tbl, _, err := e.LookupTable(ctx, tx, up.tn)
+	if err != nil {
+		return -1, err
+	}
+	rows, err := tbl.Rows(ctx, nil, nil)
+	if err != nil {
+		return -1, err
+	}
+	if up.where != nil {
+		rows = &filterRows{rows: rows, cond: up.where}
+	}
+	defer rows.Close()
 
+	updates := make([]sql.ColumnUpdate, len(up.updates))
+	var cnt int64
 	for {
-		err := up.rows.Next(ctx, up.dest)
+		err := rows.Next(ctx, up.dest)
 		if err == io.EOF {
 			return cnt, nil
 		} else if err != nil {
@@ -129,9 +137,8 @@ func (up *updatePlan) Execute(ctx context.Context, e sql.Engine, tx sql.Transact
 		}
 
 		if len(updates) > 0 {
-			err = up.rows.Update(ctx, updates)
+			err = rows.Update(ctx, updates)
 			if err != nil {
-				up.rows.Close()
 				return -1, err
 			}
 			cnt += 1
