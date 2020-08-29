@@ -255,19 +255,19 @@ func (_ *joinRows) Update(ctx context.Context, updates []sql.ColumnUpdate) error
 	return fmt.Errorf("join rows may not be updated")
 }
 
-func (fj FromJoin) rows(ses *evaluate.Session, tx sql.Transaction) (sql.Rows, *fromContext,
-	error) {
+func (fj FromJoin) rows(ctx context.Context, pe evaluate.PlanEngine, tx sql.Transaction) (sql.Rows,
+	*fromContext, error) {
 
-	leftRows, leftCtx, err := fj.Left.rows(ses, tx)
+	leftRows, leftCtx, err := fj.Left.rows(ctx, pe, tx)
 	if err != nil {
 		return nil, nil, err
 	}
-	rightRows, rightCtx, err := fj.Right.rows(ses, tx)
+	rightRows, rightCtx, err := fj.Right.rows(ctx, pe, tx)
 	if err != nil {
 		return nil, nil, err
 	}
 
-	rrows, err := evaluate.AllRows(ses, rightRows)
+	rrows, err := evaluate.AllRows(ctx, rightRows)
 	if err != nil {
 		return nil, nil, err
 	}
@@ -308,7 +308,7 @@ func (fj FromJoin) rows(ses *evaluate.Session, tx sql.Transaction) (sql.Rows, *f
 		fctx = joinContextsOn(leftCtx, rightCtx)
 		rows.rightLen = len(rightCtx.cols)
 		if fj.On != nil {
-			rows.on, err = expr.Compile(ses, tx, fctx, fj.On)
+			rows.on, err = expr.Compile(ctx, pe, tx, fctx, fj.On)
 			if err != nil {
 				return nil, nil, err
 			}

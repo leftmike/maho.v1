@@ -5,22 +5,32 @@ import (
 	"fmt"
 
 	"github.com/leftmike/maho/evaluate"
-	"github.com/leftmike/maho/evaluate/query"
 	"github.com/leftmike/maho/sql"
 )
 
 type Show struct {
 	Variable sql.Identifier
+	ses      *evaluate.Session
 }
 
 func (stmt *Show) String() string {
 	return fmt.Sprintf("SHOW %s", stmt.Variable)
 }
 
-func (_ *Show) Resolve(ses *evaluate.Session) {}
+func (stmt *Show) Resolve(ses *evaluate.Session) {
+	stmt.ses = ses
+}
 
-func (stmt *Show) Plan(ctx context.Context, ses *evaluate.Session, pe evaluate.PlanEngine,
+func (stmt *Show) Plan(ctx context.Context, pe evaluate.PlanEngine,
 	tx sql.Transaction) (evaluate.Plan, error) {
 
-	return query.RowsPlan(ses.Show(stmt.Variable))
+	return stmt, nil
+}
+
+func (stmt *Show) Explain() string {
+	return stmt.String()
+}
+
+func (stmt *Show) Rows(ctx context.Context, e sql.Engine, tx sql.Transaction) (sql.Rows, error) {
+	return stmt.ses.Show(stmt.Variable)
 }

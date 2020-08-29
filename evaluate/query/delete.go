@@ -31,15 +31,15 @@ func (stmt *Delete) Resolve(ses *evaluate.Session) {
 	stmt.Table = ses.ResolveTableName(stmt.Table)
 }
 
-func (stmt *Delete) Plan(ctx context.Context, ses *evaluate.Session, pe evaluate.PlanEngine,
+func (stmt *Delete) Plan(ctx context.Context, pe evaluate.PlanEngine,
 	tx sql.Transaction) (evaluate.Plan, error) {
 
-	rows, err := lookupRows(ses, tx, stmt.Table)
+	rows, err := lookupRows(ctx, pe, tx, stmt.Table)
 	if err != nil {
 		return nil, err
 	}
 	if stmt.Where != nil {
-		ce, err := expr.Compile(ses, tx, makeFromContext(stmt.Table.Table, rows.Columns()),
+		ce, err := expr.Compile(ctx, pe, tx, makeFromContext(stmt.Table.Table, rows.Columns()),
 			stmt.Where)
 		if err != nil {
 			return nil, err

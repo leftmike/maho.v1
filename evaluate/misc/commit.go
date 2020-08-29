@@ -15,7 +15,7 @@ func (stmt *Commit) String() string {
 
 func (_ *Commit) Resolve(ses *evaluate.Session) {}
 
-func (stmt *Commit) Plan(ctx context.Context, ses *evaluate.Session, pe evaluate.PlanEngine,
+func (stmt *Commit) Plan(ctx context.Context, pe evaluate.PlanEngine,
 	tx sql.Transaction) (evaluate.Plan, error) {
 
 	return stmt, nil

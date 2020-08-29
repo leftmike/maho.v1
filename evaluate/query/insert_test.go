@@ -1,6 +1,7 @@
 package query_test
 
 import (
+	"context"
 	"io"
 	"reflect"
 	"strings"
@@ -206,13 +207,15 @@ func statement(ses *evaluate.Session, tx sql.Transaction, s string) error {
 	if err != nil {
 		return err
 	}
+	ctx := context.Background()
+
 	stmt.Resolve(ses)
-	plan, err := stmt.Plan(ses.Context(), ses, ses.Engine, tx)
+	plan, err := stmt.Plan(ctx, ses.Engine, tx)
 	if err != nil {
 		return err
 	}
 	stmtPlan := plan.(evaluate.StmtPlan)
-	_, err = stmtPlan.Execute(ses.Context(), ses.Engine, tx)
+	_, err = stmtPlan.Execute(ctx, ses.Engine, tx)
 	return err
 }
 

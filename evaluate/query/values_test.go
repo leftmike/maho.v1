@@ -1,6 +1,7 @@
 package query_test
 
 import (
+	"context"
 	"reflect"
 	"testing"
 
@@ -51,6 +52,7 @@ func TestValues(t *testing.T) {
 		},
 	}
 
+	ctx := context.Background()
 	e, ses := test.StartSession(t)
 	for _, c := range cases {
 		tx := e.Begin(0)
@@ -59,7 +61,7 @@ func TestValues(t *testing.T) {
 			continue
 		}
 		c.values.Resolve(ses)
-		ret, err := c.values.Plan(ses.Context(), ses, e, tx)
+		ret, err := c.values.Plan(ctx, e, tx)
 		if err != nil {
 			t.Errorf("(%v).Plan() failed with %s", c.values, err)
 			continue
@@ -74,7 +76,7 @@ func TestValues(t *testing.T) {
 			t.Errorf("(%v).Plan().Columns() got %v want %v", c.values, cols, c.cols)
 			continue
 		}
-		all, err := evaluate.AllRows(ses, rows)
+		all, err := evaluate.AllRows(ctx, rows)
 		if err != nil {
 			t.Errorf("(%v).AllRows() failed with %s", c.values, err)
 		}
@@ -82,7 +84,7 @@ func TestValues(t *testing.T) {
 			t.Errorf("(%v).AllRows() got %v want %v", c.values, all, c.rows)
 		}
 
-		err = tx.Commit(ses.Context())
+		err = tx.Commit(ctx)
 		if err != nil {
 			t.Error(err)
 		}

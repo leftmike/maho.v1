@@ -19,7 +19,7 @@ func (stmt *Set) String() string {
 
 func (_ *Set) Resolve(ses *evaluate.Session) {}
 
-func (stmt *Set) Plan(ctx context.Context, ses *evaluate.Session, pe evaluate.PlanEngine,
+func (stmt *Set) Plan(ctx context.Context, pe evaluate.PlanEngine,
 	tx sql.Transaction) (evaluate.Plan, error) {
 
 	return stmt, nil

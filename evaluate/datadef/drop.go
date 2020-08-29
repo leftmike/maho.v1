@@ -33,7 +33,7 @@ func (stmt *DropTable) Resolve(ses *evaluate.Session) {
 	}
 }
 
-func (stmt *DropTable) Plan(ctx context.Context, ses *evaluate.Session, pe evaluate.PlanEngine,
+func (stmt *DropTable) Plan(ctx context.Context, pe evaluate.PlanEngine,
 	tx sql.Transaction) (evaluate.Plan, error) {
 
 	return stmt, nil
@@ -74,7 +74,7 @@ func (stmt *DropIndex) Resolve(ses *evaluate.Session) {
 	stmt.Table = ses.ResolveTableName(stmt.Table)
 }
 
-func (stmt *DropIndex) Plan(ctx context.Context, ses *evaluate.Session, pe evaluate.PlanEngine,
+func (stmt *DropIndex) Plan(ctx context.Context, pe evaluate.PlanEngine,
 	tx sql.Transaction) (evaluate.Plan, error) {
 
 	return stmt, nil
@@ -113,7 +113,7 @@ func (stmt *DropDatabase) String() string {
 
 func (_ *DropDatabase) Resolve(ses *evaluate.Session) {}
 
-func (stmt *DropDatabase) Plan(ctx context.Context, ses *evaluate.Session, pe evaluate.PlanEngine,
+func (stmt *DropDatabase) Plan(ctx context.Context, pe evaluate.PlanEngine,
 	tx sql.Transaction) (evaluate.Plan, error) {
 
 	return stmt, nil
@@ -146,7 +146,7 @@ func (stmt *DropSchema) Resolve(ses *evaluate.Session) {
 	stmt.Schema = ses.ResolveSchemaName(stmt.Schema)
 }
 
-func (stmt *DropSchema) Plan(ctx context.Context, ses *evaluate.Session, pe evaluate.PlanEngine,
+func (stmt *DropSchema) Plan(ctx context.Context, pe evaluate.PlanEngine,
 	tx sql.Transaction) (evaluate.Plan, error) {
 
 	return stmt, nil

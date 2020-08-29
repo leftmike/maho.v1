@@ -10,7 +10,7 @@ import (
 type Stmt interface {
 	fmt.Stringer
 	Resolve(ses *Session)
-	Plan(ctx context.Context, ses *Session, pe PlanEngine, tx sql.Transaction) (Plan, error)
+	Plan(ctx context.Context, pe PlanEngine, tx sql.Transaction) (Plan, error)
 }
 
 type Plan interface {

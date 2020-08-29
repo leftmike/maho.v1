@@ -52,14 +52,15 @@ To Do:
 -- engine.Table: IndexRows(...) => engine.IndexRows {Columns, Close, Next, Row}
 
 - SELECT, INSERT, UPDATE, DELETE
--- remove ses *Session from Plan(...)
+-- check that Expr are resolved before being compiled
 -- remove ses.Context(); session manages a context and passes as an argument to runFunc
 -- change ses.Engine to ses.e (ie. don't make it exported)
--- add type queryPlan interface{evaluate.Plan} or maybe rowsPlan
+-- add type rowsOp interface{...}
 -- engine.LookupTable should take a type rather than returning one
 -- change PlanEngine to just have LookupTableType
 -- move sql.Engine to evaluate.Engine for StmtPlan.Execute and RowsPlan.Rows
 -- change selects to use a plan
+-- fix Explain XXX
 -- make plans reusable
 -- keep track of tables and type versions used
 -- look at move sql.Transaction to execute.Transaction, etc

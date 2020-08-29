@@ -42,7 +42,7 @@ func (fk *ForeignKey) Resolve(ses *evaluate.Session) {
 	fk.RefTable = ses.ResolveTableName(fk.RefTable)
 }
 
-func (fk *ForeignKey) Plan(ctx context.Context, ses *evaluate.Session, pe evaluate.PlanEngine,
+func (fk *ForeignKey) Plan(ctx context.Context, pe evaluate.PlanEngine,
 	tx sql.Transaction) (evaluate.StmtPlan, error) {
 
 	if fk.FKTable.Database != fk.RefTable.Database {

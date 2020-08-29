@@ -1455,7 +1455,7 @@ func (p *parser) parseShowFromTable() (sql.TableName, *expr.Binary) {
 		schemaTest = &expr.Binary{
 			Op:    expr.EqualOp,
 			Left:  expr.Ref{sql.ID("schema_name")},
-			Right: expr.Stmt{&misc.Show{sql.SCHEMA}},
+			Right: expr.Stmt{&misc.Show{Variable: sql.SCHEMA}},
 		}
 	} else {
 		schemaTest = &expr.Binary{
@@ -1568,7 +1568,7 @@ func (p *parser) parseShow() evaluate.Stmt {
 			where = &expr.Binary{
 				Op:    expr.EqualOp,
 				Left:  expr.Ref{sql.ID("schema_name")},
-				Right: expr.Stmt{&misc.Show{sql.SCHEMA}},
+				Right: expr.Stmt{&misc.Show{Variable: sql.SCHEMA}},
 			}
 		}
 		return &query.Select{
@@ -1582,7 +1582,7 @@ func (p *parser) parseShow() evaluate.Stmt {
 			Where: where,
 		}
 	default:
-		return &misc.Show{p.sctx.Identifier}
+		return &misc.Show{Variable: p.sctx.Identifier}
 	}
 }
 

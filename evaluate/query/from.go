@@ -1,6 +1,7 @@
 package query
 
 import (
+	"context"
 	"fmt"
 
 	"github.com/leftmike/maho/evaluate"
@@ -11,7 +12,8 @@ import (
 type FromItem interface {
 	fmt.Stringer
 	resolve(ses *evaluate.Session)
-	rows(ses *evaluate.Session, tx sql.Transaction) (sql.Rows, *fromContext, error)
+	rows(ctx context.Context, pe evaluate.PlanEngine, tx sql.Transaction) (sql.Rows, *fromContext,
+		error)
 }
 
 type FromTableAlias struct {
@@ -27,22 +29,24 @@ func (fta *FromTableAlias) String() string {
 	return s
 }
 
-func lookupRows(ses *evaluate.Session, tx sql.Transaction, tn sql.TableName) (sql.Rows, error) {
-	tbl, _, err := ses.Engine.LookupTable(ses.Context(), tx, tn)
+func lookupRows(ctx context.Context, pe evaluate.PlanEngine, tx sql.Transaction,
+	tn sql.TableName) (sql.Rows, error) {
+
+	tbl, _, err := pe.LookupTable(ctx, tx, tn)
 	if err != nil {
 		return nil, err
 	}
-	return tbl.Rows(ses.Context(), nil, nil)
+	return tbl.Rows(ctx, nil, nil)
 }
 
 func (fta *FromTableAlias) resolve(ses *evaluate.Session) {
 	fta.TableName = ses.ResolveTableName(fta.TableName)
 }
 
-func (fta *FromTableAlias) rows(ses *evaluate.Session, tx sql.Transaction) (sql.Rows,
-	*fromContext, error) {
+func (fta *FromTableAlias) rows(ctx context.Context, pe evaluate.PlanEngine,
+	tx sql.Transaction) (sql.Rows, *fromContext, error) {
 
-	rows, err := lookupRows(ses, tx, fta.TableName)
+	rows, err := lookupRows(ctx, pe, tx, fta.TableName)
 	if err != nil {
 		return nil, nil, err
 	}
@@ -78,15 +82,15 @@ func (fs FromStmt) resolve(ses *evaluate.Session) {
 	fs.Stmt.Resolve(ses)
 }
 
-func (fs FromStmt) rows(ses *evaluate.Session, tx sql.Transaction) (sql.Rows, *fromContext,
-	error) {
+func (fs FromStmt) rows(ctx context.Context, pe evaluate.PlanEngine, tx sql.Transaction) (sql.Rows,
+	*fromContext, error) {
 
-	plan, err := fs.Stmt.Plan(ses.Context(), ses, ses.Engine, tx)
+	plan, err := fs.Stmt.Plan(ctx, pe, tx)
 	if err != nil {
 		return nil, nil, err
 	}
 	rowsPlan := plan.(evaluate.RowsPlan)
-	rows, err := rowsPlan.Rows(ses.Context(), ses.Engine, tx)
+	rows, err := rowsPlan.Rows(ctx, pe, tx)
 	if err != nil {
 		return nil, nil, err
 	}

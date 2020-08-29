@@ -1,6 +1,7 @@
 package datadef_test
 
 import (
+	"context"
 	"strings"
 	"testing"
 
@@ -95,6 +96,7 @@ func TestCreateTablePlan(t *testing.T) {
 		},
 	}
 
+	ctx := context.Background()
 	e, ses := test.StartSession(t)
 	for _, c := range cases {
 		p := parser.NewParser(strings.NewReader(c.sql), "test")
@@ -105,7 +107,7 @@ func TestCreateTablePlan(t *testing.T) {
 		tx := e.Begin(0)
 
 		stmt.Resolve(ses)
-		_, err = stmt.Plan(ses.Context(), ses, e, tx)
+		_, err = stmt.Plan(ctx, e, tx)
 		if err == nil {
 			if c.fail {
 				t.Errorf("Plan(%q) did not fail", c.sql)

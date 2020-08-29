@@ -1,6 +1,7 @@
 package test_test
 
 import (
+	"context"
 	"fmt"
 	"reflect"
 	"strings"
@@ -49,6 +50,8 @@ func TestValuesSimple(t *testing.T) {
 		DefaultDatabase: sql.ID("core_test"),
 		DefaultSchema:   sql.PUBLIC,
 	}
+	ctx := context.Background()
+
 	for i, c := range cases {
 		p := parser.NewParser(strings.NewReader(c.sql), fmt.Sprintf("tests[%d]", i))
 		stmt, err := p.Parse()
@@ -59,7 +62,7 @@ func TestValuesSimple(t *testing.T) {
 		tx := e.Begin(0)
 
 		stmt.Resolve(ses)
-		ret, err := stmt.Plan(ses.Context(), ses, e, tx)
+		ret, err := stmt.Plan(ctx, e, tx)
 		if c.fail {
 			if err == nil {
 				t.Errorf("Plan(%q) did not fail", c.sql)
@@ -77,7 +80,7 @@ func TestValuesSimple(t *testing.T) {
 		}
 		dest := make([]sql.Value, len(rows.Columns()))
 		for i, r := range c.rows {
-			if rows.Next(ses.Context(), dest) != nil {
+			if rows.Next(ctx, dest) != nil {
 				t.Errorf("Plan(%q).Rows() got %d rows; want %d rows", c.sql, i, len(c.rows))
 				break
 			}
@@ -87,7 +90,7 @@ func TestValuesSimple(t *testing.T) {
 			}
 		}
 
-		err = tx.Commit(ses.Context())
+		err = tx.Commit(ctx)
 		if err != nil {
 			t.Error(err)
 		}

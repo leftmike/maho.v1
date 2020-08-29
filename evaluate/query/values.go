@@ -82,7 +82,7 @@ func (_ *exprValues) Update(ctx context.Context, updates []sql.ColumnUpdate) err
 
 func (_ *Values) Resolve(ses *evaluate.Session) {}
 
-func (stmt *Values) Plan(ctx context.Context, ses *evaluate.Session, pe evaluate.PlanEngine,
+func (stmt *Values) Plan(ctx context.Context, pe evaluate.PlanEngine,
 	tx sql.Transaction) (evaluate.Plan, error) {
 
 	columns := make([]sql.Identifier, len(stmt.Expressions[0]))
@@ -95,7 +95,7 @@ func (stmt *Values) Plan(ctx context.Context, ses *evaluate.Session, pe evaluate
 		row := make([]sql.CExpr, len(r))
 		for j := range r {
 			var err error
-			row[j], err = expr.Compile(ses, tx, nil, r[j])
+			row[j], err = expr.Compile(ctx, pe, tx, nil, r[j])
 			if err != nil {
 				return nil, err
 			}

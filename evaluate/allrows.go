@@ -1,18 +1,19 @@
 package evaluate
 
 import (
+	"context"
 	"io"
 
 	"github.com/leftmike/maho/sql"
 )
 
 // AllRows returns all of the rows from a Rows as slices of values.
-func AllRows(ses *Session, rows sql.Rows) ([][]sql.Value, error) {
+func AllRows(ctx context.Context, rows sql.Rows) ([][]sql.Value, error) {
 	all := [][]sql.Value{}
 	l := len(rows.Columns())
 	for {
 		dest := make([]sql.Value, l)
-		err := rows.Next(ses.Context(), dest)
+		err := rows.Next(ctx, dest)
 		if err == io.EOF {
 			break
 		} else if err != nil {

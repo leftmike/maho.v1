@@ -55,21 +55,21 @@ func (stmt *Update) Resolve(ses *evaluate.Session) {
 	stmt.Table = ses.ResolveTableName(stmt.Table)
 }
 
-func (stmt *Update) Plan(ctx context.Context, ses *evaluate.Session, pe evaluate.PlanEngine,
+func (stmt *Update) Plan(ctx context.Context, pe evaluate.PlanEngine,
 	tx sql.Transaction) (evaluate.Plan, error) {
 
-	tbl, tt, err := ses.Engine.LookupTable(ses.Context(), tx, stmt.Table)
+	tbl, tt, err := pe.LookupTable(ctx, tx, stmt.Table)
 	if err != nil {
 		return nil, err
 	}
-	rows, err := tbl.Rows(ses.Context(), nil, nil)
+	rows, err := tbl.Rows(ctx, nil, nil)
 	if err != nil {
 		return nil, err
 	}
 
 	fctx := makeFromContext(stmt.Table.Table, rows.Columns())
 	if stmt.Where != nil {
-		ce, err := expr.Compile(ses, tx, fctx, stmt.Where)
+		ce, err := expr.Compile(ctx, pe, tx, fctx, stmt.Where)
 		if err != nil {
 			return nil, err
 		}
@@ -83,7 +83,7 @@ func (stmt *Update) Plan(ctx context.Context, ses *evaluate.Session, pe evaluate
 	}
 
 	for _, cu := range stmt.ColumnUpdates {
-		ce, err := expr.Compile(ses, tx, fctx, cu.Expr)
+		ce, err := expr.Compile(ctx, pe, tx, fctx, cu.Expr)
 		if err != nil {
 			return nil, err
 		}

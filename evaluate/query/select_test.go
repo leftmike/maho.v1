@@ -1,6 +1,7 @@
 package query_test
 
 import (
+	"context"
 	"reflect"
 	"testing"
 
@@ -94,6 +95,7 @@ func TestSelect(t *testing.T) {
 		},
 	}
 
+	ctx := context.Background()
 	e, ses := test.StartSession(t)
 	for _, c := range cases {
 		tx := e.Begin(0)
@@ -102,7 +104,7 @@ func TestSelect(t *testing.T) {
 			continue
 		}
 		c.stmt.Resolve(ses)
-		plan, err := c.stmt.Plan(ses.Context(), ses, e, tx)
+		plan, err := c.stmt.Plan(ctx, e, tx)
 		if err != nil {
 			t.Errorf("(%v).Plan() failed with %s", c.stmt, err)
 			continue
@@ -112,7 +114,7 @@ func TestSelect(t *testing.T) {
 			t.Errorf("(%v).Plan() did not return Rows", c.stmt)
 			continue
 		}
-		rows, err := rowsPlan.Rows(ses.Context(), e, tx)
+		rows, err := rowsPlan.Rows(ctx, e, tx)
 		if err != nil {
 			t.Errorf("(%v).Rows() failed with %s", c.stmt, err)
 			continue
@@ -123,7 +125,7 @@ func TestSelect(t *testing.T) {
 			t.Errorf("(%v).Plan().Columns() got %v want %v", c.stmt, cols, c.cols)
 			continue
 		}
-		all, err := evaluate.AllRows(ses, rows)
+		all, err := evaluate.AllRows(ctx, rows)
 		if err != nil {
 			t.Errorf("(%v).AllRows() failed with %s", c.stmt, err)
 		}
