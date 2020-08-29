@@ -42,13 +42,13 @@ func TestCreateTableString(t *testing.T) {
 						ColNum: 3,
 					},
 				},
-				ForeignKeys: []datadef.ForeignKey{
-					{
+				ForeignKeys: []*datadef.ForeignKey{
+					&datadef.ForeignKey{
 						Name:     sql.ID("foreign_2"),
 						FKCols:   []sql.Identifier{sql.ID("c1"), sql.ID("c2")},
 						RefTable: sql.TableName{Table: sql.ID("t2")},
 					},
-					{
+					&datadef.ForeignKey{
 						Name:     sql.ID("fkey"),
 						FKCols:   []sql.Identifier{sql.ID("c3"), sql.ID("c4"), sql.ID("c2")},
 						RefTable: sql.TableName{Table: sql.ID("t3")},
@@ -103,6 +103,8 @@ func TestCreateTablePlan(t *testing.T) {
 			t.Fatal(err)
 		}
 		tx := e.Begin(0)
+
+		stmt.Resolve(ses)
 		_, err = stmt.Plan(ses.Context(), ses, e, tx)
 		if err == nil {
 			if c.fail {

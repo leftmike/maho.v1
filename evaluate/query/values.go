@@ -80,6 +80,8 @@ func (_ *exprValues) Update(ctx context.Context, updates []sql.ColumnUpdate) err
 	return fmt.Errorf("values: rows may not be updated")
 }
 
+func (_ *Values) Resolve(ses *evaluate.Session) {}
+
 func (stmt *Values) Plan(ctx context.Context, ses *evaluate.Session, pe evaluate.PlanEngine,
 	tx sql.Transaction) (evaluate.Plan, error) {
 

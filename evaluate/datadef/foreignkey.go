@@ -38,11 +38,12 @@ func (fk ForeignKey) String() string {
 	return s
 }
 
-func (fk ForeignKey) Plan(ctx context.Context, ses *evaluate.Session, pe evaluate.PlanEngine,
-	tx sql.Transaction) (evaluate.Plan, error) {
-
-	fk.FKTable = ses.ResolveTableName(fk.FKTable)
+func (fk *ForeignKey) Resolve(ses *evaluate.Session) {
 	fk.RefTable = ses.ResolveTableName(fk.RefTable)
+}
+
+func (fk *ForeignKey) Plan(ctx context.Context, ses *evaluate.Session, pe evaluate.PlanEngine,
+	tx sql.Transaction) (evaluate.StmtPlan, error) {
 
 	if fk.FKTable.Database != fk.RefTable.Database {
 		return nil, fmt.Errorf(
@@ -50,7 +51,7 @@ func (fk ForeignKey) Plan(ctx context.Context, ses *evaluate.Session, pe evaluat
 			fk.FKTable, fk.RefTable)
 	}
 
-	return &fk, nil
+	return fk, nil
 }
 
 func hasColumn(id sql.Identifier, cols []sql.Identifier) bool {

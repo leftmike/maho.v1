@@ -587,13 +587,13 @@ c2 int constraint check_1 check(true))`,
 					{Type: sql.IntegerType, Size: 4},
 					{Type: sql.IntegerType, Size: 4},
 				},
-				ForeignKeys: []datadef.ForeignKey{
-					{
+				ForeignKeys: []*datadef.ForeignKey{
+					&datadef.ForeignKey{
 						Name:     sql.ID("foreign_1"),
 						FKCols:   []sql.Identifier{sql.ID("c1")},
 						RefTable: sql.TableName{Table: sql.ID("t2")},
 					},
-					{
+					&datadef.ForeignKey{
 						Name:     sql.ID("foreign_2"),
 						FKCols:   []sql.Identifier{sql.ID("c2")},
 						RefTable: sql.TableName{Table: sql.ID("t3")},
@@ -622,13 +622,13 @@ constraint fkey foreign key (c3, c4, c2) references t3 (p1, p2, p3))`,
 						ColNum: 3,
 					},
 				},
-				ForeignKeys: []datadef.ForeignKey{
-					{
+				ForeignKeys: []*datadef.ForeignKey{
+					&datadef.ForeignKey{
 						Name:     sql.ID("foreign_2"),
 						FKCols:   []sql.Identifier{sql.ID("c1"), sql.ID("c2")},
 						RefTable: sql.TableName{Table: sql.ID("t2")},
 					},
-					{
+					&datadef.ForeignKey{
 						Name:     sql.ID("fkey"),
 						FKCols:   []sql.Identifier{sql.ID("c3"), sql.ID("c4"), sql.ID("c2")},
 						RefTable: sql.TableName{Table: sql.ID("t3")},

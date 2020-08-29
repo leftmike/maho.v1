@@ -36,10 +36,14 @@ func (stmt *Copy) String() string {
 	return s
 }
 
+func (stmt *Copy) Resolve(ses *evaluate.Session) {
+	stmt.Table = ses.ResolveTableName(stmt.Table)
+}
+
 func (stmt *Copy) Plan(ctx context.Context, ses *evaluate.Session, pe evaluate.PlanEngine,
 	tx sql.Transaction) (evaluate.Plan, error) {
 
-	tbl, tt, err := ses.Engine.LookupTable(ses.Context(), tx, ses.ResolveTableName(stmt.Table))
+	tbl, tt, err := ses.Engine.LookupTable(ses.Context(), tx, stmt.Table)
 	if err != nil {
 		return nil, err
 	}

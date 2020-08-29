@@ -13,6 +13,8 @@ func (stmt *Rollback) String() string {
 	return "ROLLBACK"
 }
 
+func (_ *Rollback) Resolve(ses *evaluate.Session) {}
+
 func (stmt *Rollback) Plan(ctx context.Context, ses *evaluate.Session, pe evaluate.PlanEngine,
 	tx sql.Transaction) (evaluate.Plan, error) {
 

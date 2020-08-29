@@ -13,6 +13,8 @@ func (stmt *Commit) String() string {
 	return "COMMIT"
 }
 
+func (_ *Commit) Resolve(ses *evaluate.Session) {}
+
 func (stmt *Commit) Plan(ctx context.Context, ses *evaluate.Session, pe evaluate.PlanEngine,
 	tx sql.Transaction) (evaluate.Plan, error) {
 

@@ -41,6 +41,7 @@ func (run *Runner) RunExec(tst *sqltestdb.Test) (int64, error) {
 
 		err = run.ses.Run(stmt,
 			func(tx sql.Transaction, stmt evaluate.Stmt) error {
+				stmt.Resolve(run.ses)
 				plan, err := stmt.Plan(run.ses.Context(), run.ses, run.Engine, tx)
 				if err != nil {
 					return err
@@ -87,6 +88,7 @@ func (run *Runner) RunQuery(tst *sqltestdb.Test) ([]string, [][]string, error) {
 	var results [][]string
 	err = run.ses.Run(stmt,
 		func(tx sql.Transaction, stmt evaluate.Stmt) error {
+			stmt.Resolve(run.ses)
 			plan, err := stmt.Plan(run.ses.Context(), run.ses, run.Engine, tx)
 			if err != nil {
 				return err

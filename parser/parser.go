@@ -521,7 +521,7 @@ func (p *parser) parseCreateDetails(s *datadef.CreateTable) {
 			}
 
 			s.ForeignKeys = append(s.ForeignKeys,
-				datadef.ForeignKey{
+				&datadef.ForeignKey{
 					Name:     p.makeConstraintName(cn, s, "foreign_"),
 					FKCols:   cols,
 					RefTable: rtn,
@@ -790,7 +790,7 @@ func (p *parser) parseColumn(s *datadef.CreateTable) {
 			}
 
 			s.ForeignKeys = append(s.ForeignKeys,
-				datadef.ForeignKey{
+				&datadef.ForeignKey{
 					Name:     p.makeConstraintName(cn, s, "foreign_"),
 					FKCols:   []sql.Identifier{nam},
 					RefTable: rtn,

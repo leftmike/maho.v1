@@ -12,6 +12,8 @@ func (stmt *Begin) String() string {
 	return "BEGIN"
 }
 
+func (_ *Begin) Resolve(ses *Session) {}
+
 func (stmt *Begin) Plan(ctx context.Context, ses *Session, pe PlanEngine,
 	tx sql.Transaction) (Plan, error) {
 

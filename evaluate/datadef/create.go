@@ -108,7 +108,7 @@ type CreateTable struct {
 	IfNotExists bool
 	Constraints []Constraint
 	constraints []sql.Constraint
-	ForeignKeys []ForeignKey
+	ForeignKeys []*ForeignKey
 	foreignKeys []evaluate.StmtPlan
 }
 
@@ -169,19 +169,26 @@ func (cc columnCheck) CompileRef(r expr.Ref) (int, error) {
 	return -1, fmt.Errorf("engine: reference %s not found", r)
 }
 
+func (stmt *CreateTable) Resolve(ses *evaluate.Session) {
+	stmt.Table = ses.ResolveTableName(stmt.Table)
+
+	for _, fk := range stmt.ForeignKeys {
+		fk.FKTable = stmt.Table
+		fk.Resolve(ses)
+	}
+}
+
 func (stmt *CreateTable) Plan(ctx context.Context, ses *evaluate.Session, pe evaluate.PlanEngine,
 	tx sql.Transaction) (evaluate.Plan, error) {
 
 	for _, fk := range stmt.ForeignKeys {
-		fk.FKTable = stmt.Table
 		pfk, err := fk.Plan(ctx, ses, pe, tx)
 		if err != nil {
 			return nil, err
 		}
-		stmt.foreignKeys = append(stmt.foreignKeys, pfk.(evaluate.StmtPlan))
+		stmt.foreignKeys = append(stmt.foreignKeys, pfk)
 	}
 
-	stmt.Table = ses.ResolveTableName(stmt.Table)
 	for _, con := range stmt.Constraints {
 		var key []sql.ColumnKey
 		var check sql.CExpr
@@ -295,10 +302,13 @@ func (stmt *CreateIndex) String() string {
 	return s
 }
 
+func (stmt *CreateIndex) Resolve(ses *evaluate.Session) {
+	stmt.Table = ses.ResolveTableName(stmt.Table)
+}
+
 func (stmt *CreateIndex) Plan(ctx context.Context, ses *evaluate.Session, pe evaluate.PlanEngine,
 	tx sql.Transaction) (evaluate.Plan, error) {
 
-	stmt.Table = ses.ResolveTableName(stmt.Table)
 	return stmt, nil
 }
 
@@ -339,6 +349,8 @@ func (stmt *CreateDatabase) String() string {
 	return s
 }
 
+func (_ *CreateDatabase) Resolve(ses *evaluate.Session) {}
+
 func (stmt *CreateDatabase) Plan(ctx context.Context, ses *evaluate.Session,
 	pe evaluate.PlanEngine, tx sql.Transaction) (evaluate.Plan, error) {
 
@@ -363,10 +375,13 @@ func (stmt *CreateSchema) String() string {
 	return fmt.Sprintf("CREATE SCHEMA %s", stmt.Schema)
 }
 
+func (stmt *CreateSchema) Resolve(ses *evaluate.Session) {
+	stmt.Schema = ses.ResolveSchemaName(stmt.Schema)
+}
+
 func (stmt *CreateSchema) Plan(ctx context.Context, ses *evaluate.Session, pe evaluate.PlanEngine,
 	tx sql.Transaction) (evaluate.Plan, error) {
 
-	stmt.Schema = ses.ResolveSchemaName(stmt.Schema)
 	return stmt, nil
 }
 

@@ -206,6 +206,7 @@ func statement(ses *evaluate.Session, tx sql.Transaction, s string) error {
 	if err != nil {
 		return err
 	}
+	stmt.Resolve(ses)
 	plan, err := stmt.Plan(ses.Context(), ses, ses.Engine, tx)
 	if err != nil {
 		return err

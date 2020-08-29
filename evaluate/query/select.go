@@ -114,6 +114,10 @@ func (stmt *Select) String() string {
 	return s
 }
 
+func (stmt *Select) Resolve(ses *evaluate.Session) {
+	// XXX
+}
+
 func (stmt *Select) Plan(ctx context.Context, ses *evaluate.Session, pe evaluate.PlanEngine,
 	tx sql.Transaction) (evaluate.Plan, error) {
 

@@ -27,6 +27,10 @@ type deletePlan struct {
 	rows sql.Rows
 }
 
+func (stmt *Delete) Resolve(ses *evaluate.Session) {
+	stmt.Table = ses.ResolveTableName(stmt.Table)
+}
+
 func (stmt *Delete) Plan(ctx context.Context, ses *evaluate.Session, pe evaluate.PlanEngine,
 	tx sql.Transaction) (evaluate.Plan, error) {
 

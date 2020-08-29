@@ -54,10 +54,14 @@ func (stmt *InsertValues) String() string {
 	return s
 }
 
+func (stmt *InsertValues) Resolve(ses *evaluate.Session) {
+	stmt.Table = ses.ResolveTableName(stmt.Table)
+}
+
 func (stmt *InsertValues) Plan(ctx context.Context, ses *evaluate.Session, pe evaluate.PlanEngine,
 	tx sql.Transaction) (evaluate.Plan, error) {
 
-	tbl, tt, err := ses.Engine.LookupTable(ses.Context(), tx, ses.ResolveTableName(stmt.Table))
+	tbl, tt, err := ses.Engine.LookupTable(ses.Context(), tx, stmt.Table)
 	if err != nil {
 		return nil, err
 	}

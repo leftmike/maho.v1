@@ -17,6 +17,8 @@ func (stmt *Show) String() string {
 	return fmt.Sprintf("SHOW %s", stmt.Variable)
 }
 
+func (_ *Show) Resolve(ses *evaluate.Session) {}
+
 func (stmt *Show) Plan(ctx context.Context, ses *evaluate.Session, pe evaluate.PlanEngine,
 	tx sql.Transaction) (evaluate.Plan, error) {
 
