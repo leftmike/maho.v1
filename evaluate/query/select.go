@@ -150,23 +150,23 @@ func (stmt *Select) Resolve(ses *evaluate.Session) {
 func (stmt *Select) Plan(ctx context.Context, pe evaluate.PlanEngine,
 	tx sql.Transaction) (evaluate.Plan, error) {
 
-	var rows sql.Rows
+	var rop rowsOp
 	var fctx *fromContext
 	var err error
 
 	if stmt.From == nil {
-		rows = &oneEmptyRow{}
+		rop = oneEmptyOp{}
 		fctx = &fromContext{}
 	} else {
-		var rop rowsOp
 		rop, fctx, err = stmt.From.plan(ctx, pe, tx)
 		if err != nil {
 			return nil, err
 		}
-		rows, err = rop.rows(ctx, pe, tx)
-		if err != nil {
-			return nil, err
-		}
+	}
+
+	rows, err := rop.rows(ctx, pe, tx)
+	if err != nil {
+		return nil, err
 	}
 
 	rows, err = where(ctx, pe, tx, rows, fctx, stmt.Where)
@@ -421,6 +421,18 @@ func where(ctx context.Context, pe evaluate.PlanEngine, tx sql.Transaction, rows
 		return nil, err
 	}
 	return &filterRows{rows: rows, cond: ce}, nil
+}
+
+type oneEmptyOp struct{}
+
+func (oeo oneEmptyOp) explain() string {
+	return "one empty row"
+}
+
+func (oeo oneEmptyOp) rows(ctx context.Context, e sql.Engine, tx sql.Transaction) (sql.Rows,
+	error) {
+
+	return &oneEmptyRow{}, nil
 }
 
 type oneEmptyRow struct {
