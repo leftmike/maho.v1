@@ -266,7 +266,7 @@ func (e *Engine) makeColumnsTable(ctx context.Context, tx sql.Transaction,
 			} else if scname == sql.METADATA && tblname == sql.CONSTRAINTS {
 				values = appendColumns(values, ttn, constraintsColumns, constraintsColumnTypes)
 			} else {
-				_, tt, err := e.LookupTable(ctx, tx, ttn)
+				tt, err := e.LookupTableType(ctx, tx, ttn)
 				if err != nil {
 					return nil, nil, err
 				}
@@ -407,7 +407,7 @@ func (e *Engine) makeConstraintsTable(ctx context.Context, tx sql.Transaction,
 				values = appendConstraints(values, ttn,
 					MakeTableType(constraintsColumns, constraintsColumnTypes, nil))
 			} else {
-				_, tt, err := e.LookupTable(ctx, tx, ttn)
+				tt, err := e.LookupTableType(ctx, tx, ttn)
 				if err != nil {
 					return nil, nil, err
 				}
