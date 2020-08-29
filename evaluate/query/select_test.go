@@ -13,7 +13,7 @@ import (
 
 func TestSelectString(t *testing.T) {
 	s := query.Select{
-		From: query.FromTableAlias{
+		From: &query.FromTableAlias{
 			TableName: sql.TableName{sql.ID("db"), sql.ID("sc"), sql.ID("tbl")},
 			Alias:     sql.ID("alias"),
 		},

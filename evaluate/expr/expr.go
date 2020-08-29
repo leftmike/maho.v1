@@ -11,6 +11,7 @@ type Expr interface {
 	fmt.Stringer
 	Equal(e Expr) bool
 	HasRef() bool
+	Resolve(ses *evaluate.Session)
 }
 
 type Op int
@@ -94,6 +95,8 @@ func (_ *Literal) HasRef() bool {
 	return false
 }
 
+func (_ *Literal) Resolve(ses *evaluate.Session) {}
+
 func Nil() *Literal {
 	return &Literal{nil}
 }
@@ -146,6 +149,10 @@ func (u *Unary) HasRef() bool {
 	return u.Expr.HasRef()
 }
 
+func (u *Unary) Resolve(ses *evaluate.Session) {
+	u.Expr.Resolve(ses)
+}
+
 type Binary struct {
 	Op    Op
 	Left  Expr
@@ -166,6 +173,11 @@ func (b *Binary) Equal(e Expr) bool {
 
 func (b *Binary) HasRef() bool {
 	return b.Left.HasRef() || b.Right.HasRef()
+}
+
+func (b *Binary) Resolve(ses *evaluate.Session) {
+	b.Left.Resolve(ses)
+	b.Right.Resolve(ses)
 }
 
 type Ref []sql.Identifier
@@ -197,6 +209,8 @@ func (r Ref) Equal(e Expr) bool {
 func (_ Ref) HasRef() bool {
 	return true
 }
+
+func (_ Ref) Resolve(ses *evaluate.Session) {}
 
 type Call struct {
 	Name sql.Identifier
@@ -240,6 +254,12 @@ func (c *Call) HasRef() bool {
 	return false
 }
 
+func (c *Call) Resolve(ses *evaluate.Session) {
+	for _, a := range c.Args {
+		a.Resolve(ses)
+	}
+}
+
 type Stmt struct {
 	Stmt evaluate.Stmt
 }
@@ -254,4 +274,8 @@ func (_ Stmt) Equal(e Expr) bool {
 
 func (_ Stmt) HasRef() bool {
 	return false
+}
+
+func (s Stmt) Resolve(ses *evaluate.Session) {
+	s.Stmt.Resolve(ses)
 }

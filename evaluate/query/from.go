@@ -10,6 +10,7 @@ import (
 
 type FromItem interface {
 	fmt.Stringer
+	resolve(ses *evaluate.Session)
 	rows(ses *evaluate.Session, tx sql.Transaction) (sql.Rows, *fromContext, error)
 }
 
@@ -18,7 +19,7 @@ type FromTableAlias struct {
 	Alias sql.Identifier
 }
 
-func (fta FromTableAlias) String() string {
+func (fta *FromTableAlias) String() string {
 	s := fta.TableName.String()
 	if fta.Alias != 0 {
 		s += fmt.Sprintf(" AS %s", fta.Alias)
@@ -27,14 +28,18 @@ func (fta FromTableAlias) String() string {
 }
 
 func lookupRows(ses *evaluate.Session, tx sql.Transaction, tn sql.TableName) (sql.Rows, error) {
-	tbl, _, err := ses.Engine.LookupTable(ses.Context(), tx, ses.ResolveTableName(tn))
+	tbl, _, err := ses.Engine.LookupTable(ses.Context(), tx, tn)
 	if err != nil {
 		return nil, err
 	}
 	return tbl.Rows(ses.Context(), nil, nil)
 }
 
-func (fta FromTableAlias) rows(ses *evaluate.Session, tx sql.Transaction) (sql.Rows,
+func (fta *FromTableAlias) resolve(ses *evaluate.Session) {
+	fta.TableName = ses.ResolveTableName(fta.TableName)
+}
+
+func (fta *FromTableAlias) rows(ses *evaluate.Session, tx sql.Transaction) (sql.Rows,
 	*fromContext, error) {
 
 	rows, err := lookupRows(ses, tx, fta.TableName)
@@ -69,10 +74,13 @@ func (fs FromStmt) String() string {
 	return s
 }
 
+func (fs FromStmt) resolve(ses *evaluate.Session) {
+	fs.Stmt.Resolve(ses)
+}
+
 func (fs FromStmt) rows(ses *evaluate.Session, tx sql.Transaction) (sql.Rows, *fromContext,
 	error) {
 
-	fs.Stmt.Resolve(ses)
 	plan, err := fs.Stmt.Plan(ses.Context(), ses, ses.Engine, tx)
 	if err != nil {
 		return nil, nil, err

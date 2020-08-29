@@ -60,6 +60,14 @@ func (fj FromJoin) String() string {
 	return s
 }
 
+func (fj FromJoin) resolve(ses *evaluate.Session) {
+	fj.Left.resolve(ses)
+	fj.Right.resolve(ses)
+	if fj.On != nil {
+		fj.On.Resolve(ses)
+	}
+}
+
 type joinState int
 
 const (

@@ -385,9 +385,9 @@ func (p *parser) parseAlias(required bool) sql.Identifier {
 	return 0
 }
 
-func (p *parser) parseTableAlias() query.FromTableAlias {
+func (p *parser) parseTableAlias() *query.FromTableAlias {
 	tn := p.parseTableName()
-	return query.FromTableAlias{TableName: tn, Alias: p.parseAlias(false)}
+	return &query.FromTableAlias{TableName: tn, Alias: p.parseAlias(false)}
 }
 
 func (p *parser) parseColumnAliases() []sql.Identifier {
@@ -883,7 +883,7 @@ func (p *parser) optionalSubquery() (evaluate.Stmt, bool) {
 	} else if p.optionalReserved(sql.TABLE) {
 		// ( TABLE [[database .] schema .] table )
 		return &query.Select{
-			From: query.FromTableAlias{TableName: p.parseTableName()},
+			From: &query.FromTableAlias{TableName: p.parseTableName()},
 		}, true
 	}
 	return nil, false
@@ -1490,7 +1490,7 @@ func (p *parser) parseShow() evaluate.Stmt {
 		tn, schemaTest := p.parseShowFromTable()
 
 		return &query.Select{
-			From: query.FromTableAlias{
+			From: &query.FromTableAlias{
 				TableName: sql.TableName{
 					Database: tn.Database,
 					Schema:   sql.METADATA,
@@ -1512,7 +1512,7 @@ func (p *parser) parseShow() evaluate.Stmt {
 		tn, schemaTest := p.parseShowFromTable()
 
 		return &query.Select{
-			From: query.FromTableAlias{
+			From: &query.FromTableAlias{
 				TableName: sql.TableName{
 					Database: tn.Database,
 					Schema:   sql.METADATA,
@@ -1531,7 +1531,7 @@ func (p *parser) parseShow() evaluate.Stmt {
 		}
 	case sql.DATABASES:
 		return &query.Select{
-			From: query.FromTableAlias{
+			From: &query.FromTableAlias{
 				TableName: sql.TableName{
 					Database: sql.SYSTEM,
 					Schema:   sql.INFO,
@@ -1545,7 +1545,7 @@ func (p *parser) parseShow() evaluate.Stmt {
 			db = p.expectIdentifier("expected a database")
 		}
 		return &query.Select{
-			From: query.FromTableAlias{
+			From: &query.FromTableAlias{
 				TableName: sql.TableName{
 					Database: db,
 					Schema:   sql.METADATA,
@@ -1572,7 +1572,7 @@ func (p *parser) parseShow() evaluate.Stmt {
 			}
 		}
 		return &query.Select{
-			From: query.FromTableAlias{
+			From: &query.FromTableAlias{
 				TableName: sql.TableName{
 					Database: sn.Database,
 					Schema:   sql.METADATA,

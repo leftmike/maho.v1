@@ -13,6 +13,7 @@ import (
 
 type SelectResult interface {
 	fmt.Stringer
+	resolve(ses *evaluate.Session)
 }
 
 type TableResult struct {
@@ -42,12 +43,18 @@ func (tr TableResult) String() string {
 	return fmt.Sprintf("%s.*", tr.Table)
 }
 
+func (_ TableResult) resolve(ses *evaluate.Session) {}
+
 func (er ExprResult) String() string {
 	s := er.Expr.String()
 	if er.Alias != 0 {
 		s += fmt.Sprintf(" AS %s", er.Alias)
 	}
 	return s
+}
+
+func (er ExprResult) resolve(ses *evaluate.Session) {
+	er.Expr.Resolve(ses)
 }
 
 func (er ExprResult) Column(idx int) sql.Identifier {
@@ -115,7 +122,29 @@ func (stmt *Select) String() string {
 }
 
 func (stmt *Select) Resolve(ses *evaluate.Session) {
-	// XXX
+	for _, sr := range stmt.Results {
+		sr.resolve(ses)
+	}
+
+	if stmt.From != nil {
+		stmt.From.resolve(ses)
+	}
+
+	if stmt.Where != nil {
+		stmt.Where.Resolve(ses)
+	}
+
+	for _, gb := range stmt.GroupBy {
+		gb.Resolve(ses)
+	}
+
+	if stmt.Having != nil {
+		stmt.Having.Resolve(ses)
+	}
+
+	for _, ob := range stmt.OrderBy {
+		ob.Expr.Resolve(ses)
+	}
 }
 
 func (stmt *Select) Plan(ctx context.Context, ses *evaluate.Session, pe evaluate.PlanEngine,
