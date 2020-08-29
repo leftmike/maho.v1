@@ -12,7 +12,7 @@ import (
 type FromItem interface {
 	fmt.Stringer
 	resolve(ses *evaluate.Session)
-	rows(ctx context.Context, pe evaluate.PlanEngine, tx sql.Transaction) (sql.Rows, *fromContext,
+	plan(ctx context.Context, pe evaluate.PlanEngine, tx sql.Transaction) (rowsOp, *fromContext,
 		error)
 }
 
@@ -29,32 +29,41 @@ func (fta *FromTableAlias) String() string {
 	return s
 }
 
-func lookupRows(ctx context.Context, pe evaluate.PlanEngine, tx sql.Transaction,
-	tn sql.TableName) (sql.Rows, error) {
-
-	tbl, _, err := pe.LookupTable(ctx, tx, tn)
-	if err != nil {
-		return nil, err
-	}
-	return tbl.Rows(ctx, nil, nil)
-}
-
 func (fta *FromTableAlias) resolve(ses *evaluate.Session) {
 	fta.TableName = ses.ResolveTableName(fta.TableName)
 }
 
-func (fta *FromTableAlias) rows(ctx context.Context, pe evaluate.PlanEngine,
-	tx sql.Transaction) (sql.Rows, *fromContext, error) {
+func (fta *FromTableAlias) plan(ctx context.Context, pe evaluate.PlanEngine,
+	tx sql.Transaction) (rowsOp, *fromContext, error) {
 
-	rows, err := lookupRows(ctx, pe, tx, fta.TableName)
+	tt, err := pe.LookupTableType(ctx, tx, fta.TableName)
 	if err != nil {
 		return nil, nil, err
 	}
+
 	nam := fta.Table
 	if fta.Alias != 0 {
 		nam = fta.Alias
 	}
-	return rows, makeFromContext(nam, rows.Columns()), nil
+	return scanTableOp{fta.TableName}, makeFromContext(nam, tt.Columns()), nil
+}
+
+type scanTableOp struct {
+	tn sql.TableName
+}
+
+func (sto scanTableOp) explain() string {
+	return fmt.Sprintf("scan %s", sto.tn)
+}
+
+func (sto scanTableOp) rows(ctx context.Context, e sql.Engine, tx sql.Transaction) (sql.Rows,
+	error) {
+
+	tbl, _, err := e.LookupTable(ctx, tx, sto.tn)
+	if err != nil {
+		return nil, err
+	}
+	return tbl.Rows(ctx, nil, nil)
 }
 
 type FromStmt struct {
@@ -82,7 +91,7 @@ func (fs FromStmt) resolve(ses *evaluate.Session) {
 	fs.Stmt.Resolve(ses)
 }
 
-func (fs FromStmt) rows(ctx context.Context, pe evaluate.PlanEngine, tx sql.Transaction) (sql.Rows,
+func (fs FromStmt) plan(ctx context.Context, pe evaluate.PlanEngine, tx sql.Transaction) (rowsOp,
 	*fromContext, error) {
 
 	plan, err := fs.Stmt.Plan(ctx, pe, tx)
@@ -102,7 +111,22 @@ func (fs FromStmt) rows(ctx context.Context, pe evaluate.PlanEngine, tx sql.Tran
 		}
 		cols = fs.ColumnAliases
 	}
-	return rows, makeFromContext(fs.Alias, cols), nil
+	return fromRowsOp{rows}, makeFromContext(fs.Alias, cols), nil
+}
+
+type fromRowsOp struct { // XXX: unneccesary, should be able to return ft.Stmt.Plan with fromContext
+	r sql.Rows
+}
+
+func (_ fromRowsOp) explain() string {
+	// XXX
+	return ""
+}
+
+func (fro fromRowsOp) rows(ctx context.Context, e sql.Engine, tx sql.Transaction) (sql.Rows,
+	error) {
+
+	return fro.r, nil
 }
 
 type colRef struct {

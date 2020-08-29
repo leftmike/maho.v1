@@ -158,11 +158,17 @@ func (stmt *Select) Plan(ctx context.Context, pe evaluate.PlanEngine,
 		rows = &oneEmptyRow{}
 		fctx = &fromContext{}
 	} else {
-		rows, fctx, err = stmt.From.rows(ctx, pe, tx)
+		var rop rowsOp
+		rop, fctx, err = stmt.From.plan(ctx, pe, tx)
+		if err != nil {
+			return nil, err
+		}
+		rows, err = rop.rows(ctx, pe, tx)
 		if err != nil {
 			return nil, err
 		}
 	}
+
 	rows, err = where(ctx, pe, tx, rows, fctx, stmt.Where)
 	if err != nil {
 		return nil, err
@@ -170,17 +176,17 @@ func (stmt *Select) Plan(ctx context.Context, pe evaluate.PlanEngine,
 	if stmt.GroupBy == nil && stmt.Having == nil {
 		rrows, err := results(ctx, pe, tx, rows, fctx, stmt.Results)
 		if err == nil {
-			return RowsPlan(order(rrows, fctx, stmt.OrderBy))
+			return makeRowsPlan(order(rrows, fctx, stmt.OrderBy))
 		} else if _, ok := err.(*expr.ContextError); !ok {
 			return nil, err
 		}
 		// Aggregrate function used in SELECT results causes an implicit GROUP BY
 	}
-	return RowsPlan(group(ctx, pe, tx, rows, fctx, stmt.Results, stmt.GroupBy, stmt.Having,
+	return makeRowsPlan(group(ctx, pe, tx, rows, fctx, stmt.Results, stmt.GroupBy, stmt.Having,
 		stmt.OrderBy))
 }
 
-func RowsPlan(rows sql.Rows, err error) (evaluate.RowsPlan, error) {
+func makeRowsPlan(rows sql.Rows, err error) (evaluate.RowsPlan, error) {
 	if err != nil {
 		return nil, err
 	}

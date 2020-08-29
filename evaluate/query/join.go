@@ -255,34 +255,28 @@ func (_ *joinRows) Update(ctx context.Context, updates []sql.ColumnUpdate) error
 	return fmt.Errorf("join rows may not be updated")
 }
 
-func (fj FromJoin) rows(ctx context.Context, pe evaluate.PlanEngine, tx sql.Transaction) (sql.Rows,
+func (fj FromJoin) plan(ctx context.Context, pe evaluate.PlanEngine, tx sql.Transaction) (rowsOp,
 	*fromContext, error) {
 
-	leftRows, leftCtx, err := fj.Left.rows(ctx, pe, tx)
+	leftRowsOp, leftCtx, err := fj.Left.plan(ctx, pe, tx)
 	if err != nil {
 		return nil, nil, err
 	}
-	rightRows, rightCtx, err := fj.Right.rows(ctx, pe, tx)
+	rightRowsOp, rightCtx, err := fj.Right.plan(ctx, pe, tx)
 	if err != nil {
 		return nil, nil, err
 	}
 
-	rrows, err := evaluate.AllRows(ctx, rightRows)
-	if err != nil {
-		return nil, nil, err
-	}
-	leftLen := len(leftCtx.cols)
-	rows := joinRows{
-		leftRows:  leftRows,
-		leftDest:  make([]sql.Value, leftLen),
-		leftLen:   leftLen,
-		rightRows: rrows,
+	jop := joinOp{
+		leftRowsOp:  leftRowsOp,
+		leftLen:     len(leftCtx.cols),
+		rightRowsOp: rightRowsOp,
 	}
 	if fj.Type == LeftJoin || fj.Type == FullJoin {
-		rows.needLeft = true
+		jop.needLeft = true
 	}
 	if fj.Type == RightJoin || fj.Type == FullJoin {
-		rows.rightUsed = make([]bool, len(rrows))
+		jop.needRightUsed = true
 	}
 
 	var fctx *fromContext
@@ -298,23 +292,80 @@ func (fj FromJoin) rows(ctx context.Context, pe evaluate.PlanEngine, tx sql.Tran
 			if err != nil {
 				return nil, nil, err
 			}
-			rows.using = append(rows.using, usingMatch{leftColIndex: lcdx, rightColIndex: rcdx})
+			jop.using = append(jop.using, usingMatch{leftColIndex: lcdx, rightColIndex: rcdx})
 			useSet[col] = struct{}{}
 		}
 
-		fctx, rows.src2dest = joinContextsUsing(leftCtx, rightCtx, useSet)
-		rows.rightLen = len(rows.src2dest)
+		fctx, jop.src2dest = joinContextsUsing(leftCtx, rightCtx, useSet)
+		jop.rightLen = len(jop.src2dest)
 	} else {
 		fctx = joinContextsOn(leftCtx, rightCtx)
-		rows.rightLen = len(rightCtx.cols)
+		jop.rightLen = len(rightCtx.cols)
 		if fj.On != nil {
-			rows.on, err = expr.Compile(ctx, pe, tx, fctx, fj.On)
+			jop.on, err = expr.Compile(ctx, pe, tx, fctx, fj.On)
 			if err != nil {
 				return nil, nil, err
 			}
 		}
 	}
 
-	rows.columns = fctx.columns()
-	return &rows, fctx, nil
+	jop.columns = fctx.columns()
+	return jop, fctx, nil
+}
+
+type joinOp struct {
+	leftRowsOp rowsOp
+	leftLen    int
+	needLeft   bool
+
+	rightRowsOp   rowsOp
+	rightLen      int
+	needRightUsed bool
+
+	columns []sql.Identifier
+
+	on sql.CExpr
+
+	using    []usingMatch
+	src2dest []int
+}
+
+func (jo joinOp) explain() string {
+	// XXX: joinOp.explain
+	return ""
+}
+
+func (jo joinOp) rows(ctx context.Context, e sql.Engine, tx sql.Transaction) (sql.Rows, error) {
+	leftRows, err := jo.leftRowsOp.rows(ctx, e, tx)
+	if err != nil {
+		return nil, err
+	}
+
+	rows, err := jo.rightRowsOp.rows(ctx, e, tx)
+	if err != nil {
+		return nil, err
+	}
+
+	rightRows, err := evaluate.AllRows(ctx, rows)
+	if err != nil {
+		return nil, err
+	}
+	var rightUsed []bool
+	if jo.needRightUsed {
+		rightUsed = make([]bool, len(rightRows))
+	}
+
+	return &joinRows{
+		leftRows:  leftRows,
+		leftDest:  make([]sql.Value, jo.leftLen),
+		leftLen:   jo.leftLen,
+		rightRows: rightRows,
+		rightUsed: rightUsed,
+		needLeft:  jo.needLeft,
+		using:     jo.using,
+		src2dest:  jo.src2dest,
+		rightLen:  jo.rightLen,
+		on:        jo.on,
+		columns:   jo.columns,
+	}, nil
 }
