@@ -1,6 +1,7 @@
 package test
 
 import (
+	"context"
 	"fmt"
 	"io"
 	"strings"
@@ -12,20 +13,10 @@ import (
 	"github.com/leftmike/maho/sql"
 )
 
-type Runner struct {
-	Engine   sql.Engine
-	Database sql.Identifier
-	ses      *evaluate.Session
-}
+type Runner evaluate.Session
 
 func (run *Runner) RunExec(tst *sqltestdb.Test) (int64, error) {
-	if run.ses == nil {
-		run.ses = &evaluate.Session{
-			Engine:          run.Engine,
-			DefaultDatabase: run.Database,
-			DefaultSchema:   sql.PUBLIC,
-		}
-	}
+	ses := ((*evaluate.Session)(run))
 
 	p := parser.NewParser(strings.NewReader(tst.Test),
 		fmt.Sprintf("%s:%d", tst.Filename, tst.LineNumber))
@@ -39,20 +30,22 @@ func (run *Runner) RunExec(tst *sqltestdb.Test) (int64, error) {
 			return -1, err
 		}
 
-		err = run.ses.Run(stmt,
-			func(tx sql.Transaction, stmt evaluate.Stmt) error {
-				stmt.Resolve(run.ses)
-				plan, err := stmt.Plan(run.ses.Context(), run.Engine, tx)
+		err = ses.Run(stmt,
+			func(ctx context.Context, ses *evaluate.Session, e sql.Engine,
+				tx sql.Transaction) error {
+
+				stmt.Resolve(ses)
+				plan, err := stmt.Plan(ctx, e, tx)
 				if err != nil {
 					return err
 				}
 				if stmtPlan, ok := plan.(evaluate.StmtPlan); ok {
-					n, err = stmtPlan.Execute(run.ses.Context(), run.Engine, tx)
+					n, err = stmtPlan.Execute(ctx, e, tx)
 					if err != nil {
 						return err
 					}
 				} else if cmdPlan, ok := plan.(evaluate.CmdPlan); ok {
-					err = cmdPlan.Command(run.ses.Context(), run.ses)
+					err = cmdPlan.Command(ctx, ses)
 					if err != nil {
 						return err
 					}
@@ -70,13 +63,8 @@ func (run *Runner) RunExec(tst *sqltestdb.Test) (int64, error) {
 }
 
 func (run *Runner) RunQuery(tst *sqltestdb.Test) ([]string, [][]string, error) {
-	if run.ses == nil {
-		run.ses = &evaluate.Session{
-			Engine:          run.Engine,
-			DefaultDatabase: run.Database,
-			DefaultSchema:   sql.PUBLIC,
-		}
-	}
+	ses := ((*evaluate.Session)(run))
+
 	p := parser.NewParser(strings.NewReader(tst.Test),
 		fmt.Sprintf("%s:%d", tst.Filename, tst.LineNumber))
 	stmt, err := p.Parse()
@@ -86,10 +74,12 @@ func (run *Runner) RunQuery(tst *sqltestdb.Test) ([]string, [][]string, error) {
 
 	var resultCols []string
 	var results [][]string
-	err = run.ses.Run(stmt,
-		func(tx sql.Transaction, stmt evaluate.Stmt) error {
-			stmt.Resolve(run.ses)
-			plan, err := stmt.Plan(run.ses.Context(), run.Engine, tx)
+	err = ses.Run(stmt,
+		func(ctx context.Context, ses *evaluate.Session, e sql.Engine,
+			tx sql.Transaction) error {
+
+			stmt.Resolve(ses)
+			plan, err := stmt.Plan(ctx, e, tx)
 			if err != nil {
 				return err
 			}
@@ -97,7 +87,7 @@ func (run *Runner) RunQuery(tst *sqltestdb.Test) ([]string, [][]string, error) {
 			if !ok {
 				return fmt.Errorf("%s:%d: expected a query", tst.Filename, tst.LineNumber)
 			}
-			rows, err := rowsPlan.Rows(run.ses.Context(), run.Engine, tx)
+			rows, err := rowsPlan.Rows(ctx, e, tx)
 			if err != nil {
 				return err
 			}
@@ -111,7 +101,7 @@ func (run *Runner) RunQuery(tst *sqltestdb.Test) ([]string, [][]string, error) {
 
 			dest := make([]sql.Value, lenCols)
 			for {
-				err = rows.Next(run.ses.Context(), dest)
+				err = rows.Next(ctx, dest)
 				if err == io.EOF {
 					break
 				} else if err != nil {

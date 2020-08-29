@@ -114,12 +114,9 @@ func testStore(t *testing.T, st *storage.Store, cases []testCase) {
 	e := engine.NewEngine(st)
 
 	for i, c := range cases {
+		ses := evaluate.NewSession(e, sql.SYSTEM, sql.INFO)
+
 		var b bytes.Buffer
-		ses := &evaluate.Session{
-			Engine:          e,
-			DefaultDatabase: sql.SYSTEM,
-			DefaultSchema:   sql.INFO,
-		}
 		replSQL(ses, parser.NewParser(strings.NewReader(c.s), fmt.Sprintf("cases[%d]", i)), &b)
 		if b.String() != c.r {
 			t.Errorf("parse(%q) got\n%s\nwant\n%s", c.s, b.String(), c.r)

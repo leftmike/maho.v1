@@ -10,15 +10,25 @@ import (
 )
 
 type Session struct {
-	Engine          sql.Engine
-	DefaultDatabase sql.Identifier
-	DefaultSchema   sql.Identifier
 	User            string
 	Type            string
 	Addr            string
 	Interactive     bool
+	ctx             context.Context
+	e               sql.Engine
+	defaultDatabase sql.Identifier
+	defaultSchema   sql.Identifier
 	sesid           uint64
 	tx              sql.Transaction
+}
+
+func NewSession(e sql.Engine, defaultDatabase, defaultSchema sql.Identifier) *Session {
+	return &Session{
+		ctx:             context.Background(),
+		e:               e,
+		defaultDatabase: defaultDatabase,
+		defaultSchema:   defaultSchema,
+	}
 }
 
 func (ses *Session) SetSessionID(sesid uint64) {
@@ -29,15 +39,11 @@ func (ses *Session) String() string {
 	return fmt.Sprintf("session-%d", ses.sesid)
 }
 
-func (ses *Session) Context() context.Context {
-	return nil
-}
-
 func (ses *Session) Begin() error {
 	if ses.tx != nil {
 		return fmt.Errorf("execute: session already has active transaction")
 	}
-	ses.tx = ses.Engine.Begin(ses.sesid)
+	ses.tx = ses.e.Begin(ses.sesid)
 	return nil
 }
 
@@ -45,7 +51,7 @@ func (ses *Session) Commit() error {
 	if ses.tx == nil {
 		return fmt.Errorf("execute: session does not have active transaction")
 	}
-	err := ses.tx.Commit(ses.Context())
+	err := ses.tx.Commit(ses.ctx)
 	ses.tx = nil
 	return err
 }
@@ -59,37 +65,39 @@ func (ses *Session) Rollback() error {
 	return err
 }
 
-func (ses *Session) Run(stmt Stmt, run func(tx sql.Transaction, stmt Stmt) error) error {
+type runFunc func(ctx context.Context, ses *Session, e sql.Engine, tx sql.Transaction) error
+
+func (ses *Session) Run(stmt Stmt, run runFunc) error {
 	if ses.tx != nil {
-		err := ses.tx.NextStmt(ses.Context())
+		err := ses.tx.NextStmt(ses.ctx)
 		if err != nil {
 			return err
 		}
 
-		return run(ses.tx, stmt)
+		return run(ses.ctx, ses, ses.e, ses.tx)
 	}
 	if _, ok := stmt.(*Begin); ok {
 		return ses.Begin()
 	}
 
-	tx := ses.Engine.Begin(ses.sesid)
-	err := run(tx, stmt)
+	tx := ses.e.Begin(ses.sesid)
+	err := run(ses.ctx, ses, ses.e, tx)
 	if err != nil {
 		rerr := tx.Rollback()
 		if rerr != nil {
 			err = fmt.Errorf("%s; rollback: %s", err, rerr)
 		}
 	} else {
-		err = tx.Commit(ses.Context())
+		err = tx.Commit(ses.ctx)
 	}
 	return err
 }
 
 func (ses *Session) Set(v sql.Identifier, s string) error {
 	if v == sql.DATABASE {
-		ses.DefaultDatabase = sql.ID(s)
+		ses.defaultDatabase = sql.ID(s)
 	} else if v == sql.SCHEMA {
-		ses.DefaultSchema = sql.ID(s)
+		ses.defaultSchema = sql.ID(s)
 	} else {
 		return fmt.Errorf("set: %s not found", v)
 	}
@@ -132,12 +140,12 @@ func (ses *Session) Show(v sql.Identifier) (sql.Rows, error) {
 	if v == sql.DATABASE {
 		return &values{
 			columns: []sql.Identifier{sql.DATABASE},
-			rows:    [][]sql.Value{{sql.StringValue(ses.DefaultDatabase.String())}},
+			rows:    [][]sql.Value{{sql.StringValue(ses.defaultDatabase.String())}},
 		}, nil
 	} else if v == sql.SCHEMA {
 		return &values{
 			columns: []sql.Identifier{sql.SCHEMA},
-			rows:    [][]sql.Value{{sql.StringValue(ses.DefaultSchema.String())}},
+			rows:    [][]sql.Value{{sql.StringValue(ses.defaultSchema.String())}},
 		}, nil
 	} else if cv, ok := config.Lookup(v.String()); ok {
 		return &values{
@@ -152,9 +160,9 @@ func (ses *Session) Show(v sql.Identifier) (sql.Rows, error) {
 
 func (ses *Session) ResolveTableName(tn sql.TableName) sql.TableName {
 	if tn.Database == 0 {
-		tn.Database = ses.DefaultDatabase
+		tn.Database = ses.defaultDatabase
 		if tn.Schema == 0 {
-			tn.Schema = ses.DefaultSchema
+			tn.Schema = ses.defaultSchema
 		}
 	}
 	return tn
@@ -162,7 +170,7 @@ func (ses *Session) ResolveTableName(tn sql.TableName) sql.TableName {
 
 func (ses *Session) ResolveSchemaName(sn sql.SchemaName) sql.SchemaName {
 	if sn.Database == 0 {
-		sn.Database = ses.DefaultDatabase
+		sn.Database = ses.defaultDatabase
 	}
 	return sn
 }

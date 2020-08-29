@@ -62,7 +62,7 @@ func (slt stepLockTable) lockTable(t *testing.T, ses *session, svc *service.Lock
 	t.Helper()
 
 	tn := sql.TableName{sql.ID("db"), sql.PUBLIC, slt.tbl}
-	err := svc.LockTable(ses.Context(), ses.tl, tn, slt.ll)
+	err := svc.LockTable(context.Background(), ses.tl, tn, slt.ll)
 	if slt.fail {
 		if err == nil {
 			t.Errorf("LockTable(%s, %s, %s) did not fail", ses, ses.tl, slt.ll)

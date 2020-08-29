@@ -201,30 +201,31 @@ func TestInsert(t *testing.T) {
 		insertColumnTypes3, insertCases3)
 }
 
-func statement(ses *evaluate.Session, tx sql.Transaction, s string) error {
+func statement(ctx context.Context, ses *evaluate.Session, e sql.Engine, tx sql.Transaction,
+	s string) error {
+
 	p := parser.NewParser(strings.NewReader(s), "statement")
 	stmt, err := p.Parse()
 	if err != nil {
 		return err
 	}
-	ctx := context.Background()
 
 	stmt.Resolve(ses)
-	plan, err := stmt.Plan(ctx, ses.Engine, tx)
+	plan, err := stmt.Plan(ctx, e, tx)
 	if err != nil {
 		return err
 	}
 	stmtPlan := plan.(evaluate.StmtPlan)
-	_, err = stmtPlan.Execute(ctx, ses.Engine, tx)
+	_, err = stmtPlan.Execute(ctx, e, tx)
 	return err
 }
 
-func allRows(ses *evaluate.Session, rows sql.Rows, numCols int) ([][]sql.Value, error) {
+func allRows(ctx context.Context, rows sql.Rows, numCols int) ([][]sql.Value, error) {
 	all := [][]sql.Value{}
 	l := len(rows.Columns())
 	for {
 		dest := make([]sql.Value, l)
-		err := rows.Next(ses.Context(), dest)
+		err := rows.Next(ctx, dest)
 		if err == io.EOF {
 			break
 		} else if err != nil {
@@ -238,15 +239,16 @@ func allRows(ses *evaluate.Session, rows sql.Rows, numCols int) ([][]sql.Value, 
 func testInsert(t *testing.T, e sql.Engine, ses *evaluate.Session, tn sql.TableName,
 	cols []sql.Identifier, colTypes []sql.ColumnType, cases []insertCase) {
 
+	ctx := context.Background()
 	for _, c := range cases {
 		tx := e.Begin(0)
-		err := e.CreateTable(ses.Context(), tx, tn, cols, colTypes, nil, false)
+		err := e.CreateTable(ctx, tx, tn, cols, colTypes, nil, false)
 		if err != nil {
 			t.Error(err)
 			return
 		}
 
-		err = statement(ses, tx, c.stmt)
+		err = statement(ctx, ses, e, tx, c.stmt)
 		if c.fail {
 			if err == nil {
 				t.Errorf("Parse(\"%s\").Execute() did not fail", c.stmt)
@@ -255,19 +257,19 @@ func testInsert(t *testing.T, e sql.Engine, ses *evaluate.Session, tn sql.TableN
 			t.Errorf("Parse(\"%s\").Execute() failed with %s", c.stmt, err.Error())
 		} else {
 			var tbl sql.Table
-			tbl, _, err = e.LookupTable(ses.Context(), tx, tn)
+			tbl, _, err = e.LookupTable(ctx, tx, tn)
 			if err != nil {
 				t.Error(err)
 				continue
 			}
 			var rows sql.Rows
-			rows, err = tbl.Rows(ses.Context(), nil, nil)
+			rows, err = tbl.Rows(ctx, nil, nil)
 			if err != nil {
 				t.Errorf("(%s).Rows() failed with %s", tn, err)
 				continue
 			}
 			var all [][]sql.Value
-			all, err = allRows(ses, rows, len(cols))
+			all, err = allRows(ctx, rows, len(cols))
 			if err != nil {
 				t.Errorf("(%s).Rows().Next() failed with %s", tn, err)
 				continue
@@ -277,13 +279,13 @@ func testInsert(t *testing.T, e sql.Engine, ses *evaluate.Session, tn sql.TableN
 			}
 		}
 
-		err = e.DropTable(ses.Context(), tx, tn, false)
+		err = e.DropTable(ctx, tx, tn, false)
 		if err != nil {
 			t.Error(err)
 			return
 		}
 
-		err = tx.Commit(ses.Context())
+		err = tx.Commit(ctx)
 		if err != nil {
 			t.Error(err)
 			return

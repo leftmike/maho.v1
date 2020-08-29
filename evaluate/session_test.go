@@ -166,7 +166,7 @@ func TestSessionCommit(t *testing.T) {
 		},
 	}
 
-	ses := evaluate.Session{Engine: engine.NewEngine(st)}
+	ses := evaluate.NewSession(engine.NewEngine(st), 0, 0)
 	ses.SetSessionID(123)
 	if ses.String() != "session-123" {
 		t.Errorf("SetSessionID: got %s want session-123", ses.String())
@@ -201,7 +201,7 @@ func TestSessionRollback(t *testing.T) {
 		},
 	}
 
-	ses := evaluate.Session{Engine: engine.NewEngine(st)}
+	ses := evaluate.NewSession(engine.NewEngine(st), 0, 0)
 	err := ses.Begin()
 	if err != nil {
 		t.Errorf("Begin failed with %s", err)
@@ -228,7 +228,7 @@ func TestSessionRunExplicit(t *testing.T) {
 		},
 	}
 
-	ses := evaluate.Session{Engine: engine.NewEngine(st)}
+	ses := evaluate.NewSession(engine.NewEngine(st), 0, 0)
 	err := ses.Begin()
 	if err != nil {
 		t.Errorf("Begin failed with %s", err)
@@ -236,7 +236,7 @@ func TestSessionRunExplicit(t *testing.T) {
 
 	var ran bool
 	err = ses.Run(nil,
-		func(tx sql.Transaction, stmt evaluate.Stmt) error {
+		func(ctx context.Context, ses *evaluate.Session, e sql.Engine, tx sql.Transaction) error {
 			ran = true
 			return nil
 		})
@@ -250,7 +250,7 @@ func TestSessionRunExplicit(t *testing.T) {
 	ran = false
 	wantErr := errors.New("failed")
 	err = ses.Run(nil,
-		func(tx sql.Transaction, stmt evaluate.Stmt) error {
+		func(ctx context.Context, ses *evaluate.Session, e sql.Engine, tx sql.Transaction) error {
 			ran = true
 			return wantErr
 		})
@@ -276,11 +276,11 @@ func TestSessionRunImplicit(t *testing.T) {
 		},
 	}
 
-	ses := evaluate.Session{Engine: engine.NewEngine(st)}
+	ses := evaluate.NewSession(engine.NewEngine(st), 0, 0)
 
 	var ran bool
 	err := ses.Run(nil,
-		func(tx sql.Transaction, stmt evaluate.Stmt) error {
+		func(ctx context.Context, ses *evaluate.Session, e sql.Engine, tx sql.Transaction) error {
 			ran = true
 			return nil
 		})
@@ -294,7 +294,7 @@ func TestSessionRunImplicit(t *testing.T) {
 	ran = false
 	wantErr := errors.New("failed")
 	err = ses.Run(nil,
-		func(tx sql.Transaction, stmt evaluate.Stmt) error {
+		func(ctx context.Context, ses *evaluate.Session, e sql.Engine, tx sql.Transaction) error {
 			ran = true
 			return wantErr
 		})

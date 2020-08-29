@@ -10,6 +10,7 @@ import (
 	"github.com/leftmike/sqltest/sqltestdb"
 
 	"github.com/leftmike/maho/engine"
+	"github.com/leftmike/maho/evaluate"
 	"github.com/leftmike/maho/sql"
 	"github.com/leftmike/maho/storage"
 	"github.com/leftmike/maho/storage/basic"
@@ -66,12 +67,9 @@ func testSQL(t *testing.T, typ string, e sql.Engine, testData string, psql bool)
 		// If the test is run multiple times, then the database will already exist.
 	}
 
-	run := test.Runner{
-		Engine:   e,
-		Database: dbname,
-	}
+	run := ((*test.Runner)(evaluate.NewSession(e, dbname, sql.PUBLIC)))
 	var rptr reporter
-	err = sqltestdb.RunTests(testData, &run, &rptr, mahoDialect{name: "maho-" + typ}, *update,
+	err = sqltestdb.RunTests(testData, run, &rptr, mahoDialect{name: "maho-" + typ}, *update,
 		psql)
 	if err != nil {
 		t.Errorf("RunTests(%q) failed with %s", testData, err)

@@ -62,15 +62,12 @@ func (svr *Server) removeSession(ses *evaluate.Session) {
 }
 
 func (svr *Server) Handle(rr io.RuneReader, w io.Writer, user, typ, addr string, interactive bool) {
-	ses := &evaluate.Session{
-		Engine:          svr.Engine,
-		DefaultDatabase: svr.DefaultDatabase,
-		DefaultSchema:   sql.PUBLIC,
-		User:            user,
-		Type:            typ,
-		Addr:            addr,
-		Interactive:     interactive,
-	}
+	ses := evaluate.NewSession(svr.Engine, svr.DefaultDatabase, sql.PUBLIC)
+	ses.User = user
+	ses.Type = typ
+	ses.Addr = addr
+	ses.Interactive = interactive
+
 	svr.addSession(ses)
 	svr.Handler(ses, rr, w)
 	svr.removeSession(ses)

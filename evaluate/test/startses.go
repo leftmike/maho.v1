@@ -23,9 +23,5 @@ func StartSession(t *testing.T) (sql.Engine, *evaluate.Session) {
 		t.Fatal(err)
 	}
 
-	return e, &evaluate.Session{
-		Engine:          e,
-		DefaultDatabase: sql.ID("test"),
-		DefaultSchema:   sql.PUBLIC,
-	}
+	return e, evaluate.NewSession(e, sql.ID("test"), sql.PUBLIC)
 }

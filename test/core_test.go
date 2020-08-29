@@ -45,11 +45,7 @@ func TestValuesSimple(t *testing.T) {
 		// If the test is run multiple times, then the database will already exist.
 	}
 
-	ses := &evaluate.Session{
-		Engine:          e,
-		DefaultDatabase: sql.ID("core_test"),
-		DefaultSchema:   sql.PUBLIC,
-	}
+	ses := evaluate.NewSession(e, sql.ID("core_test"), sql.PUBLIC)
 	ctx := context.Background()
 
 	for i, c := range cases {

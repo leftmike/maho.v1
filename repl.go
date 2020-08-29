@@ -1,6 +1,7 @@
 package main
 
 import (
+	"context"
 	"fmt"
 	"io"
 	"strings"
@@ -27,16 +28,18 @@ func replSQL(ses *evaluate.Session, p parser.Parser, w io.Writer) {
 		}
 
 		err = ses.Run(stmt,
-			func(tx sql.Transaction, stmt evaluate.Stmt) error {
+			func(ctx context.Context, ses *evaluate.Session, e sql.Engine,
+				tx sql.Transaction) error {
+
 				stmt.Resolve(ses)
-				plan, err := stmt.Plan(ses.Context(), ses.Engine, tx)
+				plan, err := stmt.Plan(ctx, e, tx)
 				if err != nil {
 					return err
 				}
 
 				if stmtPlan, ok := plan.(evaluate.StmtPlan); ok {
 					var cnt int64
-					cnt, err = stmtPlan.Execute(ses.Context(), ses.Engine, tx)
+					cnt, err = stmtPlan.Execute(ctx, e, tx)
 					if err != nil {
 						return err
 					}
@@ -44,14 +47,14 @@ func replSQL(ses *evaluate.Session, p parser.Parser, w io.Writer) {
 						fmt.Fprintf(w, "%d rows updated\n", cnt)
 					}
 				} else if cmdPlan, ok := plan.(evaluate.CmdPlan); ok {
-					err = cmdPlan.Command(ses.Context(), ses)
+					err = cmdPlan.Command(ctx, ses)
 					if err != nil {
 						return err
 					}
 				} else if rowsPlan, ok := plan.(evaluate.RowsPlan); ok {
 					w := tabwriter.NewWriter(w, 0, 0, 1, ' ', tabwriter.AlignRight)
 
-					rows, err := rowsPlan.Rows(ses.Context(), ses.Engine, tx)
+					rows, err := rowsPlan.Rows(ctx, e, tx)
 					if err != nil {
 						return err
 					}
@@ -71,7 +74,7 @@ func replSQL(ses *evaluate.Session, p parser.Parser, w io.Writer) {
 					dest := make([]sql.Value, len(cols))
 					i := 1
 					for {
-						err = rows.Next(ses.Context(), dest)
+						err = rows.Next(ctx, dest)
 						if err != nil {
 							break
 						}
