@@ -103,38 +103,38 @@ func (fs FromStmt) plan(ctx context.Context, pe evaluate.PlanEngine, tx sql.Tran
 		return nil, nil, err
 	}
 	rowsPlan := plan.(evaluate.RowsPlan)
-	rows, err := rowsPlan.Rows(ctx, pe, tx)
-	if err != nil {
-		return nil, nil, err
-	}
 
-	cols := rows.Columns()
+	cols := rowsPlan.Columns()
 	if fs.ColumnAliases != nil {
 		if len(fs.ColumnAliases) != len(cols) {
 			return nil, nil, fmt.Errorf("engine: wrong number of column aliases")
 		}
 		cols = fs.ColumnAliases
 	}
-	return fromRowsOp{rows}, makeFromContext(fs.Alias, cols), nil
+	fctx := makeFromContext(fs.Alias, cols)
+
+	if rop, ok := rowsPlan.(rowsOpPlan); ok {
+		return rop.rop, fctx, nil
+	}
+	return fromPlanOp{rowsPlan}, fctx, nil
 }
 
-type fromRowsOp struct { // XXX: unneccesary, should be able to return ft.Stmt.Plan with fromContext
-	r sql.Rows
+type fromPlanOp struct {
+	rp evaluate.RowsPlan
 }
 
-func (_ fromRowsOp) explain() string {
-	// XXX
-	return ""
+func (fpo fromPlanOp) explain() string {
+	return fpo.rp.Explain()
 }
 
-func (_ fromRowsOp) children() []rowsOp {
+func (_ fromPlanOp) children() []rowsOp {
 	return nil
 }
 
-func (fro fromRowsOp) rows(ctx context.Context, e sql.Engine, tx sql.Transaction) (sql.Rows,
+func (fpo fromPlanOp) rows(ctx context.Context, e sql.Engine, tx sql.Transaction) (sql.Rows,
 	error) {
 
-	return fro.r, nil
+	return fpo.rp.Rows(ctx, e, tx)
 }
 
 type colRef struct {

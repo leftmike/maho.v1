@@ -136,6 +136,17 @@ func (_ *values) Update(ctx context.Context, updates []sql.ColumnUpdate) error {
 	return fmt.Errorf("values: rows may not be updated")
 }
 
+func (ses *Session) Columns(v sql.Identifier) []sql.Identifier {
+	if v == sql.DATABASE {
+		return []sql.Identifier{sql.DATABASE}
+	} else if v == sql.SCHEMA {
+		return []sql.Identifier{sql.SCHEMA}
+	} else if _, ok := config.Lookup(v.String()); ok {
+		return []sql.Identifier{sql.ID("name"), sql.ID("by"), sql.ID("value")}
+	}
+	return nil
+}
+
 func (ses *Session) Show(v sql.Identifier) (sql.Rows, error) {
 	if v == sql.DATABASE {
 		return &values{

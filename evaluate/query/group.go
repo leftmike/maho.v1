@@ -243,7 +243,7 @@ func makeGroupContext(ctx context.Context, pe evaluate.PlanEngine, tx sql.Transa
 
 func group(ctx context.Context, pe evaluate.PlanEngine, tx sql.Transaction, rop rowsOp,
 	fctx *fromContext, results []SelectResult, group []expr.Expr, having expr.Expr,
-	orderBy []OrderBy) (rowsOp, error) {
+	orderBy []OrderBy) (evaluate.Plan, error) {
 
 	gctx, err := makeGroupContext(ctx, pe, tx, fctx, group)
 
@@ -282,7 +282,12 @@ func group(ctx context.Context, pe evaluate.PlanEngine, tx sql.Transaction, rop 
 
 	rrop := makeResultsOp(rop, resultCols, destExprs)
 	if orderBy == nil {
-		return rrop, nil
+		return rowsOpPlan{rop: rrop, cols: resultCols}, nil
 	}
-	return order(rrop, makeFromContext(0, rrop.columns()), orderBy)
+
+	rop, err = order(rrop, makeFromContext(0, rrop.columns()), orderBy)
+	if err != nil {
+		return nil, err
+	}
+	return rowsOpPlan{rop: rop, cols: resultCols}, nil
 }

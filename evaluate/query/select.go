@@ -174,29 +174,26 @@ func (stmt *Select) Plan(ctx context.Context, pe evaluate.PlanEngine,
 		rrop, err := results(ctx, pe, tx, rop, fctx, stmt.Results)
 		if err == nil {
 			if stmt.OrderBy == nil {
-				return rowsOpPlan{rrop}, nil
+				return rowsOpPlan{rop: rrop, cols: rrop.columns()}, nil
 			}
 
 			rop, err = order(rrop, fctx, stmt.OrderBy)
 			if err != nil {
 				return nil, err
 			}
-			return rowsOpPlan{rop}, nil
+			return rowsOpPlan{rop: rop, cols: rrop.columns()}, nil
 		} else if _, ok := err.(*expr.ContextError); !ok {
 			return nil, err
 		}
 		// Aggregrate function used in SELECT results causes an implicit GROUP BY
 	}
 
-	rop, err = group(ctx, pe, tx, rop, fctx, stmt.Results, stmt.GroupBy, stmt.Having, stmt.OrderBy)
-	if err != nil {
-		return nil, err
-	}
-	return rowsOpPlan{rop}, nil
+	return group(ctx, pe, tx, rop, fctx, stmt.Results, stmt.GroupBy, stmt.Having, stmt.OrderBy)
 }
 
 type rowsOpPlan struct {
-	rop rowsOp
+	rop  rowsOp
+	cols []sql.Identifier
 }
 
 func explain(rop rowsOp, depth int) string {
@@ -209,6 +206,10 @@ func explain(rop rowsOp, depth int) string {
 
 func (rp rowsOpPlan) Explain() string {
 	return explain(rp.rop, 0)
+}
+
+func (rp rowsOpPlan) Columns() []sql.Identifier {
+	return rp.cols
 }
 
 func (rp rowsOpPlan) Rows(ctx context.Context, e sql.Engine, tx sql.Transaction) (sql.Rows,
