@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"io"
 	"sort"
+	"strings"
 
 	"github.com/leftmike/maho/evaluate"
 	"github.com/leftmike/maho/evaluate/expr"
@@ -172,11 +173,19 @@ func (stmt *Select) Plan(ctx context.Context, pe evaluate.PlanEngine,
 	if stmt.GroupBy == nil && stmt.Having == nil {
 		rrop, err := results(ctx, pe, tx, rop, fctx, stmt.Results)
 		if err == nil {
+			if stmt.OrderBy == nil {
+				return rowsOpPlan{rrop}, nil
+			}
+
 			rrows, err := rrop.rows(ctx, pe, tx)
 			if err != nil {
 				return nil, err
 			}
-			return makeRowsPlan(order(rrows, fctx, stmt.OrderBy))
+			rrows, err = order(rrows, fctx, stmt.OrderBy)
+			if err != nil {
+				return nil, err
+			}
+			return rowsPlan{stmt, rrows}, nil
 		} else if _, ok := err.(*expr.ContextError); !ok {
 			return nil, err
 		}
@@ -188,33 +197,47 @@ func (stmt *Select) Plan(ctx context.Context, pe evaluate.PlanEngine,
 		return nil, err
 	}
 
-	return makeRowsPlan(group(ctx, pe, tx, rows, fctx, stmt.Results, stmt.GroupBy, stmt.Having,
-		stmt.OrderBy))
-}
-
-func makeRowsPlan(rows sql.Rows, err error) (evaluate.RowsPlan, error) {
+	rows, err = group(ctx, pe, tx, rows, fctx, stmt.Results, stmt.GroupBy, stmt.Having,
+		stmt.OrderBy)
 	if err != nil {
 		return nil, err
 	}
+	return rowsPlan{stmt, rows}, nil
+}
 
-	return rowsPlan{rows}, nil
+type rowsOpPlan struct {
+	rop rowsOp
+}
+
+func explain(rop rowsOp, depth int) string {
+	s := strings.Repeat("    ", depth) + rop.explain()
+	for _, crop := range rop.children() {
+		s += "\n" + explain(crop, depth+1)
+	}
+	return s
+}
+
+func (rp rowsOpPlan) Explain() string {
+	return explain(rp.rop, 0)
+}
+
+func (rp rowsOpPlan) Rows(ctx context.Context, e sql.Engine, tx sql.Transaction) (sql.Rows,
+	error) {
+
+	return rp.rop.rows(ctx, e, tx)
 }
 
 type rowsPlan struct {
+	stmt *Select
 	rows sql.Rows
 }
 
-func (re rowsPlan) Explain() string {
-	// XXX: rowsPlan.Explain
-	return "rows plan"
+func (rp rowsPlan) Explain() string {
+	return rp.stmt.String()
 }
 
-func (re rowsPlan) children() []rowsOp {
-	return nil
-}
-
-func (re rowsPlan) Rows(ctx context.Context, e sql.Engine, tx sql.Transaction) (sql.Rows, error) {
-	return re.rows, nil
+func (rp rowsPlan) Rows(ctx context.Context, e sql.Engine, tx sql.Transaction) (sql.Rows, error) {
+	return rp.rows, nil
 }
 
 type orderBy struct {

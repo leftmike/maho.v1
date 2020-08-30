@@ -51,6 +51,8 @@ To Do:
 -- add create index test to sqltest/
 -- engine.Table: IndexRows(...) => engine.IndexRows {Columns, Close, Next, Row}
 
+- EXPLAIN
+
 - SELECT, INSERT, UPDATE, DELETE
 -- check that Expr are resolved before being compiled
 -- add type rowsOp interface{...}
