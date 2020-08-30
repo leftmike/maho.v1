@@ -163,16 +163,16 @@ func (stmt *Select) Plan(ctx context.Context, pe evaluate.PlanEngine,
 			return nil, err
 		}
 	}
+	rop, err = where(ctx, pe, tx, rop, fctx, stmt.Where)
+	if err != nil {
+		return nil, err
+	}
 
 	rows, err := rop.rows(ctx, pe, tx)
 	if err != nil {
 		return nil, err
 	}
 
-	rows, err = where(ctx, pe, tx, rows, fctx, stmt.Where)
-	if err != nil {
-		return nil, err
-	}
 	if stmt.GroupBy == nil && stmt.Having == nil {
 		rrows, err := results(ctx, pe, tx, rows, fctx, stmt.Results)
 		if err == nil {
@@ -410,17 +410,37 @@ func (fr *filterRows) Update(ctx context.Context, updates []sql.ColumnUpdate) er
 	return fr.rows.Update(ctx, updates)
 }
 
-func where(ctx context.Context, pe evaluate.PlanEngine, tx sql.Transaction, rows sql.Rows,
-	fctx *fromContext, cond expr.Expr) (sql.Rows, error) {
+func where(ctx context.Context, pe evaluate.PlanEngine, tx sql.Transaction, rop rowsOp,
+	fctx *fromContext, cond expr.Expr) (rowsOp, error) {
 
 	if cond == nil {
-		return rows, nil
+		return rop, nil
 	}
 	ce, err := expr.Compile(ctx, pe, tx, fctx, cond)
 	if err != nil {
 		return nil, err
 	}
-	return &filterRows{rows: rows, cond: ce}, nil
+	return &filterOp{rop, ce}, nil
+}
+
+type filterOp struct {
+	rop  rowsOp
+	cond sql.CExpr
+}
+
+func (fo filterOp) explain() string {
+	return fmt.Sprintf("filter %s", fo.cond)
+}
+
+func (fo filterOp) rows(ctx context.Context, e sql.Engine, tx sql.Transaction) (sql.Rows,
+	error) {
+
+	r, err := fo.rop.rows(ctx, e, tx)
+	if err != nil {
+		return nil, err
+	}
+
+	return &filterRows{rows: r, cond: fo.cond}, nil
 }
 
 type oneEmptyOp struct{}
