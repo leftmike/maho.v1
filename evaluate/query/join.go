@@ -4,6 +4,7 @@ import (
 	"context"
 	"fmt"
 	"io"
+	"strings"
 
 	"github.com/leftmike/maho/evaluate"
 	"github.com/leftmike/maho/evaluate/expr"
@@ -66,6 +67,75 @@ func (fj FromJoin) resolve(ses *evaluate.Session) {
 	if fj.On != nil {
 		fj.On.Resolve(ses)
 	}
+}
+
+type joinOp struct {
+	typ JoinType
+
+	leftRowsOp rowsOp
+	leftLen    int
+	needLeft   bool
+
+	rightRowsOp   rowsOp
+	rightLen      int
+	needRightUsed bool
+
+	columns []sql.Identifier
+
+	on sql.CExpr
+
+	using    []usingMatch
+	src2dest []int
+}
+
+func (jo joinOp) explain() string {
+	s := strings.ToLower(jo.typ.String())
+	for _, col := range jo.columns {
+		s += " " + col.String()
+	}
+	if jo.on != nil {
+		s += " on " + jo.on.String()
+	}
+	return s
+}
+
+func (jo joinOp) children() []rowsOp {
+	return []rowsOp{jo.leftRowsOp, jo.rightRowsOp}
+}
+
+func (jo joinOp) rows(ctx context.Context, e sql.Engine, tx sql.Transaction) (sql.Rows, error) {
+	leftRows, err := jo.leftRowsOp.rows(ctx, e, tx)
+	if err != nil {
+		return nil, err
+	}
+
+	rows, err := jo.rightRowsOp.rows(ctx, e, tx)
+	if err != nil {
+		return nil, err
+	}
+
+	rightRows, err := evaluate.AllRows(ctx, rows)
+	if err != nil {
+		return nil, err
+	}
+	var rightUsed []bool
+	if jo.needRightUsed {
+		rightUsed = make([]bool, len(rightRows))
+	}
+
+	return &joinRows{
+		leftRows:  leftRows,
+		leftDest:  make([]sql.Value, jo.leftLen),
+		leftLen:   jo.leftLen,
+		rightRows: rightRows,
+		rightUsed: rightUsed,
+		needLeft:  jo.needLeft,
+		using:     jo.using,
+		src2dest:  jo.src2dest,
+		rightLen:  jo.rightLen,
+		on:        jo.on,
+		columns:   jo.columns,
+	}, nil
 }
 
 type joinState int
@@ -268,6 +338,7 @@ func (fj FromJoin) plan(ctx context.Context, pe evaluate.PlanEngine, tx sql.Tran
 	}
 
 	jop := joinOp{
+		typ:         fj.Type,
 		leftRowsOp:  leftRowsOp,
 		leftLen:     len(leftCtx.cols),
 		rightRowsOp: rightRowsOp,
@@ -311,61 +382,4 @@ func (fj FromJoin) plan(ctx context.Context, pe evaluate.PlanEngine, tx sql.Tran
 
 	jop.columns = fctx.columns()
 	return jop, fctx, nil
-}
-
-type joinOp struct {
-	leftRowsOp rowsOp
-	leftLen    int
-	needLeft   bool
-
-	rightRowsOp   rowsOp
-	rightLen      int
-	needRightUsed bool
-
-	columns []sql.Identifier
-
-	on sql.CExpr
-
-	using    []usingMatch
-	src2dest []int
-}
-
-func (jo joinOp) explain() string {
-	// XXX: joinOp.explain
-	return ""
-}
-
-func (jo joinOp) rows(ctx context.Context, e sql.Engine, tx sql.Transaction) (sql.Rows, error) {
-	leftRows, err := jo.leftRowsOp.rows(ctx, e, tx)
-	if err != nil {
-		return nil, err
-	}
-
-	rows, err := jo.rightRowsOp.rows(ctx, e, tx)
-	if err != nil {
-		return nil, err
-	}
-
-	rightRows, err := evaluate.AllRows(ctx, rows)
-	if err != nil {
-		return nil, err
-	}
-	var rightUsed []bool
-	if jo.needRightUsed {
-		rightUsed = make([]bool, len(rightRows))
-	}
-
-	return &joinRows{
-		leftRows:  leftRows,
-		leftDest:  make([]sql.Value, jo.leftLen),
-		leftLen:   jo.leftLen,
-		rightRows: rightRows,
-		rightUsed: rightUsed,
-		needLeft:  jo.needLeft,
-		using:     jo.using,
-		src2dest:  jo.src2dest,
-		rightLen:  jo.rightLen,
-		on:        jo.on,
-		columns:   jo.columns,
-	}, nil
 }

@@ -206,7 +206,11 @@ type rowsPlan struct {
 
 func (re rowsPlan) Explain() string {
 	// XXX: rowsPlan.Explain
-	return ""
+	return "rows plan"
+}
+
+func (re rowsPlan) children() []rowsOp {
+	return nil
 }
 
 func (re rowsPlan) Rows(ctx context.Context, e sql.Engine, tx sql.Transaction) (sql.Rows, error) {
@@ -438,6 +442,10 @@ func (fo filterOp) explain() string {
 	return fmt.Sprintf("filter %s", fo.cond)
 }
 
+func (fo filterOp) children() []rowsOp {
+	return []rowsOp{fo.rop}
+}
+
 func (fo filterOp) rows(ctx context.Context, e sql.Engine, tx sql.Transaction) (sql.Rows,
 	error) {
 
@@ -451,11 +459,15 @@ func (fo filterOp) rows(ctx context.Context, e sql.Engine, tx sql.Transaction) (
 
 type oneEmptyOp struct{}
 
-func (oeo oneEmptyOp) explain() string {
+func (_ oneEmptyOp) explain() string {
 	return "one empty row"
 }
 
-func (oeo oneEmptyOp) rows(ctx context.Context, e sql.Engine, tx sql.Transaction) (sql.Rows,
+func (_ oneEmptyOp) children() []rowsOp {
+	return nil
+}
+
+func (_ oneEmptyOp) rows(ctx context.Context, e sql.Engine, tx sql.Transaction) (sql.Rows,
 	error) {
 
 	return &oneEmptyRow{}, nil
@@ -501,6 +513,10 @@ func (aro *allResultsOp) explain() string {
 		s += " " + col.String()
 	}
 	return s
+}
+
+func (aro *allResultsOp) children() []rowsOp {
+	return []rowsOp{aro.rop}
 }
 
 func (aro *allResultsOp) rows(ctx context.Context, e sql.Engine, tx sql.Transaction) (sql.Rows,
@@ -555,6 +571,10 @@ func (ro *resultsOp) explain() string {
 		s += fmt.Sprintf(" %s -> %s", e2d.expr, ro.columns[e2d.destColIndex])
 	}
 	return s
+}
+
+func (ro *resultsOp) children() []rowsOp {
+	return []rowsOp{ro.rop}
 }
 
 func (ro *resultsOp) rows(ctx context.Context, e sql.Engine, tx sql.Transaction) (sql.Rows,

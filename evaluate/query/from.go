@@ -56,6 +56,10 @@ func (sto scanTableOp) explain() string {
 	return fmt.Sprintf("table scan %s", sto.tn)
 }
 
+func (sto scanTableOp) children() []rowsOp {
+	return nil
+}
+
 func (sto scanTableOp) rows(ctx context.Context, e sql.Engine, tx sql.Transaction) (sql.Rows,
 	error) {
 
@@ -121,6 +125,10 @@ type fromRowsOp struct { // XXX: unneccesary, should be able to return ft.Stmt.P
 func (_ fromRowsOp) explain() string {
 	// XXX
 	return ""
+}
+
+func (_ fromRowsOp) children() []rowsOp {
+	return nil
 }
 
 func (fro fromRowsOp) rows(ctx context.Context, e sql.Engine, tx sql.Transaction) (sql.Rows,

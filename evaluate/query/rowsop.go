@@ -8,5 +8,6 @@ import (
 
 type rowsOp interface {
 	explain() string
+	children() []rowsOp
 	rows(ctx context.Context, e sql.Engine, tx sql.Transaction) (sql.Rows, error)
 }
