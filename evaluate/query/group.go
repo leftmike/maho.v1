@@ -254,3 +254,27 @@ func group(ctx context.Context, pe evaluate.PlanEngine, tx sql.Transaction, rows
 	}
 	return order(rrows, makeFromContext(0, rows.Columns()), orderBy)
 }
+
+func makeResultRows(rows sql.Rows, cols []sql.Identifier, destExprs []expr2dest) sql.Rows {
+	rr := resultRows{rows: rows, columns: cols}
+	for _, de := range destExprs {
+		if ci, ok := expr.ColumnIndex(de.expr); ok {
+			rr.destCols = append(rr.destCols,
+				src2dest{destColIndex: de.destColIndex, srcColIndex: ci})
+		} else {
+			rr.destExprs = append(rr.destExprs, de)
+		}
+	}
+	return &rr
+	/*
+		if rr.destExprs != nil || len(rows.Columns()) != len(cols) {
+			return &rr
+		}
+		for cdx, dc := range rr.destCols {
+			if dc.destColIndex != cdx || dc.srcColIndex != cdx {
+				return &rr
+			}
+		}
+		return &allResultRows{rows: rows, columns: cols}
+	*/
+}

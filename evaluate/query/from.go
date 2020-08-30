@@ -53,7 +53,7 @@ type scanTableOp struct {
 }
 
 func (sto scanTableOp) explain() string {
-	return fmt.Sprintf("scan %s", sto.tn)
+	return fmt.Sprintf("table scan %s", sto.tn)
 }
 
 func (sto scanTableOp) rows(ctx context.Context, e sql.Engine, tx sql.Transaction) (sql.Rows,

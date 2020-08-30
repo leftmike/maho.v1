@@ -163,9 +163,24 @@ func (stmt *Select) Plan(ctx context.Context, pe evaluate.PlanEngine,
 			return nil, err
 		}
 	}
+
 	rop, err = where(ctx, pe, tx, rop, fctx, stmt.Where)
 	if err != nil {
 		return nil, err
+	}
+
+	if stmt.GroupBy == nil && stmt.Having == nil {
+		rrop, err := results(ctx, pe, tx, rop, fctx, stmt.Results)
+		if err == nil {
+			rrows, err := rrop.rows(ctx, pe, tx)
+			if err != nil {
+				return nil, err
+			}
+			return makeRowsPlan(order(rrows, fctx, stmt.OrderBy))
+		} else if _, ok := err.(*expr.ContextError); !ok {
+			return nil, err
+		}
+		// Aggregrate function used in SELECT results causes an implicit GROUP BY
 	}
 
 	rows, err := rop.rows(ctx, pe, tx)
@@ -173,15 +188,6 @@ func (stmt *Select) Plan(ctx context.Context, pe evaluate.PlanEngine,
 		return nil, err
 	}
 
-	if stmt.GroupBy == nil && stmt.Having == nil {
-		rrows, err := results(ctx, pe, tx, rows, fctx, stmt.Results)
-		if err == nil {
-			return makeRowsPlan(order(rrows, fctx, stmt.OrderBy))
-		} else if _, ok := err.(*expr.ContextError); !ok {
-			return nil, err
-		}
-		// Aggregrate function used in SELECT results causes an implicit GROUP BY
-	}
 	return makeRowsPlan(group(ctx, pe, tx, rows, fctx, stmt.Results, stmt.GroupBy, stmt.Having,
 		stmt.OrderBy))
 }
@@ -484,6 +490,30 @@ func (_ *oneEmptyRow) Update(ctx context.Context, updates []sql.ColumnUpdate) er
 	return fmt.Errorf("one empty row may not be updated")
 }
 
+type allResultsOp struct {
+	rop     rowsOp
+	columns []sql.Identifier
+}
+
+func (aro *allResultsOp) explain() string {
+	s := "results"
+	for _, col := range aro.columns {
+		s += " " + col.String()
+	}
+	return s
+}
+
+func (aro *allResultsOp) rows(ctx context.Context, e sql.Engine, tx sql.Transaction) (sql.Rows,
+	error) {
+
+	r, err := aro.rop.rows(ctx, e, tx)
+	if err != nil {
+		return nil, err
+	}
+
+	return &allResultRows{r, aro.columns}, nil
+}
+
 type allResultRows struct {
 	rows    sql.Rows
 	columns []sql.Identifier
@@ -507,6 +537,40 @@ func (_ *allResultRows) Delete(ctx context.Context) error {
 
 func (_ *allResultRows) Update(ctx context.Context, updates []sql.ColumnUpdate) error {
 	return fmt.Errorf("all result rows may not be updated")
+}
+
+type resultsOp struct {
+	rop       rowsOp
+	columns   []sql.Identifier
+	destCols  []src2dest
+	destExprs []expr2dest
+}
+
+func (ro *resultsOp) explain() string {
+	s := "results"
+	for _, c2d := range ro.destCols {
+		s += fmt.Sprintf(" %d -> %s", c2d.srcColIndex, ro.columns[c2d.destColIndex])
+	}
+	for _, e2d := range ro.destExprs {
+		s += fmt.Sprintf(" %s -> %s", e2d.expr, ro.columns[e2d.destColIndex])
+	}
+	return s
+}
+
+func (ro *resultsOp) rows(ctx context.Context, e sql.Engine, tx sql.Transaction) (sql.Rows,
+	error) {
+
+	r, err := ro.rop.rows(ctx, e, tx)
+	if err != nil {
+		return nil, err
+	}
+
+	return &resultRows{
+		rows:      r,
+		columns:   ro.columns,
+		destCols:  ro.destCols,
+		destExprs: ro.destExprs,
+	}, nil
 }
 
 type src2dest struct {
@@ -568,11 +632,11 @@ func (_ *resultRows) Update(ctx context.Context, updates []sql.ColumnUpdate) err
 	return fmt.Errorf("result rows may not be updated")
 }
 
-func results(ctx context.Context, pe evaluate.PlanEngine, tx sql.Transaction, rows sql.Rows,
-	fctx *fromContext, results []SelectResult) (sql.Rows, error) {
+func results(ctx context.Context, pe evaluate.PlanEngine, tx sql.Transaction, rop rowsOp,
+	fctx *fromContext, results []SelectResult) (rowsOp, error) {
 
 	if results == nil {
-		return &allResultRows{rows: rows, columns: fctx.columns()}, nil
+		return &allResultsOp{rop: rop, columns: fctx.columns()}, nil
 	}
 
 	var destExprs []expr2dest
@@ -602,26 +666,18 @@ func results(ctx context.Context, pe evaluate.PlanEngine, tx sql.Transaction, ro
 			panic(fmt.Sprintf("unexpected type for query.SelectResult: %T: %v", sr, sr))
 		}
 	}
-	return makeResultRows(rows, cols, destExprs), nil
+	return makeResultsOp(rop, cols, destExprs), nil
 }
 
-func makeResultRows(rows sql.Rows, cols []sql.Identifier, destExprs []expr2dest) sql.Rows {
-	rr := resultRows{rows: rows, columns: cols}
+func makeResultsOp(rop rowsOp, cols []sql.Identifier, destExprs []expr2dest) rowsOp {
+	ro := resultsOp{rop: rop, columns: cols}
 	for _, de := range destExprs {
 		if ci, ok := expr.ColumnIndex(de.expr); ok {
-			rr.destCols = append(rr.destCols,
+			ro.destCols = append(ro.destCols,
 				src2dest{destColIndex: de.destColIndex, srcColIndex: ci})
 		} else {
-			rr.destExprs = append(rr.destExprs, de)
+			ro.destExprs = append(ro.destExprs, de)
 		}
 	}
-	if rr.destExprs != nil || len(rows.Columns()) != len(cols) {
-		return &rr
-	}
-	for cdx, dc := range rr.destCols {
-		if dc.destColIndex != cdx || dc.srcColIndex != cdx {
-			return &rr
-		}
-	}
-	return &allResultRows{rows: rows, columns: cols}
+	return &ro
 }
