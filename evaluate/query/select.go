@@ -177,27 +177,22 @@ func (stmt *Select) Plan(ctx context.Context, pe evaluate.PlanEngine,
 				return rowsOpPlan{rrop}, nil
 			}
 
-			rrows, err := rrop.rows(ctx, pe, tx)
+			rop, err = order(rrop, fctx, stmt.OrderBy)
 			if err != nil {
 				return nil, err
 			}
-			rrows, err = order(rrows, fctx, stmt.OrderBy)
-			if err != nil {
-				return nil, err
-			}
-			return rowsPlan{stmt, rrows}, nil
+			return rowsOpPlan{rop}, nil
 		} else if _, ok := err.(*expr.ContextError); !ok {
 			return nil, err
 		}
 		// Aggregrate function used in SELECT results causes an implicit GROUP BY
 	}
 
-	rows, err := group(ctx, pe, tx, rop, fctx, stmt.Results, stmt.GroupBy, stmt.Having,
-		stmt.OrderBy)
+	rop, err = group(ctx, pe, tx, rop, fctx, stmt.Results, stmt.GroupBy, stmt.Having, stmt.OrderBy)
 	if err != nil {
 		return nil, err
 	}
-	return rowsPlan{stmt, rows}, nil
+	return rowsOpPlan{rop}, nil
 }
 
 type rowsOpPlan struct {
@@ -222,17 +217,37 @@ func (rp rowsOpPlan) Rows(ctx context.Context, e sql.Engine, tx sql.Transaction)
 	return rp.rop.rows(ctx, e, tx)
 }
 
-type rowsPlan struct {
-	stmt *Select
-	rows sql.Rows
+type sortOp struct {
+	rop     rowsOp
+	orderBy []orderBy
 }
 
-func (rp rowsPlan) Explain() string {
-	return rp.stmt.String()
+func (so sortOp) explain() string {
+	s := "sort"
+	for _, ob := range so.orderBy {
+		s += fmt.Sprintf(" %d", ob.colIndex)
+		if ob.reverse {
+			s += " DESC"
+		} else {
+			s += " ASC"
+		}
+	}
+	return s
 }
 
-func (rp rowsPlan) Rows(ctx context.Context, e sql.Engine, tx sql.Transaction) (sql.Rows, error) {
-	return rp.rows, nil
+func (so sortOp) children() []rowsOp {
+	return []rowsOp{so.rop}
+}
+
+func (so sortOp) rows(ctx context.Context, e sql.Engine, tx sql.Transaction) (sql.Rows,
+	error) {
+
+	r, err := so.rop.rows(ctx, e, tx)
+	if err != nil {
+		return nil, err
+	}
+
+	return &sortRows{rows: r, orderBy: so.orderBy}, nil
 }
 
 type orderBy struct {
@@ -357,33 +372,29 @@ func orderByInput(order []OrderBy, fctx *fromContext) []orderBy {
 	return byInput
 }
 
-func order(rows sql.Rows, fctx *fromContext, order []OrderBy) (sql.Rows, error) {
-	if order == nil {
-		return rows, nil
-	}
-
+func order(rrop resultRowsOp, fctx *fromContext, order []OrderBy) (rowsOp, error) {
 	// ORDER BY is based on output columns
-	byCols := orderByOutput(order, rows.Columns())
+	byCols := orderByOutput(order, rrop.columns())
 	if byCols != nil {
-		return &sortRows{rows: rows, orderBy: byCols}, nil
+		return sortOp{rop: rrop, orderBy: byCols}, nil
 	}
 
 	// ORDER BY is based on input columns
 	byCols = orderByInput(order, fctx)
 	if byCols != nil {
-		if rrows, ok := rows.(*resultRows); ok {
-			rrows.rows = &sortRows{rows: rrows.rows, orderBy: byCols}
-			return rrows, nil
-		} else if arows, ok := rows.(*allResultRows); ok {
-			arows.rows = &sortRows{rows: arows.rows, orderBy: byCols}
-			return arows, nil
+		if aro, ok := rrop.(*allResultsOp); ok {
+			aro.rop = sortOp{rop: aro.rop, orderBy: byCols}
+			return aro, nil
+		} else if ro, ok := rrop.(*resultsOp); ok {
+			ro.rop = sortOp{rop: ro.rop, orderBy: byCols}
+			return ro, nil
 		} else {
-			panic("must be resultRows or allResultRows")
+			panic("must be allResultsOp or resultsOp")
 		}
 	}
 
 	// ORDER BY is based on arbitrary input column expressions
-	return rows, fmt.Errorf("ORDER BY arbitrary input column expressions is not supported")
+	return nil, fmt.Errorf("ORDER BY arbitrary input column expressions is not supported")
 }
 
 type filterRows struct {
@@ -679,7 +690,7 @@ func (_ *resultRows) Update(ctx context.Context, updates []sql.ColumnUpdate) err
 }
 
 func results(ctx context.Context, pe evaluate.PlanEngine, tx sql.Transaction, rop rowsOp,
-	fctx *fromContext, results []SelectResult) (rowsOp, error) {
+	fctx *fromContext, results []SelectResult) (resultRowsOp, error) {
 
 	if results == nil {
 		return &allResultsOp{rop: rop, cols: fctx.columns()}, nil
@@ -715,7 +726,7 @@ func results(ctx context.Context, pe evaluate.PlanEngine, tx sql.Transaction, ro
 	return makeResultsOp(rop, cols, destExprs), nil
 }
 
-func makeResultsOp(rop rowsOp, cols []sql.Identifier, destExprs []expr2dest) rowsOp {
+func makeResultsOp(rop rowsOp, cols []sql.Identifier, destExprs []expr2dest) resultRowsOp {
 	ro := resultsOp{rop: rop, cols: cols}
 	for _, de := range destExprs {
 		if ci, ok := expr.ColumnIndex(de.expr); ok {

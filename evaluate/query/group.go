@@ -243,7 +243,7 @@ func makeGroupContext(ctx context.Context, pe evaluate.PlanEngine, tx sql.Transa
 
 func group(ctx context.Context, pe evaluate.PlanEngine, tx sql.Transaction, rop rowsOp,
 	fctx *fromContext, results []SelectResult, group []expr.Expr, having expr.Expr,
-	orderBy []OrderBy) (sql.Rows, error) {
+	orderBy []OrderBy) (rowsOp, error) {
 
 	gctx, err := makeGroupContext(ctx, pe, tx, fctx, group)
 
@@ -280,38 +280,9 @@ func group(ctx context.Context, pe evaluate.PlanEngine, tx sql.Transaction, rop 
 		rop = &filterOp{rop: rop, cond: hce}
 	}
 
-	rop = makeResultsOp(rop, resultCols, destExprs)
-	rrows, err := rop.rows(ctx, pe, tx)
-	if err != nil {
-		return nil, err
-	}
+	rrop := makeResultsOp(rop, resultCols, destExprs)
 	if orderBy == nil {
-		return rrows, nil
+		return rrop, nil
 	}
-	// XXX: should be makeFromContext(0, rows.Columns())
-	return order(rrows, makeFromContext(0, rrows.Columns()), orderBy)
-}
-
-func makeResultRows(rows sql.Rows, cols []sql.Identifier, destExprs []expr2dest) sql.Rows {
-	rr := resultRows{rows: rows, columns: cols}
-	for _, de := range destExprs {
-		if ci, ok := expr.ColumnIndex(de.expr); ok {
-			rr.destCols = append(rr.destCols,
-				src2dest{destColIndex: de.destColIndex, srcColIndex: ci})
-		} else {
-			rr.destExprs = append(rr.destExprs, de)
-		}
-	}
-	return &rr
-	/*
-		if rr.destExprs != nil || len(rows.Columns()) != len(cols) {
-			return &rr
-		}
-		for cdx, dc := range rr.destCols {
-			if dc.destColIndex != cdx || dc.srcColIndex != cdx {
-				return &rr
-			}
-		}
-		return &allResultRows{rows: rows, columns: cols}
-	*/
+	return order(rrop, makeFromContext(0, rrop.columns()), orderBy)
 }

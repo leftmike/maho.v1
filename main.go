@@ -55,8 +55,6 @@ To Do:
 
 - SELECT, INSERT, UPDATE, DELETE
 -- check that Expr are resolved before being compiled
--- add type rowsOp interface{...}
--- change selects to use a plan
 -- change PlanEngine to just have LookupTableType
 -- move sql.Engine to evaluate.Engine for StmtPlan.Execute and RowsPlan.Rows
 -- engine.LookupTable should take a type rather than returning one
