@@ -192,12 +192,7 @@ func (stmt *Select) Plan(ctx context.Context, pe evaluate.PlanEngine,
 		// Aggregrate function used in SELECT results causes an implicit GROUP BY
 	}
 
-	rows, err := rop.rows(ctx, pe, tx)
-	if err != nil {
-		return nil, err
-	}
-
-	rows, err = group(ctx, pe, tx, rows, fctx, stmt.Results, stmt.GroupBy, stmt.Having,
+	rows, err := group(ctx, pe, tx, rop, fctx, stmt.Results, stmt.GroupBy, stmt.Having,
 		stmt.OrderBy)
 	if err != nil {
 		return nil, err
@@ -526,13 +521,13 @@ func (_ *oneEmptyRow) Update(ctx context.Context, updates []sql.ColumnUpdate) er
 }
 
 type allResultsOp struct {
-	rop     rowsOp
-	columns []sql.Identifier
+	rop  rowsOp
+	cols []sql.Identifier
 }
 
 func (aro *allResultsOp) explain() string {
 	s := "results"
-	for _, col := range aro.columns {
+	for _, col := range aro.cols {
 		s += " " + col.String()
 	}
 	return s
@@ -550,7 +545,11 @@ func (aro *allResultsOp) rows(ctx context.Context, e sql.Engine, tx sql.Transact
 		return nil, err
 	}
 
-	return &allResultRows{r, aro.columns}, nil
+	return &allResultRows{r, aro.cols}, nil
+}
+
+func (aro *allResultsOp) columns() []sql.Identifier {
+	return aro.cols
 }
 
 type allResultRows struct {
@@ -580,7 +579,7 @@ func (_ *allResultRows) Update(ctx context.Context, updates []sql.ColumnUpdate) 
 
 type resultsOp struct {
 	rop       rowsOp
-	columns   []sql.Identifier
+	cols      []sql.Identifier
 	destCols  []src2dest
 	destExprs []expr2dest
 }
@@ -588,10 +587,10 @@ type resultsOp struct {
 func (ro *resultsOp) explain() string {
 	s := "results"
 	for _, c2d := range ro.destCols {
-		s += fmt.Sprintf(" %d -> %s", c2d.srcColIndex, ro.columns[c2d.destColIndex])
+		s += fmt.Sprintf(" %d -> %s", c2d.srcColIndex, ro.cols[c2d.destColIndex])
 	}
 	for _, e2d := range ro.destExprs {
-		s += fmt.Sprintf(" %s -> %s", e2d.expr, ro.columns[e2d.destColIndex])
+		s += fmt.Sprintf(" %s -> %s", e2d.expr, ro.cols[e2d.destColIndex])
 	}
 	return s
 }
@@ -610,10 +609,14 @@ func (ro *resultsOp) rows(ctx context.Context, e sql.Engine, tx sql.Transaction)
 
 	return &resultRows{
 		rows:      r,
-		columns:   ro.columns,
+		columns:   ro.cols,
 		destCols:  ro.destCols,
 		destExprs: ro.destExprs,
 	}, nil
+}
+
+func (ro *resultsOp) columns() []sql.Identifier {
+	return ro.cols
 }
 
 type src2dest struct {
@@ -679,7 +682,7 @@ func results(ctx context.Context, pe evaluate.PlanEngine, tx sql.Transaction, ro
 	fctx *fromContext, results []SelectResult) (rowsOp, error) {
 
 	if results == nil {
-		return &allResultsOp{rop: rop, columns: fctx.columns()}, nil
+		return &allResultsOp{rop: rop, cols: fctx.columns()}, nil
 	}
 
 	var destExprs []expr2dest
@@ -713,7 +716,7 @@ func results(ctx context.Context, pe evaluate.PlanEngine, tx sql.Transaction, ro
 }
 
 func makeResultsOp(rop rowsOp, cols []sql.Identifier, destExprs []expr2dest) rowsOp {
-	ro := resultsOp{rop: rop, columns: cols}
+	ro := resultsOp{rop: rop, cols: cols}
 	for _, de := range destExprs {
 		if ci, ok := expr.ColumnIndex(de.expr); ok {
 			ro.destCols = append(ro.destCols,

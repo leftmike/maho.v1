@@ -10,6 +10,38 @@ import (
 	"github.com/leftmike/maho/sql"
 )
 
+type groupByOp struct {
+	rop         rowsOp
+	columns     []sql.Identifier
+	groupExprs  []expr2dest
+	aggregators []aggregator
+}
+
+func (gbo groupByOp) explain() string {
+	// XXX
+	return "group by"
+}
+
+func (gbo groupByOp) children() []rowsOp {
+	return []rowsOp{gbo.rop}
+}
+
+func (gbo groupByOp) rows(ctx context.Context, e sql.Engine, tx sql.Transaction) (sql.Rows,
+	error) {
+
+	r, err := gbo.rop.rows(ctx, e, tx)
+	if err != nil {
+		return nil, err
+	}
+
+	return &groupRows{
+		rows:        r,
+		columns:     gbo.columns,
+		groupExprs:  gbo.groupExprs,
+		aggregators: gbo.aggregators,
+	}, nil
+}
+
 type aggregator struct {
 	maker expr.MakeAggregator
 	args  []sql.CExpr
@@ -163,10 +195,10 @@ func (gctx *groupContext) CompileAggregator(c *expr.Call, maker expr.MakeAggrega
 	return len(gctx.group) + len(gctx.aggregators) - 1
 }
 
-func (gctx *groupContext) makeGroupRows(ctx context.Context, pe evaluate.PlanEngine,
-	tx sql.Transaction, rows sql.Rows, fctx *fromContext) (sql.Rows, error) {
+func (gctx *groupContext) makeGroupByOp(ctx context.Context, pe evaluate.PlanEngine,
+	tx sql.Transaction, rop rowsOp, fctx *fromContext) (rowsOp, error) {
 
-	gr := &groupRows{rows: rows, columns: gctx.groupCols, groupExprs: gctx.groupExprs}
+	gbo := &groupByOp{rop: rop, columns: gctx.groupCols, groupExprs: gctx.groupExprs}
 	for idx := range gctx.aggregators {
 		agg := aggregator{maker: gctx.makers[idx]}
 		for _, a := range gctx.aggregators[idx].Args {
@@ -176,10 +208,10 @@ func (gctx *groupContext) makeGroupRows(ctx context.Context, pe evaluate.PlanEng
 			}
 			agg.args = append(agg.args, ce)
 		}
-		gr.aggregators = append(gr.aggregators, agg)
-		gr.columns = append(gr.columns, sql.ID(fmt.Sprintf("agg%d", len(gr.columns)+1)))
+		gbo.aggregators = append(gbo.aggregators, agg)
+		gbo.columns = append(gbo.columns, sql.ID(fmt.Sprintf("agg%d", len(gbo.columns)+1)))
 	}
-	return gr, nil
+	return gbo, nil
 }
 
 func makeGroupContext(ctx context.Context, pe evaluate.PlanEngine, tx sql.Transaction,
@@ -209,7 +241,7 @@ func makeGroupContext(ctx context.Context, pe evaluate.PlanEngine, tx sql.Transa
 
 }
 
-func group(ctx context.Context, pe evaluate.PlanEngine, tx sql.Transaction, rows sql.Rows,
+func group(ctx context.Context, pe evaluate.PlanEngine, tx sql.Transaction, rop rowsOp,
 	fctx *fromContext, results []SelectResult, group []expr.Expr, having expr.Expr,
 	orderBy []OrderBy) (sql.Rows, error) {
 
@@ -239,20 +271,25 @@ func group(ctx context.Context, pe evaluate.PlanEngine, tx sql.Transaction, rows
 		}
 	}
 
-	rows, err = gctx.makeGroupRows(ctx, pe, tx, rows, fctx)
+	rop, err = gctx.makeGroupByOp(ctx, pe, tx, rop, fctx)
 	if err != nil {
 		return nil, err
 	}
 
 	if having != nil {
-		rows = &filterRows{rows: rows, cond: hce}
+		rop = &filterOp{rop: rop, cond: hce}
 	}
 
-	rrows := makeResultRows(rows, resultCols, destExprs)
+	rop = makeResultsOp(rop, resultCols, destExprs)
+	rrows, err := rop.rows(ctx, pe, tx)
+	if err != nil {
+		return nil, err
+	}
 	if orderBy == nil {
 		return rrows, nil
 	}
-	return order(rrows, makeFromContext(0, rows.Columns()), orderBy)
+	// XXX: should be makeFromContext(0, rows.Columns())
+	return order(rrows, makeFromContext(0, rrows.Columns()), orderBy)
 }
 
 func makeResultRows(rows sql.Rows, cols []sql.Identifier, destExprs []expr2dest) sql.Rows {

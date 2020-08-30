@@ -11,3 +11,8 @@ type rowsOp interface {
 	children() []rowsOp
 	rows(ctx context.Context, e sql.Engine, tx sql.Transaction) (sql.Rows, error)
 }
+
+type resultRowsOp interface {
+	rowsOp
+	columns() []sql.Identifier
+}
