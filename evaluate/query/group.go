@@ -18,7 +18,7 @@ type groupByOp struct {
 }
 
 func (gbo groupByOp) explain() string {
-	// XXX
+	// XXX: groupByOp.explain
 	return "group by"
 }
 

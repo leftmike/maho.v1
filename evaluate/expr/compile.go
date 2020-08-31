@@ -119,7 +119,11 @@ func compile(ctx context.Context, tx sql.Transaction, cctx CompileContext, e Exp
 			}
 		}
 		return &call{cf, args}, nil
-	case Stmt:
+	case *Stmt:
+		if !e.resolved {
+			panic("expression must be resolved before being compiled")
+		}
+
 		if tx == nil {
 			return nil, fmt.Errorf("engine: expression statements not allowed here: %s", e.Stmt)
 		}

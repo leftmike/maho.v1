@@ -1041,7 +1041,7 @@ func (p *parser) parseSubExpr() expr.Expr {
 	} else if r == token.LParen {
 		if s, ok := p.optionalSubquery(); ok {
 			// ( subquery )
-			e = expr.Stmt{s}
+			e = &expr.Stmt{Stmt: s}
 		} else {
 			// ( expr )
 			e = &expr.Unary{Op: expr.NoOp, Expr: p.parseSubExpr()}
@@ -1455,7 +1455,7 @@ func (p *parser) parseShowFromTable() (sql.TableName, *expr.Binary) {
 		schemaTest = &expr.Binary{
 			Op:    expr.EqualOp,
 			Left:  expr.Ref{sql.ID("schema_name")},
-			Right: expr.Stmt{&misc.Show{Variable: sql.SCHEMA}},
+			Right: &expr.Stmt{Stmt: &misc.Show{Variable: sql.SCHEMA}},
 		}
 	} else {
 		schemaTest = &expr.Binary{
@@ -1568,7 +1568,7 @@ func (p *parser) parseShow() evaluate.Stmt {
 			where = &expr.Binary{
 				Op:    expr.EqualOp,
 				Left:  expr.Ref{sql.ID("schema_name")},
-				Right: expr.Stmt{&misc.Show{Variable: sql.SCHEMA}},
+				Right: &expr.Stmt{Stmt: &misc.Show{Variable: sql.SCHEMA}},
 			}
 		}
 		return &query.Select{

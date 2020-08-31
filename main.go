@@ -54,7 +54,6 @@ To Do:
 - EXPLAIN
 
 - SELECT, INSERT, UPDATE, DELETE
--- check that Expr are resolved before being compiled
 -- tx.LookupTable should take a type rather than returning one
 -- fix Explain XXX
 -- make plans reusable

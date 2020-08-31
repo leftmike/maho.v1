@@ -261,21 +261,23 @@ func (c *Call) Resolve(ses *evaluate.Session) {
 }
 
 type Stmt struct {
-	Stmt evaluate.Stmt
+	resolved bool
+	Stmt     evaluate.Stmt
 }
 
-func (s Stmt) String() string {
+func (s *Stmt) String() string {
 	return fmt.Sprintf("(%s)", s.Stmt)
 }
 
-func (_ Stmt) Equal(e Expr) bool {
+func (_ *Stmt) Equal(e Expr) bool {
 	return false
 }
 
-func (_ Stmt) HasRef() bool {
+func (_ *Stmt) HasRef() bool {
 	return false
 }
 
-func (s Stmt) Resolve(ses *evaluate.Session) {
+func (s *Stmt) Resolve(ses *evaluate.Session) {
+	s.resolved = true
 	s.Stmt.Resolve(ses)
 }
