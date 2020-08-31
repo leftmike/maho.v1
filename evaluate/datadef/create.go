@@ -258,9 +258,7 @@ func (stmt *CreateTable) Explain() string {
 	return stmt.String()
 }
 
-func (stmt *CreateTable) Execute(ctx context.Context, e sql.Engine, tx sql.Transaction) (int64,
-	error) {
-
+func (stmt *CreateTable) Execute(ctx context.Context, tx sql.Transaction) (int64, error) {
 	err := tx.CreateTable(ctx, stmt.Table, stmt.Columns, stmt.columnTypes, stmt.constraints,
 		stmt.IfNotExists)
 	if err != nil {
@@ -273,7 +271,7 @@ func (stmt *CreateTable) Execute(ctx context.Context, e sql.Engine, tx sql.Trans
 			return -1, err
 		}
 
-		_, err = fk.Execute(ctx, e, tx)
+		_, err = fk.Execute(ctx, tx)
 		if err != nil {
 			return -1, err
 		}
@@ -316,9 +314,7 @@ func (stmt *CreateIndex) Explain() string {
 	return stmt.String()
 }
 
-func (stmt *CreateIndex) Execute(ctx context.Context, e sql.Engine, tx sql.Transaction) (int64,
-	error) {
-
+func (stmt *CreateIndex) Execute(ctx context.Context, tx sql.Transaction) (int64, error) {
 	tt, err := tx.LookupTableType(ctx, stmt.Table)
 	if err != nil {
 		return -1, err
@@ -361,8 +357,8 @@ func (stmt *CreateDatabase) Explain() string {
 	return stmt.String()
 }
 
-func (stmt *CreateDatabase) Execute(ctx context.Context, e sql.Engine, tx sql.Transaction) (int64,
-	error) {
+func (stmt *CreateDatabase) Command(ctx context.Context, ses *evaluate.Session,
+	e sql.Engine) (int64, error) {
 
 	return -1, e.CreateDatabase(stmt.Database, stmt.Options)
 }
@@ -389,8 +385,6 @@ func (stmt *CreateSchema) Explain() string {
 	return stmt.String()
 }
 
-func (stmt *CreateSchema) Execute(ctx context.Context, e sql.Engine, tx sql.Transaction) (int64,
-	error) {
-
+func (stmt *CreateSchema) Execute(ctx context.Context, tx sql.Transaction) (int64, error) {
 	return -1, tx.CreateSchema(ctx, stmt.Schema)
 }

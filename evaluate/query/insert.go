@@ -135,9 +135,7 @@ func (plan *insertValuesPlan) Explain() string {
 	return ""
 }
 
-func (plan *insertValuesPlan) Execute(ctx context.Context, e sql.Engine,
-	tx sql.Transaction) (int64, error) {
-
+func (plan *insertValuesPlan) Execute(ctx context.Context, tx sql.Transaction) (int64, error) {
 	tbl, _, err := tx.LookupTable(ctx, plan.tn)
 	if err != nil {
 		return -1, err

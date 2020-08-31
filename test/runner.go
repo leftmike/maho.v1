@@ -40,12 +40,12 @@ func (run *Runner) RunExec(tst *sqltestdb.Test) (int64, error) {
 					return err
 				}
 				if stmtPlan, ok := plan.(evaluate.StmtPlan); ok {
-					n, err = stmtPlan.Execute(ctx, e, tx)
+					n, err = stmtPlan.Execute(ctx, tx)
 					if err != nil {
 						return err
 					}
 				} else if cmdPlan, ok := plan.(evaluate.CmdPlan); ok {
-					err = cmdPlan.Command(ctx, ses)
+					err = cmdPlan.Command(ctx, ses, e)
 					if err != nil {
 						return err
 					}

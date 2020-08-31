@@ -54,9 +54,7 @@ func (dp *deletePlan) Explain() string {
 	return ""
 }
 
-func (dp *deletePlan) Execute(ctx context.Context, e sql.Engine, tx sql.Transaction) (int64,
-	error) {
-
+func (dp *deletePlan) Execute(ctx context.Context, tx sql.Transaction) (int64, error) {
 	tbl, _, err := tx.LookupTable(ctx, dp.tn)
 	if err != nil {
 		return -1, err

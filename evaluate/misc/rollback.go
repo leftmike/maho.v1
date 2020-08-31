@@ -4,6 +4,7 @@ import (
 	"context"
 
 	"github.com/leftmike/maho/evaluate"
+	"github.com/leftmike/maho/sql"
 )
 
 type Rollback struct{}
@@ -22,6 +23,6 @@ func (stmt *Rollback) Explain() string {
 	return stmt.String()
 }
 
-func (stmt *Rollback) Command(ctx context.Context, ses *evaluate.Session) error {
+func (stmt *Rollback) Command(ctx context.Context, ses *evaluate.Session, e sql.Engine) error {
 	return ses.Rollback()
 }

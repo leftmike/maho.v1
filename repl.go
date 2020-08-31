@@ -39,7 +39,7 @@ func replSQL(ses *evaluate.Session, p parser.Parser, w io.Writer) {
 
 				if stmtPlan, ok := plan.(evaluate.StmtPlan); ok {
 					var cnt int64
-					cnt, err = stmtPlan.Execute(ctx, e, tx)
+					cnt, err = stmtPlan.Execute(ctx, tx)
 					if err != nil {
 						return err
 					}
@@ -47,7 +47,7 @@ func replSQL(ses *evaluate.Session, p parser.Parser, w io.Writer) {
 						fmt.Fprintf(w, "%d rows updated\n", cnt)
 					}
 				} else if cmdPlan, ok := plan.(evaluate.CmdPlan); ok {
-					err = cmdPlan.Command(ctx, ses)
+					err = cmdPlan.Command(ctx, ses, e)
 					if err != nil {
 						return err
 					}

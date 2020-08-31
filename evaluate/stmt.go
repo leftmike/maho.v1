@@ -19,12 +19,12 @@ type Plan interface {
 
 type StmtPlan interface {
 	Plan
-	Execute(ctx context.Context, e sql.Engine, tx sql.Transaction) (int64, error)
+	Execute(ctx context.Context, tx sql.Transaction) (int64, error)
 }
 
 type CmdPlan interface {
 	Plan
-	Command(ctx context.Context, ses *Session) error
+	Command(ctx context.Context, ses *Session, e sql.Engine) error
 }
 
 type RowsPlan interface {

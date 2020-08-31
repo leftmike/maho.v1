@@ -216,7 +216,7 @@ func statement(ctx context.Context, ses *evaluate.Session, e sql.Engine, tx sql.
 		return err
 	}
 	stmtPlan := plan.(evaluate.StmtPlan)
-	_, err = stmtPlan.Execute(ctx, e, tx)
+	_, err = stmtPlan.Execute(ctx, tx)
 	return err
 }
 

@@ -161,9 +161,7 @@ func (fk *ForeignKey) Explain() string {
 	return ""
 }
 
-func (fk *ForeignKey) Execute(ctx context.Context, e sql.Engine, tx sql.Transaction) (int64,
-	error) {
-
+func (fk *ForeignKey) Execute(ctx context.Context, tx sql.Transaction) (int64, error) {
 	fktt, err := tx.LookupTableType(ctx, fk.FKTable)
 	if err != nil {
 		return -1, err

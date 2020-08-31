@@ -96,9 +96,7 @@ func (up *updatePlan) Explain() string {
 	return ""
 }
 
-func (up *updatePlan) Execute(ctx context.Context, e sql.Engine, tx sql.Transaction) (int64,
-	error) {
-
+func (up *updatePlan) Execute(ctx context.Context, tx sql.Transaction) (int64, error) {
 	tbl, _, err := tx.LookupTable(ctx, up.tn)
 	if err != nil {
 		return -1, err

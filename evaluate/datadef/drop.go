@@ -43,9 +43,7 @@ func (stmt *DropTable) Explain() string {
 	return stmt.String()
 }
 
-func (stmt *DropTable) Execute(ctx context.Context, e sql.Engine, tx sql.Transaction) (int64,
-	error) {
-
+func (stmt *DropTable) Execute(ctx context.Context, tx sql.Transaction) (int64, error) {
 	for _, tn := range stmt.Tables {
 		err := tx.DropTable(ctx, tn, stmt.IfExists)
 		if err != nil {
@@ -84,9 +82,7 @@ func (stmt *DropIndex) Explain() string {
 	return stmt.String()
 }
 
-func (stmt *DropIndex) Execute(ctx context.Context, e sql.Engine, tx sql.Transaction) (int64,
-	error) {
-
+func (stmt *DropIndex) Execute(ctx context.Context, tx sql.Transaction) (int64, error) {
 	return -1, tx.DropIndex(ctx, stmt.Index, stmt.Table, stmt.IfExists)
 }
 
@@ -123,7 +119,7 @@ func (stmt *DropDatabase) Explain() string {
 	return stmt.String()
 }
 
-func (stmt *DropDatabase) Execute(ctx context.Context, e sql.Engine, tx sql.Transaction) (int64,
+func (stmt *DropDatabase) Command(ctx context.Context, ses *evaluate.Session, e sql.Engine) (int64,
 	error) {
 
 	return -1, e.DropDatabase(stmt.Database, stmt.IfExists, stmt.Options)
@@ -156,8 +152,6 @@ func (stmt *DropSchema) Explain() string {
 	return stmt.String()
 }
 
-func (stmt *DropSchema) Execute(ctx context.Context, e sql.Engine, tx sql.Transaction) (int64,
-	error) {
-
+func (stmt *DropSchema) Execute(ctx context.Context, tx sql.Transaction) (int64, error) {
 	return -1, tx.DropSchema(ctx, stmt.Schema, stmt.IfExists)
 }

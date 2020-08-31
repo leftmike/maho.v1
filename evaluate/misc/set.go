@@ -27,6 +27,6 @@ func (stmt *Set) Explain() string {
 	return stmt.String()
 }
 
-func (stmt *Set) Command(ctx context.Context, ses *evaluate.Session) error {
+func (stmt *Set) Command(ctx context.Context, ses *evaluate.Session, e sql.Engine) error {
 	return ses.Set(stmt.Variable, stmt.Value)
 }
