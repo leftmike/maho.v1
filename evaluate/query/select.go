@@ -393,6 +393,7 @@ func order(rrop resultRowsOp, fctx *fromContext, order []OrderBy) (rowsOp, error
 }
 
 type filterRows struct {
+	tx   sql.Transaction
 	rows sql.Rows
 	cond sql.CExpr
 	dest []sql.Value
@@ -420,7 +421,7 @@ func (fr *filterRows) Next(ctx context.Context, dest []sql.Value) error {
 		defer func() {
 			fr.dest = nil
 		}()
-		v, err := fr.cond.Eval(ctx, fr)
+		v, err := fr.cond.Eval(ctx, fr.tx, fr)
 		if err != nil {
 			return err
 		}
@@ -476,7 +477,7 @@ func (fo filterOp) rows(ctx context.Context, tx sql.Transaction) (sql.Rows, erro
 		return nil, err
 	}
 
-	return &filterRows{rows: r, cond: fo.cond}, nil
+	return &filterRows{tx: tx, rows: r, cond: fo.cond}, nil
 }
 
 type oneEmptyOp struct{}
@@ -606,6 +607,7 @@ func (ro *resultsOp) rows(ctx context.Context, tx sql.Transaction) (sql.Rows, er
 	}
 
 	return &resultRows{
+		tx:        tx,
 		rows:      r,
 		columns:   ro.cols,
 		destCols:  ro.destCols,
@@ -628,6 +630,7 @@ type expr2dest struct {
 }
 
 type resultRows struct {
+	tx        sql.Transaction
 	rows      sql.Rows
 	dest      []sql.Value
 	columns   []sql.Identifier
@@ -659,7 +662,7 @@ func (rr *resultRows) Next(ctx context.Context, dest []sql.Value) error {
 		dest[c2d.destColIndex] = rr.dest[c2d.srcColIndex]
 	}
 	for _, e2d := range rr.destExprs {
-		val, err := e2d.expr.Eval(ctx, rr)
+		val, err := e2d.expr.Eval(ctx, rr.tx, rr)
 		if err != nil {
 			return err
 		}

@@ -163,7 +163,7 @@ func TestEval(t *testing.T) {
 			t.Errorf("CompileExpr(%q) failed with %s", c.s, err)
 			continue
 		}
-		v, err := r.Eval(nil, nil)
+		v, err := r.Eval(nil, nil, nil)
 		if err != nil {
 			t.Errorf("Eval(%q) failed with %s", c.s, err)
 			continue
@@ -297,7 +297,7 @@ func TestEval(t *testing.T) {
 			t.Errorf("CompileExpr(%q) failed with %s", f, err)
 			continue
 		}
-		v, err := r.Eval(nil, nil)
+		v, err := r.Eval(nil, nil, nil)
 		if err == nil {
 			t.Errorf("Eval(%q) did not fail, got %s", f, sql.Format(v))
 		}
@@ -327,7 +327,7 @@ func compareTest(t *testing.T, m, op, n string, b bool) {
 		t.Errorf("CompileExpr(%q) failed with %s", s, err)
 		return
 	}
-	v, err := r.Eval(nil, nil)
+	v, err := r.Eval(nil, nil, nil)
 	if err != nil {
 		t.Errorf("Eval(%q) failed with %s", s, err)
 		return

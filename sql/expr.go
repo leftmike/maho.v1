@@ -11,5 +11,5 @@ type EvalContext interface {
 
 type CExpr interface {
 	fmt.Stringer
-	Eval(ctx context.Context, ectx EvalContext) (Value, error)
+	Eval(ctx context.Context, tx Transaction, ectx EvalContext) (Value, error)
 }

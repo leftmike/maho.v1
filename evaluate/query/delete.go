@@ -64,7 +64,7 @@ func (dp *deletePlan) Execute(ctx context.Context, tx sql.Transaction) (int64, e
 		return -1, err
 	}
 	if dp.where != nil {
-		rows = &filterRows{rows: rows, cond: dp.where}
+		rows = &filterRows{tx: tx, rows: rows, cond: dp.where}
 	}
 	defer rows.Close()
 

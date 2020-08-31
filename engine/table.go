@@ -13,7 +13,6 @@ import (
 
 type table struct {
 	tx   *transaction
-	st   store
 	tn   sql.TableName
 	stbl Table
 	tt   *TableType
@@ -188,7 +187,7 @@ func (tbl *table) Insert(ctx context.Context, row []sql.Value) error {
 	}
 
 	for _, chk := range tbl.tt.checks {
-		val, err := chk.check.Eval(ctx, rowContext(row))
+		val, err := chk.check.Eval(ctx, tbl.tx, rowContext(row))
 		if err != nil {
 			return fmt.Errorf("engine: table %s: constraint: %s: %s", tbl.tn, chk.name, err)
 		}
@@ -245,7 +244,7 @@ func (tbl *table) update(ctx context.Context, r Rows, updates []sql.ColumnUpdate
 	}
 
 	for _, chk := range tbl.tt.checks {
-		val, err := chk.check.Eval(ctx, rowContext(updateRow))
+		val, err := chk.check.Eval(ctx, tbl.tx, rowContext(updateRow))
 		if err != nil {
 			return fmt.Errorf("engine: table %s: constraint: %s: %s", tbl.tn, chk.name,
 				err)

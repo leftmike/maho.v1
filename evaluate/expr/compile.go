@@ -133,11 +133,7 @@ func compile(ctx context.Context, tx sql.Transaction, cctx CompileContext, e Exp
 		if !ok {
 			return nil, fmt.Errorf("engine: expected rows: %s", e.Stmt)
 		}
-		rows, err := rowsPlan.Rows(ctx, tx)
-		if err != nil {
-			return nil, err
-		}
-		return &rowsExpr{rows: rows}, nil
+		return &rowsExpr{rowsPlan: rowsPlan}, nil
 	default:
 		panic("missing case for expr")
 	}

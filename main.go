@@ -55,12 +55,10 @@ To Do:
 
 - SELECT, INSERT, UPDATE, DELETE
 -- check that Expr are resolved before being compiled
--- change PlanEngine to just have LookupTableType
--- engine.LookupTable should take a type rather than returning one
+-- tx.LookupTable should take a type rather than returning one
 -- fix Explain XXX
 -- make plans reusable
 -- keep track of tables and type versions used
--- look at move sql.Transaction to execute.Transaction, etc
 -- maybe get rid of Rows.Columns()
 -- prepared statements
 

@@ -9,6 +9,7 @@ import (
 	"math"
 	"sync/atomic"
 
+	"github.com/leftmike/maho/evaluate"
 	"github.com/leftmike/maho/sql"
 	"github.com/leftmike/maho/util"
 )
@@ -201,7 +202,9 @@ func decode(buf []byte) (sql.CExpr, []byte) {
 	}
 }
 
-func (l *Literal) Eval(ctx context.Context, ectx sql.EvalContext) (sql.Value, error) {
+func (l *Literal) Eval(ctx context.Context, tx sql.Transaction, ectx sql.EvalContext) (sql.Value,
+	error) {
+
 	return l.Value, nil
 }
 
@@ -211,7 +214,9 @@ func (ci colIndex) String() string {
 	return fmt.Sprintf("[%d]", ci)
 }
 
-func (ci colIndex) Eval(ctx context.Context, ectx sql.EvalContext) (sql.Value, error) {
+func (ci colIndex) Eval(ctx context.Context, tx sql.Transaction, ectx sql.EvalContext) (sql.Value,
+	error) {
+
 	return ectx.EvalRef(int(ci)), nil
 }
 
@@ -223,26 +228,32 @@ func ColumnIndex(ce sql.CExpr) (int, bool) {
 }
 
 type rowsExpr struct {
-	rows  sql.Rows
-	value sql.Value
-	err   error
-	done  bool
+	rowsPlan evaluate.RowsPlan
+	value    sql.Value
+	err      error
+	done     bool
 }
 
 func (re *rowsExpr) String() string {
-	return fmt.Sprintf("rows: %#v", re)
+	return fmt.Sprintf("rows: %s", re.rowsPlan.Explain())
 }
 
-func (re *rowsExpr) eval(ctx context.Context, ectx sql.EvalContext) (sql.Value, error) {
-	if len(re.rows.Columns()) != 1 {
-		return nil, errors.New("engine: expected one column for scalar subquery")
-	}
-	dest := []sql.Value{nil}
-	err := re.rows.Next(ctx, dest)
+func (re *rowsExpr) eval(ctx context.Context, tx sql.Transaction) (sql.Value, error) {
+	rows, err := re.rowsPlan.Rows(ctx, tx)
 	if err != nil {
 		return nil, err
 	}
-	err = re.rows.Next(ctx, []sql.Value{nil})
+	defer rows.Close()
+
+	if len(rows.Columns()) != 1 {
+		return nil, errors.New("engine: expected one column for scalar subquery")
+	}
+	dest := []sql.Value{nil}
+	err = rows.Next(ctx, dest)
+	if err != nil {
+		return nil, err
+	}
+	err = rows.Next(ctx, []sql.Value{nil})
 	if err == nil {
 		return nil, errors.New("engine: expected one row for scalar subquery")
 	} else if err != io.EOF {
@@ -251,10 +262,12 @@ func (re *rowsExpr) eval(ctx context.Context, ectx sql.EvalContext) (sql.Value, 
 	return dest[0], nil
 }
 
-func (re *rowsExpr) Eval(ctx context.Context, ectx sql.EvalContext) (sql.Value, error) {
+func (re *rowsExpr) Eval(ctx context.Context, tx sql.Transaction, ectx sql.EvalContext) (sql.Value,
+	error) {
+
 	if !re.done {
 		re.done = true
-		re.value, re.err = re.eval(ctx, ectx)
+		re.value, re.err = re.eval(ctx, tx)
 	}
 	return re.value, re.err
 }
@@ -276,11 +289,13 @@ func (c *call) String() string {
 	return s
 }
 
-func (c *call) Eval(ctx context.Context, ectx sql.EvalContext) (sql.Value, error) {
+func (c *call) Eval(ctx context.Context, tx sql.Transaction, ectx sql.EvalContext) (sql.Value,
+	error) {
+
 	args := make([]sql.Value, len(c.args))
 	for i, a := range c.args {
 		var err error
-		args[i], err = a.Eval(ctx, ectx)
+		args[i], err = a.Eval(ctx, tx, ectx)
 		if err != nil {
 			return nil, err
 		} else if args[i] == nil && !c.call.handleNull {

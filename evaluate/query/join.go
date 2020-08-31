@@ -124,6 +124,7 @@ func (jo joinOp) rows(ctx context.Context, tx sql.Transaction) (sql.Rows, error)
 	}
 
 	return &joinRows{
+		tx:        tx,
 		leftRows:  leftRows,
 		leftDest:  make([]sql.Value, jo.leftLen),
 		leftLen:   jo.leftLen,
@@ -151,6 +152,8 @@ type usingMatch struct {
 }
 
 type joinRows struct {
+	tx sql.Transaction
+
 	state joinState
 
 	leftRows sql.Rows
@@ -191,7 +194,7 @@ func (jr *joinRows) EvalRef(idx int) sql.Value {
 }
 
 func (jr *joinRows) onMatch(ctx context.Context, dest []sql.Value) (bool, error) {
-	v, err := jr.on.Eval(ctx, jr)
+	v, err := jr.on.Eval(ctx, jr.tx, jr)
 	if err != nil {
 		return true, err
 	}

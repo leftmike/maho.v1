@@ -106,7 +106,7 @@ func (up *updatePlan) Execute(ctx context.Context, tx sql.Transaction) (int64, e
 		return -1, err
 	}
 	if up.where != nil {
-		rows = &filterRows{rows: rows, cond: up.where}
+		rows = &filterRows{tx: tx, rows: rows, cond: up.where}
 	}
 	defer rows.Close()
 
@@ -123,7 +123,7 @@ func (up *updatePlan) Execute(ctx context.Context, tx sql.Transaction) (int64, e
 		updates = updates[:0]
 		for _, update := range up.updates {
 			col := update.column
-			val, err := update.expr.Eval(ctx, up)
+			val, err := update.expr.Eval(ctx, tx, up)
 			if err != nil {
 				return -1, err
 			}

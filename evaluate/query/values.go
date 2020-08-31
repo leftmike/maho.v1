@@ -37,6 +37,7 @@ func (stmt *Values) String() string {
 }
 
 type exprValues struct {
+	tx      sql.Transaction
 	columns []sql.Identifier
 	rows    [][]sql.CExpr
 	index   int
@@ -62,7 +63,7 @@ func (ev *exprValues) Next(ctx context.Context, dest []sql.Value) error {
 	i := 0
 	for i < len(dest) && i < len(row) {
 		var err error
-		dest[i], err = row[i].Eval(ctx, nil)
+		dest[i], err = row[i].Eval(ctx, ev.tx, nil)
 		if err != nil {
 			return err
 		}
@@ -112,5 +113,6 @@ func (ev *exprValues) Explain() string {
 }
 
 func (ev *exprValues) Rows(ctx context.Context, tx sql.Transaction) (sql.Rows, error) {
+	ev.tx = tx
 	return ev, nil
 }

@@ -147,7 +147,7 @@ func (plan *insertValuesPlan) Execute(ctx context.Context, tx sql.Transaction) (
 
 			if ce != nil {
 				var err error
-				v, err = ce.Eval(ctx, nil)
+				v, err = ce.Eval(ctx, tx, nil)
 				if err != nil {
 					return -1, err
 				}

@@ -117,7 +117,7 @@ func (plan *copyPlan) Execute(ctx context.Context, tx sql.Transaction) (int64, e
 				}
 
 				var err error
-				row[cdx], err = ce.Eval(ctx, nil)
+				row[cdx], err = ce.Eval(ctx, tx, nil)
 				if err != nil {
 					return err
 				}
