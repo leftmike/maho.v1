@@ -201,9 +201,7 @@ func TestInsert(t *testing.T) {
 		insertColumnTypes3, insertCases3)
 }
 
-func statement(ctx context.Context, ses *evaluate.Session, e sql.Engine, tx sql.Transaction,
-	s string) error {
-
+func statement(ctx context.Context, ses *evaluate.Session, tx sql.Transaction, s string) error {
 	p := parser.NewParser(strings.NewReader(s), "statement")
 	stmt, err := p.Parse()
 	if err != nil {
@@ -211,7 +209,7 @@ func statement(ctx context.Context, ses *evaluate.Session, e sql.Engine, tx sql.
 	}
 
 	stmt.Resolve(ses)
-	plan, err := stmt.Plan(ctx, evaluate.MakePlanContext(e, tx))
+	plan, err := stmt.Plan(ctx, tx)
 	if err != nil {
 		return err
 	}
@@ -248,7 +246,7 @@ func testInsert(t *testing.T, e sql.Engine, ses *evaluate.Session, tn sql.TableN
 			return
 		}
 
-		err = statement(ctx, ses, e, tx, c.stmt)
+		err = statement(ctx, ses, tx, c.stmt)
 		if c.fail {
 			if err == nil {
 				t.Errorf("Parse(\"%s\").Execute() did not fail", c.stmt)

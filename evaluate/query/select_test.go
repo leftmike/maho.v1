@@ -104,7 +104,7 @@ func TestSelect(t *testing.T) {
 			continue
 		}
 		c.stmt.Resolve(ses)
-		plan, err := c.stmt.Plan(ctx, evaluate.MakePlanContext(e, tx))
+		plan, err := c.stmt.Plan(ctx, tx)
 		if err != nil {
 			t.Errorf("(%v).Plan() failed with %s", c.stmt, err)
 			continue
@@ -114,7 +114,7 @@ func TestSelect(t *testing.T) {
 			t.Errorf("(%v).Plan() did not return Rows", c.stmt)
 			continue
 		}
-		rows, err := rowsPlan.Rows(ctx, e, tx)
+		rows, err := rowsPlan.Rows(ctx, tx)
 		if err != nil {
 			t.Errorf("(%v).Rows() failed with %s", c.stmt, err)
 			continue

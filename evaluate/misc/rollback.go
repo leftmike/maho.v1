@@ -15,7 +15,7 @@ func (stmt *Rollback) String() string {
 
 func (_ *Rollback) Resolve(ses *evaluate.Session) {}
 
-func (stmt *Rollback) Plan(ctx context.Context, pctx evaluate.PlanContext) (evaluate.Plan, error) {
+func (stmt *Rollback) Plan(ctx context.Context, tx sql.Transaction) (evaluate.Plan, error) {
 	return stmt, nil
 }
 

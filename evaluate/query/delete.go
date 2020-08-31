@@ -32,15 +32,15 @@ func (stmt *Delete) Resolve(ses *evaluate.Session) {
 	stmt.Table = ses.ResolveTableName(stmt.Table)
 }
 
-func (stmt *Delete) Plan(ctx context.Context, pctx evaluate.PlanContext) (evaluate.Plan, error) {
-	tt, err := pctx.Transaction().LookupTableType(ctx, stmt.Table)
+func (stmt *Delete) Plan(ctx context.Context, tx sql.Transaction) (evaluate.Plan, error) {
+	tt, err := tx.LookupTableType(ctx, stmt.Table)
 	if err != nil {
 		return nil, err
 	}
 
 	var where sql.CExpr
 	if stmt.Where != nil {
-		where, err = expr.Compile(ctx, pctx, makeFromContext(stmt.Table.Table, tt.Columns()),
+		where, err = expr.Compile(ctx, tx, makeFromContext(stmt.Table.Table, tt.Columns()),
 			stmt.Where)
 		if err != nil {
 			return nil, err

@@ -12,7 +12,7 @@ import (
 type FromItem interface {
 	fmt.Stringer
 	resolve(ses *evaluate.Session)
-	plan(ctx context.Context, pctx evaluate.PlanContext) (rowsOp, *fromContext, error)
+	plan(ctx context.Context, tx sql.Transaction) (rowsOp, *fromContext, error)
 }
 
 type FromTableAlias struct {
@@ -32,10 +32,10 @@ func (fta *FromTableAlias) resolve(ses *evaluate.Session) {
 	fta.TableName = ses.ResolveTableName(fta.TableName)
 }
 
-func (fta *FromTableAlias) plan(ctx context.Context, pctx evaluate.PlanContext) (rowsOp,
-	*fromContext, error) {
+func (fta *FromTableAlias) plan(ctx context.Context, tx sql.Transaction) (rowsOp, *fromContext,
+	error) {
 
-	tt, err := pctx.Transaction().LookupTableType(ctx, fta.TableName)
+	tt, err := tx.LookupTableType(ctx, fta.TableName)
 	if err != nil {
 		return nil, nil, err
 	}
@@ -59,9 +59,7 @@ func (sto scanTableOp) children() []rowsOp {
 	return nil
 }
 
-func (sto scanTableOp) rows(ctx context.Context, e sql.Engine, tx sql.Transaction) (sql.Rows,
-	error) {
-
+func (sto scanTableOp) rows(ctx context.Context, tx sql.Transaction) (sql.Rows, error) {
 	tbl, _, err := tx.LookupTable(ctx, sto.tn)
 	if err != nil {
 		return nil, err
@@ -94,10 +92,8 @@ func (fs FromStmt) resolve(ses *evaluate.Session) {
 	fs.Stmt.Resolve(ses)
 }
 
-func (fs FromStmt) plan(ctx context.Context, pctx evaluate.PlanContext) (rowsOp, *fromContext,
-	error) {
-
-	plan, err := fs.Stmt.Plan(ctx, pctx)
+func (fs FromStmt) plan(ctx context.Context, tx sql.Transaction) (rowsOp, *fromContext, error) {
+	plan, err := fs.Stmt.Plan(ctx, tx)
 	if err != nil {
 		return nil, nil, err
 	}
@@ -112,8 +108,8 @@ func (fs FromStmt) plan(ctx context.Context, pctx evaluate.PlanContext) (rowsOp,
 	}
 	fctx := makeFromContext(fs.Alias, cols)
 
-	if rop, ok := rowsPlan.(rowsOpPlan); ok {
-		return rop.rop, fctx, nil
+	if rp, ok := rowsPlan.(rowsOpPlan); ok {
+		return rp.rop, fctx, nil
 	}
 	return fromPlanOp{rowsPlan}, fctx, nil
 }
@@ -130,10 +126,8 @@ func (_ fromPlanOp) children() []rowsOp {
 	return nil
 }
 
-func (fpo fromPlanOp) rows(ctx context.Context, e sql.Engine, tx sql.Transaction) (sql.Rows,
-	error) {
-
-	return fpo.rp.Rows(ctx, e, tx)
+func (fpo fromPlanOp) rows(ctx context.Context, tx sql.Transaction) (sql.Rows, error) {
+	return fpo.rp.Rows(ctx, tx)
 }
 
 type colRef struct {

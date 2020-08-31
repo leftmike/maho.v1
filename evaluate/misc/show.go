@@ -21,7 +21,7 @@ func (stmt *Show) Resolve(ses *evaluate.Session) {
 	stmt.ses = ses
 }
 
-func (stmt *Show) Plan(ctx context.Context, pctx evaluate.PlanContext) (evaluate.Plan, error) {
+func (stmt *Show) Plan(ctx context.Context, tx sql.Transaction) (evaluate.Plan, error) {
 	return stmt, nil
 }
 
@@ -33,6 +33,6 @@ func (stmt *Show) Columns() []sql.Identifier {
 	return stmt.ses.Columns(stmt.Variable)
 }
 
-func (stmt *Show) Rows(ctx context.Context, e sql.Engine, tx sql.Transaction) (sql.Rows, error) {
+func (stmt *Show) Rows(ctx context.Context, tx sql.Transaction) (sql.Rows, error) {
 	return stmt.ses.Show(stmt.Variable)
 }

@@ -103,13 +103,13 @@ func (jo joinOp) children() []rowsOp {
 	return []rowsOp{jo.leftRowsOp, jo.rightRowsOp}
 }
 
-func (jo joinOp) rows(ctx context.Context, e sql.Engine, tx sql.Transaction) (sql.Rows, error) {
-	leftRows, err := jo.leftRowsOp.rows(ctx, e, tx)
+func (jo joinOp) rows(ctx context.Context, tx sql.Transaction) (sql.Rows, error) {
+	leftRows, err := jo.leftRowsOp.rows(ctx, tx)
 	if err != nil {
 		return nil, err
 	}
 
-	rows, err := jo.rightRowsOp.rows(ctx, e, tx)
+	rows, err := jo.rightRowsOp.rows(ctx, tx)
 	if err != nil {
 		return nil, err
 	}
@@ -325,14 +325,12 @@ func (_ *joinRows) Update(ctx context.Context, updates []sql.ColumnUpdate) error
 	return fmt.Errorf("join rows may not be updated")
 }
 
-func (fj FromJoin) plan(ctx context.Context, pctx evaluate.PlanContext) (rowsOp, *fromContext,
-	error) {
-
-	leftRowsOp, leftCtx, err := fj.Left.plan(ctx, pctx)
+func (fj FromJoin) plan(ctx context.Context, tx sql.Transaction) (rowsOp, *fromContext, error) {
+	leftRowsOp, leftCtx, err := fj.Left.plan(ctx, tx)
 	if err != nil {
 		return nil, nil, err
 	}
-	rightRowsOp, rightCtx, err := fj.Right.plan(ctx, pctx)
+	rightRowsOp, rightCtx, err := fj.Right.plan(ctx, tx)
 	if err != nil {
 		return nil, nil, err
 	}
@@ -373,7 +371,7 @@ func (fj FromJoin) plan(ctx context.Context, pctx evaluate.PlanContext) (rowsOp,
 		fctx = joinContextsOn(leftCtx, rightCtx)
 		jop.rightLen = len(rightCtx.cols)
 		if fj.On != nil {
-			jop.on, err = expr.Compile(ctx, pctx, fctx, fj.On)
+			jop.on, err = expr.Compile(ctx, tx, fctx, fj.On)
 			if err != nil {
 				return nil, nil, err
 			}

@@ -55,8 +55,8 @@ func (stmt *Update) Resolve(ses *evaluate.Session) {
 	stmt.Table = ses.ResolveTableName(stmt.Table)
 }
 
-func (stmt *Update) Plan(ctx context.Context, pctx evaluate.PlanContext) (evaluate.Plan, error) {
-	tt, err := pctx.Transaction().LookupTableType(ctx, stmt.Table)
+func (stmt *Update) Plan(ctx context.Context, tx sql.Transaction) (evaluate.Plan, error) {
+	tt, err := tx.LookupTableType(ctx, stmt.Table)
 	if err != nil {
 		return nil, err
 	}
@@ -64,7 +64,7 @@ func (stmt *Update) Plan(ctx context.Context, pctx evaluate.PlanContext) (evalua
 	fctx := makeFromContext(stmt.Table.Table, tt.Columns())
 	var where sql.CExpr
 	if stmt.Where != nil {
-		where, err = expr.Compile(ctx, pctx, fctx, stmt.Where)
+		where, err = expr.Compile(ctx, tx, fctx, stmt.Where)
 		if err != nil {
 			return nil, err
 		}
@@ -78,7 +78,7 @@ func (stmt *Update) Plan(ctx context.Context, pctx evaluate.PlanContext) (evalua
 	}
 
 	for _, cu := range stmt.ColumnUpdates {
-		ce, err := expr.Compile(ctx, pctx, fctx, cu.Expr)
+		ce, err := expr.Compile(ctx, tx, fctx, cu.Expr)
 		if err != nil {
 			return nil, err
 		}

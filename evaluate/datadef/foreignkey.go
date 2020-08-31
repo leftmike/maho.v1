@@ -42,9 +42,7 @@ func (fk *ForeignKey) Resolve(ses *evaluate.Session) {
 	fk.RefTable = ses.ResolveTableName(fk.RefTable)
 }
 
-func (fk *ForeignKey) Plan(ctx context.Context, pctx evaluate.PlanContext) (evaluate.StmtPlan,
-	error) {
-
+func (fk *ForeignKey) Plan(ctx context.Context, tx sql.Transaction) (evaluate.StmtPlan, error) {
 	if fk.FKTable.Database != fk.RefTable.Database {
 		return nil, fmt.Errorf(
 			"engine: table %s: foreign key reference not within same database: %s",

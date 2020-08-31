@@ -178,11 +178,9 @@ func (stmt *CreateTable) Resolve(ses *evaluate.Session) {
 	}
 }
 
-func (stmt *CreateTable) Plan(ctx context.Context, pctx evaluate.PlanContext) (evaluate.Plan,
-	error) {
-
+func (stmt *CreateTable) Plan(ctx context.Context, tx sql.Transaction) (evaluate.Plan, error) {
 	for _, fk := range stmt.ForeignKeys {
-		pfk, err := fk.Plan(ctx, pctx)
+		pfk, err := fk.Plan(ctx, tx)
 		if err != nil {
 			return nil, err
 		}
@@ -211,7 +209,7 @@ func (stmt *CreateTable) Plan(ctx context.Context, pctx evaluate.PlanContext) (e
 			} else {
 				cctx = tableCheck(stmt.Columns)
 			}
-			check, err = expr.Compile(ctx, pctx, cctx, con.Check)
+			check, err = expr.Compile(ctx, tx, cctx, con.Check)
 			if err != nil {
 				return nil, err
 			}
@@ -234,7 +232,7 @@ func (stmt *CreateTable) Plan(ctx context.Context, pctx evaluate.PlanContext) (e
 		var dfltExpr string
 		if ct.Default != nil {
 			var err error
-			dflt, err = expr.Compile(ctx, pctx, nil, ct.Default)
+			dflt, err = expr.Compile(ctx, tx, nil, ct.Default)
 			if err != nil {
 				return nil, err
 			}
@@ -304,9 +302,7 @@ func (stmt *CreateIndex) Resolve(ses *evaluate.Session) {
 	stmt.Table = ses.ResolveTableName(stmt.Table)
 }
 
-func (stmt *CreateIndex) Plan(ctx context.Context, pctx evaluate.PlanContext) (evaluate.Plan,
-	error) {
-
+func (stmt *CreateIndex) Plan(ctx context.Context, tx sql.Transaction) (evaluate.Plan, error) {
 	return stmt, nil
 }
 
@@ -347,9 +343,7 @@ func (stmt *CreateDatabase) String() string {
 
 func (_ *CreateDatabase) Resolve(ses *evaluate.Session) {}
 
-func (stmt *CreateDatabase) Plan(ctx context.Context, pctx evaluate.PlanContext) (evaluate.Plan,
-	error) {
-
+func (stmt *CreateDatabase) Plan(ctx context.Context, tx sql.Transaction) (evaluate.Plan, error) {
 	return stmt, nil
 }
 
@@ -375,9 +369,7 @@ func (stmt *CreateSchema) Resolve(ses *evaluate.Session) {
 	stmt.Schema = ses.ResolveSchemaName(stmt.Schema)
 }
 
-func (stmt *CreateSchema) Plan(ctx context.Context, pctx evaluate.PlanContext) (evaluate.Plan,
-	error) {
-
+func (stmt *CreateSchema) Plan(ctx context.Context, tx sql.Transaction) (evaluate.Plan, error) {
 	return stmt, nil
 }
 

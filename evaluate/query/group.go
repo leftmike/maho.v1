@@ -26,10 +26,8 @@ func (gbo groupByOp) children() []rowsOp {
 	return []rowsOp{gbo.rop}
 }
 
-func (gbo groupByOp) rows(ctx context.Context, e sql.Engine, tx sql.Transaction) (sql.Rows,
-	error) {
-
-	r, err := gbo.rop.rows(ctx, e, tx)
+func (gbo groupByOp) rows(ctx context.Context, tx sql.Transaction) (sql.Rows, error) {
+	r, err := gbo.rop.rows(ctx, tx)
 	if err != nil {
 		return nil, err
 	}
@@ -195,14 +193,14 @@ func (gctx *groupContext) CompileAggregator(c *expr.Call, maker expr.MakeAggrega
 	return len(gctx.group) + len(gctx.aggregators) - 1
 }
 
-func (gctx *groupContext) makeGroupByOp(ctx context.Context, pctx evaluate.PlanContext, rop rowsOp,
+func (gctx *groupContext) makeGroupByOp(ctx context.Context, tx sql.Transaction, rop rowsOp,
 	fctx *fromContext) (rowsOp, error) {
 
 	gbo := &groupByOp{rop: rop, columns: gctx.groupCols, groupExprs: gctx.groupExprs}
 	for idx := range gctx.aggregators {
 		agg := aggregator{maker: gctx.makers[idx]}
 		for _, a := range gctx.aggregators[idx].Args {
-			ce, err := expr.Compile(ctx, pctx, fctx, a)
+			ce, err := expr.Compile(ctx, tx, fctx, a)
 			if err != nil {
 				return nil, err
 			}
@@ -214,7 +212,7 @@ func (gctx *groupContext) makeGroupByOp(ctx context.Context, pctx evaluate.PlanC
 	return gbo, nil
 }
 
-func makeGroupContext(ctx context.Context, pctx evaluate.PlanContext, fctx *fromContext,
+func makeGroupContext(ctx context.Context, tx sql.Transaction, fctx *fromContext,
 	group []expr.Expr) (*groupContext, error) {
 
 	var groupExprs []expr2dest
@@ -222,7 +220,7 @@ func makeGroupContext(ctx context.Context, pctx evaluate.PlanContext, fctx *from
 	var groupRefs []bool
 	ddx := 0
 	for _, e := range group {
-		ce, err := expr.Compile(ctx, pctx, fctx, e)
+		ce, err := expr.Compile(ctx, tx, fctx, e)
 		if err != nil {
 			return nil, err
 		}
@@ -241,11 +239,11 @@ func makeGroupContext(ctx context.Context, pctx evaluate.PlanContext, fctx *from
 
 }
 
-func group(ctx context.Context, pctx evaluate.PlanContext, rop rowsOp, fctx *fromContext,
+func group(ctx context.Context, tx sql.Transaction, rop rowsOp, fctx *fromContext,
 	results []SelectResult, group []expr.Expr, having expr.Expr, orderBy []OrderBy) (evaluate.Plan,
 	error) {
 
-	gctx, err := makeGroupContext(ctx, pctx, fctx, group)
+	gctx, err := makeGroupContext(ctx, tx, fctx, group)
 
 	var destExprs []expr2dest
 	var resultCols []sql.Identifier
@@ -255,7 +253,7 @@ func group(ctx context.Context, pctx evaluate.PlanContext, rop rowsOp, fctx *fro
 			panic(fmt.Sprintf("unexpected type for query.SelectResult: %T: %v", sr, sr))
 		}
 		var ce sql.CExpr
-		ce, err = expr.CompileAggregator(ctx, pctx, gctx, er.Expr)
+		ce, err = expr.CompileAggregator(ctx, tx, gctx, er.Expr)
 		if err != nil {
 			return nil, err
 		}
@@ -265,13 +263,13 @@ func group(ctx context.Context, pctx evaluate.PlanContext, rop rowsOp, fctx *fro
 
 	var hce sql.CExpr
 	if having != nil {
-		hce, err = expr.CompileAggregator(ctx, pctx, gctx, having)
+		hce, err = expr.CompileAggregator(ctx, tx, gctx, having)
 		if err != nil {
 			return nil, err
 		}
 	}
 
-	rop, err = gctx.makeGroupByOp(ctx, pctx, rop, fctx)
+	rop, err = gctx.makeGroupByOp(ctx, tx, rop, fctx)
 	if err != nil {
 		return nil, err
 	}

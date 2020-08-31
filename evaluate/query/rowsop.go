@@ -9,7 +9,7 @@ import (
 type rowsOp interface {
 	explain() string
 	children() []rowsOp
-	rows(ctx context.Context, e sql.Engine, tx sql.Transaction) (sql.Rows, error)
+	rows(ctx context.Context, tx sql.Transaction) (sql.Rows, error)
 }
 
 type resultRowsOp interface {

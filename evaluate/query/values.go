@@ -82,7 +82,7 @@ func (_ *exprValues) Update(ctx context.Context, updates []sql.ColumnUpdate) err
 
 func (_ *Values) Resolve(ses *evaluate.Session) {}
 
-func (stmt *Values) Plan(ctx context.Context, pctx evaluate.PlanContext) (evaluate.Plan, error) {
+func (stmt *Values) Plan(ctx context.Context, tx sql.Transaction) (evaluate.Plan, error) {
 	columns := make([]sql.Identifier, len(stmt.Expressions[0]))
 	for i := 0; i < len(columns); i++ {
 		columns[i] = sql.ID(fmt.Sprintf("column%d", i+1))
@@ -93,7 +93,7 @@ func (stmt *Values) Plan(ctx context.Context, pctx evaluate.PlanContext) (evalua
 		row := make([]sql.CExpr, len(r))
 		for j := range r {
 			var err error
-			row[j], err = expr.Compile(ctx, pctx, nil, r[j])
+			row[j], err = expr.Compile(ctx, tx, nil, r[j])
 			if err != nil {
 				return nil, err
 			}
@@ -111,8 +111,6 @@ func (ev *exprValues) Explain() string {
 	return ""
 }
 
-func (ev *exprValues) Rows(ctx context.Context, e sql.Engine, tx sql.Transaction) (sql.Rows,
-	error) {
-
+func (ev *exprValues) Rows(ctx context.Context, tx sql.Transaction) (sql.Rows, error) {
 	return ev, nil
 }
