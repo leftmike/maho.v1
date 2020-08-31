@@ -201,7 +201,7 @@ func decode(buf []byte) (sql.CExpr, []byte) {
 	}
 }
 
-func (l *Literal) Eval(ctx context.Context, etx sql.EvalContext) (sql.Value, error) {
+func (l *Literal) Eval(ctx context.Context, ectx sql.EvalContext) (sql.Value, error) {
 	return l.Value, nil
 }
 
@@ -211,8 +211,8 @@ func (ci colIndex) String() string {
 	return fmt.Sprintf("[%d]", ci)
 }
 
-func (ci colIndex) Eval(ctx context.Context, etx sql.EvalContext) (sql.Value, error) {
-	return etx.EvalRef(int(ci)), nil
+func (ci colIndex) Eval(ctx context.Context, ectx sql.EvalContext) (sql.Value, error) {
+	return ectx.EvalRef(int(ci)), nil
 }
 
 func ColumnIndex(ce sql.CExpr) (int, bool) {
@@ -233,7 +233,7 @@ func (re *rowsExpr) String() string {
 	return fmt.Sprintf("rows: %#v", re)
 }
 
-func (re *rowsExpr) eval(ctx context.Context, etx sql.EvalContext) (sql.Value, error) {
+func (re *rowsExpr) eval(ctx context.Context, ectx sql.EvalContext) (sql.Value, error) {
 	if len(re.rows.Columns()) != 1 {
 		return nil, errors.New("engine: expected one column for scalar subquery")
 	}
@@ -251,10 +251,10 @@ func (re *rowsExpr) eval(ctx context.Context, etx sql.EvalContext) (sql.Value, e
 	return dest[0], nil
 }
 
-func (re *rowsExpr) Eval(ctx context.Context, etx sql.EvalContext) (sql.Value, error) {
+func (re *rowsExpr) Eval(ctx context.Context, ectx sql.EvalContext) (sql.Value, error) {
 	if !re.done {
 		re.done = true
-		re.value, re.err = re.eval(ctx, etx)
+		re.value, re.err = re.eval(ctx, ectx)
 	}
 	return re.value, re.err
 }
@@ -276,18 +276,18 @@ func (c *call) String() string {
 	return s
 }
 
-func (c *call) Eval(ctx context.Context, etx sql.EvalContext) (sql.Value, error) {
+func (c *call) Eval(ctx context.Context, ectx sql.EvalContext) (sql.Value, error) {
 	args := make([]sql.Value, len(c.args))
 	for i, a := range c.args {
 		var err error
-		args[i], err = a.Eval(ctx, etx)
+		args[i], err = a.Eval(ctx, ectx)
 		if err != nil {
 			return nil, err
 		} else if args[i] == nil && !c.call.handleNull {
 			return nil, nil
 		}
 	}
-	return c.call.fn(etx, args)
+	return c.call.fn(ectx, args)
 }
 
 func numFunc(a0 sql.Value, a1 sql.Value, ifn func(i0, i1 sql.Int64Value) sql.Value,

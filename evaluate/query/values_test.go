@@ -61,7 +61,7 @@ func TestValues(t *testing.T) {
 			continue
 		}
 		c.values.Resolve(ses)
-		ret, err := c.values.Plan(ctx, e, tx)
+		ret, err := c.values.Plan(ctx, evaluate.MakePlanContext(e, tx))
 		if err != nil {
 			t.Errorf("(%v).Plan() failed with %s", c.values, err)
 			continue

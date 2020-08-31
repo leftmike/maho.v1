@@ -12,8 +12,7 @@ import (
 type FromItem interface {
 	fmt.Stringer
 	resolve(ses *evaluate.Session)
-	plan(ctx context.Context, pe evaluate.PlanEngine, tx sql.Transaction) (rowsOp, *fromContext,
-		error)
+	plan(ctx context.Context, pctx evaluate.PlanContext) (rowsOp, *fromContext, error)
 }
 
 type FromTableAlias struct {
@@ -33,10 +32,10 @@ func (fta *FromTableAlias) resolve(ses *evaluate.Session) {
 	fta.TableName = ses.ResolveTableName(fta.TableName)
 }
 
-func (fta *FromTableAlias) plan(ctx context.Context, pe evaluate.PlanEngine,
-	tx sql.Transaction) (rowsOp, *fromContext, error) {
+func (fta *FromTableAlias) plan(ctx context.Context, pctx evaluate.PlanContext) (rowsOp,
+	*fromContext, error) {
 
-	tt, err := pe.LookupTableType(ctx, tx, fta.TableName)
+	tt, err := pctx.Engine().LookupTableType(ctx, pctx.Transaction(), fta.TableName)
 	if err != nil {
 		return nil, nil, err
 	}
@@ -95,10 +94,10 @@ func (fs FromStmt) resolve(ses *evaluate.Session) {
 	fs.Stmt.Resolve(ses)
 }
 
-func (fs FromStmt) plan(ctx context.Context, pe evaluate.PlanEngine, tx sql.Transaction) (rowsOp,
-	*fromContext, error) {
+func (fs FromStmt) plan(ctx context.Context, pctx evaluate.PlanContext) (rowsOp, *fromContext,
+	error) {
 
-	plan, err := fs.Stmt.Plan(ctx, pe, tx)
+	plan, err := fs.Stmt.Plan(ctx, pctx)
 	if err != nil {
 		return nil, nil, err
 	}

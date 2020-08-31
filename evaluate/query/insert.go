@@ -58,10 +58,10 @@ func (stmt *InsertValues) Resolve(ses *evaluate.Session) {
 	stmt.Table = ses.ResolveTableName(stmt.Table)
 }
 
-func (stmt *InsertValues) Plan(ctx context.Context, pe evaluate.PlanEngine,
-	tx sql.Transaction) (evaluate.Plan, error) {
+func (stmt *InsertValues) Plan(ctx context.Context, pctx evaluate.PlanContext) (evaluate.Plan,
+	error) {
 
-	tt, err := pe.LookupTableType(ctx, tx, stmt.Table)
+	tt, err := pctx.Engine().LookupTableType(ctx, pctx.Transaction(), stmt.Table)
 	if err != nil {
 		return nil, err
 	}
@@ -108,7 +108,7 @@ func (stmt *InsertValues) Plan(ctx context.Context, pe evaluate.PlanEngine,
 
 			var ce sql.CExpr
 			if e != nil {
-				ce, err = expr.Compile(ctx, pe, tx, nil, e)
+				ce, err = expr.Compile(ctx, pctx, nil, e)
 				if err != nil {
 					return nil, err
 				}

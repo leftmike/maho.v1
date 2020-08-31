@@ -5,6 +5,7 @@ import (
 	"strings"
 	"testing"
 
+	"github.com/leftmike/maho/evaluate"
 	"github.com/leftmike/maho/evaluate/datadef"
 	"github.com/leftmike/maho/evaluate/test"
 	"github.com/leftmike/maho/parser"
@@ -107,7 +108,7 @@ func TestCreateTablePlan(t *testing.T) {
 		tx := e.Begin(0)
 
 		stmt.Resolve(ses)
-		_, err = stmt.Plan(ctx, e, tx)
+		_, err = stmt.Plan(ctx, evaluate.MakePlanContext(e, tx))
 		if err == nil {
 			if c.fail {
 				t.Errorf("Plan(%q) did not fail", c.sql)

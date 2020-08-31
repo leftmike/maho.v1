@@ -376,7 +376,7 @@ func TestEncode(t *testing.T) {
 		if err != nil {
 			t.Errorf("ParseExpr(%q) failed with %s", c, err)
 		}
-		ce, err := expr.Compile(nil, nil, nil, ctx, e)
+		ce, err := expr.Compile(nil, nil, ctx, e)
 		if err != nil {
 			t.Errorf("Compile(%q) failed with %s", c, err)
 		}

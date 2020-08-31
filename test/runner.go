@@ -35,7 +35,7 @@ func (run *Runner) RunExec(tst *sqltestdb.Test) (int64, error) {
 				tx sql.Transaction) error {
 
 				stmt.Resolve(ses)
-				plan, err := stmt.Plan(ctx, e, tx)
+				plan, err := stmt.Plan(ctx, evaluate.MakePlanContext(e, tx))
 				if err != nil {
 					return err
 				}
@@ -79,7 +79,7 @@ func (run *Runner) RunQuery(tst *sqltestdb.Test) ([]string, [][]string, error) {
 			tx sql.Transaction) error {
 
 			stmt.Resolve(ses)
-			plan, err := stmt.Plan(ctx, e, tx)
+			plan, err := stmt.Plan(ctx, evaluate.MakePlanContext(e, tx))
 			if err != nil {
 				return err
 			}

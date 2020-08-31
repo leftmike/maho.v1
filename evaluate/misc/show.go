@@ -21,9 +21,7 @@ func (stmt *Show) Resolve(ses *evaluate.Session) {
 	stmt.ses = ses
 }
 
-func (stmt *Show) Plan(ctx context.Context, pe evaluate.PlanEngine,
-	tx sql.Transaction) (evaluate.Plan, error) {
-
+func (stmt *Show) Plan(ctx context.Context, pctx evaluate.PlanContext) (evaluate.Plan, error) {
 	return stmt, nil
 }
 

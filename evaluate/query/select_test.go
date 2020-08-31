@@ -104,7 +104,7 @@ func TestSelect(t *testing.T) {
 			continue
 		}
 		c.stmt.Resolve(ses)
-		plan, err := c.stmt.Plan(ctx, e, tx)
+		plan, err := c.stmt.Plan(ctx, evaluate.MakePlanContext(e, tx))
 		if err != nil {
 			t.Errorf("(%v).Plan() failed with %s", c.stmt, err)
 			continue

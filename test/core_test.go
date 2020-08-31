@@ -58,7 +58,7 @@ func TestValuesSimple(t *testing.T) {
 		tx := e.Begin(0)
 
 		stmt.Resolve(ses)
-		ret, err := stmt.Plan(ctx, e, tx)
+		ret, err := stmt.Plan(ctx, evaluate.MakePlanContext(e, tx))
 		if c.fail {
 			if err == nil {
 				t.Errorf("Plan(%q) did not fail", c.sql)

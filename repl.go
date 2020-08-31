@@ -32,7 +32,7 @@ func replSQL(ses *evaluate.Session, p parser.Parser, w io.Writer) {
 				tx sql.Transaction) error {
 
 				stmt.Resolve(ses)
-				plan, err := stmt.Plan(ctx, e, tx)
+				plan, err := stmt.Plan(ctx, evaluate.MakePlanContext(e, tx))
 				if err != nil {
 					return err
 				}

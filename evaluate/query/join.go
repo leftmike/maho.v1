@@ -325,14 +325,14 @@ func (_ *joinRows) Update(ctx context.Context, updates []sql.ColumnUpdate) error
 	return fmt.Errorf("join rows may not be updated")
 }
 
-func (fj FromJoin) plan(ctx context.Context, pe evaluate.PlanEngine, tx sql.Transaction) (rowsOp,
-	*fromContext, error) {
+func (fj FromJoin) plan(ctx context.Context, pctx evaluate.PlanContext) (rowsOp, *fromContext,
+	error) {
 
-	leftRowsOp, leftCtx, err := fj.Left.plan(ctx, pe, tx)
+	leftRowsOp, leftCtx, err := fj.Left.plan(ctx, pctx)
 	if err != nil {
 		return nil, nil, err
 	}
-	rightRowsOp, rightCtx, err := fj.Right.plan(ctx, pe, tx)
+	rightRowsOp, rightCtx, err := fj.Right.plan(ctx, pctx)
 	if err != nil {
 		return nil, nil, err
 	}
@@ -373,7 +373,7 @@ func (fj FromJoin) plan(ctx context.Context, pe evaluate.PlanEngine, tx sql.Tran
 		fctx = joinContextsOn(leftCtx, rightCtx)
 		jop.rightLen = len(rightCtx.cols)
 		if fj.On != nil {
-			jop.on, err = expr.Compile(ctx, pe, tx, fctx, fj.On)
+			jop.on, err = expr.Compile(ctx, pctx, fctx, fj.On)
 			if err != nil {
 				return nil, nil, err
 			}

@@ -211,7 +211,7 @@ func statement(ctx context.Context, ses *evaluate.Session, e sql.Engine, tx sql.
 	}
 
 	stmt.Resolve(ses)
-	plan, err := stmt.Plan(ctx, e, tx)
+	plan, err := stmt.Plan(ctx, evaluate.MakePlanContext(e, tx))
 	if err != nil {
 		return err
 	}

@@ -40,10 +40,8 @@ func (stmt *Copy) Resolve(ses *evaluate.Session) {
 	stmt.Table = ses.ResolveTableName(stmt.Table)
 }
 
-func (stmt *Copy) Plan(ctx context.Context, pe evaluate.PlanEngine,
-	tx sql.Transaction) (evaluate.Plan, error) {
-
-	tt, err := pe.LookupTableType(ctx, tx, stmt.Table)
+func (stmt *Copy) Plan(ctx context.Context, pctx evaluate.PlanContext) (evaluate.Plan, error) {
+	tt, err := pctx.Engine().LookupTableType(ctx, pctx.Transaction(), stmt.Table)
 	if err != nil {
 		return nil, err
 	}

@@ -30,24 +30,24 @@ func CompileRef(idx int) sql.CExpr {
 	return colIndex(idx)
 }
 
-func Compile(ctx context.Context, pe evaluate.PlanEngine, tx sql.Transaction, cctx CompileContext,
+func Compile(ctx context.Context, pctx evaluate.PlanContext, cctx CompileContext,
 	e Expr) (sql.CExpr, error) {
 
-	return compile(ctx, pe, tx, cctx, e, false)
+	return compile(ctx, pctx, cctx, e, false)
 }
 
-func CompileAggregator(ctx context.Context, pe evaluate.PlanEngine, tx sql.Transaction,
-	cctx CompileContext, e Expr) (sql.CExpr, error) {
+func CompileAggregator(ctx context.Context, pctx evaluate.PlanContext, cctx CompileContext,
+	e Expr) (sql.CExpr, error) {
 
-	return compile(ctx, pe, tx, cctx, e, true)
+	return compile(ctx, pctx, cctx, e, true)
 }
 
 func CompileExpr(e Expr) (sql.CExpr, error) {
-	return compile(nil, nil, nil, nil, e, false)
+	return compile(nil, nil, nil, e, false)
 }
 
-func compile(ctx context.Context, pe evaluate.PlanEngine, tx sql.Transaction, cctx CompileContext,
-	e Expr, agg bool) (sql.CExpr, error) {
+func compile(ctx context.Context, pctx evaluate.PlanContext, cctx CompileContext, e Expr,
+	agg bool) (sql.CExpr, error) {
 
 	if agg {
 		idx, ok := cctx.(AggregatorContext).MaybeRefExpr(e)
@@ -60,21 +60,21 @@ func compile(ctx context.Context, pe evaluate.PlanEngine, tx sql.Transaction, cc
 		return e, nil
 	case *Unary:
 		if e.Op == NoOp {
-			return compile(ctx, pe, tx, cctx, e.Expr, agg)
+			return compile(ctx, pctx, cctx, e.Expr, agg)
 		}
 		cf := opFuncs[e.Op]
-		a1, err := compile(ctx, pe, tx, cctx, e.Expr, agg)
+		a1, err := compile(ctx, pctx, cctx, e.Expr, agg)
 		if err != nil {
 			return nil, err
 		}
 		return &call{cf, []sql.CExpr{a1}}, nil
 	case *Binary:
 		cf := opFuncs[e.Op]
-		a1, err := compile(ctx, pe, tx, cctx, e.Left, agg)
+		a1, err := compile(ctx, pctx, cctx, e.Left, agg)
 		if err != nil {
 			return nil, err
 		}
-		a2, err := compile(ctx, pe, tx, cctx, e.Right, agg)
+		a2, err := compile(ctx, pctx, cctx, e.Right, agg)
 		if err != nil {
 			return nil, err
 		}
@@ -113,18 +113,18 @@ func compile(ctx context.Context, pe evaluate.PlanEngine, tx sql.Transaction, cc
 		args := make([]sql.CExpr, len(e.Args))
 		for i, a := range e.Args {
 			var err error
-			args[i], err = compile(ctx, pe, tx, cctx, a, agg)
+			args[i], err = compile(ctx, pctx, cctx, a, agg)
 			if err != nil {
 				return nil, err
 			}
 		}
 		return &call{cf, args}, nil
 	case Stmt:
-		if pe == nil || tx == nil {
+		if pctx == nil {
 			return nil, fmt.Errorf("engine: expression statements not allowed here: %s", e.Stmt)
 		}
 
-		plan, err := e.Stmt.Plan(ctx, pe, tx)
+		plan, err := e.Stmt.Plan(ctx, pctx)
 		if err != nil {
 			return nil, err
 		}
@@ -133,7 +133,7 @@ func compile(ctx context.Context, pe evaluate.PlanEngine, tx sql.Transaction, cc
 		if !ok {
 			return nil, fmt.Errorf("engine: expected rows: %s", e.Stmt)
 		}
-		rows, err := rowsPlan.Rows(ctx, pe, tx)
+		rows, err := rowsPlan.Rows(ctx, pctx.Engine(), pctx.Transaction())
 		if err != nil {
 			return nil, err
 		}
@@ -144,7 +144,7 @@ func compile(ctx context.Context, pe evaluate.PlanEngine, tx sql.Transaction, cc
 }
 
 type callFunc struct {
-	fn             func(etx sql.EvalContext, args []sql.Value) (sql.Value, error)
+	fn             func(ectx sql.EvalContext, args []sql.Value) (sql.Value, error)
 	minArgs        int16
 	maxArgs        int16
 	name           string
