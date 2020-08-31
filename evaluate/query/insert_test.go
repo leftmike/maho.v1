@@ -242,7 +242,7 @@ func testInsert(t *testing.T, e sql.Engine, ses *evaluate.Session, tn sql.TableN
 	ctx := context.Background()
 	for _, c := range cases {
 		tx := e.Begin(0)
-		err := e.CreateTable(ctx, tx, tn, cols, colTypes, nil, false)
+		err := tx.CreateTable(ctx, tn, cols, colTypes, nil, false)
 		if err != nil {
 			t.Error(err)
 			return
@@ -257,7 +257,7 @@ func testInsert(t *testing.T, e sql.Engine, ses *evaluate.Session, tn sql.TableN
 			t.Errorf("Parse(\"%s\").Execute() failed with %s", c.stmt, err.Error())
 		} else {
 			var tbl sql.Table
-			tbl, _, err = e.LookupTable(ctx, tx, tn)
+			tbl, _, err = tx.LookupTable(ctx, tn)
 			if err != nil {
 				t.Error(err)
 				continue
@@ -279,7 +279,7 @@ func testInsert(t *testing.T, e sql.Engine, ses *evaluate.Session, tn sql.TableN
 			}
 		}
 
-		err = e.DropTable(ctx, tx, tn, false)
+		err = tx.DropTable(ctx, tn, false)
 		if err != nil {
 			t.Error(err)
 			return

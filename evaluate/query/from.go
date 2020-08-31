@@ -35,7 +35,7 @@ func (fta *FromTableAlias) resolve(ses *evaluate.Session) {
 func (fta *FromTableAlias) plan(ctx context.Context, pctx evaluate.PlanContext) (rowsOp,
 	*fromContext, error) {
 
-	tt, err := pctx.Engine().LookupTableType(ctx, pctx.Transaction(), fta.TableName)
+	tt, err := pctx.Transaction().LookupTableType(ctx, fta.TableName)
 	if err != nil {
 		return nil, nil, err
 	}
@@ -62,7 +62,7 @@ func (sto scanTableOp) children() []rowsOp {
 func (sto scanTableOp) rows(ctx context.Context, e sql.Engine, tx sql.Transaction) (sql.Rows,
 	error) {
 
-	tbl, _, err := e.LookupTable(ctx, tx, sto.tn)
+	tbl, _, err := tx.LookupTable(ctx, sto.tn)
 	if err != nil {
 		return nil, err
 	}

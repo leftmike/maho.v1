@@ -261,7 +261,7 @@ func (stmt *CreateTable) Explain() string {
 func (stmt *CreateTable) Execute(ctx context.Context, e sql.Engine, tx sql.Transaction) (int64,
 	error) {
 
-	err := e.CreateTable(ctx, tx, stmt.Table, stmt.Columns, stmt.columnTypes, stmt.constraints,
+	err := tx.CreateTable(ctx, stmt.Table, stmt.Columns, stmt.columnTypes, stmt.constraints,
 		stmt.IfNotExists)
 	if err != nil {
 		return -1, err
@@ -319,7 +319,7 @@ func (stmt *CreateIndex) Explain() string {
 func (stmt *CreateIndex) Execute(ctx context.Context, e sql.Engine, tx sql.Transaction) (int64,
 	error) {
 
-	tt, err := e.LookupTableType(ctx, tx, stmt.Table)
+	tt, err := tx.LookupTableType(ctx, stmt.Table)
 	if err != nil {
 		return -1, err
 	}
@@ -329,7 +329,7 @@ func (stmt *CreateIndex) Execute(ctx context.Context, e sql.Engine, tx sql.Trans
 		return -1, fmt.Errorf("engine: %s in unique key for table %s", err, stmt.Table)
 	}
 
-	return -1, e.CreateIndex(ctx, tx, stmt.Index, stmt.Table, stmt.Key.Unique, colKeys,
+	return -1, tx.CreateIndex(ctx, stmt.Index, stmt.Table, stmt.Key.Unique, colKeys,
 		stmt.IfNotExists)
 }
 
@@ -392,5 +392,5 @@ func (stmt *CreateSchema) Explain() string {
 func (stmt *CreateSchema) Execute(ctx context.Context, e sql.Engine, tx sql.Transaction) (int64,
 	error) {
 
-	return -1, e.CreateSchema(ctx, tx, stmt.Schema)
+	return -1, tx.CreateSchema(ctx, stmt.Schema)
 }

@@ -47,7 +47,7 @@ func (stmt *DropTable) Execute(ctx context.Context, e sql.Engine, tx sql.Transac
 	error) {
 
 	for _, tn := range stmt.Tables {
-		err := e.DropTable(ctx, tx, tn, stmt.IfExists)
+		err := tx.DropTable(ctx, tn, stmt.IfExists)
 		if err != nil {
 			return -1, err
 		}
@@ -87,7 +87,7 @@ func (stmt *DropIndex) Explain() string {
 func (stmt *DropIndex) Execute(ctx context.Context, e sql.Engine, tx sql.Transaction) (int64,
 	error) {
 
-	return -1, e.DropIndex(ctx, tx, stmt.Index, stmt.Table, stmt.IfExists)
+	return -1, tx.DropIndex(ctx, stmt.Index, stmt.Table, stmt.IfExists)
 }
 
 type DropDatabase struct {
@@ -159,5 +159,5 @@ func (stmt *DropSchema) Explain() string {
 func (stmt *DropSchema) Execute(ctx context.Context, e sql.Engine, tx sql.Transaction) (int64,
 	error) {
 
-	return -1, e.DropSchema(ctx, tx, stmt.Schema, stmt.IfExists)
+	return -1, tx.DropSchema(ctx, stmt.Schema, stmt.IfExists)
 }

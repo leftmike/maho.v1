@@ -56,7 +56,7 @@ func (stmt *Update) Resolve(ses *evaluate.Session) {
 }
 
 func (stmt *Update) Plan(ctx context.Context, pctx evaluate.PlanContext) (evaluate.Plan, error) {
-	tt, err := pctx.Engine().LookupTableType(ctx, pctx.Transaction(), stmt.Table)
+	tt, err := pctx.Transaction().LookupTableType(ctx, stmt.Table)
 	if err != nil {
 		return nil, err
 	}
@@ -99,7 +99,7 @@ func (up *updatePlan) Explain() string {
 func (up *updatePlan) Execute(ctx context.Context, e sql.Engine, tx sql.Transaction) (int64,
 	error) {
 
-	tbl, _, err := e.LookupTable(ctx, tx, up.tn)
+	tbl, _, err := tx.LookupTable(ctx, up.tn)
 	if err != nil {
 		return -1, err
 	}

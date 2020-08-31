@@ -41,7 +41,7 @@ func (stmt *Copy) Resolve(ses *evaluate.Session) {
 }
 
 func (stmt *Copy) Plan(ctx context.Context, pctx evaluate.PlanContext) (evaluate.Plan, error) {
-	tt, err := pctx.Engine().LookupTableType(ctx, pctx.Transaction(), stmt.Table)
+	tt, err := pctx.Transaction().LookupTableType(ctx, stmt.Table)
 	if err != nil {
 		return nil, err
 	}
@@ -104,7 +104,7 @@ func (plan *copyPlan) Explain() string {
 func (plan *copyPlan) Execute(ctx context.Context, e sql.Engine, tx sql.Transaction) (int64,
 	error) {
 
-	tbl, _, err := e.LookupTable(ctx, tx, plan.tn)
+	tbl, _, err := tx.LookupTable(ctx, plan.tn)
 	if err != nil {
 		return -1, err
 	}

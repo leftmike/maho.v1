@@ -55,6 +55,8 @@ To Do:
 
 - SELECT, INSERT, UPDATE, DELETE
 -- check that Expr are resolved before being compiled
+-- remove sql.Engine from StmtPlan.Execute
+-- add sql.Engine to CmdPlan.Command
 -- change PlanEngine to just have LookupTableType
 -- move sql.Engine to evaluate.Engine for StmtPlan.Execute and RowsPlan.Rows
 -- engine.LookupTable should take a type rather than returning one
@@ -272,7 +274,7 @@ func main() {
 	}
 
 	tx := e.Begin(0)
-	dbs, err := e.ListDatabases(context.Background(), tx)
+	dbs, err := tx.ListDatabases(context.Background())
 	tx.Rollback()
 
 	defaultDB := sql.ID(*database)

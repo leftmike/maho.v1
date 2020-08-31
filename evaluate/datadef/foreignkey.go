@@ -164,11 +164,11 @@ func (fk *ForeignKey) Explain() string {
 func (fk *ForeignKey) Execute(ctx context.Context, e sql.Engine, tx sql.Transaction) (int64,
 	error) {
 
-	fktt, err := e.LookupTableType(ctx, tx, fk.FKTable)
+	fktt, err := tx.LookupTableType(ctx, fk.FKTable)
 	if err != nil {
 		return -1, err
 	}
-	rtt, err := e.LookupTableType(ctx, tx, fk.RefTable)
+	rtt, err := tx.LookupTableType(ctx, fk.RefTable)
 	if err != nil {
 		return -1, err
 	}
@@ -178,5 +178,5 @@ func (fk *ForeignKey) Execute(ctx context.Context, e sql.Engine, tx sql.Transact
 		return -1, err
 	}
 
-	return -1, e.AddForeignKey(ctx, tx, fk.Name, fk.FKTable, fkCols, fk.RefTable, ridx)
+	return -1, tx.AddForeignKey(ctx, fk.Name, fk.FKTable, fkCols, fk.RefTable, ridx)
 }
