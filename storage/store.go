@@ -51,6 +51,7 @@ type tableRow struct {
 	Table          string
 	TID            int64
 	TypeMetadata   []byte
+	TypeVersion    int64
 	LayoutMetadata []byte
 }
 
@@ -90,9 +91,9 @@ func NewStore(name string, ps PersistentStore, init bool) (*Store, error) {
 
 		tables: engine.MakeTableType(
 			[]sql.Identifier{sql.ID("database"), sql.ID("schema"), sql.ID("table"), sql.ID("tid"),
-				sql.ID("typemetadata"), sql.ID("layoutmetadata")},
+				sql.ID("typemetadata"), sql.ID("typeversion"), sql.ID("layoutmetadata")},
 			[]sql.ColumnType{sql.IdColType, sql.IdColType, sql.IdColType, sql.Int64ColType,
-				{Type: sql.BytesType, Fixed: false, Size: sql.MaxColumnSize},
+				{Type: sql.BytesType, Fixed: false, Size: sql.MaxColumnSize}, sql.Int64ColType,
 				{Type: sql.BytesType, Fixed: false, Size: sql.MaxColumnSize}},
 			[]sql.ColumnKey{sql.MakeColumnKey(0, false), sql.MakeColumnKey(1, false),
 				sql.MakeColumnKey(2, false)}),
@@ -124,7 +125,7 @@ func (st *Store) init(ctx context.Context, tx engine.Transaction) error {
 	err = ttbl.Insert(ctx,
 		sequenceRow{
 			Sequence: tidSequence,
-			Current:  int64(maxReservedTID),
+			Current:  maxReservedTID,
 		})
 	if err != nil {
 		return err
@@ -474,6 +475,10 @@ func (st *Store) LookupTable(ctx context.Context, tx engine.Transaction,
 	if err != nil {
 		return nil, nil, err
 	}
+	if tt.Version() != tr.TypeVersion {
+		return nil, nil, fmt.Errorf("%s: table %s metadata corrupted", st.name, tn)
+	}
+
 	tl, err := st.decodeTableLayout(tn, tt, tr.LayoutMetadata)
 	if err != nil {
 		return nil, nil, err
@@ -519,6 +524,7 @@ func (st *Store) createTable(ctx context.Context, tx engine.Transaction, tn sql.
 			Table:          tn.Table.String(),
 			TID:            tid,
 			TypeMetadata:   typmd,
+			TypeVersion:    tt.Version(),
 			LayoutMetadata: lyomd,
 		})
 	if err != nil {
@@ -606,6 +612,10 @@ func (st *Store) updateLayout(ctx context.Context, tx engine.Transaction, tn sql
 	if err != nil {
 		return err
 	}
+	if ptt.Version() != tr.TypeVersion {
+		return fmt.Errorf("%s: table %s metadata corrupted", st.name, tn)
+	}
+
 	tl, err := st.decodeTableLayout(tn, ptt, tr.LayoutMetadata)
 	if err != nil {
 		return err
@@ -635,8 +645,9 @@ func (st *Store) updateLayout(ctx context.Context, tx engine.Transaction, tn sql
 	return rows.Update(ctx,
 		struct {
 			TypeMetadata   []byte
+			TypeVersion    int64
 			LayoutMetadata []byte
-		}{typmd, lyomd})
+		}{typmd, tt.Version(), lyomd})
 }
 
 func addColumn(cols []int, num int) []int {

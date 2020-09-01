@@ -31,7 +31,7 @@ type foreignKey struct {
 }
 
 type TableType struct {
-	ver         uint32
+	ver         int64
 	cols        []sql.Identifier
 	colTypes    []sql.ColumnType
 	primary     []sql.ColumnKey
@@ -68,7 +68,7 @@ func (tt *TableType) Indexes() []sql.IndexType {
 	return tt.indexes
 }
 
-func (tt *TableType) Version() uint32 {
+func (tt *TableType) Version() int64 {
 	return tt.ver
 }
 
