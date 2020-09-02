@@ -409,7 +409,7 @@ func (st *Store) updateSchema(ctx context.Context, tx engine.Transaction,
 		}{sr.Tables + delta})
 }
 
-func (st *Store) lookupTable(ctx context.Context, tx engine.Transaction,
+func (st *Store) lookupTableRows(ctx context.Context, tx engine.Transaction,
 	tn sql.TableName) (*util.TypedRows, error) {
 
 	tbl, err := st.ps.Table(ctx, tx, tablesTableName, tablesTID, st.tables,
@@ -434,7 +434,7 @@ func (st *Store) lookupTable(ctx context.Context, tx engine.Transaction,
 func (st *Store) validTable(ctx context.Context, tx engine.Transaction, tn sql.TableName) (bool,
 	error) {
 
-	rows, err := st.lookupTable(ctx, tx, tn)
+	rows, err := st.lookupTableRows(ctx, tx, tn)
 	if err != nil {
 		return false, err
 	}
@@ -452,10 +452,10 @@ func (st *Store) validTable(ctx context.Context, tx engine.Transaction, tn sql.T
 	return true, nil
 }
 
-func (st *Store) LookupTable(ctx context.Context, tx engine.Transaction,
-	tn sql.TableName) (engine.Table, *engine.TableType, error) {
+func (st *Store) lookupTable(ctx context.Context, tx engine.Transaction,
+	tn sql.TableName, wantTbl bool) (engine.Table, *engine.TableType, error) {
 
-	rows, err := st.lookupTable(ctx, tx, tn)
+	rows, err := st.lookupTableRows(ctx, tx, tn)
 	if err != nil {
 		return nil, nil, err
 	}
@@ -478,6 +478,9 @@ func (st *Store) LookupTable(ctx context.Context, tx engine.Transaction,
 	if tt.Version() != tr.TypeVersion {
 		return nil, nil, fmt.Errorf("%s: table %s metadata corrupted", st.name, tn)
 	}
+	if !wantTbl {
+		return nil, tt, nil
+	}
 
 	tl, err := st.decodeTableLayout(tn, tt, tr.LayoutMetadata)
 	if err != nil {
@@ -488,7 +491,20 @@ func (st *Store) LookupTable(ctx context.Context, tx engine.Transaction,
 	if err != nil {
 		return nil, nil, err
 	}
-	return tbl, tt, err
+	return tbl, tt, nil
+}
+
+func (st *Store) LookupTableType(ctx context.Context, tx engine.Transaction,
+	tn sql.TableName) (*engine.TableType, error) {
+
+	_, tt, err := st.lookupTable(ctx, tx, tn, false)
+	return tt, err
+}
+
+func (st *Store) LookupTable(ctx context.Context, tx engine.Transaction,
+	tn sql.TableName) (engine.Table, *engine.TableType, error) {
+
+	return st.lookupTable(ctx, tx, tn, true)
 }
 
 func (st *Store) createTable(ctx context.Context, tx engine.Transaction, tn sql.TableName,
@@ -564,7 +580,7 @@ func (st *Store) DropTable(ctx context.Context, tx engine.Transaction, tn sql.Ta
 		return err
 	}
 
-	rows, err := st.lookupTable(ctx, tx, tn)
+	rows, err := st.lookupTableRows(ctx, tx, tn)
 	if err != nil {
 		return err
 	}
@@ -593,7 +609,7 @@ func (st *Store) UpdateType(ctx context.Context, tx engine.Transaction, tn sql.T
 func (st *Store) updateLayout(ctx context.Context, tx engine.Transaction, tn sql.TableName,
 	tt *engine.TableType, update func(tl *TableLayout) error) error {
 
-	rows, err := st.lookupTable(ctx, tx, tn)
+	rows, err := st.lookupTableRows(ctx, tx, tn)
 	if err != nil {
 		return err
 	}

@@ -85,7 +85,7 @@ func (tx *transaction) LookupTableType(ctx context.Context, tn sql.TableName) (s
 		return tt, err
 	}
 
-	_, tt, err = tx.e.st.LookupTable(ctx, tx.tx, tn)
+	tt, err = tx.e.st.LookupTableType(ctx, tx.tx, tn)
 	if err != nil {
 		return nil, err
 	}
@@ -220,7 +220,7 @@ func (tx *transaction) AddForeignKey(ctx context.Context, con sql.Identifier, fk
 		return fmt.Errorf("engine: schema %s may not be modified", fktn.Schema)
 	}
 
-	_, fktt, err := tx.e.st.LookupTable(ctx, tx.tx, fktn)
+	fktt, err := tx.e.st.LookupTableType(ctx, tx.tx, fktn)
 	if err != nil {
 		return err
 	}
@@ -246,7 +246,7 @@ func (tx *transaction) AddForeignKey(ctx context.Context, con sql.Identifier, fk
 	}
 
 	/*
-		_, rtt, err := tx.e.st.LookupTable(ctx, tx.tx, rtn)
+		rtt, err := tx.e.st.LookupTableType(ctx, tx.tx, rtn)
 		if err != nil {
 			return err
 		}
@@ -266,7 +266,7 @@ func (tx *transaction) CreateIndex(ctx context.Context, idxname sql.Identifier, 
 		return fmt.Errorf("engine: schema %s may not be modified", tn.Schema)
 	}
 
-	_, tt, err := tx.e.st.LookupTable(ctx, tx.tx, tn)
+	tt, err := tx.e.st.LookupTableType(ctx, tx.tx, tn)
 	if err != nil {
 		return err
 	}
@@ -296,7 +296,7 @@ func (tx *transaction) DropIndex(ctx context.Context, idxname sql.Identifier, tn
 		return fmt.Errorf("engine: schema %s may not be modified", tn.Schema)
 	}
 
-	_, tt, err := tx.e.st.LookupTable(ctx, tx.tx, tn)
+	tt, err := tx.e.st.LookupTableType(ctx, tx.tx, tn)
 	if err != nil {
 		return err
 	}

@@ -54,10 +54,7 @@ To Do:
 - EXPLAIN
 
 - SELECT, INSERT, UPDATE, DELETE
--- tx.LookupTable should take a type rather than returning one
 -- fix Explain XXX
--- make plans reusable
--- add store.LookupTableType
 -- maybe get rid of Rows.Columns()
 -- prepared statements
 

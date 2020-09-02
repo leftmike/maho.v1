@@ -32,6 +32,7 @@ type store interface {
 	CreateSchema(ctx context.Context, tx Transaction, sn sql.SchemaName) error
 	DropSchema(ctx context.Context, tx Transaction, sn sql.SchemaName, ifExists bool) error
 
+	LookupTableType(ctx context.Context, tx Transaction, tn sql.TableName) (*TableType, error)
 	LookupTable(ctx context.Context, tx Transaction, tn sql.TableName) (Table, *TableType,
 		error)
 	CreateTable(ctx context.Context, tx Transaction, tn sql.TableName, tt *TableType,
