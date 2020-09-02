@@ -52,6 +52,10 @@ func MakeTableType(cols []sql.Identifier, colTypes []sql.ColumnType,
 	}
 }
 
+func (tt *TableType) Version() int64 {
+	return tt.ver
+}
+
 func (tt *TableType) Columns() []sql.Identifier {
 	return tt.cols
 }
@@ -66,10 +70,6 @@ func (tt *TableType) PrimaryKey() []sql.ColumnKey {
 
 func (tt *TableType) Indexes() []sql.IndexType {
 	return tt.indexes
-}
-
-func (tt *TableType) Version() int64 {
-	return tt.ver
 }
 
 func encodeColumnKey(key []sql.ColumnKey) []*ColumnKey {

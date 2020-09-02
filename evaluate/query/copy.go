@@ -79,6 +79,7 @@ func (stmt *Copy) Plan(ctx context.Context, tx sql.Transaction) (evaluate.Plan, 
 
 	return &copyPlan{
 		tn:         stmt.Table,
+		ttVer:      tt.Version(),
 		cols:       cols,
 		from:       copy.NewReader("stdin", stmt.From, stmt.FromLine),
 		fromToRow:  fromToRow,
@@ -89,6 +90,7 @@ func (stmt *Copy) Plan(ctx context.Context, tx sql.Transaction) (evaluate.Plan, 
 
 type copyPlan struct {
 	tn         sql.TableName
+	ttVer      int64
 	cols       []sql.Identifier
 	from       *copy.Reader
 	fromToRow  []int
@@ -102,7 +104,7 @@ func (plan *copyPlan) Explain() string {
 }
 
 func (plan *copyPlan) Execute(ctx context.Context, tx sql.Transaction) (int64, error) {
-	tbl, _, err := tx.LookupTable(ctx, plan.tn)
+	tbl, err := tx.LookupTable(ctx, plan.tn, plan.ttVer)
 	if err != nil {
 		return -1, err
 	}

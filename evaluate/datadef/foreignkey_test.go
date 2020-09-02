@@ -20,6 +20,10 @@ type tableType struct {
 	indexes     []sql.IndexType
 }
 
+func (tt tableType) Version() int64 {
+	return 0
+}
+
 func (tt tableType) Columns() []sql.Identifier {
 	return tt.columns
 }

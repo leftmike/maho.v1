@@ -24,15 +24,13 @@ type rows struct {
 	curRow []sql.Value
 }
 
-func makeTable(tx *transaction, tn sql.TableName, stbl Table, tt *TableType) (*table,
-	sql.TableType, error) {
-
+func makeTable(tx *transaction, tn sql.TableName, stbl Table, tt *TableType) *table {
 	return &table{
 		tx:   tx,
 		tn:   tn,
 		stbl: stbl,
 		tt:   tt,
-	}, tt, nil
+	}
 }
 
 func (tbl *table) Columns(ctx context.Context) []sql.Identifier {

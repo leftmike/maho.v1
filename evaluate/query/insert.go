@@ -119,13 +119,14 @@ func (stmt *InsertValues) Plan(ctx context.Context, tx sql.Transaction) (evaluat
 		rows = append(rows, row)
 	}
 
-	return &insertValuesPlan{stmt.Table, cols, rows}, nil
+	return &insertValuesPlan{stmt.Table, tt.Version(), cols, rows}, nil
 }
 
 type insertValuesPlan struct {
-	tn   sql.TableName
-	cols []sql.Identifier
-	rows [][]sql.CExpr
+	tn    sql.TableName
+	ttVer int64
+	cols  []sql.Identifier
+	rows  [][]sql.CExpr
 }
 
 func (plan *insertValuesPlan) Explain() string {
@@ -134,7 +135,7 @@ func (plan *insertValuesPlan) Explain() string {
 }
 
 func (plan *insertValuesPlan) Execute(ctx context.Context, tx sql.Transaction) (int64, error) {
-	tbl, _, err := tx.LookupTable(ctx, plan.tn)
+	tbl, err := tx.LookupTable(ctx, plan.tn, plan.ttVer)
 	if err != nil {
 		return -1, err
 	}

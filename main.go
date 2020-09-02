@@ -57,7 +57,7 @@ To Do:
 -- tx.LookupTable should take a type rather than returning one
 -- fix Explain XXX
 -- make plans reusable
--- keep track of tables and type versions used
+-- add store.LookupTableType
 -- maybe get rid of Rows.Columns()
 -- prepared statements
 

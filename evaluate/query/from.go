@@ -44,11 +44,12 @@ func (fta *FromTableAlias) plan(ctx context.Context, tx sql.Transaction) (rowsOp
 	if fta.Alias != 0 {
 		nam = fta.Alias
 	}
-	return scanTableOp{fta.TableName}, makeFromContext(nam, tt.Columns()), nil
+	return scanTableOp{fta.TableName, tt.Version()}, makeFromContext(nam, tt.Columns()), nil
 }
 
 type scanTableOp struct {
-	tn sql.TableName
+	tn    sql.TableName
+	ttVer int64
 }
 
 func (sto scanTableOp) explain() string {
@@ -60,7 +61,7 @@ func (sto scanTableOp) children() []rowsOp {
 }
 
 func (sto scanTableOp) rows(ctx context.Context, tx sql.Transaction) (sql.Rows, error) {
-	tbl, _, err := tx.LookupTable(ctx, sto.tn)
+	tbl, err := tx.LookupTable(ctx, sto.tn, sto.ttVer)
 	if err != nil {
 		return nil, err
 	}

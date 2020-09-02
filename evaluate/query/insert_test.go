@@ -254,12 +254,20 @@ func testInsert(t *testing.T, e sql.Engine, ses *evaluate.Session, tn sql.TableN
 		} else if err != nil {
 			t.Errorf("Parse(\"%s\").Execute() failed with %s", c.stmt, err.Error())
 		} else {
-			var tbl sql.Table
-			tbl, _, err = tx.LookupTable(ctx, tn)
+			var tt sql.TableType
+			tt, err = tx.LookupTableType(ctx, tn)
 			if err != nil {
 				t.Error(err)
 				continue
 			}
+
+			var tbl sql.Table
+			tbl, err = tx.LookupTable(ctx, tn, tt.Version())
+			if err != nil {
+				t.Error(err)
+				continue
+			}
+
 			var rows sql.Rows
 			rows, err = tbl.Rows(ctx, nil, nil)
 			if err != nil {

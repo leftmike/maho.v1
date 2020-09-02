@@ -42,6 +42,7 @@ type columnUpdate struct {
 
 type updatePlan struct {
 	tn      sql.TableName
+	ttVer   int64
 	where   sql.CExpr
 	dest    []sql.Value
 	updates []columnUpdate
@@ -72,6 +73,7 @@ func (stmt *Update) Plan(ctx context.Context, tx sql.Transaction) (evaluate.Plan
 
 	plan := updatePlan{
 		tn:      stmt.Table,
+		ttVer:   tt.Version(),
 		where:   where,
 		dest:    make([]sql.Value, len(tt.Columns())),
 		updates: make([]columnUpdate, 0, len(stmt.ColumnUpdates)),
@@ -97,7 +99,7 @@ func (up *updatePlan) Explain() string {
 }
 
 func (up *updatePlan) Execute(ctx context.Context, tx sql.Transaction) (int64, error) {
-	tbl, _, err := tx.LookupTable(ctx, up.tn)
+	tbl, err := tx.LookupTable(ctx, up.tn, up.ttVer)
 	if err != nil {
 		return -1, err
 	}

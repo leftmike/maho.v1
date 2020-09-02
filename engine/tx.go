@@ -92,19 +92,25 @@ func (tx *transaction) LookupTableType(ctx context.Context, tn sql.TableName) (s
 	return tt, err
 }
 
-func (tx *transaction) LookupTable(ctx context.Context, tn sql.TableName) (sql.Table,
-	sql.TableType, error) {
+func (tx *transaction) LookupTable(ctx context.Context, tn sql.TableName, ttVer int64) (sql.Table,
+	error) {
 
-	tbl, tt, err, ok := tx.e.lookupVirtualTable(ctx, tx, tn)
+	vtbl, vtt, err, ok := tx.e.lookupVirtualTable(ctx, tx, tn)
 	if ok {
-		return tbl, tt, err
+		if vtt.Version() != ttVer {
+			return nil, fmt.Errorf("engine: table %s: type version mismatch", tn)
+		}
+		return vtbl, err
 	}
 
-	stbl, ett, err := tx.e.st.LookupTable(ctx, tx.tx, tn)
+	stbl, stt, err := tx.e.st.LookupTable(ctx, tx.tx, tn)
 	if err != nil {
-		return nil, nil, err
+		return nil, err
 	}
-	return makeTable(tx, tn, stbl, ett)
+	if stt.Version() != ttVer {
+		return nil, fmt.Errorf("engine: table %s: type version mismatch", tn)
+	}
+	return makeTable(tx, tn, stbl, stt), nil
 }
 
 func (tx *transaction) CreateTable(ctx context.Context, tn sql.TableName, cols []sql.Identifier,

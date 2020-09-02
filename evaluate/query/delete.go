@@ -25,6 +25,7 @@ func (stmt *Delete) String() string {
 
 type deletePlan struct {
 	tn    sql.TableName
+	ttVer int64
 	where sql.CExpr
 }
 
@@ -46,7 +47,7 @@ func (stmt *Delete) Plan(ctx context.Context, tx sql.Transaction) (evaluate.Plan
 			return nil, err
 		}
 	}
-	return &deletePlan{stmt.Table, where}, nil
+	return &deletePlan{stmt.Table, tt.Version(), where}, nil
 }
 
 func (dp *deletePlan) Explain() string {
@@ -55,7 +56,7 @@ func (dp *deletePlan) Explain() string {
 }
 
 func (dp *deletePlan) Execute(ctx context.Context, tx sql.Transaction) (int64, error) {
-	tbl, _, err := tx.LookupTable(ctx, dp.tn)
+	tbl, err := tx.LookupTable(ctx, dp.tn, dp.ttVer)
 	if err != nil {
 		return -1, err
 	}
