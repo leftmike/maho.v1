@@ -18,8 +18,15 @@ type groupByOp struct {
 }
 
 func (gbo groupByOp) explain() string {
-	// XXX: groupByOp.explain
-	return "group by"
+	s := "group by ("
+	for gdx, ge := range gbo.groupExprs {
+		if gdx > 0 {
+			s += ", "
+		}
+		s += fmt.Sprintf("%s = %s", gbo.columns[ge.destColIndex], ge.expr)
+	}
+	s += ")"
+	return s
 }
 
 func (gbo groupByOp) children() []rowsOp {

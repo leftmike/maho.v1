@@ -99,8 +99,15 @@ type copyPlan struct {
 }
 
 func (plan *copyPlan) Explain() string {
-	// XXX: copyPlan.Explain
-	return ""
+	s := fmt.Sprintf("copy to %s (", plan.tn)
+	for fdx, cdx := range plan.fromToRow {
+		if fdx > 0 {
+			s += ", "
+		}
+		s += plan.cols[cdx].String()
+	}
+	s += ") from stdin"
+	return s
 }
 
 func (plan *copyPlan) Execute(ctx context.Context, tx sql.Transaction) (int64, error) {

@@ -51,8 +51,7 @@ func (stmt *Delete) Plan(ctx context.Context, tx sql.Transaction) (evaluate.Plan
 }
 
 func (dp *deletePlan) Explain() string {
-	// XXX: deletePlan.Explain
-	return ""
+	return fmt.Sprintf("delete from %s where %s", dp.tn, dp.where)
 }
 
 func (dp *deletePlan) Execute(ctx context.Context, tx sql.Transaction) (int64, error) {

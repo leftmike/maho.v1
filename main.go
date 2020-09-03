@@ -54,8 +54,6 @@ To Do:
 - EXPLAIN
 
 - SELECT, INSERT, UPDATE, DELETE
--- fix Explain XXX
--- maybe get rid of Rows.Columns()
 -- prepared statements
 
 - foreign keys

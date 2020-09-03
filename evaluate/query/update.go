@@ -94,8 +94,7 @@ func (stmt *Update) Plan(ctx context.Context, tx sql.Transaction) (evaluate.Plan
 }
 
 func (up *updatePlan) Explain() string {
-	// XXX: updatePlan.Explain
-	return ""
+	return fmt.Sprintf("update %s where %s", up.tn, up.where)
 }
 
 func (up *updatePlan) Execute(ctx context.Context, tx sql.Transaction) (int64, error) {

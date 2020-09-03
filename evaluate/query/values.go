@@ -108,8 +108,15 @@ func (stmt *Values) Plan(ctx context.Context, tx sql.Transaction) (evaluate.Plan
 }
 
 func (ev *exprValues) Explain() string {
-	// XXX: exprValues.Explain
-	return ""
+	s := "values ("
+	for cdx, col := range ev.columns {
+		if cdx > 0 {
+			s += ", "
+		}
+		s += col.String()
+	}
+	s += ")"
+	return s
 }
 
 func (ev *exprValues) Rows(ctx context.Context, tx sql.Transaction) (sql.Rows, error) {

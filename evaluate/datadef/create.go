@@ -109,7 +109,6 @@ type CreateTable struct {
 	Constraints []Constraint
 	constraints []sql.Constraint
 	ForeignKeys []*ForeignKey
-	foreignKeys []evaluate.StmtPlan
 }
 
 func (stmt *CreateTable) String() string {
@@ -174,17 +173,16 @@ func (stmt *CreateTable) Resolve(ses *evaluate.Session) {
 
 	for _, fk := range stmt.ForeignKeys {
 		fk.FKTable = stmt.Table
-		fk.Resolve(ses)
+		fk.resolve(ses)
 	}
 }
 
 func (stmt *CreateTable) Plan(ctx context.Context, tx sql.Transaction) (evaluate.Plan, error) {
 	for _, fk := range stmt.ForeignKeys {
-		pfk, err := fk.Plan(ctx, tx)
+		err := fk.plan(ctx, tx)
 		if err != nil {
 			return nil, err
 		}
-		stmt.foreignKeys = append(stmt.foreignKeys, pfk)
 	}
 
 	for _, con := range stmt.Constraints {
@@ -263,13 +261,13 @@ func (stmt *CreateTable) Execute(ctx context.Context, tx sql.Transaction) (int64
 		return -1, err
 	}
 
-	for _, fk := range stmt.foreignKeys {
+	for _, fk := range stmt.ForeignKeys {
 		err = tx.NextStmt(ctx)
 		if err != nil {
 			return -1, err
 		}
 
-		_, err = fk.Execute(ctx, tx)
+		_, err = fk.execute(ctx, tx)
 		if err != nil {
 			return -1, err
 		}

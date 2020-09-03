@@ -38,18 +38,17 @@ func (fk ForeignKey) String() string {
 	return s
 }
 
-func (fk *ForeignKey) Resolve(ses *evaluate.Session) {
+func (fk *ForeignKey) resolve(ses *evaluate.Session) {
 	fk.RefTable = ses.ResolveTableName(fk.RefTable)
 }
 
-func (fk *ForeignKey) Plan(ctx context.Context, tx sql.Transaction) (evaluate.StmtPlan, error) {
+func (fk *ForeignKey) plan(ctx context.Context, tx sql.Transaction) error {
 	if fk.FKTable.Database != fk.RefTable.Database {
-		return nil, fmt.Errorf(
-			"engine: table %s: foreign key reference not within same database: %s",
+		return fmt.Errorf("engine: table %s: foreign key reference not within same database: %s",
 			fk.FKTable, fk.RefTable)
 	}
 
-	return fk, nil
+	return nil
 }
 
 func hasColumn(id sql.Identifier, cols []sql.Identifier) bool {
@@ -154,12 +153,7 @@ func (fk *ForeignKey) Prepare(fktt, rtt sql.TableType) ([]int, sql.Identifier, e
 	return fkCols, ridx, nil
 }
 
-func (fk *ForeignKey) Explain() string {
-	// XXX: ForeignKey.Explain
-	return ""
-}
-
-func (fk *ForeignKey) Execute(ctx context.Context, tx sql.Transaction) (int64, error) {
+func (fk *ForeignKey) execute(ctx context.Context, tx sql.Transaction) (int64, error) {
 	fktt, err := tx.LookupTableType(ctx, fk.FKTable)
 	if err != nil {
 		return -1, err

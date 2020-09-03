@@ -130,8 +130,7 @@ type insertValuesPlan struct {
 }
 
 func (plan *insertValuesPlan) Explain() string {
-	// XXX: insertValuePlan.Explain
-	return ""
+	return fmt.Sprintf("insert into %s", plan.tn)
 }
 
 func (plan *insertValuesPlan) Execute(ctx context.Context, tx sql.Transaction) (int64, error) {
