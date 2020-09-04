@@ -11,6 +11,7 @@ import (
 type Set struct {
 	Variable sql.Identifier
 	Value    string
+	ses      *evaluate.Session
 }
 
 func (stmt *Set) String() string {
@@ -20,11 +21,12 @@ func (stmt *Set) String() string {
 func (stmt *Set) Plan(ctx context.Context, ses *evaluate.Session,
 	tx sql.Transaction) (evaluate.Plan, error) {
 
+	stmt.ses = ses
 	return stmt, nil
 }
 
 func (_ *Set) Planned() {}
 
-func (stmt *Set) Command(ctx context.Context, ses *evaluate.Session, e sql.Engine) error {
-	return ses.Set(stmt.Variable, stmt.Value)
+func (stmt *Set) Execute(ctx context.Context, tx sql.Transaction) (int64, error) {
+	return -1, stmt.ses.Set(stmt.Variable, stmt.Value)
 }

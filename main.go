@@ -54,12 +54,17 @@ To Do:
 - EXPLAIN
 -- limit to same statements that PostgreSQL does
 -- return rows with one row per step
-
-- SET: use Execute rather than Command
+-- look at how CockroachDB does it
+-- include full column names
+-- select: track where columns come from, maybe as part of Plan
 
 - SELECT, INSERT, UPDATE, DELETE
--- select: track where columns come from, maybe as part of Resolve
 -- prepared statements
+
+- SELECT
+-- push filters down to scans
+-- use primary index if possible
+-- use indexes when available
 
 - foreign keys
 -- make create SQL (as structs) to check and update foreign key relations
