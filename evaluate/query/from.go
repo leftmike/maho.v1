@@ -11,8 +11,8 @@ import (
 
 type FromItem interface {
 	fmt.Stringer
-	resolve(ses *evaluate.Session)
-	plan(ctx context.Context, tx sql.Transaction) (rowsOp, *fromContext, error)
+	plan(ctx context.Context, ses *evaluate.Session, tx sql.Transaction) (rowsOp, *fromContext,
+		error)
 }
 
 type FromTableAlias struct {
@@ -20,7 +20,7 @@ type FromTableAlias struct {
 	Alias sql.Identifier
 }
 
-func (fta *FromTableAlias) String() string {
+func (fta FromTableAlias) String() string {
 	s := fta.TableName.String()
 	if fta.Alias != 0 {
 		s += fmt.Sprintf(" AS %s", fta.Alias)
@@ -28,36 +28,25 @@ func (fta *FromTableAlias) String() string {
 	return s
 }
 
-func (fta *FromTableAlias) resolve(ses *evaluate.Session) {
-	fta.TableName = ses.ResolveTableName(fta.TableName)
-}
+func (fta FromTableAlias) plan(ctx context.Context, ses *evaluate.Session,
+	tx sql.Transaction) (rowsOp, *fromContext, error) {
 
-func (fta *FromTableAlias) plan(ctx context.Context, tx sql.Transaction) (rowsOp, *fromContext,
-	error) {
-
-	tt, err := tx.LookupTableType(ctx, fta.TableName)
+	tn := ses.ResolveTableName(fta.TableName)
+	tt, err := tx.LookupTableType(ctx, tn)
 	if err != nil {
 		return nil, nil, err
 	}
 
-	nam := fta.Table
+	nam := tn.Table
 	if fta.Alias != 0 {
 		nam = fta.Alias
 	}
-	return scanTableOp{fta.TableName, tt.Version()}, makeFromContext(nam, tt.Columns()), nil
+	return scanTableOp{tn, tt.Version()}, makeFromContext(nam, tt.Columns()), nil
 }
 
 type scanTableOp struct {
 	tn    sql.TableName
 	ttVer int64
-}
-
-func (sto scanTableOp) explain() string {
-	return fmt.Sprintf("table scan %s", sto.tn)
-}
-
-func (sto scanTableOp) children() []rowsOp {
-	return nil
 }
 
 func (sto scanTableOp) rows(ctx context.Context, tx sql.Transaction) (sql.Rows, error) {
@@ -89,12 +78,10 @@ func (fs FromStmt) String() string {
 	return s
 }
 
-func (fs FromStmt) resolve(ses *evaluate.Session) {
-	fs.Stmt.Resolve(ses)
-}
+func (fs FromStmt) plan(ctx context.Context, ses *evaluate.Session, tx sql.Transaction) (rowsOp,
+	*fromContext, error) {
 
-func (fs FromStmt) plan(ctx context.Context, tx sql.Transaction) (rowsOp, *fromContext, error) {
-	plan, err := fs.Stmt.Plan(ctx, tx)
+	plan, err := fs.Stmt.Plan(ctx, ses, tx)
 	if err != nil {
 		return nil, nil, err
 	}
@@ -117,14 +104,6 @@ func (fs FromStmt) plan(ctx context.Context, tx sql.Transaction) (rowsOp, *fromC
 
 type fromPlanOp struct {
 	rp evaluate.RowsPlan
-}
-
-func (fpo fromPlanOp) explain() string {
-	return fpo.rp.Explain()
-}
-
-func (_ fromPlanOp) children() []rowsOp {
-	return nil
 }
 
 func (fpo fromPlanOp) rows(ctx context.Context, tx sql.Transaction) (sql.Rows, error) {

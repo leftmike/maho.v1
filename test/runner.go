@@ -34,8 +34,7 @@ func (run *Runner) RunExec(tst *sqltestdb.Test) (int64, error) {
 			func(ctx context.Context, ses *evaluate.Session, e sql.Engine,
 				tx sql.Transaction) error {
 
-				stmt.Resolve(ses)
-				plan, err := stmt.Plan(ctx, tx)
+				plan, err := stmt.Plan(ctx, ses, tx)
 				if err != nil {
 					return err
 				}
@@ -50,7 +49,8 @@ func (run *Runner) RunExec(tst *sqltestdb.Test) (int64, error) {
 						return err
 					}
 				} else {
-					panic("expected Executor or Commander")
+					return fmt.Errorf("%s:%d: expected a stmt or cmd", tst.Filename,
+						tst.LineNumber)
 				}
 
 				return nil
@@ -78,8 +78,7 @@ func (run *Runner) RunQuery(tst *sqltestdb.Test) ([]string, [][]string, error) {
 		func(ctx context.Context, ses *evaluate.Session, e sql.Engine,
 			tx sql.Transaction) error {
 
-			stmt.Resolve(ses)
-			plan, err := stmt.Plan(ctx, tx)
+			plan, err := stmt.Plan(ctx, ses, tx)
 			if err != nil {
 				return err
 			}

@@ -29,30 +29,27 @@ type deletePlan struct {
 	where sql.CExpr
 }
 
-func (stmt *Delete) Resolve(ses *evaluate.Session) {
-	stmt.Table = ses.ResolveTableName(stmt.Table)
-}
+func (stmt *Delete) Plan(ctx context.Context, ses *evaluate.Session,
+	tx sql.Transaction) (evaluate.Plan, error) {
 
-func (stmt *Delete) Plan(ctx context.Context, tx sql.Transaction) (evaluate.Plan, error) {
-	tt, err := tx.LookupTableType(ctx, stmt.Table)
+	tn := ses.ResolveTableName(stmt.Table)
+	tt, err := tx.LookupTableType(ctx, tn)
 	if err != nil {
 		return nil, err
 	}
 
 	var where sql.CExpr
 	if stmt.Where != nil {
-		where, err = expr.Compile(ctx, tx, makeFromContext(stmt.Table.Table, tt.Columns()),
+		where, err = expr.Compile(ctx, ses, tx, makeFromContext(tn.Table, tt.Columns()),
 			stmt.Where)
 		if err != nil {
 			return nil, err
 		}
 	}
-	return &deletePlan{stmt.Table, tt.Version(), where}, nil
+	return &deletePlan{tn, tt.Version(), where}, nil
 }
 
-func (dp *deletePlan) Explain() string {
-	return fmt.Sprintf("delete from %s where %s", dp.tn, dp.where)
-}
+func (_ *deletePlan) Planned() {}
 
 func (dp *deletePlan) Execute(ctx context.Context, tx sql.Transaction) (int64, error) {
 	tbl, err := tx.LookupTable(ctx, dp.tn, dp.ttVer)

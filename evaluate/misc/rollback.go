@@ -13,15 +13,13 @@ func (stmt *Rollback) String() string {
 	return "ROLLBACK"
 }
 
-func (_ *Rollback) Resolve(ses *evaluate.Session) {}
+func (stmt *Rollback) Plan(ctx context.Context, ses *evaluate.Session,
+	tx sql.Transaction) (evaluate.Plan, error) {
 
-func (stmt *Rollback) Plan(ctx context.Context, tx sql.Transaction) (evaluate.Plan, error) {
 	return stmt, nil
 }
 
-func (stmt *Rollback) Explain() string {
-	return stmt.String()
-}
+func (_ *Rollback) Planned() {}
 
 func (stmt *Rollback) Command(ctx context.Context, ses *evaluate.Session, e sql.Engine) error {
 	return ses.Rollback()

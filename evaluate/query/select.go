@@ -5,7 +5,6 @@ import (
 	"fmt"
 	"io"
 	"sort"
-	"strings"
 
 	"github.com/leftmike/maho/evaluate"
 	"github.com/leftmike/maho/evaluate/expr"
@@ -14,7 +13,6 @@ import (
 
 type SelectResult interface {
 	fmt.Stringer
-	resolve(ses *evaluate.Session)
 }
 
 type TableResult struct {
@@ -44,18 +42,12 @@ func (tr TableResult) String() string {
 	return fmt.Sprintf("%s.*", tr.Table)
 }
 
-func (_ TableResult) resolve(ses *evaluate.Session) {}
-
 func (er ExprResult) String() string {
 	s := er.Expr.String()
 	if er.Alias != 0 {
 		s += fmt.Sprintf(" AS %s", er.Alias)
 	}
 	return s
-}
-
-func (er ExprResult) resolve(ses *evaluate.Session) {
-	er.Expr.Resolve(ses)
 }
 
 func (er ExprResult) Column(idx int) sql.Identifier {
@@ -122,33 +114,9 @@ func (stmt *Select) String() string {
 	return s
 }
 
-func (stmt *Select) Resolve(ses *evaluate.Session) {
-	for _, sr := range stmt.Results {
-		sr.resolve(ses)
-	}
+func (stmt *Select) Plan(ctx context.Context, ses *evaluate.Session,
+	tx sql.Transaction) (evaluate.Plan, error) {
 
-	if stmt.From != nil {
-		stmt.From.resolve(ses)
-	}
-
-	if stmt.Where != nil {
-		stmt.Where.Resolve(ses)
-	}
-
-	for _, gb := range stmt.GroupBy {
-		gb.Resolve(ses)
-	}
-
-	if stmt.Having != nil {
-		stmt.Having.Resolve(ses)
-	}
-
-	for _, ob := range stmt.OrderBy {
-		ob.Expr.Resolve(ses)
-	}
-}
-
-func (stmt *Select) Plan(ctx context.Context, tx sql.Transaction) (evaluate.Plan, error) {
 	var rop rowsOp
 	var fctx *fromContext
 	var err error
@@ -157,19 +125,19 @@ func (stmt *Select) Plan(ctx context.Context, tx sql.Transaction) (evaluate.Plan
 		rop = oneEmptyOp{}
 		fctx = &fromContext{}
 	} else {
-		rop, fctx, err = stmt.From.plan(ctx, tx)
+		rop, fctx, err = stmt.From.plan(ctx, ses, tx)
 		if err != nil {
 			return nil, err
 		}
 	}
 
-	rop, err = where(ctx, tx, rop, fctx, stmt.Where)
+	rop, err = where(ctx, ses, tx, rop, fctx, stmt.Where)
 	if err != nil {
 		return nil, err
 	}
 
 	if stmt.GroupBy == nil && stmt.Having == nil {
-		rrop, err := results(ctx, tx, rop, fctx, stmt.Results)
+		rrop, err := results(ctx, ses, tx, rop, fctx, stmt.Results)
 		if err == nil {
 			if stmt.OrderBy == nil {
 				return rowsOpPlan{rop: rrop, cols: rrop.columns()}, nil
@@ -186,7 +154,7 @@ func (stmt *Select) Plan(ctx context.Context, tx sql.Transaction) (evaluate.Plan
 		// Aggregrate function used in SELECT results causes an implicit GROUP BY
 	}
 
-	return group(ctx, tx, rop, fctx, stmt.Results, stmt.GroupBy, stmt.Having, stmt.OrderBy)
+	return group(ctx, ses, tx, rop, fctx, stmt.Results, stmt.GroupBy, stmt.Having, stmt.OrderBy)
 }
 
 type rowsOpPlan struct {
@@ -194,17 +162,7 @@ type rowsOpPlan struct {
 	cols []sql.Identifier
 }
 
-func explain(rop rowsOp, depth int) string {
-	s := strings.Repeat("    ", depth) + rop.explain()
-	for _, crop := range rop.children() {
-		s += "\n" + explain(crop, depth+1)
-	}
-	return s
-}
-
-func (rp rowsOpPlan) Explain() string {
-	return explain(rp.rop, 0)
-}
+func (_ rowsOpPlan) Planned() {}
 
 func (rp rowsOpPlan) Columns() []sql.Identifier {
 	return rp.cols
@@ -217,23 +175,6 @@ func (rp rowsOpPlan) Rows(ctx context.Context, tx sql.Transaction) (sql.Rows, er
 type sortOp struct {
 	rop     rowsOp
 	orderBy []orderBy
-}
-
-func (so sortOp) explain() string {
-	s := "sort"
-	for _, ob := range so.orderBy {
-		s += fmt.Sprintf(" %d", ob.colIndex)
-		if ob.reverse {
-			s += " DESC"
-		} else {
-			s += " ASC"
-		}
-	}
-	return s
-}
-
-func (so sortOp) children() []rowsOp {
-	return []rowsOp{so.rop}
 }
 
 func (so sortOp) rows(ctx context.Context, tx sql.Transaction) (sql.Rows, error) {
@@ -445,13 +386,13 @@ func (fr *filterRows) Update(ctx context.Context, updates []sql.ColumnUpdate) er
 	return fr.rows.Update(ctx, updates)
 }
 
-func where(ctx context.Context, tx sql.Transaction, rop rowsOp, fctx *fromContext,
-	cond expr.Expr) (rowsOp, error) {
+func where(ctx context.Context, ses *evaluate.Session, tx sql.Transaction, rop rowsOp,
+	fctx *fromContext, cond expr.Expr) (rowsOp, error) {
 
 	if cond == nil {
 		return rop, nil
 	}
-	ce, err := expr.Compile(ctx, tx, fctx, cond)
+	ce, err := expr.Compile(ctx, ses, tx, fctx, cond)
 	if err != nil {
 		return nil, err
 	}
@@ -461,14 +402,6 @@ func where(ctx context.Context, tx sql.Transaction, rop rowsOp, fctx *fromContex
 type filterOp struct {
 	rop  rowsOp
 	cond sql.CExpr
-}
-
-func (fo filterOp) explain() string {
-	return fmt.Sprintf("filter %s", fo.cond)
-}
-
-func (fo filterOp) children() []rowsOp {
-	return []rowsOp{fo.rop}
 }
 
 func (fo filterOp) rows(ctx context.Context, tx sql.Transaction) (sql.Rows, error) {
@@ -481,14 +414,6 @@ func (fo filterOp) rows(ctx context.Context, tx sql.Transaction) (sql.Rows, erro
 }
 
 type oneEmptyOp struct{}
-
-func (_ oneEmptyOp) explain() string {
-	return "one empty row"
-}
-
-func (_ oneEmptyOp) children() []rowsOp {
-	return nil
-}
 
 func (_ oneEmptyOp) rows(ctx context.Context, tx sql.Transaction) (sql.Rows, error) {
 	return &oneEmptyRow{}, nil
@@ -526,18 +451,6 @@ func (_ *oneEmptyRow) Update(ctx context.Context, updates []sql.ColumnUpdate) er
 type allResultsOp struct {
 	rop  rowsOp
 	cols []sql.Identifier
-}
-
-func (aro *allResultsOp) explain() string {
-	s := "results"
-	for _, col := range aro.cols {
-		s += " " + col.String()
-	}
-	return s
-}
-
-func (aro *allResultsOp) children() []rowsOp {
-	return []rowsOp{aro.rop}
 }
 
 func (aro *allResultsOp) rows(ctx context.Context, tx sql.Transaction) (sql.Rows, error) {
@@ -583,21 +496,6 @@ type resultsOp struct {
 	cols      []sql.Identifier
 	destCols  []src2dest
 	destExprs []expr2dest
-}
-
-func (ro *resultsOp) explain() string {
-	s := "results"
-	for _, c2d := range ro.destCols {
-		s += fmt.Sprintf(" %d -> %s", c2d.srcColIndex, ro.cols[c2d.destColIndex])
-	}
-	for _, e2d := range ro.destExprs {
-		s += fmt.Sprintf(" %s -> %s", e2d.expr, ro.cols[e2d.destColIndex])
-	}
-	return s
-}
-
-func (ro *resultsOp) children() []rowsOp {
-	return []rowsOp{ro.rop}
 }
 
 func (ro *resultsOp) rows(ctx context.Context, tx sql.Transaction) (sql.Rows, error) {
@@ -679,8 +577,8 @@ func (_ *resultRows) Update(ctx context.Context, updates []sql.ColumnUpdate) err
 	return fmt.Errorf("result rows may not be updated")
 }
 
-func results(ctx context.Context, tx sql.Transaction, rop rowsOp, fctx *fromContext,
-	results []SelectResult) (resultRowsOp, error) {
+func results(ctx context.Context, ses *evaluate.Session, tx sql.Transaction, rop rowsOp,
+	fctx *fromContext, results []SelectResult) (resultRowsOp, error) {
 
 	if results == nil {
 		return &allResultsOp{rop: rop, cols: fctx.columns()}, nil
@@ -693,7 +591,7 @@ func results(ctx context.Context, tx sql.Transaction, rop rowsOp, fctx *fromCont
 		switch sr := sr.(type) {
 		case TableResult:
 			for _, col := range fctx.tableColumns(sr.Table) {
-				ce, err := expr.Compile(ctx, tx, fctx, expr.Ref{sr.Table, col})
+				ce, err := expr.Compile(ctx, ses, tx, fctx, expr.Ref{sr.Table, col})
 				if err != nil {
 					panic(err)
 				}
@@ -702,7 +600,7 @@ func results(ctx context.Context, tx sql.Transaction, rop rowsOp, fctx *fromCont
 				ddx += 1
 			}
 		case ExprResult:
-			ce, err := expr.Compile(ctx, tx, fctx, sr.Expr)
+			ce, err := expr.Compile(ctx, ses, tx, fctx, sr.Expr)
 			if err != nil {
 				return nil, err
 			}

@@ -7,8 +7,6 @@ import (
 )
 
 type rowsOp interface {
-	explain() string
-	children() []rowsOp
 	rows(ctx context.Context, tx sql.Transaction) (sql.Rows, error)
 }
 

@@ -9,12 +9,11 @@ import (
 
 type Stmt interface {
 	fmt.Stringer
-	Resolve(ses *Session)
-	Plan(ctx context.Context, tx sql.Transaction) (Plan, error)
+	Plan(ctx context.Context, ses *Session, tx sql.Transaction) (Plan, error)
 }
 
 type Plan interface {
-	Explain() string
+	Planned()
 }
 
 type StmtPlan interface {

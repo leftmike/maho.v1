@@ -103,8 +103,7 @@ func TestSelect(t *testing.T) {
 			t.Errorf("(%v).String() got %q want %q", c.stmt, c.stmt.String(), c.s)
 			continue
 		}
-		c.stmt.Resolve(ses)
-		plan, err := c.stmt.Plan(ctx, tx)
+		plan, err := c.stmt.Plan(ctx, ses, tx)
 		if err != nil {
 			t.Errorf("(%v).Plan() failed with %s", c.stmt, err)
 			continue

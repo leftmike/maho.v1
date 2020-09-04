@@ -208,8 +208,7 @@ func statement(ctx context.Context, ses *evaluate.Session, tx sql.Transaction, s
 		return err
 	}
 
-	stmt.Resolve(ses)
-	plan, err := stmt.Plan(ctx, tx)
+	plan, err := stmt.Plan(ctx, ses, tx)
 	if err != nil {
 		return err
 	}

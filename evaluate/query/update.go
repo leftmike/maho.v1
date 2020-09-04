@@ -52,27 +52,26 @@ func (up *updatePlan) EvalRef(idx int) sql.Value {
 	return up.dest[idx]
 }
 
-func (stmt *Update) Resolve(ses *evaluate.Session) {
-	stmt.Table = ses.ResolveTableName(stmt.Table)
-}
+func (stmt *Update) Plan(ctx context.Context, ses *evaluate.Session,
+	tx sql.Transaction) (evaluate.Plan, error) {
 
-func (stmt *Update) Plan(ctx context.Context, tx sql.Transaction) (evaluate.Plan, error) {
-	tt, err := tx.LookupTableType(ctx, stmt.Table)
+	tn := ses.ResolveTableName(stmt.Table)
+	tt, err := tx.LookupTableType(ctx, tn)
 	if err != nil {
 		return nil, err
 	}
 
-	fctx := makeFromContext(stmt.Table.Table, tt.Columns())
+	fctx := makeFromContext(tn.Table, tt.Columns())
 	var where sql.CExpr
 	if stmt.Where != nil {
-		where, err = expr.Compile(ctx, tx, fctx, stmt.Where)
+		where, err = expr.Compile(ctx, ses, tx, fctx, stmt.Where)
 		if err != nil {
 			return nil, err
 		}
 	}
 
 	plan := updatePlan{
-		tn:      stmt.Table,
+		tn:      tn,
 		ttVer:   tt.Version(),
 		where:   where,
 		dest:    make([]sql.Value, len(tt.Columns())),
@@ -80,7 +79,7 @@ func (stmt *Update) Plan(ctx context.Context, tx sql.Transaction) (evaluate.Plan
 	}
 
 	for _, cu := range stmt.ColumnUpdates {
-		ce, err := expr.Compile(ctx, tx, fctx, cu.Expr)
+		ce, err := expr.Compile(ctx, ses, tx, fctx, cu.Expr)
 		if err != nil {
 			return nil, err
 		}
@@ -93,9 +92,7 @@ func (stmt *Update) Plan(ctx context.Context, tx sql.Transaction) (evaluate.Plan
 	return &plan, nil
 }
 
-func (up *updatePlan) Explain() string {
-	return fmt.Sprintf("update %s where %s", up.tn, up.where)
-}
+func (_ *updatePlan) Planned() {}
 
 func (up *updatePlan) Execute(ctx context.Context, tx sql.Transaction) (int64, error) {
 	tbl, err := tx.LookupTable(ctx, up.tn, up.ttVer)

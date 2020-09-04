@@ -54,12 +54,11 @@ func (stmt *InsertValues) String() string {
 	return s
 }
 
-func (stmt *InsertValues) Resolve(ses *evaluate.Session) {
-	stmt.Table = ses.ResolveTableName(stmt.Table)
-}
+func (stmt *InsertValues) Plan(ctx context.Context, ses *evaluate.Session,
+	tx sql.Transaction) (evaluate.Plan, error) {
 
-func (stmt *InsertValues) Plan(ctx context.Context, tx sql.Transaction) (evaluate.Plan, error) {
-	tt, err := tx.LookupTableType(ctx, stmt.Table)
+	tn := ses.ResolveTableName(stmt.Table)
+	tt, err := tx.LookupTableType(ctx, tn)
 	if err != nil {
 		return nil, err
 	}
@@ -86,7 +85,7 @@ func (stmt *InsertValues) Plan(ctx context.Context, tx sql.Transaction) (evaluat
 		for v, nam := range stmt.Columns {
 			c, ok := cmap[nam]
 			if !ok {
-				return nil, fmt.Errorf("engine: %s: column not found: %s", stmt.Table, nam)
+				return nil, fmt.Errorf("engine: %s: column not found: %s", tn, nam)
 			}
 			c2v[c] = v
 		}
@@ -95,7 +94,7 @@ func (stmt *InsertValues) Plan(ctx context.Context, tx sql.Transaction) (evaluat
 	var rows [][]sql.CExpr
 	for _, r := range stmt.Rows {
 		if len(r) > mv {
-			return nil, fmt.Errorf("engine: %s: too many values", stmt.Table)
+			return nil, fmt.Errorf("engine: %s: too many values", tn)
 		}
 		row := make([]sql.CExpr, len(cols))
 		for i, ct := range colTypes {
@@ -106,7 +105,7 @@ func (stmt *InsertValues) Plan(ctx context.Context, tx sql.Transaction) (evaluat
 
 			var ce sql.CExpr
 			if e != nil {
-				ce, err = expr.Compile(ctx, tx, nil, e)
+				ce, err = expr.Compile(ctx, ses, tx, nil, e)
 				if err != nil {
 					return nil, err
 				}
@@ -119,7 +118,7 @@ func (stmt *InsertValues) Plan(ctx context.Context, tx sql.Transaction) (evaluat
 		rows = append(rows, row)
 	}
 
-	return &insertValuesPlan{stmt.Table, tt.Version(), cols, rows}, nil
+	return &insertValuesPlan{tn, tt.Version(), cols, rows}, nil
 }
 
 type insertValuesPlan struct {
@@ -129,9 +128,7 @@ type insertValuesPlan struct {
 	rows  [][]sql.CExpr
 }
 
-func (plan *insertValuesPlan) Explain() string {
-	return fmt.Sprintf("insert into %s", plan.tn)
-}
+func (_ *insertValuesPlan) Planned() {}
 
 func (plan *insertValuesPlan) Execute(ctx context.Context, tx sql.Transaction) (int64, error) {
 	tbl, err := tx.LookupTable(ctx, plan.tn, plan.ttVer)

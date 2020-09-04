@@ -36,11 +36,10 @@ func (stmt *Copy) String() string {
 	return s
 }
 
-func (stmt *Copy) Resolve(ses *evaluate.Session) {
-	stmt.Table = ses.ResolveTableName(stmt.Table)
-}
+func (stmt *Copy) Plan(ctx context.Context, ses *evaluate.Session,
+	tx sql.Transaction) (evaluate.Plan, error) {
 
-func (stmt *Copy) Plan(ctx context.Context, tx sql.Transaction) (evaluate.Plan, error) {
+	stmt.Table = ses.ResolveTableName(stmt.Table)
 	tt, err := tx.LookupTableType(ctx, stmt.Table)
 	if err != nil {
 		return nil, err
@@ -98,17 +97,7 @@ type copyPlan struct {
 	delimiter  rune
 }
 
-func (plan *copyPlan) Explain() string {
-	s := fmt.Sprintf("copy to %s (", plan.tn)
-	for fdx, cdx := range plan.fromToRow {
-		if fdx > 0 {
-			s += ", "
-		}
-		s += plan.cols[cdx].String()
-	}
-	s += ") from stdin"
-	return s
-}
+func (_ *copyPlan) Planned() {}
 
 func (plan *copyPlan) Execute(ctx context.Context, tx sql.Transaction) (int64, error) {
 	tbl, err := tx.LookupTable(ctx, plan.tn, plan.ttVer)

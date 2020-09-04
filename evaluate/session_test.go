@@ -51,6 +51,13 @@ func (st *testStore) DropSchema(ctx context.Context, tx engine.Transaction, sn s
 	return nil
 }
 
+func (st *testStore) LookupTableType(ctx context.Context, tx engine.Transaction,
+	tn sql.TableName) (*engine.TableType, error) {
+
+	st.t.Error("LookupTableType should never be called")
+	return nil, nil
+}
+
 func (st *testStore) LookupTable(ctx context.Context, tx engine.Transaction,
 	tn sql.TableName) (engine.Table, *engine.TableType, error) {
 

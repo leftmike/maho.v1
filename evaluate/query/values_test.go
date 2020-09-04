@@ -60,8 +60,7 @@ func TestValues(t *testing.T) {
 			t.Errorf("(%v).String() got %q want %q", c.values, c.values.String(), c.s)
 			continue
 		}
-		c.values.Resolve(ses)
-		ret, err := c.values.Plan(ctx, tx)
+		ret, err := c.values.Plan(ctx, ses, tx)
 		if err != nil {
 			t.Errorf("(%v).Plan() failed with %s", c.values, err)
 			continue

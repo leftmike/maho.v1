@@ -4,7 +4,6 @@ import (
 	"context"
 	"fmt"
 	"io"
-	"strings"
 
 	"github.com/leftmike/maho/evaluate"
 	"github.com/leftmike/maho/evaluate/expr"
@@ -61,14 +60,6 @@ func (fj FromJoin) String() string {
 	return s
 }
 
-func (fj FromJoin) resolve(ses *evaluate.Session) {
-	fj.Left.resolve(ses)
-	fj.Right.resolve(ses)
-	if fj.On != nil {
-		fj.On.Resolve(ses)
-	}
-}
-
 type joinOp struct {
 	typ JoinType
 
@@ -86,21 +77,6 @@ type joinOp struct {
 
 	using    []usingMatch
 	src2dest []int
-}
-
-func (jo joinOp) explain() string {
-	s := strings.ToLower(jo.typ.String())
-	for _, col := range jo.columns {
-		s += " " + col.String()
-	}
-	if jo.on != nil {
-		s += " on " + jo.on.String()
-	}
-	return s
-}
-
-func (jo joinOp) children() []rowsOp {
-	return []rowsOp{jo.leftRowsOp, jo.rightRowsOp}
 }
 
 func (jo joinOp) rows(ctx context.Context, tx sql.Transaction) (sql.Rows, error) {
@@ -328,12 +304,14 @@ func (_ *joinRows) Update(ctx context.Context, updates []sql.ColumnUpdate) error
 	return fmt.Errorf("join rows may not be updated")
 }
 
-func (fj FromJoin) plan(ctx context.Context, tx sql.Transaction) (rowsOp, *fromContext, error) {
-	leftRowsOp, leftCtx, err := fj.Left.plan(ctx, tx)
+func (fj FromJoin) plan(ctx context.Context, ses *evaluate.Session, tx sql.Transaction) (rowsOp,
+	*fromContext, error) {
+
+	leftRowsOp, leftCtx, err := fj.Left.plan(ctx, ses, tx)
 	if err != nil {
 		return nil, nil, err
 	}
-	rightRowsOp, rightCtx, err := fj.Right.plan(ctx, tx)
+	rightRowsOp, rightCtx, err := fj.Right.plan(ctx, ses, tx)
 	if err != nil {
 		return nil, nil, err
 	}
@@ -374,7 +352,7 @@ func (fj FromJoin) plan(ctx context.Context, tx sql.Transaction) (rowsOp, *fromC
 		fctx = joinContextsOn(leftCtx, rightCtx)
 		jop.rightLen = len(rightCtx.cols)
 		if fj.On != nil {
-			jop.on, err = expr.Compile(ctx, tx, fctx, fj.On)
+			jop.on, err = expr.Compile(ctx, ses, tx, fctx, fj.On)
 			if err != nil {
 				return nil, nil, err
 			}

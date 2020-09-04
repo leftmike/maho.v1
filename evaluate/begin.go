@@ -12,9 +12,8 @@ func (stmt *Begin) String() string {
 	return "BEGIN"
 }
 
-func (_ *Begin) Resolve(ses *Session) {}
+func (stmt *Begin) Plan(ctx context.Context, ses *Session, tx sql.Transaction) (Plan, error) {
 
-func (stmt *Begin) Plan(ctx context.Context, tx sql.Transaction) (Plan, error) {
 	panic("do not call; begin handled by session")
 	return nil, nil
 }

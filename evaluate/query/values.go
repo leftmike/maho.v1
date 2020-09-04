@@ -81,9 +81,9 @@ func (_ *exprValues) Update(ctx context.Context, updates []sql.ColumnUpdate) err
 	return fmt.Errorf("values: rows may not be updated")
 }
 
-func (_ *Values) Resolve(ses *evaluate.Session) {}
+func (stmt *Values) Plan(ctx context.Context, ses *evaluate.Session,
+	tx sql.Transaction) (evaluate.Plan, error) {
 
-func (stmt *Values) Plan(ctx context.Context, tx sql.Transaction) (evaluate.Plan, error) {
 	columns := make([]sql.Identifier, len(stmt.Expressions[0]))
 	for i := 0; i < len(columns); i++ {
 		columns[i] = sql.ID(fmt.Sprintf("column%d", i+1))
@@ -94,7 +94,7 @@ func (stmt *Values) Plan(ctx context.Context, tx sql.Transaction) (evaluate.Plan
 		row := make([]sql.CExpr, len(r))
 		for j := range r {
 			var err error
-			row[j], err = expr.Compile(ctx, tx, nil, r[j])
+			row[j], err = expr.Compile(ctx, ses, tx, nil, r[j])
 			if err != nil {
 				return nil, err
 			}
@@ -107,17 +107,7 @@ func (stmt *Values) Plan(ctx context.Context, tx sql.Transaction) (evaluate.Plan
 	}, nil
 }
 
-func (ev *exprValues) Explain() string {
-	s := "values ("
-	for cdx, col := range ev.columns {
-		if cdx > 0 {
-			s += ", "
-		}
-		s += col.String()
-	}
-	s += ")"
-	return s
-}
+func (_ *exprValues) Planned() {}
 
 func (ev *exprValues) Rows(ctx context.Context, tx sql.Transaction) (sql.Rows, error) {
 	ev.tx = tx

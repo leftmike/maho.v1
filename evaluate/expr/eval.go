@@ -235,7 +235,7 @@ type rowsExpr struct {
 }
 
 func (re *rowsExpr) String() string {
-	return fmt.Sprintf("rows: %s", re.rowsPlan.Explain())
+	return "rows plan"
 }
 
 func (re *rowsExpr) eval(ctx context.Context, tx sql.Transaction) (sql.Value, error) {

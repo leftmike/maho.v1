@@ -38,11 +38,8 @@ func (fk ForeignKey) String() string {
 	return s
 }
 
-func (fk *ForeignKey) resolve(ses *evaluate.Session) {
+func (fk *ForeignKey) plan(ctx context.Context, ses *evaluate.Session, tx sql.Transaction) error {
 	fk.RefTable = ses.ResolveTableName(fk.RefTable)
-}
-
-func (fk *ForeignKey) plan(ctx context.Context, tx sql.Transaction) error {
 	if fk.FKTable.Database != fk.RefTable.Database {
 		return fmt.Errorf("engine: table %s: foreign key reference not within same database: %s",
 			fk.FKTable, fk.RefTable)

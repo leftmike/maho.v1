@@ -30,24 +30,24 @@ func CompileRef(idx int) sql.CExpr {
 	return colIndex(idx)
 }
 
-func Compile(ctx context.Context, tx sql.Transaction, cctx CompileContext, e Expr) (sql.CExpr,
-	error) {
-
-	return compile(ctx, tx, cctx, e, false)
-}
-
-func CompileAggregator(ctx context.Context, tx sql.Transaction, cctx CompileContext,
+func Compile(ctx context.Context, ses *evaluate.Session, tx sql.Transaction, cctx CompileContext,
 	e Expr) (sql.CExpr, error) {
 
-	return compile(ctx, tx, cctx, e, true)
+	return compile(ctx, ses, tx, cctx, e, false)
+}
+
+func CompileAggregator(ctx context.Context, ses *evaluate.Session, tx sql.Transaction,
+	cctx CompileContext, e Expr) (sql.CExpr, error) {
+
+	return compile(ctx, ses, tx, cctx, e, true)
 }
 
 func CompileExpr(e Expr) (sql.CExpr, error) {
-	return compile(nil, nil, nil, e, false)
+	return compile(nil, nil, nil, nil, e, false)
 }
 
-func compile(ctx context.Context, tx sql.Transaction, cctx CompileContext, e Expr,
-	agg bool) (sql.CExpr, error) {
+func compile(ctx context.Context, ses *evaluate.Session, tx sql.Transaction, cctx CompileContext,
+	e Expr, agg bool) (sql.CExpr, error) {
 
 	if agg {
 		idx, ok := cctx.(AggregatorContext).MaybeRefExpr(e)
@@ -60,21 +60,21 @@ func compile(ctx context.Context, tx sql.Transaction, cctx CompileContext, e Exp
 		return e, nil
 	case *Unary:
 		if e.Op == NoOp {
-			return compile(ctx, tx, cctx, e.Expr, agg)
+			return compile(ctx, ses, tx, cctx, e.Expr, agg)
 		}
 		cf := opFuncs[e.Op]
-		a1, err := compile(ctx, tx, cctx, e.Expr, agg)
+		a1, err := compile(ctx, ses, tx, cctx, e.Expr, agg)
 		if err != nil {
 			return nil, err
 		}
 		return &call{cf, []sql.CExpr{a1}}, nil
 	case *Binary:
 		cf := opFuncs[e.Op]
-		a1, err := compile(ctx, tx, cctx, e.Left, agg)
+		a1, err := compile(ctx, ses, tx, cctx, e.Left, agg)
 		if err != nil {
 			return nil, err
 		}
-		a2, err := compile(ctx, tx, cctx, e.Right, agg)
+		a2, err := compile(ctx, ses, tx, cctx, e.Right, agg)
 		if err != nil {
 			return nil, err
 		}
@@ -113,22 +113,18 @@ func compile(ctx context.Context, tx sql.Transaction, cctx CompileContext, e Exp
 		args := make([]sql.CExpr, len(e.Args))
 		for i, a := range e.Args {
 			var err error
-			args[i], err = compile(ctx, tx, cctx, a, agg)
+			args[i], err = compile(ctx, ses, tx, cctx, a, agg)
 			if err != nil {
 				return nil, err
 			}
 		}
 		return &call{cf, args}, nil
 	case *Stmt:
-		if !e.resolved {
-			panic("expression must be resolved before being compiled")
-		}
-
-		if tx == nil {
+		if ses == nil || tx == nil {
 			return nil, fmt.Errorf("engine: expression statements not allowed here: %s", e.Stmt)
 		}
 
-		plan, err := e.Stmt.Plan(ctx, tx)
+		plan, err := e.Stmt.Plan(ctx, ses, tx)
 		if err != nil {
 			return nil, err
 		}
@@ -139,7 +135,7 @@ func compile(ctx context.Context, tx sql.Transaction, cctx CompileContext, e Exp
 		}
 		return &rowsExpr{rowsPlan: rowsPlan}, nil
 	default:
-		panic("missing case for expr")
+		panic(fmt.Sprintf("missing case for expr: %#v", e))
 	}
 }
 

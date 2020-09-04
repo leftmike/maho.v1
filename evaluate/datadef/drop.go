@@ -27,19 +27,16 @@ func (stmt *DropTable) String() string {
 	return s
 }
 
-func (stmt *DropTable) Resolve(ses *evaluate.Session) {
+func (stmt *DropTable) Plan(ctx context.Context, ses *evaluate.Session,
+	tx sql.Transaction) (evaluate.Plan, error) {
+
 	for idx, tn := range stmt.Tables {
 		stmt.Tables[idx] = ses.ResolveTableName(tn)
 	}
-}
-
-func (stmt *DropTable) Plan(ctx context.Context, tx sql.Transaction) (evaluate.Plan, error) {
 	return stmt, nil
 }
 
-func (stmt *DropTable) Explain() string {
-	return stmt.String()
-}
+func (_ *DropTable) Planned() {}
 
 func (stmt *DropTable) Execute(ctx context.Context, tx sql.Transaction) (int64, error) {
 	for _, tn := range stmt.Tables {
@@ -66,17 +63,14 @@ func (stmt *DropIndex) String() string {
 	return s
 }
 
-func (stmt *DropIndex) Resolve(ses *evaluate.Session) {
-	stmt.Table = ses.ResolveTableName(stmt.Table)
-}
+func (stmt *DropIndex) Plan(ctx context.Context, ses *evaluate.Session,
+	tx sql.Transaction) (evaluate.Plan, error) {
 
-func (stmt *DropIndex) Plan(ctx context.Context, tx sql.Transaction) (evaluate.Plan, error) {
+	stmt.Table = ses.ResolveTableName(stmt.Table)
 	return stmt, nil
 }
 
-func (stmt *DropIndex) Explain() string {
-	return stmt.String()
-}
+func (_ *DropIndex) Planned() {}
 
 func (stmt *DropIndex) Execute(ctx context.Context, tx sql.Transaction) (int64, error) {
 	return -1, tx.DropIndex(ctx, stmt.Index, stmt.Table, stmt.IfExists)
@@ -103,15 +97,13 @@ func (stmt *DropDatabase) String() string {
 	return s
 }
 
-func (_ *DropDatabase) Resolve(ses *evaluate.Session) {}
+func (stmt *DropDatabase) Plan(ctx context.Context, ses *evaluate.Session,
+	tx sql.Transaction) (evaluate.Plan, error) {
 
-func (stmt *DropDatabase) Plan(ctx context.Context, tx sql.Transaction) (evaluate.Plan, error) {
 	return stmt, nil
 }
 
-func (stmt *DropDatabase) Explain() string {
-	return stmt.String()
-}
+func (_ *DropDatabase) Planned() {}
 
 func (stmt *DropDatabase) Command(ctx context.Context, ses *evaluate.Session, e sql.Engine) (int64,
 	error) {
@@ -132,17 +124,14 @@ func (stmt *DropSchema) String() string {
 	return s + stmt.Schema.String()
 }
 
-func (stmt *DropSchema) Resolve(ses *evaluate.Session) {
-	stmt.Schema = ses.ResolveSchemaName(stmt.Schema)
-}
+func (stmt *DropSchema) Plan(ctx context.Context, ses *evaluate.Session,
+	tx sql.Transaction) (evaluate.Plan, error) {
 
-func (stmt *DropSchema) Plan(ctx context.Context, tx sql.Transaction) (evaluate.Plan, error) {
+	stmt.Schema = ses.ResolveSchemaName(stmt.Schema)
 	return stmt, nil
 }
 
-func (stmt *DropSchema) Explain() string {
-	return stmt.String()
-}
+func (_ *DropSchema) Planned() {}
 
 func (stmt *DropSchema) Execute(ctx context.Context, tx sql.Transaction) (int64, error) {
 	return -1, tx.DropSchema(ctx, stmt.Schema, stmt.IfExists)

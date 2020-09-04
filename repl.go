@@ -31,8 +31,7 @@ func replSQL(ses *evaluate.Session, p parser.Parser, w io.Writer) {
 			func(ctx context.Context, ses *evaluate.Session, e sql.Engine,
 				tx sql.Transaction) error {
 
-				stmt.Resolve(ses)
-				plan, err := stmt.Plan(ctx, tx)
+				plan, err := stmt.Plan(ctx, ses, tx)
 				if err != nil {
 					return err
 				}
@@ -90,7 +89,10 @@ func replSQL(ses *evaluate.Session, p parser.Parser, w io.Writer) {
 					if err != io.EOF {
 						return err
 					}
+				} else {
+					panic(fmt.Sprintf("expected StmtPlan, CmdPlan, or RowsPlan: %#v", plan))
 				}
+
 				return nil
 			})
 
