@@ -49,6 +49,11 @@ COMMIT
 ```
 
 ```
+COPY [[database '.'] schema '.'] table '(' column [',' ...] ')' FROM STDIN
+    [DELIMITER delimiter]
+```
+
+```
 CREATE DATABASE database
 ```
 

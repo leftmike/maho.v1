@@ -51,9 +51,17 @@ To Do:
 -- add create index test to sqltest/
 -- engine.Table: IndexRows(...) => engine.IndexRows {Columns, Close, Next, Row}
 
+- Statements
+-- 33.3.3: Retrieving Other Result Information
+
+- PostgreSQL tracks which OID (table) each column in a result set comes from
+
 - EXPLAIN
+-- limit to same statements that PostgreSQL does
+-- return rows with one row per step
 
 - SELECT, INSERT, UPDATE, DELETE
+-- select: track where columns come from, maybe as part of Resolve
 -- prepared statements
 
 - foreign keys

@@ -70,6 +70,7 @@ const (
 	DETACH
 	DROP
 	EXISTS
+	EXPLAIN
 	FALSE
 	FOREIGN
 	FROM
@@ -163,6 +164,7 @@ var knownKeywords = map[string]struct {
 	"DOUBLE":      {DOUBLE, false},
 	"DROP":        {DROP, true},
 	"EXISTS":      {EXISTS, true},
+	"EXPLAIN":     {EXPLAIN, true},
 	"FALSE":       {FALSE, true},
 	"FOREIGN":     {FOREIGN, true},
 	"FROM":        {FROM, true},
