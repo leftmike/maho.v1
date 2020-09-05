@@ -14,10 +14,6 @@ import (
 
 func replSQL(ses *evaluate.Session, p parser.Parser, w io.Writer) {
 	for {
-		if ses.Interactive {
-			io.WriteString(w, "maho> ")
-		}
-
 		stmt, err := p.Parse()
 		if err == io.EOF {
 			return

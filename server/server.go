@@ -61,12 +61,11 @@ func (svr *Server) removeSession(ses *evaluate.Session) {
 	delete(svr.sessions, ses)
 }
 
-func (svr *Server) Handle(rr io.RuneReader, w io.Writer, user, typ, addr string, interactive bool) {
+func (svr *Server) Handle(rr io.RuneReader, w io.Writer, user, typ, addr string) {
 	ses := evaluate.NewSession(svr.Engine, svr.DefaultDatabase, sql.PUBLIC)
 	ses.User = user
 	ses.Type = typ
 	ses.Addr = addr
-	ses.Interactive = interactive
 
 	svr.addSession(ses)
 	svr.Handler(ses, rr, w)
@@ -129,13 +128,11 @@ func (svr *Server) makeSessionsVirtual(ctx context.Context, tx sql.Transaction,
 			sql.StringValue(ses.User),
 			sql.StringValue(ses.Type),
 			addr,
-			sql.BoolValue(ses.Interactive),
 		})
 	}
 
 	return engine.MakeVirtualTable(tn,
-		[]sql.Identifier{sql.ID("session"), sql.ID("user"), sql.ID("type"), sql.ID("address"),
-			sql.ID("interactive")},
+		[]sql.Identifier{sql.ID("session"), sql.ID("user"), sql.ID("type"), sql.ID("address")},
 		[]sql.ColumnType{sql.StringColType, sql.IdColType, sql.IdColType,
-			sql.NullStringColType, sql.BoolColType}, values)
+			sql.NullStringColType}, values)
 }

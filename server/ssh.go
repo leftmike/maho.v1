@@ -250,7 +250,7 @@ func (ss *sshServer) handleChannel(conn *ssh.ServerConn, nch ssh.NewChannel, svr
 	tr := termReader{
 		term: t,
 	}
-	svr.Handle(bufio.NewReader(&tr), t, conn.User(), "ssh", conn.RemoteAddr().String(), true)
+	svr.Handle(bufio.NewReader(&tr), t, conn.User(), "ssh", conn.RemoteAddr().String())
 }
 
 func (ss *sshServer) Close() error {

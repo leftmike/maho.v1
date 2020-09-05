@@ -12,6 +12,7 @@ require (
 	github.com/hashicorp/hcl v1.0.0
 	github.com/leftmike/sqltest v0.0.0-20200623021847-ba3348200a46
 	github.com/lib/pq v1.7.0 // indirect
+	github.com/peterh/liner v1.2.0
 	github.com/sirupsen/logrus v1.6.0
 	go.etcd.io/bbolt v1.3.5
 	golang.org/x/crypto v0.0.0-20200622213623-75b288015ac9

@@ -13,7 +13,6 @@ type Session struct {
 	User            string
 	Type            string
 	Addr            string
-	Interactive     bool
 	ctx             context.Context
 	e               sql.Engine
 	defaultDatabase sql.Identifier

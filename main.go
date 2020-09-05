@@ -13,7 +13,6 @@ To Do:
 
 - use cockroachdb/pebble as a storage engine with kvrows
 
-- use knz/go-libedit for readline
 - use spf13/cobra for command argument handling
 
 - use jackc/pgx or cockroach/pkg/sql/pgwire for client sql interface
@@ -56,8 +55,8 @@ To Do:
 - EXPLAIN
 -- group by fields: need to get name of compiled aggregator
 -- include full column names
--- select: track where columns come from, maybe as part of Plan
--- DELETE, INSERT, SELECT, UPDATE, VALUES
+-- SELECT: track where columns come from, maybe as part of Plan
+-- DELETE, INSERT, UPDATE, VALUES
 
 - SELECT, INSERT, UPDATE, DELETE
 -- prepared statements
@@ -295,8 +294,7 @@ func main() {
 	}
 
 	for idx, arg := range sqlArgs {
-		svr.Handle(strings.NewReader(arg), os.Stdout, "startup", "sql-arg", fmt.Sprintf("%d", idx),
-			false)
+		svr.Handle(strings.NewReader(arg), os.Stdout, "startup", "sql-arg", fmt.Sprintf("%d", idx))
 	}
 
 	args := flag.Args()
@@ -306,7 +304,7 @@ func main() {
 			fmt.Fprintf(os.Stderr, "maho: sql file: %s\n", err)
 			return
 		}
-		svr.Handle(bufio.NewReader(f), os.Stderr, "startup", "sql-file", args[idx], false)
+		svr.Handle(bufio.NewReader(f), os.Stderr, "startup", "sql-file", args[idx])
 	}
 
 	if *sshServer {
@@ -354,7 +352,7 @@ func main() {
 	}
 
 	if *repl || (!*sshServer && len(args) == 0 && len(sqlArgs) == 0) {
-		svr.Handle(bufio.NewReader(os.Stdin), os.Stdout, "startup", "console", "", true)
+		interact(&svr)
 	} else if *sshServer {
 		ch := make(chan os.Signal, 1)
 		signal.Notify(ch, os.Interrupt)
