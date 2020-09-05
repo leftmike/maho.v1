@@ -4,6 +4,7 @@ import (
 	"context"
 	"fmt"
 	"io"
+	"strings"
 
 	"github.com/leftmike/maho/evaluate"
 	"github.com/leftmike/maho/evaluate/expr"
@@ -77,6 +78,46 @@ type joinOp struct {
 
 	using    []usingMatch
 	src2dest []int
+}
+
+func (_ joinOp) Name() string {
+	return "join"
+}
+
+func (jo joinOp) Columns() []string {
+	var cols []string
+	for _, col := range jo.columns {
+		cols = append(cols, col.String())
+	}
+	return cols
+}
+
+func (jo joinOp) Fields() []evaluate.FieldDescription {
+	fd := []evaluate.FieldDescription{
+		{Field: "type", Description: strings.ToLower(jo.typ.String())},
+	}
+
+	if jo.on != nil {
+		fd = append(fd, evaluate.FieldDescription{Field: "on", Description: jo.on.String()})
+	} else if jo.using != nil {
+		leftCols := jo.leftRowsOp.Columns()
+		rightCols := jo.rightRowsOp.Columns()
+		var desc string
+		for _, use := range jo.using {
+			if desc != "" {
+				desc += ", "
+			}
+			desc += fmt.Sprintf("%s = %s", leftCols[use.leftColIndex],
+				rightCols[use.rightColIndex])
+		}
+		fd = append(fd, evaluate.FieldDescription{Field: "using", Description: desc})
+	}
+
+	return fd
+}
+
+func (jo joinOp) Children() []evaluate.ExplainTree {
+	return []evaluate.ExplainTree{jo.leftRowsOp, jo.rightRowsOp}
 }
 
 func (jo joinOp) rows(ctx context.Context, tx sql.Transaction) (sql.Rows, error) {

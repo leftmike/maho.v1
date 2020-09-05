@@ -41,12 +41,35 @@ func (fta FromTableAlias) plan(ctx context.Context, ses *evaluate.Session,
 	if fta.Alias != 0 {
 		nam = fta.Alias
 	}
-	return scanTableOp{tn, tt.Version()}, makeFromContext(nam, tt.Columns()), nil
+	return scanTableOp{tn, tt.Version(), tt.Columns()}, makeFromContext(nam, tt.Columns()), nil
 }
 
 type scanTableOp struct {
 	tn    sql.TableName
 	ttVer int64
+	cols  []sql.Identifier
+}
+
+func (sto scanTableOp) Name() string {
+	return "scan"
+}
+
+func (sto scanTableOp) Columns() []string {
+	var cols []string
+	for _, col := range sto.cols {
+		cols = append(cols, col.String())
+	}
+	return cols
+}
+
+func (sto scanTableOp) Fields() []evaluate.FieldDescription {
+	return []evaluate.FieldDescription{
+		{Field: "table", Description: sto.tn.String()},
+	}
+}
+
+func (_ scanTableOp) Children() []evaluate.ExplainTree {
+	return nil
 }
 
 func (sto scanTableOp) rows(ctx context.Context, tx sql.Transaction) (sql.Rows, error) {
@@ -99,11 +122,35 @@ func (fs FromStmt) plan(ctx context.Context, ses *evaluate.Session, tx sql.Trans
 	if rp, ok := rowsPlan.(rowsOpPlan); ok {
 		return rp.rop, fctx, nil
 	}
-	return fromPlanOp{rowsPlan}, fctx, nil
+	return fromPlanOp{rowsPlan, fs.Stmt.String(), cols}, fctx, nil
 }
 
 type fromPlanOp struct {
-	rp evaluate.RowsPlan
+	rp   evaluate.RowsPlan
+	stmt string
+	cols []sql.Identifier
+}
+
+func (_ fromPlanOp) Name() string {
+	return "stmt"
+}
+
+func (fpo fromPlanOp) Columns() []string {
+	var cols []string
+	for _, col := range fpo.cols {
+		cols = append(cols, col.String())
+	}
+	return cols
+}
+
+func (fpo fromPlanOp) Fields() []evaluate.FieldDescription {
+	return []evaluate.FieldDescription{
+		{Field: "stmt", Description: fpo.stmt},
+	}
+}
+
+func (fpo fromPlanOp) Children() []evaluate.ExplainTree {
+	return nil
 }
 
 func (fpo fromPlanOp) rows(ctx context.Context, tx sql.Transaction) (sql.Rows, error) {

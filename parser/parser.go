@@ -253,6 +253,7 @@ func (p *parser) parseStmt() evaluate.Stmt {
 		sql.DELETE,
 		sql.DETACH,
 		sql.DROP,
+		sql.EXPLAIN,
 		sql.INSERT,
 		sql.ROLLBACK,
 		sql.SELECT,
@@ -310,6 +311,8 @@ func (p *parser) parseStmt() evaluate.Stmt {
 			// DROP TABLE ...
 			return p.parseDropTable()
 		}
+	case sql.EXPLAIN:
+		return p.parseExplain()
 	case sql.INSERT:
 		// INSERT INTO ...
 		p.expectReserved(sql.INTO)
@@ -1684,4 +1687,32 @@ func (p *parser) parseDropSchema() evaluate.Stmt {
 
 	s.Schema = p.parseSchemaName()
 	return &s
+}
+
+func (p *parser) parseExplain() evaluate.Stmt {
+	// EXPLAIN [VERBOSE] (delete | insert | select | update | values)
+
+	var s misc.Explain
+	s.Verbose = p.optionalReserved(sql.VERBOSE)
+	switch p.expectReserved(sql.DELETE, sql.INSERT, sql.SELECT, sql.UPDATE, sql.VALUES) {
+	case sql.DELETE:
+		// DELETE FROM ...
+		p.expectReserved(sql.FROM)
+		s.Stmt = p.parseDelete()
+	case sql.INSERT:
+		// INSERT INTO ...
+		p.expectReserved(sql.INTO)
+		s.Stmt = p.parseInsert()
+	case sql.SELECT:
+		// SELECT ...
+		s.Stmt = p.parseSelect()
+	case sql.UPDATE:
+		// UPDATE ...
+		s.Stmt = p.parseUpdate()
+	case sql.VALUES:
+		// VALUES ...
+		s.Stmt = p.parseValues()
+	}
+
+	return s
 }

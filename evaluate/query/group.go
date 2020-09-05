@@ -17,6 +17,47 @@ type groupByOp struct {
 	aggregators []aggregator
 }
 
+func (_ groupByOp) Name() string {
+	return "group"
+}
+
+func (gbo groupByOp) Columns() []string {
+	var cols []string
+	for _, col := range gbo.columns {
+		cols = append(cols, col.String())
+	}
+	return cols
+}
+
+func (gbo groupByOp) Fields() []evaluate.FieldDescription {
+	var fd []evaluate.FieldDescription
+	for _, ge := range gbo.groupExprs {
+		fd = append(fd,
+			evaluate.FieldDescription{
+				Field:       "by",
+				Description: fmt.Sprintf("%s = %s", gbo.columns[ge.destColIndex], ge.expr),
+			})
+	}
+
+	for _, agg := range gbo.aggregators {
+		var desc string
+		for _, arg := range agg.args {
+			if desc != "" {
+				desc += ", "
+			}
+			desc += arg.String()
+		}
+		//XXX: agg.maker.String()
+		fd = append(fd, evaluate.FieldDescription{Field: "aggregate", Description: desc})
+	}
+
+	return fd
+}
+
+func (gbo groupByOp) Children() []evaluate.ExplainTree {
+	return []evaluate.ExplainTree{gbo.rop}
+}
+
 func (gbo groupByOp) rows(ctx context.Context, tx sql.Transaction) (sql.Rows, error) {
 	r, err := gbo.rop.rows(ctx, tx)
 	if err != nil {

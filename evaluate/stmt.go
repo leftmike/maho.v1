@@ -31,3 +31,15 @@ type RowsPlan interface {
 	Columns() []sql.Identifier
 	Rows(ctx context.Context, tx sql.Transaction) (sql.Rows, error)
 }
+
+type FieldDescription struct {
+	Field       string
+	Description string
+}
+
+type ExplainTree interface {
+	Name() string
+	Columns() []string
+	Fields() []FieldDescription
+	Children() []ExplainTree
+}

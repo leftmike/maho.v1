@@ -25,7 +25,9 @@ const (
 	COUNT
 	COUNT_ALL
 	DATABASES
+	DESCRIPTION
 	DOUBLE
+	FIELD
 	INDEXES
 	INFO
 	INT
@@ -46,6 +48,7 @@ const (
 	SYSTEM
 	TABLES
 	TEXT
+	TREE
 	VARBINARY
 	VARCHAR
 )
@@ -109,6 +112,7 @@ const (
 	USE
 	USING
 	VALUES
+	VERBOSE
 	WHERE
 	WITH
 )
@@ -120,6 +124,8 @@ var knownIdentifiers = map[string]Identifier{
 	"count":       COUNT,
 	"count_all":   COUNT_ALL,
 	"databases":   DATABASES,
+	"description": DESCRIPTION,
+	"field":       FIELD,
 	"indexes":     INDEXES,
 	"info":        INFO,
 	"metadata":    METADATA,
@@ -129,6 +135,7 @@ var knownIdentifiers = map[string]Identifier{
 	"sequences":   SEQUENCES,
 	"system":      SYSTEM,
 	"tables":      TABLES,
+	"tree":        TREE,
 }
 
 var knownKeywords = map[string]struct {
@@ -216,6 +223,7 @@ var knownKeywords = map[string]struct {
 	"VALUES":      {VALUES, true},
 	"VARBINARY":   {VARBINARY, false},
 	"VARCHAR":     {VARCHAR, false},
+	"VERBOSE":     {VERBOSE, true},
 	"WHERE":       {WHERE, true},
 	"WITH":        {WITH, true},
 }

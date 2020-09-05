@@ -51,12 +51,13 @@ To Do:
 -- add create index test to sqltest/
 -- engine.Table: IndexRows(...) => engine.IndexRows {Columns, Close, Next, Row}
 
+- columns variable and field to cols
+
 - EXPLAIN
--- limit to same statements that PostgreSQL does
--- return rows with one row per step
--- look at how CockroachDB does it
+-- group by fields: need to get name of compiled aggregator
 -- include full column names
 -- select: track where columns come from, maybe as part of Plan
+-- DELETE, INSERT, SELECT, UPDATE, VALUES
 
 - SELECT, INSERT, UPDATE, DELETE
 -- prepared statements

@@ -132,6 +132,10 @@ DROP TABLE [IF EXISTS] [[database '.'] schema '.'] table [',' ...]
 ```
 
 ```
+EXPLAIN [VERBOSE] (delete | insert | select | update | values)
+```
+
+```
 INSERT INTO [[database '.'] schema '.'] table ['(' column [',' ...] ')']
 	VALUES '(' expr | DEFAULT [',' ...] ')' [',' ...]
 ```

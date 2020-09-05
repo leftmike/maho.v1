@@ -172,9 +172,45 @@ func (rp rowsOpPlan) Rows(ctx context.Context, tx sql.Transaction) (sql.Rows, er
 	return rp.rop.rows(ctx, tx)
 }
 
+func (rp rowsOpPlan) Explain() evaluate.ExplainTree {
+	return rp.rop
+}
+
 type sortOp struct {
 	rop     rowsOp
 	orderBy []orderBy
+}
+
+func (_ sortOp) Name() string {
+	return "sort"
+}
+
+func (so sortOp) Columns() []string {
+	return so.rop.Columns()
+}
+
+func (so sortOp) Fields() []evaluate.FieldDescription {
+	cols := so.rop.Columns()
+	var desc string
+	for _, ob := range so.orderBy {
+		if desc != "" {
+			desc += ", "
+		}
+		if ob.reverse {
+			desc += "-"
+		} else {
+			desc += "+"
+		}
+		desc += cols[ob.colIndex]
+	}
+
+	return []evaluate.FieldDescription{
+		{Field: "order", Description: desc},
+	}
+}
+
+func (so sortOp) Children() []evaluate.ExplainTree {
+	return []evaluate.ExplainTree{so.rop}
 }
 
 func (so sortOp) rows(ctx context.Context, tx sql.Transaction) (sql.Rows, error) {
@@ -404,6 +440,24 @@ type filterOp struct {
 	cond sql.CExpr
 }
 
+func (_ filterOp) Name() string {
+	return "filter"
+}
+
+func (fo filterOp) Columns() []string {
+	return fo.rop.Columns()
+}
+
+func (fo filterOp) Fields() []evaluate.FieldDescription {
+	return []evaluate.FieldDescription{
+		{Field: "expr", Description: fo.cond.String()},
+	}
+}
+
+func (fo filterOp) Children() []evaluate.ExplainTree {
+	return []evaluate.ExplainTree{fo.rop}
+}
+
 func (fo filterOp) rows(ctx context.Context, tx sql.Transaction) (sql.Rows, error) {
 	r, err := fo.rop.rows(ctx, tx)
 	if err != nil {
@@ -414,6 +468,22 @@ func (fo filterOp) rows(ctx context.Context, tx sql.Transaction) (sql.Rows, erro
 }
 
 type oneEmptyOp struct{}
+
+func (_ oneEmptyOp) Name() string {
+	return "empty"
+}
+
+func (_ oneEmptyOp) Columns() []string {
+	return nil
+}
+
+func (_ oneEmptyOp) Fields() []evaluate.FieldDescription {
+	return nil
+}
+
+func (_ oneEmptyOp) Children() []evaluate.ExplainTree {
+	return nil
+}
 
 func (_ oneEmptyOp) rows(ctx context.Context, tx sql.Transaction) (sql.Rows, error) {
 	return &oneEmptyRow{}, nil
@@ -451,6 +521,26 @@ func (_ *oneEmptyRow) Update(ctx context.Context, updates []sql.ColumnUpdate) er
 type allResultsOp struct {
 	rop  rowsOp
 	cols []sql.Identifier
+}
+
+func (_ *allResultsOp) Name() string {
+	return "select"
+}
+
+func (aro *allResultsOp) Columns() []string {
+	var cols []string
+	for _, col := range aro.cols {
+		cols = append(cols, col.String())
+	}
+	return cols
+}
+
+func (_ *allResultsOp) Fields() []evaluate.FieldDescription {
+	return nil
+}
+
+func (aro *allResultsOp) Children() []evaluate.ExplainTree {
+	return []evaluate.ExplainTree{aro.rop}
 }
 
 func (aro *allResultsOp) rows(ctx context.Context, tx sql.Transaction) (sql.Rows, error) {
@@ -496,6 +586,34 @@ type resultsOp struct {
 	cols      []sql.Identifier
 	destCols  []src2dest
 	destExprs []expr2dest
+}
+
+func (_ *resultsOp) Name() string {
+	return "select"
+}
+
+func (ro *resultsOp) Columns() []string {
+	var cols []string
+	for _, col := range ro.cols {
+		cols = append(cols, col.String())
+	}
+	return cols
+}
+
+func (ro *resultsOp) Fields() []evaluate.FieldDescription {
+	var fd []evaluate.FieldDescription
+	for _, de := range ro.destExprs {
+		fd = append(fd,
+			evaluate.FieldDescription{
+				Field:       "expr",
+				Description: fmt.Sprintf("%s = %s", ro.cols[de.destColIndex], de.expr),
+			})
+	}
+	return fd
+}
+
+func (ro *resultsOp) Children() []evaluate.ExplainTree {
+	return []evaluate.ExplainTree{ro.rop}
 }
 
 func (ro *resultsOp) rows(ctx context.Context, tx sql.Transaction) (sql.Rows, error) {

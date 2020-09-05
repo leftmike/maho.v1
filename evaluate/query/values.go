@@ -2,6 +2,7 @@ package query
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"io"
 
@@ -74,11 +75,11 @@ func (ev *exprValues) Next(ctx context.Context, dest []sql.Value) error {
 }
 
 func (_ *exprValues) Delete(ctx context.Context) error {
-	return fmt.Errorf("values: rows may not be deleted")
+	return errors.New("values: rows may not be deleted")
 }
 
 func (_ *exprValues) Update(ctx context.Context, updates []sql.ColumnUpdate) error {
-	return fmt.Errorf("values: rows may not be updated")
+	return errors.New("values: rows may not be updated")
 }
 
 func (stmt *Values) Plan(ctx context.Context, ses *evaluate.Session,
