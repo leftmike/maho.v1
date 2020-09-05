@@ -51,7 +51,7 @@ func replSQL(ses *evaluate.Session, p parser.Parser, w io.Writer) {
 						return err
 					}
 				} else if rowsPlan, ok := plan.(evaluate.RowsPlan); ok {
-					w := tabwriter.NewWriter(w, 0, 0, 1, ' ', tabwriter.AlignRight)
+					w := tabwriter.NewWriter(w, 0, 0, 1, ' ', 0)
 
 					rows, err := rowsPlan.Rows(ctx, tx)
 					if err != nil {
@@ -79,6 +79,12 @@ func replSQL(ses *evaluate.Session, p parser.Parser, w io.Writer) {
 						}
 						fmt.Fprintf(w, "%d\t", i)
 						for _, v := range dest {
+							if v != nil {
+								if s, ok := v.(sql.StringValue); ok {
+									fmt.Fprintf(w, "%s\t", string(s))
+									continue
+								}
+							}
 							fmt.Fprintf(w, "%s\t", sql.Format(v))
 						}
 						fmt.Fprintln(w)

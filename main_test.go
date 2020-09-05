@@ -27,84 +27,84 @@ select * from metadata.tables
     where table_name != 'locks' and table_name != 'transactions' and schema_name != 'private'
     order by table_name
 `,
-			`   database_name schema_name    table_name
-   ------------- -----------    ----------
- 1      'system'  'metadata'     'columns'
- 2      'system'      'info'      'config'
- 3      'system'  'metadata' 'constraints'
- 4      'system'      'info'   'databases'
- 5      'system'      'info' 'identifiers'
- 6      'system'  'metadata'     'schemas'
- 7      'system'  'metadata'      'tables'
+			`  database_name schema_name table_name  
+  ------------- ----------- ----------  
+1 system        metadata    columns     
+2 system        info        config      
+3 system        metadata    constraints 
+4 system        info        databases   
+5 system        info        identifiers 
+6 system        metadata    schemas     
+7 system        metadata    tables      
 (7 rows)
 `},
 		{"select schema_name, table_name, column_name from (show columns from identifiers) as c",
-			`   schema_name    table_name column_name
-   -----------    ---------- -----------
- 1      'info' 'identifiers'      'name'
- 2      'info' 'identifiers'        'id'
- 3      'info' 'identifiers'  'reserved'
+			`  schema_name table_name  column_name 
+  ----------- ----------  ----------- 
+1 info        identifiers name        
+2 info        identifiers id          
+3 info        identifiers reserved    
 (3 rows)
 `},
 		{"show database",
-			`   DATABASE
-   --------
- 1 'system'
+			`  DATABASE 
+  -------- 
+1 system   
 (1 rows)
 `},
 		{"show databases",
-			`   database
-   --------
- 1 'system'
+			`  database 
+  -------- 
+1 system   
 (1 rows)
 `},
 		{"show schema",
-			`   SCHEMA
-   ------
- 1 'info'
+			`  SCHEMA 
+  ------ 
+1 info   
 (1 rows)
 `},
 		{"select * from (show tables from metadata) as c order by table_name",
-			`   database_name schema_name    table_name
-   ------------- -----------    ----------
- 1      'system'  'metadata'     'columns'
- 2      'system'  'metadata' 'constraints'
- 3      'system'  'metadata'     'schemas'
- 4      'system'  'metadata'      'tables'
+			`  database_name schema_name table_name  
+  ------------- ----------- ----------  
+1 system        metadata    columns     
+2 system        metadata    constraints 
+3 system        metadata    schemas     
+4 system        metadata    tables      
 (4 rows)
 `},
 		{"show schemas",
-			`   database_name schema_name
-   ------------- -----------
- 1      'system'   'private'
- 2      'system'  'metadata'
- 3      'system'      'info'
+			`  database_name schema_name 
+  ------------- ----------- 
+1 system        private     
+2 system        metadata    
+3 system        info        
 (3 rows)
 `},
 		{"select * from metadata.tables order by table_name, schema_name",
-			`    database_name schema_name    table_name
-    ------------- -----------    ----------
-  1      'system'  'metadata'     'columns'
-  2      'system'      'info'      'config'
-  3      'system'  'metadata' 'constraints'
-  4      'system'      'info'   'databases'
-  5      'system'   'private'   'databases'
-  6      'system'      'info' 'identifiers'
-  7      'system'  'metadata'     'schemas'
-  8      'system'   'private'     'schemas'
-  9      'system'   'private'   'sequences'
- 10      'system'  'metadata'      'tables'
- 11      'system'   'private'      'tables'
+			`   database_name schema_name table_name  
+   ------------- ----------- ----------  
+1  system        metadata    columns     
+2  system        info        config      
+3  system        metadata    constraints 
+4  system        info        databases   
+5  system        private     databases   
+6  system        info        identifiers 
+7  system        metadata    schemas     
+8  system        private     schemas     
+9  system        private     sequences   
+10 system        metadata    tables      
+11 system        private     tables      
 (11 rows)
 `},
 		{`select * from metadata.constraints
 where table_name = 'tables' and schema_name = 'metadata'
 order by table_name, schema_name, constraint_name`,
-			`   database_name schema_name table_name constraint_name constraint_type                details
-   ------------- ----------- ---------- --------------- ---------------                -------
- 1      'system'  'metadata'   'tables'            NULL      'NOT NULL' 'column database_name'
- 2      'system'  'metadata'   'tables'            NULL      'NOT NULL'   'column schema_name'
- 3      'system'  'metadata'   'tables'            NULL      'NOT NULL'    'column table_name'
+			`  database_name schema_name table_name constraint_name constraint_type details              
+  ------------- ----------- ---------- --------------- --------------- -------              
+1 system        metadata    tables     NULL            NOT NULL        column database_name 
+2 system        metadata    tables     NULL            NOT NULL        column schema_name   
+3 system        metadata    tables     NULL            NOT NULL        column table_name    
 (3 rows)
 `},
 	}
