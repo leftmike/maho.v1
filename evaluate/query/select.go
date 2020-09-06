@@ -557,12 +557,12 @@ func (aro *allResultsOp) columns() []sql.Identifier {
 }
 
 type allResultRows struct {
-	rows    sql.Rows
-	columns []sql.Identifier
+	rows sql.Rows
+	cols []sql.Identifier
 }
 
 func (arr *allResultRows) Columns() []sql.Identifier {
-	return arr.columns
+	return arr.cols
 }
 
 func (arr *allResultRows) Close() error {
@@ -625,7 +625,7 @@ func (ro *resultsOp) rows(ctx context.Context, tx sql.Transaction) (sql.Rows, er
 	return &resultRows{
 		tx:        tx,
 		rows:      r,
-		columns:   ro.cols,
+		cols:      ro.cols,
 		destCols:  ro.destCols,
 		destExprs: ro.destExprs,
 	}, nil
@@ -649,7 +649,7 @@ type resultRows struct {
 	tx        sql.Transaction
 	rows      sql.Rows
 	dest      []sql.Value
-	columns   []sql.Identifier
+	cols      []sql.Identifier
 	destCols  []src2dest
 	destExprs []expr2dest
 }
@@ -659,7 +659,7 @@ func (rr *resultRows) EvalRef(idx int) sql.Value {
 }
 
 func (rr *resultRows) Columns() []sql.Identifier {
-	return rr.columns
+	return rr.cols
 }
 
 func (rr *resultRows) Close() error {

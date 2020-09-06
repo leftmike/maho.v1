@@ -44,8 +44,8 @@ func (ik IndexKey) Equal(oik IndexKey) bool {
 	return true
 }
 
-func columnNumber(nam sql.Identifier, columns []sql.Identifier) (int, bool) {
-	for num, col := range columns {
+func columnNumber(nam sql.Identifier, cols []sql.Identifier) (int, bool) {
+	for num, col := range cols {
 		if nam == col {
 			return num, true
 		}
@@ -53,11 +53,11 @@ func columnNumber(nam sql.Identifier, columns []sql.Identifier) (int, bool) {
 	return -1, false
 }
 
-func indexKeyToColumnKeys(ik IndexKey, columns []sql.Identifier) ([]sql.ColumnKey, error) {
+func indexKeyToColumnKeys(ik IndexKey, cols []sql.Identifier) ([]sql.ColumnKey, error) {
 	var colKeys []sql.ColumnKey
 
 	for cdx, col := range ik.Columns {
-		num, ok := columnNumber(col, columns)
+		num, ok := columnNumber(col, cols)
 		if !ok {
 			return nil, fmt.Errorf("unknown column %s", col)
 		}

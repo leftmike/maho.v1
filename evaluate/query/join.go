@@ -72,7 +72,7 @@ type joinOp struct {
 	rightLen      int
 	needRightUsed bool
 
-	columns []sql.Identifier
+	cols []sql.Identifier
 
 	on sql.CExpr
 
@@ -86,7 +86,7 @@ func (_ joinOp) Name() string {
 
 func (jo joinOp) Columns() []string {
 	var cols []string
-	for _, col := range jo.columns {
+	for _, col := range jo.cols {
 		cols = append(cols, col.String())
 	}
 	return cols
@@ -152,7 +152,7 @@ func (jo joinOp) rows(ctx context.Context, tx sql.Transaction) (sql.Rows, error)
 		src2dest:  jo.src2dest,
 		rightLen:  jo.rightLen,
 		on:        jo.on,
-		columns:   jo.columns,
+		cols:      jo.cols,
 	}, nil
 }
 
@@ -186,7 +186,7 @@ type joinRows struct {
 	rightLen   int
 	rightUsed  []bool
 
-	columns []sql.Identifier
+	cols []sql.Identifier
 
 	on sql.CExpr
 
@@ -195,7 +195,7 @@ type joinRows struct {
 }
 
 func (jr *joinRows) Columns() []sql.Identifier {
-	return jr.columns
+	return jr.cols
 }
 
 func (jr *joinRows) Close() error {
@@ -400,6 +400,6 @@ func (fj FromJoin) plan(ctx context.Context, ses *evaluate.Session, tx sql.Trans
 		}
 	}
 
-	jop.columns = fctx.columns()
+	jop.cols = fctx.columns()
 	return jop, fctx, nil
 }

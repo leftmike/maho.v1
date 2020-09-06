@@ -50,8 +50,6 @@ To Do:
 -- add create index test to sqltest/
 -- engine.Table: IndexRows(...) => engine.IndexRows {Columns, Close, Next, Row}
 
-- columns variable and field to cols
-
 - EXPLAIN
 -- group by fields: need to get name of compiled aggregator
 -- include full column names

@@ -14,10 +14,10 @@ func fln() testutil.FileLineNumber {
 }
 
 type tableType struct {
-	columns     []sql.Identifier
-	columnTypes []sql.ColumnType
-	primary     []sql.ColumnKey
-	indexes     []sql.IndexType
+	cols     []sql.Identifier
+	colTypes []sql.ColumnType
+	primary  []sql.ColumnKey
+	indexes  []sql.IndexType
 }
 
 func (tt tableType) Version() int64 {
@@ -25,11 +25,11 @@ func (tt tableType) Version() int64 {
 }
 
 func (tt tableType) Columns() []sql.Identifier {
-	return tt.columns
+	return tt.cols
 }
 
 func (tt tableType) ColumnTypes() []sql.ColumnType {
-	return tt.columnTypes
+	return tt.colTypes
 }
 
 func (tt tableType) PrimaryKey() []sql.ColumnKey {
@@ -46,8 +46,8 @@ func colKey(col int) sql.ColumnKey {
 
 func TestFKPrepare(t *testing.T) {
 	tt1 := tableType{
-		columns: []sql.Identifier{sql.ID("a1"), sql.ID("b1"), sql.ID("c1"), sql.ID("d1")},
-		columnTypes: []sql.ColumnType{
+		cols: []sql.Identifier{sql.ID("a1"), sql.ID("b1"), sql.ID("c1"), sql.ID("d1")},
+		colTypes: []sql.ColumnType{
 			sql.Int64ColType,
 			sql.Int64ColType,
 			sql.StringColType,
@@ -83,8 +83,8 @@ func TestFKPrepare(t *testing.T) {
 	}
 
 	tt2 := tableType{
-		columns: []sql.Identifier{sql.ID("a2"), sql.ID("b2"), sql.ID("c2"), sql.ID("d2")},
-		columnTypes: []sql.ColumnType{
+		cols: []sql.Identifier{sql.ID("a2"), sql.ID("b2"), sql.ID("c2"), sql.ID("d2")},
+		colTypes: []sql.ColumnType{
 			sql.Int64ColType,
 			sql.StringColType,
 			sql.Int64ColType,
@@ -95,8 +95,8 @@ func TestFKPrepare(t *testing.T) {
 	}
 
 	tt3 := tableType{
-		columns: []sql.Identifier{sql.ID("a3"), sql.ID("b3"), sql.ID("c3"), sql.ID("d3")},
-		columnTypes: []sql.ColumnType{
+		cols: []sql.Identifier{sql.ID("a3"), sql.ID("b3"), sql.ID("c3"), sql.ID("d3")},
+		colTypes: []sql.ColumnType{
 			sql.Int64ColType,
 			sql.Int64ColType,
 			sql.StringColType,
@@ -372,7 +372,7 @@ func TestFKPrepare(t *testing.T) {
 			t.Errorf("%sPrepare failed with %s", c.fln, err)
 		}
 		if !reflect.DeepEqual(c.fkCols, fkCols) {
-			t.Errorf("%sPrepare foreign key columns: got %#v want %#v", c.fln, fkCols, c.fkCols)
+			t.Errorf("%sPrepare foreign key cols: got %#v want %#v", c.fln, fkCols, c.fkCols)
 		}
 		if ridx != c.ridx {
 			t.Errorf("%sPrepare ref index: got %s want %s", c.fln, ridx, c.ridx)

@@ -12,7 +12,7 @@ import (
 
 type groupByOp struct {
 	rop         rowsOp
-	columns     []sql.Identifier
+	cols        []sql.Identifier
 	groupExprs  []expr2dest
 	aggregators []aggregator
 }
@@ -23,7 +23,7 @@ func (_ groupByOp) Name() string {
 
 func (gbo groupByOp) Columns() []string {
 	var cols []string
-	for _, col := range gbo.columns {
+	for _, col := range gbo.cols {
 		cols = append(cols, col.String())
 	}
 	return cols
@@ -35,7 +35,7 @@ func (gbo groupByOp) Fields() []evaluate.FieldDescription {
 		fd = append(fd,
 			evaluate.FieldDescription{
 				Field:       "by",
-				Description: fmt.Sprintf("%s = %s", gbo.columns[ge.destColIndex], ge.expr),
+				Description: fmt.Sprintf("%s = %s", gbo.cols[ge.destColIndex], ge.expr),
 			})
 	}
 
@@ -67,7 +67,7 @@ func (gbo groupByOp) rows(ctx context.Context, tx sql.Transaction) (sql.Rows, er
 	return &groupRows{
 		tx:          tx,
 		rows:        r,
-		columns:     gbo.columns,
+		cols:        gbo.cols,
 		groupExprs:  gbo.groupExprs,
 		aggregators: gbo.aggregators,
 	}, nil
@@ -82,7 +82,7 @@ type groupRows struct {
 	tx          sql.Transaction
 	rows        sql.Rows
 	dest        []sql.Value
-	columns     []sql.Identifier
+	cols        []sql.Identifier
 	groupExprs  []expr2dest
 	aggregators []aggregator
 	groups      [][]sql.Value
@@ -94,7 +94,7 @@ func (gr *groupRows) EvalRef(idx int) sql.Value {
 }
 
 func (gr *groupRows) Columns() []sql.Identifier {
-	return gr.columns
+	return gr.cols
 }
 
 func (gr *groupRows) Close() error {
@@ -230,7 +230,7 @@ func (gctx *groupContext) CompileAggregator(c *expr.Call, maker expr.MakeAggrega
 func (gctx *groupContext) makeGroupByOp(ctx context.Context, ses *evaluate.Session,
 	tx sql.Transaction, rop rowsOp, fctx *fromContext) (rowsOp, error) {
 
-	gbo := &groupByOp{rop: rop, columns: gctx.groupCols, groupExprs: gctx.groupExprs}
+	gbo := &groupByOp{rop: rop, cols: gctx.groupCols, groupExprs: gctx.groupExprs}
 	for idx := range gctx.aggregators {
 		agg := aggregator{maker: gctx.makers[idx]}
 		for _, a := range gctx.aggregators[idx].Args {
@@ -241,7 +241,7 @@ func (gctx *groupContext) makeGroupByOp(ctx context.Context, ses *evaluate.Sessi
 			agg.args = append(agg.args, ce)
 		}
 		gbo.aggregators = append(gbo.aggregators, agg)
-		gbo.columns = append(gbo.columns, sql.ID(fmt.Sprintf("agg%d", len(gbo.columns)+1)))
+		gbo.cols = append(gbo.cols, sql.ID(fmt.Sprintf("agg%d", len(gbo.cols)+1)))
 	}
 	return gbo, nil
 }

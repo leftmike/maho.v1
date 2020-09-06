@@ -38,14 +38,14 @@ func (stmt *Values) String() string {
 }
 
 type exprValues struct {
-	tx      sql.Transaction
-	columns []sql.Identifier
-	rows    [][]sql.CExpr
-	index   int
+	tx    sql.Transaction
+	cols  []sql.Identifier
+	rows  [][]sql.CExpr
+	index int
 }
 
 func (ev *exprValues) Columns() []sql.Identifier {
-	return ev.columns
+	return ev.cols
 }
 
 func (ev *exprValues) Close() error {
@@ -85,9 +85,9 @@ func (_ *exprValues) Update(ctx context.Context, updates []sql.ColumnUpdate) err
 func (stmt *Values) Plan(ctx context.Context, ses *evaluate.Session,
 	tx sql.Transaction) (evaluate.Plan, error) {
 
-	columns := make([]sql.Identifier, len(stmt.Expressions[0]))
-	for i := 0; i < len(columns); i++ {
-		columns[i] = sql.ID(fmt.Sprintf("column%d", i+1))
+	cols := make([]sql.Identifier, len(stmt.Expressions[0]))
+	for i := 0; i < len(cols); i++ {
+		cols[i] = sql.ID(fmt.Sprintf("column%d", i+1))
 	}
 
 	var rows [][]sql.CExpr
@@ -103,8 +103,8 @@ func (stmt *Values) Plan(ctx context.Context, ses *evaluate.Session,
 		rows = append(rows, row)
 	}
 	return &exprValues{
-		columns: columns,
-		rows:    rows,
+		cols: cols,
+		rows: rows,
 	}, nil
 }
 
