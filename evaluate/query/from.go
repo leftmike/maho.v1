@@ -309,8 +309,3 @@ func (fctx *fromContext) columns() []sql.Identifier {
 	}
 	return cols
 }
-
-// TestColumns is for testing.
-func (fctx *fromContext) TestColumns() []sql.Identifier {
-	return fctx.columns()
-}

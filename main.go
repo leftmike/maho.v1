@@ -65,7 +65,7 @@ To Do:
 -- use indexes when available
 
 - foreign keys
--- make create SQL (as structs) to check and update foreign key relations
+-- create SQL (as structs) to check and update foreign key relations
 -- use prepared statements so only has to be planned once, but executed multiple times
 -- sqlite: fkey IS NULL OR EXISTS(SELECT 1 FROM reftbl WHERE fkey=refkey)
 -- tests to verify that the structs match expected SQL
