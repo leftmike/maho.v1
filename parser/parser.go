@@ -1690,28 +1690,14 @@ func (p *parser) parseDropSchema() evaluate.Stmt {
 }
 
 func (p *parser) parseExplain() evaluate.Stmt {
-	// EXPLAIN [VERBOSE] (delete | insert | select | update | values)
+	// EXPLAIN [VERBOSE] select
 
 	var s misc.Explain
 	s.Verbose = p.optionalReserved(sql.VERBOSE)
-	switch p.expectReserved(sql.DELETE, sql.INSERT, sql.SELECT, sql.UPDATE, sql.VALUES) {
-	case sql.DELETE:
-		// DELETE FROM ...
-		p.expectReserved(sql.FROM)
-		s.Stmt = p.parseDelete()
-	case sql.INSERT:
-		// INSERT INTO ...
-		p.expectReserved(sql.INTO)
-		s.Stmt = p.parseInsert()
+	switch p.expectReserved(sql.SELECT) {
 	case sql.SELECT:
 		// SELECT ...
 		s.Stmt = p.parseSelect()
-	case sql.UPDATE:
-		// UPDATE ...
-		s.Stmt = p.parseUpdate()
-	case sql.VALUES:
-		// VALUES ...
-		s.Stmt = p.parseValues()
 	}
 
 	return s
