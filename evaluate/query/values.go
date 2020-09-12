@@ -37,6 +37,51 @@ func (stmt *Values) String() string {
 	return s
 }
 
+func (stmt *Values) Plan(ctx context.Context, pctx evaluate.PlanContext,
+	tx sql.Transaction) (evaluate.Plan, error) {
+
+	cols := make([]sql.Identifier, len(stmt.Expressions[0]))
+	for i := 0; i < len(cols); i++ {
+		cols[i] = sql.ID(fmt.Sprintf("column%d", i+1))
+	}
+
+	var rows [][]sql.CExpr
+	for _, r := range stmt.Expressions {
+		row := make([]sql.CExpr, len(r))
+		for j := range r {
+			var err error
+			row[j], err = expr.Compile(ctx, pctx, tx, nil, r[j])
+			if err != nil {
+				return nil, err
+			}
+		}
+		rows = append(rows, row)
+	}
+	return valuesPlan{
+		cols: cols,
+		rows: rows,
+	}, nil
+}
+
+type valuesPlan struct {
+	cols []sql.Identifier
+	rows [][]sql.CExpr
+}
+
+func (_ valuesPlan) Planned() {}
+
+func (vp valuesPlan) Columns() []sql.Identifier {
+	return vp.cols
+}
+
+func (vp valuesPlan) Rows(ctx context.Context, tx sql.Transaction) (sql.Rows, error) {
+	return &exprValues{
+		tx:   tx,
+		cols: vp.cols,
+		rows: vp.rows,
+	}, nil
+}
+
 type exprValues struct {
 	tx    sql.Transaction
 	cols  []sql.Identifier
@@ -80,37 +125,4 @@ func (_ *exprValues) Delete(ctx context.Context) error {
 
 func (_ *exprValues) Update(ctx context.Context, updates []sql.ColumnUpdate) error {
 	return errors.New("values: rows may not be updated")
-}
-
-func (stmt *Values) Plan(ctx context.Context, pctx evaluate.PlanContext,
-	tx sql.Transaction) (evaluate.Plan, error) {
-
-	cols := make([]sql.Identifier, len(stmt.Expressions[0]))
-	for i := 0; i < len(cols); i++ {
-		cols[i] = sql.ID(fmt.Sprintf("column%d", i+1))
-	}
-
-	var rows [][]sql.CExpr
-	for _, r := range stmt.Expressions {
-		row := make([]sql.CExpr, len(r))
-		for j := range r {
-			var err error
-			row[j], err = expr.Compile(ctx, pctx, tx, nil, r[j])
-			if err != nil {
-				return nil, err
-			}
-		}
-		rows = append(rows, row)
-	}
-	return &exprValues{
-		cols: cols,
-		rows: rows,
-	}, nil
-}
-
-func (_ *exprValues) Planned() {}
-
-func (ev *exprValues) Rows(ctx context.Context, tx sql.Transaction) (sql.Rows, error) {
-	ev.tx = tx
-	return ev, nil
 }

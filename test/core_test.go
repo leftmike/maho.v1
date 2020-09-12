@@ -57,7 +57,7 @@ func TestValuesSimple(t *testing.T) {
 		}
 		tx := e.Begin(0)
 
-		ret, err := stmt.Plan(ctx, ses, tx)
+		plan, err := stmt.Plan(ctx, ses, tx)
 		if c.fail {
 			if err == nil {
 				t.Errorf("Plan(%q) did not fail", c.sql)
@@ -68,9 +68,14 @@ func TestValuesSimple(t *testing.T) {
 			t.Errorf("Plan(%q) failed with %s", c.sql, err)
 			continue
 		}
-		rows, ok := ret.(sql.Rows)
+		rowsPlan, ok := plan.(evaluate.RowsPlan)
 		if !ok {
-			t.Errorf("Plan(%q).(sql.Rows) failed", c.sql)
+			t.Errorf("(%v).Plan() did not return Rows", c.sql)
+			continue
+		}
+		rows, err := rowsPlan.Rows(ctx, tx)
+		if err != nil {
+			t.Errorf("(%v).Rows() failed with %s", c.sql, err)
 			continue
 		}
 		dest := make([]sql.Value, len(rows.Columns()))

@@ -43,12 +43,10 @@ To Do:
 - subquery expressions: EXISTS, IN, NOT IN, ANY/SOME, ALL
 - conditional expressions: CASE, COALESCE, NULLIF, GREATEST, LEAST
 
-- indexes
--- in select, check for an matching index and use if available
--- storage tests of indexes
--- add create unique index test to sqltest/
--- add create index test to sqltest/
--- engine.Table: IndexRows(...) => engine.IndexRows {Columns, Close, Next, Row}
+- prepared statements
+-- parse PREPARE
+-- parse EXECUTE
+-- parse parameters in expressions
 
 - EXPLAIN
 -- group by fields: need to get name of compiled aggregator
@@ -56,15 +54,14 @@ To Do:
 -- SELECT: track where columns come from, maybe as part of Plan
 -- DELETE, INSERT, UPDATE, VALUES
 
-- SELECT, INSERT, UPDATE, DELETE
--- parse PREPARE
--- parse EXECUTE
--- prepared statements
--- parse parameters in expressions
--- prepare_test.go
+- indexes
+-- storage tests of indexes
+-- add create unique index test to sqltest/
+-- add create index test to sqltest/
+-- engine.Table: IndexRows(...) => engine.IndexRows {Columns, Close, Next, Row}
 
 - SELECT
--- push filters down to scans: col op val or val op col; and combos
+-- push filters down to scans: col op val or val op col; and combos; and params
 -- use primary index if possible
 -- use indexes when available
 
