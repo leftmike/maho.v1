@@ -168,14 +168,14 @@ func (cc columnCheck) CompileRef(r expr.Ref) (int, error) {
 	return -1, fmt.Errorf("engine: reference %s not found", r)
 }
 
-func (stmt *CreateTable) Plan(ctx context.Context, ses *evaluate.Session,
+func (stmt *CreateTable) Plan(ctx context.Context, pctx evaluate.PlanContext,
 	tx sql.Transaction) (evaluate.Plan, error) {
 
-	stmt.Table = ses.ResolveTableName(stmt.Table)
+	stmt.Table = pctx.ResolveTableName(stmt.Table)
 
 	for _, fk := range stmt.ForeignKeys {
 		fk.FKTable = stmt.Table
-		err := fk.plan(ctx, ses, tx)
+		err := fk.plan(ctx, pctx, tx)
 		if err != nil {
 			return nil, err
 		}
@@ -203,7 +203,7 @@ func (stmt *CreateTable) Plan(ctx context.Context, ses *evaluate.Session,
 			} else {
 				cctx = tableCheck(stmt.Columns)
 			}
-			check, err = expr.Compile(ctx, ses, tx, cctx, con.Check)
+			check, err = expr.Compile(ctx, pctx, tx, cctx, con.Check)
 			if err != nil {
 				return nil, err
 			}
@@ -226,7 +226,7 @@ func (stmt *CreateTable) Plan(ctx context.Context, ses *evaluate.Session,
 		var dfltExpr string
 		if ct.Default != nil {
 			var err error
-			dflt, err = expr.Compile(ctx, ses, tx, nil, ct.Default)
+			dflt, err = expr.Compile(ctx, pctx, tx, nil, ct.Default)
 			if err != nil {
 				return nil, err
 			}
@@ -290,10 +290,10 @@ func (stmt *CreateIndex) String() string {
 	return s
 }
 
-func (stmt *CreateIndex) Plan(ctx context.Context, ses *evaluate.Session,
+func (stmt *CreateIndex) Plan(ctx context.Context, pctx evaluate.PlanContext,
 	tx sql.Transaction) (evaluate.Plan, error) {
 
-	stmt.Table = ses.ResolveTableName(stmt.Table)
+	stmt.Table = pctx.ResolveTableName(stmt.Table)
 	return stmt, nil
 }
 
@@ -330,7 +330,7 @@ func (stmt *CreateDatabase) String() string {
 	return s
 }
 
-func (stmt *CreateDatabase) Plan(ctx context.Context, ses *evaluate.Session,
+func (stmt *CreateDatabase) Plan(ctx context.Context, pctx evaluate.PlanContext,
 	tx sql.Transaction) (evaluate.Plan, error) {
 
 	return stmt, nil
@@ -338,7 +338,7 @@ func (stmt *CreateDatabase) Plan(ctx context.Context, ses *evaluate.Session,
 
 func (_ *CreateDatabase) Planned() {}
 
-func (stmt *CreateDatabase) Command(ctx context.Context, ses *evaluate.Session,
+func (stmt *CreateDatabase) Command(ctx context.Context, pctx evaluate.PlanContext,
 	e sql.Engine) (int64, error) {
 
 	return -1, e.CreateDatabase(stmt.Database, stmt.Options)
@@ -352,10 +352,10 @@ func (stmt *CreateSchema) String() string {
 	return fmt.Sprintf("CREATE SCHEMA %s", stmt.Schema)
 }
 
-func (stmt *CreateSchema) Plan(ctx context.Context, ses *evaluate.Session,
+func (stmt *CreateSchema) Plan(ctx context.Context, pctx evaluate.PlanContext,
 	tx sql.Transaction) (evaluate.Plan, error) {
 
-	stmt.Schema = ses.ResolveSchemaName(stmt.Schema)
+	stmt.Schema = pctx.ResolveSchemaName(stmt.Schema)
 	return stmt, nil
 }
 

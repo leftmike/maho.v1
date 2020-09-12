@@ -54,6 +54,10 @@ func TestScan(t *testing.T) {
 		{">%", token.Error},
 		{">-123", token.Greater},
 		{"=>", token.Error},
+		{"$1", token.Parameter},
+		{"$25", token.Parameter},
+		{"$-2", token.Error},
+		{"$abc", token.Error},
 	}
 
 	for i, c := range cases {
@@ -215,6 +219,30 @@ abcd -- identifier
 					t.Errorf("%d Scan(%q).String != %q", i, src, e.s)
 				}
 			}
+		}
+	}
+
+	parameters := []struct {
+		s string
+		n int64
+	}{
+		{"$12345", 12345},
+		{"$999", 999},
+		{"$999 ", 999},
+		{"$999zzz", 999},
+		{"$1", 1},
+	}
+
+	for i, n := range parameters {
+		var s Scanner
+		s.Init(strings.NewReader(n.s), fmt.Sprintf("integers[%d]", i))
+		var sctx ScanCtx
+		s.Scan(&sctx)
+		if sctx.Token != token.Parameter {
+			t.Errorf("Scan(%q) got %d want Parameter", n.s, sctx.Token)
+		}
+		if sctx.Integer != n.n {
+			t.Errorf("Scan(%q).Integer got %d want %d", n.s, sctx.Integer, n.n)
 		}
 	}
 }

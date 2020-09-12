@@ -9,7 +9,13 @@ import (
 
 type Stmt interface {
 	fmt.Stringer
-	Plan(ctx context.Context, ses *Session, tx sql.Transaction) (Plan, error)
+	Plan(ctx context.Context, pctx PlanContext, tx sql.Transaction) (Plan, error)
+}
+
+type PlanContext interface {
+	ResolveTableName(tn sql.TableName) sql.TableName
+	ResolveSchemaName(sn sql.SchemaName) sql.SchemaName
+	PlanParameter(num int) (*sql.Value, error)
 }
 
 type Plan interface {

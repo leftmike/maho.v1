@@ -2,6 +2,7 @@ package expr
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"math"
 
@@ -30,23 +31,19 @@ func CompileRef(idx int) sql.CExpr {
 	return colIndex(idx)
 }
 
-func Compile(ctx context.Context, ses *evaluate.Session, tx sql.Transaction, cctx CompileContext,
-	e Expr) (sql.CExpr, error) {
-
-	return compile(ctx, ses, tx, cctx, e, false)
-}
-
-func CompileAggregator(ctx context.Context, ses *evaluate.Session, tx sql.Transaction,
+func Compile(ctx context.Context, pctx evaluate.PlanContext, tx sql.Transaction,
 	cctx CompileContext, e Expr) (sql.CExpr, error) {
 
-	return compile(ctx, ses, tx, cctx, e, true)
+	return compile(ctx, pctx, tx, cctx, e, false)
 }
 
-func CompileExpr(e Expr) (sql.CExpr, error) {
-	return compile(nil, nil, nil, nil, e, false)
+func CompileAggregator(ctx context.Context, pctx evaluate.PlanContext, tx sql.Transaction,
+	cctx CompileContext, e Expr) (sql.CExpr, error) {
+
+	return compile(ctx, pctx, tx, cctx, e, true)
 }
 
-func compile(ctx context.Context, ses *evaluate.Session, tx sql.Transaction, cctx CompileContext,
+func compile(ctx context.Context, pctx evaluate.PlanContext, tx sql.Transaction, cctx CompileContext,
 	e Expr, agg bool) (sql.CExpr, error) {
 
 	if agg {
@@ -60,21 +57,21 @@ func compile(ctx context.Context, ses *evaluate.Session, tx sql.Transaction, cct
 		return e, nil
 	case *Unary:
 		if e.Op == NoOp {
-			return compile(ctx, ses, tx, cctx, e.Expr, agg)
+			return compile(ctx, pctx, tx, cctx, e.Expr, agg)
 		}
 		cf := opFuncs[e.Op]
-		a1, err := compile(ctx, ses, tx, cctx, e.Expr, agg)
+		a1, err := compile(ctx, pctx, tx, cctx, e.Expr, agg)
 		if err != nil {
 			return nil, err
 		}
 		return &call{cf, []sql.CExpr{a1}}, nil
 	case *Binary:
 		cf := opFuncs[e.Op]
-		a1, err := compile(ctx, ses, tx, cctx, e.Left, agg)
+		a1, err := compile(ctx, pctx, tx, cctx, e.Left, agg)
 		if err != nil {
 			return nil, err
 		}
-		a2, err := compile(ctx, ses, tx, cctx, e.Right, agg)
+		a2, err := compile(ctx, pctx, tx, cctx, e.Right, agg)
 		if err != nil {
 			return nil, err
 		}
@@ -113,18 +110,18 @@ func compile(ctx context.Context, ses *evaluate.Session, tx sql.Transaction, cct
 		args := make([]sql.CExpr, len(e.Args))
 		for i, a := range e.Args {
 			var err error
-			args[i], err = compile(ctx, ses, tx, cctx, a, agg)
+			args[i], err = compile(ctx, pctx, tx, cctx, a, agg)
 			if err != nil {
 				return nil, err
 			}
 		}
 		return &call{cf, args}, nil
 	case *Stmt:
-		if ses == nil || tx == nil {
+		if pctx == nil {
 			return nil, fmt.Errorf("engine: expression statements not allowed here: %s", e.Stmt)
 		}
 
-		plan, err := e.Stmt.Plan(ctx, ses, tx)
+		plan, err := e.Stmt.Plan(ctx, pctx, tx)
 		if err != nil {
 			return nil, err
 		}
@@ -134,6 +131,15 @@ func compile(ctx context.Context, ses *evaluate.Session, tx sql.Transaction, cct
 			return nil, fmt.Errorf("engine: expected rows: %s", e.Stmt)
 		}
 		return &rowsExpr{rowsPlan: rowsPlan}, nil
+	case Param:
+		if pctx == nil {
+			return nil, errors.New("engine: unexpected parameter, not preparing a statement")
+		}
+		ptr, err := pctx.PlanParameter(e.Num)
+		if err != nil {
+			return nil, err
+		}
+		return param{num: e.Num, ptr: ptr}, nil
 	default:
 		panic(fmt.Sprintf("missing case for expr: %#v", e))
 	}

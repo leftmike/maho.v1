@@ -52,10 +52,10 @@ func (up *updatePlan) EvalRef(idx int) sql.Value {
 	return up.dest[idx]
 }
 
-func (stmt *Update) Plan(ctx context.Context, ses *evaluate.Session,
+func (stmt *Update) Plan(ctx context.Context, pctx evaluate.PlanContext,
 	tx sql.Transaction) (evaluate.Plan, error) {
 
-	tn := ses.ResolveTableName(stmt.Table)
+	tn := pctx.ResolveTableName(stmt.Table)
 	tt, err := tx.LookupTableType(ctx, tn)
 	if err != nil {
 		return nil, err
@@ -64,7 +64,7 @@ func (stmt *Update) Plan(ctx context.Context, ses *evaluate.Session,
 	fctx := makeFromContext(tn.Table, tt.Columns())
 	var where sql.CExpr
 	if stmt.Where != nil {
-		where, err = expr.Compile(ctx, ses, tx, fctx, stmt.Where)
+		where, err = expr.Compile(ctx, pctx, tx, fctx, stmt.Where)
 		if err != nil {
 			return nil, err
 		}
@@ -79,7 +79,7 @@ func (stmt *Update) Plan(ctx context.Context, ses *evaluate.Session,
 	}
 
 	for _, cu := range stmt.ColumnUpdates {
-		ce, err := expr.Compile(ctx, ses, tx, fctx, cu.Expr)
+		ce, err := expr.Compile(ctx, pctx, tx, fctx, cu.Expr)
 		if err != nil {
 			return nil, err
 		}

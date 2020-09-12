@@ -2,6 +2,7 @@ package misc
 
 import (
 	"context"
+	"errors"
 	"fmt"
 
 	"github.com/leftmike/maho/evaluate"
@@ -18,9 +19,13 @@ func (stmt *Set) String() string {
 	return fmt.Sprintf("SET %s TO %s", stmt.Variable, stmt.Value)
 }
 
-func (stmt *Set) Plan(ctx context.Context, ses *evaluate.Session,
+func (stmt *Set) Plan(ctx context.Context, pctx evaluate.PlanContext,
 	tx sql.Transaction) (evaluate.Plan, error) {
 
+	ses, ok := pctx.(*evaluate.Session)
+	if !ok {
+		return nil, errors.New("engine: show not allowed here")
+	}
 	stmt.ses = ses
 	return stmt, nil
 }

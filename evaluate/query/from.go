@@ -11,7 +11,7 @@ import (
 
 type FromItem interface {
 	fmt.Stringer
-	plan(ctx context.Context, ses *evaluate.Session, tx sql.Transaction) (rowsOp, *fromContext,
+	plan(ctx context.Context, pctx evaluate.PlanContext, tx sql.Transaction) (rowsOp, *fromContext,
 		error)
 }
 
@@ -28,10 +28,10 @@ func (fta FromTableAlias) String() string {
 	return s
 }
 
-func (fta FromTableAlias) plan(ctx context.Context, ses *evaluate.Session,
+func (fta FromTableAlias) plan(ctx context.Context, pctx evaluate.PlanContext,
 	tx sql.Transaction) (rowsOp, *fromContext, error) {
 
-	tn := ses.ResolveTableName(fta.TableName)
+	tn := pctx.ResolveTableName(fta.TableName)
 	tt, err := tx.LookupTableType(ctx, tn)
 	if err != nil {
 		return nil, nil, err
@@ -101,10 +101,10 @@ func (fs FromStmt) String() string {
 	return s
 }
 
-func (fs FromStmt) plan(ctx context.Context, ses *evaluate.Session, tx sql.Transaction) (rowsOp,
-	*fromContext, error) {
+func (fs FromStmt) plan(ctx context.Context, pctx evaluate.PlanContext,
+	tx sql.Transaction) (rowsOp, *fromContext, error) {
 
-	plan, err := fs.Stmt.Plan(ctx, ses, tx)
+	plan, err := fs.Stmt.Plan(ctx, pctx, tx)
 	if err != nil {
 		return nil, nil, err
 	}

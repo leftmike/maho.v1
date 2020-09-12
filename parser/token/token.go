@@ -14,6 +14,7 @@ const (
 	Bytes
 	Integer
 	Float
+	Parameter
 
 	BarBar
 	LessLess

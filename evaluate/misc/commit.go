@@ -13,7 +13,7 @@ func (stmt *Commit) String() string {
 	return "COMMIT"
 }
 
-func (stmt *Commit) Plan(ctx context.Context, ses *evaluate.Session,
+func (stmt *Commit) Plan(ctx context.Context, pctx evaluate.PlanContext,
 	tx sql.Transaction) (evaluate.Plan, error) {
 
 	return stmt, nil

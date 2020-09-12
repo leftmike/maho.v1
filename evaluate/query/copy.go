@@ -36,11 +36,11 @@ func (stmt *Copy) String() string {
 	return s
 }
 
-func (stmt *Copy) Plan(ctx context.Context, ses *evaluate.Session,
+func (stmt *Copy) Plan(ctx context.Context, pctx evaluate.PlanContext,
 	tx sql.Transaction) (evaluate.Plan, error) {
 
-	stmt.Table = ses.ResolveTableName(stmt.Table)
-	tt, err := tx.LookupTableType(ctx, stmt.Table)
+	tn := pctx.ResolveTableName(stmt.Table)
+	tt, err := tx.LookupTableType(ctx, tn)
 	if err != nil {
 		return nil, err
 	}
@@ -59,7 +59,7 @@ func (stmt *Copy) Plan(ctx context.Context, ses *evaluate.Session,
 	for fdx, cn := range stmt.Columns {
 		cdx, ok := cmap[cn]
 		if !ok {
-			return nil, fmt.Errorf("engine: %s: column not found: %s", stmt.Table, cn)
+			return nil, fmt.Errorf("engine: %s: column not found: %s", tn, cn)
 		}
 		fromToRow[fdx] = cdx
 		defaultRow[cdx] = nil
@@ -77,7 +77,7 @@ func (stmt *Copy) Plan(ctx context.Context, ses *evaluate.Session,
 	}
 
 	return &copyPlan{
-		tn:         stmt.Table,
+		tn:         tn,
 		ttVer:      tt.Version(),
 		cols:       cols,
 		from:       copy.NewReader("stdin", stmt.From, stmt.FromLine),

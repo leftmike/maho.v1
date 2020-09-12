@@ -80,10 +80,10 @@ func explain(tree evaluate.ExplainTree, rows [][]sql.Value, depth int,
 	return rows
 }
 
-func (stmt Explain) Plan(ctx context.Context, ses *evaluate.Session,
+func (stmt Explain) Plan(ctx context.Context, pctx evaluate.PlanContext,
 	tx sql.Transaction) (evaluate.Plan, error) {
 
-	plan, err := stmt.Stmt.Plan(ctx, ses, tx)
+	plan, err := stmt.Stmt.Plan(ctx, pctx, tx)
 	if err != nil {
 		return nil, err
 	}

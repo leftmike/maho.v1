@@ -29,10 +29,10 @@ type deletePlan struct {
 	where sql.CExpr
 }
 
-func (stmt *Delete) Plan(ctx context.Context, ses *evaluate.Session,
+func (stmt *Delete) Plan(ctx context.Context, pctx evaluate.PlanContext,
 	tx sql.Transaction) (evaluate.Plan, error) {
 
-	tn := ses.ResolveTableName(stmt.Table)
+	tn := pctx.ResolveTableName(stmt.Table)
 	tt, err := tx.LookupTableType(ctx, tn)
 	if err != nil {
 		return nil, err
@@ -40,7 +40,7 @@ func (stmt *Delete) Plan(ctx context.Context, ses *evaluate.Session,
 
 	var where sql.CExpr
 	if stmt.Where != nil {
-		where, err = expr.Compile(ctx, ses, tx, makeFromContext(tn.Table, tt.Columns()),
+		where, err = expr.Compile(ctx, pctx, tx, makeFromContext(tn.Table, tt.Columns()),
 			stmt.Where)
 		if err != nil {
 			return nil, err

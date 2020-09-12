@@ -255,3 +255,23 @@ func (_ Stmt) Equal(e Expr) bool {
 func (_ Stmt) HasRef() bool {
 	return false
 }
+
+type Param struct {
+	Num int
+}
+
+func (p Param) String() string {
+	return fmt.Sprintf("$%d", p.Num)
+}
+
+func (p Param) Equal(e Expr) bool {
+	p2, ok := e.(Param)
+	if !ok {
+		return false
+	}
+	return p.Num == p2.Num
+}
+
+func (p Param) HasRef() bool {
+	return false
+}

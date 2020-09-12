@@ -13,7 +13,7 @@ func (stmt *Rollback) String() string {
 	return "ROLLBACK"
 }
 
-func (stmt *Rollback) Plan(ctx context.Context, ses *evaluate.Session,
+func (stmt *Rollback) Plan(ctx context.Context, pctx evaluate.PlanContext,
 	tx sql.Transaction) (evaluate.Plan, error) {
 
 	return stmt, nil

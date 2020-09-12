@@ -132,7 +132,7 @@ DROP TABLE [IF EXISTS] [[database '.'] schema '.'] table [',' ...]
 ```
 
 ```
-EXPLAIN [VERBOSE] (delete | insert | select | update | values)
+EXPLAIN [VERBOSE] select
 ```
 
 ```

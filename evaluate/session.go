@@ -2,6 +2,7 @@ package evaluate
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"io"
 
@@ -183,4 +184,8 @@ func (ses *Session) ResolveSchemaName(sn sql.SchemaName) sql.SchemaName {
 		sn.Database = ses.defaultDatabase
 	}
 	return sn
+}
+
+func (ses *Session) PlanParameter(num int) (*sql.Value, error) {
+	return nil, errors.New("engine: unexpected parameter, not preparing a statement")
 }

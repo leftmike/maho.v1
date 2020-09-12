@@ -57,10 +57,14 @@ To Do:
 -- DELETE, INSERT, UPDATE, VALUES
 
 - SELECT, INSERT, UPDATE, DELETE
+-- parse PREPARE
+-- parse EXECUTE
 -- prepared statements
+-- parse parameters in expressions
+-- prepare_test.go
 
 - SELECT
--- push filters down to scans
+-- push filters down to scans: col op val or val op col; and combos
 -- use primary index if possible
 -- use indexes when available
 

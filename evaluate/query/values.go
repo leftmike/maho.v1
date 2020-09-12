@@ -82,7 +82,7 @@ func (_ *exprValues) Update(ctx context.Context, updates []sql.ColumnUpdate) err
 	return errors.New("values: rows may not be updated")
 }
 
-func (stmt *Values) Plan(ctx context.Context, ses *evaluate.Session,
+func (stmt *Values) Plan(ctx context.Context, pctx evaluate.PlanContext,
 	tx sql.Transaction) (evaluate.Plan, error) {
 
 	cols := make([]sql.Identifier, len(stmt.Expressions[0]))
@@ -95,7 +95,7 @@ func (stmt *Values) Plan(ctx context.Context, ses *evaluate.Session,
 		row := make([]sql.CExpr, len(r))
 		for j := range r {
 			var err error
-			row[j], err = expr.Compile(ctx, ses, tx, nil, r[j])
+			row[j], err = expr.Compile(ctx, pctx, tx, nil, r[j])
 			if err != nil {
 				return nil, err
 			}

@@ -77,6 +77,8 @@ func encode(buf []byte, ce sql.CExpr) []byte {
 		for _, a := range ce.args {
 			buf = encode(buf, a)
 		}
+	case param:
+		panic("engine: parameters may not be encoded")
 	default:
 		panic(fmt.Sprintf("unexpected type for sql.CExpr: %T: %v", ce, ce))
 	}
@@ -303,6 +305,21 @@ func (c *call) Eval(ctx context.Context, tx sql.Transaction, ectx sql.EvalContex
 		}
 	}
 	return c.call.fn(ectx, args)
+}
+
+type param struct {
+	num int
+	ptr *sql.Value
+}
+
+func (p param) String() string {
+	return fmt.Sprintf("$%d = %s", p.num, *p.ptr)
+}
+
+func (p param) Eval(ctx context.Context, tx sql.Transaction, ectx sql.EvalContext) (sql.Value,
+	error) {
+
+	return *p.ptr, nil
 }
 
 func numFunc(a0 sql.Value, a1 sql.Value, ifn func(i0, i1 sql.Int64Value) sql.Value,

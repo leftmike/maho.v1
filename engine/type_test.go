@@ -1,6 +1,7 @@
 package engine
 
 import (
+	"context"
 	"reflect"
 	"testing"
 
@@ -9,7 +10,7 @@ import (
 )
 
 func mustCompile(t *testing.T, e expr.Expr) sql.CExpr {
-	ce, err := expr.CompileExpr(e)
+	ce, err := expr.Compile(context.Background(), nil, nil, nil, e)
 	if err != nil {
 		t.Fatal(err)
 	}

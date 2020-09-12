@@ -24,6 +24,7 @@ func TestExpr(t *testing.T) {
 				Name: sql.ID("abc"),
 				Args: []Expr{
 					&Unary{Op: NegateOp, Expr: Int64Literal(123)},
+					Param{Num: 3},
 					Int64Literal(456),
 					&Binary{Op: AddOp,
 						Left:  Ref{sql.ID("def"), sql.ID("ghi")},
@@ -31,7 +32,7 @@ func TestExpr(t *testing.T) {
 					},
 				},
 			},
-			s: "abc((- 123), 456, (def.ghi + 789))",
+			s: "abc((- 123), $3, 456, (def.ghi + 789))",
 		},
 	}
 

@@ -237,6 +237,13 @@ SkipWhitespace:
 		}
 	} else if r == '.' || r == ',' || r == '(' || r == ')' {
 		return r
+	} else if r == '$' {
+		r = s.readRune(sctx)
+		if !unicode.IsDigit(r) {
+			sctx.Error = fmt.Errorf("scanner: expected parameter %s", s.buffer.String())
+			return token.Error
+		}
+		return s.scanParameter(sctx, r)
 	}
 
 	sctx.Error = fmt.Errorf("scanner: unexpected character '%c'", r)
@@ -330,6 +337,31 @@ func (s *Scanner) scanNumber(sctx *ScanCtx, r rune, sign int64) rune {
 		sctx.Integer *= sign
 		return token.Integer
 	}
+}
+
+func (s *Scanner) scanParameter(sctx *ScanCtx, r rune) rune {
+	for {
+		s.buffer.WriteRune(r)
+		r = s.readRune(sctx)
+		if r == token.EOF {
+			break
+		} else if r == token.Error {
+			return token.Error
+		}
+		if !unicode.IsDigit(r) {
+			s.unreadRune()
+			break
+		}
+	}
+
+	var err error
+	sctx.Integer, err = strconv.ParseInt(s.buffer.String(), 10, 64)
+	if err != nil {
+		sctx.Error = err
+		return token.Error
+	}
+
+	return token.Parameter
 }
 
 func (s *Scanner) scanQuotedIdentifier(sctx *ScanCtx, delim rune) rune {

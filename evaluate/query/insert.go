@@ -54,10 +54,10 @@ func (stmt *InsertValues) String() string {
 	return s
 }
 
-func (stmt *InsertValues) Plan(ctx context.Context, ses *evaluate.Session,
+func (stmt *InsertValues) Plan(ctx context.Context, pctx evaluate.PlanContext,
 	tx sql.Transaction) (evaluate.Plan, error) {
 
-	tn := ses.ResolveTableName(stmt.Table)
+	tn := pctx.ResolveTableName(stmt.Table)
 	tt, err := tx.LookupTableType(ctx, tn)
 	if err != nil {
 		return nil, err
@@ -105,7 +105,7 @@ func (stmt *InsertValues) Plan(ctx context.Context, ses *evaluate.Session,
 
 			var ce sql.CExpr
 			if e != nil {
-				ce, err = expr.Compile(ctx, ses, tx, nil, e)
+				ce, err = expr.Compile(ctx, pctx, tx, nil, e)
 				if err != nil {
 					return nil, err
 				}
