@@ -33,18 +33,6 @@ func makeTable(tx *transaction, tn sql.TableName, stbl Table, tt *TableType) *ta
 	}
 }
 
-func (tbl *table) Columns(ctx context.Context) []sql.Identifier {
-	return tbl.tt.cols
-}
-
-func (tbl *table) ColumnTypes(ctx context.Context) []sql.ColumnType {
-	return tbl.tt.colTypes
-}
-
-func (tbl *table) PrimaryKey(ctx context.Context) []sql.ColumnKey {
-	return tbl.tt.primary
-}
-
 func (tbl *table) Rows(ctx context.Context, minRow, maxRow []sql.Value) (sql.Rows, error) {
 	r, err := tbl.stbl.Rows(ctx, minRow, maxRow)
 	if err != nil {
