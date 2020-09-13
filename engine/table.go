@@ -147,8 +147,8 @@ func (fka *foreignKeyAction) execute(ctx context.Context, e *Engine, tx *transac
 	}
 
 	if fka.fk.refIndex == 0 {
+		keyRow := make([]sql.Value, len(rtt.Columns()))
 		for _, key := range fka.keys {
-			keyRow := make([]sql.Value, len(rtt.Columns()))
 			for cdx, ck := range rtt.PrimaryKey() {
 				keyRow[ck.Column()] = key[cdx]
 			}
@@ -253,6 +253,13 @@ func (tbl *table) update(ctx context.Context, r Rows, updates []sql.ColumnUpdate
 			}
 		}
 	}
+
+	/*
+		for _, fk := range tbl.tt.foreignKeys {
+			// XXX: check if any fk.keyCols are not null and updated
+			// XXX: add foreignKeyAction
+		}
+	*/
 
 	return r.Update(ctx, updatedCols, updateRow)
 }

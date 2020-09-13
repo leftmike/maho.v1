@@ -43,8 +43,6 @@ To Do:
 - subquery expressions: EXISTS, IN, NOT IN, ANY/SOME, ALL
 - conditional expressions: CASE, COALESCE, NULLIF, GREATEST, LEAST
 
-- test prepared statements
-
 - EXPLAIN
 -- group by fields: need to get name of compiled aggregator
 -- include full column names
@@ -58,18 +56,23 @@ To Do:
 -- engine.Table: IndexRows(...) => engine.IndexRows {Columns, Close, Next, Row}
 
 - SELECT
--- push filters down to scans: col op val or val op col; and combos; and params
+-- push filters down to scans: col op (literal | param) or (literal | param) op col; and combos
 -- use primary index if possible
 -- use indexes when available
 
-- foreign keys
+- ALTER TABLE ONLY table ADD CONSTRAINT constraint FOREIGN KEY ...
+
+- foreign key references
+-- check fkey against ref table on update
+-- sqlite: fkey IS NULL OR EXISTS(SELECT 1 FROM reftbl WHERE fkey=refkey)
+-- need read lock on referenced keys
+-- insert and update
+
+- references from foreign keys
 -- create SQL (as structs) to check and update foreign key relations
 -- use prepared statements so only has to be planned once, but executed multiple times
--- sqlite: fkey IS NULL OR EXISTS(SELECT 1 FROM reftbl WHERE fkey=refkey)
 -- tests to verify that the structs match expected SQL
--- ALTER TABLE ONLY table ADD CONSTRAINT constraint FOREIGN KEY ...
 -- check foreign keys on update, insert, and delete
--- need read lock for referenced keys
 
 - constraints
 -- DROP TABLE: CASCADE: to remove foreign key constraint of another table
