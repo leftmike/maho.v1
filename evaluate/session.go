@@ -20,6 +20,7 @@ type Session struct {
 	defaultSchema   sql.Identifier
 	sesid           uint64
 	tx              sql.Transaction
+	preparedPlans   map[sql.Identifier]PreparedPlan
 }
 
 func NewSession(e sql.Engine, defaultDatabase, defaultSchema sql.Identifier) *Session {
@@ -188,4 +189,18 @@ func (ses *Session) ResolveSchemaName(sn sql.SchemaName) sql.SchemaName {
 
 func (ses *Session) PlanParameter(num int) (*sql.Value, error) {
 	return nil, errors.New("engine: unexpected parameter, not preparing a statement")
+}
+
+func (ses *Session) SetPreparedPlan(nam sql.Identifier, prep PreparedPlan) error {
+	if ses.preparedPlans == nil {
+		ses.preparedPlans = map[sql.Identifier]PreparedPlan{}
+	} else if _, ok := ses.preparedPlans[nam]; ok {
+		return fmt.Errorf("engine: prepared statement %s already defined", nam)
+	}
+	ses.preparedPlans[nam] = prep
+	return nil
+}
+
+func (ses *Session) GetPreparedPlan(nam sql.Identifier) PreparedPlan {
+	return ses.preparedPlans[nam]
 }

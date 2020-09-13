@@ -11,6 +11,7 @@ import (
 type Prepare struct {
 	Name sql.Identifier
 	Stmt evaluate.Stmt
+	prep evaluate.PreparedPlan
 }
 
 func (stmt *Prepare) String() string {
@@ -48,6 +49,10 @@ func (prep *prepareContext) PlanParameter(num int) (*sql.Value, error) {
 	return ptr, nil
 }
 
+func (prep *prepareContext) GetPreparedPlan(nam sql.Identifier) evaluate.PreparedPlan {
+	panic("unexpected, should never be called")
+}
+
 func (stmt *Prepare) PreparePlan(ctx context.Context, pctx evaluate.PlanContext,
 	tx sql.Transaction) (evaluate.PreparedPlan, error) {
 
@@ -64,4 +69,22 @@ func (stmt *Prepare) PreparePlan(ctx context.Context, pctx evaluate.PlanContext,
 	}
 
 	return evaluate.MakePreparedPlan(plan, prep.params), nil
+}
+
+func (stmt *Prepare) Plan(ctx context.Context, pctx evaluate.PlanContext,
+	tx sql.Transaction) (evaluate.Plan, error) {
+
+	var err error
+	stmt.prep, err = stmt.PreparePlan(ctx, pctx, tx)
+	if err != nil {
+		return nil, err
+	}
+
+	return stmt, nil
+}
+
+func (stmt *Prepare) Planned() {}
+
+func (stmt *Prepare) Command(ctx context.Context, ses *evaluate.Session, e sql.Engine) error {
+	return ses.SetPreparedPlan(stmt.Name, stmt.prep)
 }

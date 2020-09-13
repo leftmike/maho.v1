@@ -253,8 +253,10 @@ func (p *parser) parseStmt() evaluate.Stmt {
 		sql.DELETE,
 		sql.DETACH,
 		sql.DROP,
+		sql.EXECUTE,
 		sql.EXPLAIN,
 		sql.INSERT,
+		sql.PREPARE,
 		sql.ROLLBACK,
 		sql.SELECT,
 		sql.SET,
@@ -311,12 +313,16 @@ func (p *parser) parseStmt() evaluate.Stmt {
 			// DROP TABLE ...
 			return p.parseDropTable()
 		}
+	case sql.EXECUTE:
+		return p.parseExecute()
 	case sql.EXPLAIN:
 		return p.parseExplain()
 	case sql.INSERT:
 		// INSERT INTO ...
 		p.expectReserved(sql.INTO)
 		return p.parseInsert()
+	case sql.PREPARE:
+		return p.parsePrepare()
 	case sql.ROLLBACK:
 		// ROLLBACK
 		return &misc.Rollback{}
@@ -958,6 +964,7 @@ expr = literal
     | '(' expr | select | values | show ')'
     | expr op expr
     | ref ['.' ref ...]
+    | param
     | func '(' [expr [',' ...]] ')'
     | 'count' '(' '*' ')'
 op = '+' '-' '*' '/' '%'
@@ -1010,6 +1017,8 @@ func (p *parser) parseSubExpr() expr.Expr {
 		e = expr.Int64Literal(p.sctx.Integer)
 	} else if r == token.Float {
 		e = expr.Float64Literal(p.sctx.Float)
+	} else if r == token.Parameter {
+		e = expr.Param{Num: int(p.sctx.Integer)}
 	} else if r == token.Identifier {
 		id := p.sctx.Identifier
 		if p.maybeToken(token.LParen) {
@@ -1701,4 +1710,51 @@ func (p *parser) parseExplain() evaluate.Stmt {
 	}
 
 	return s
+}
+
+func (p *parser) parsePrepare() evaluate.Stmt {
+	// PREPARE name AS (delete | insert | select | update | values)
+
+	var s misc.Prepare
+	s.Name = p.expectIdentifier("expected a prepared statement")
+	p.expectReserved(sql.AS)
+	switch p.expectReserved(sql.DELETE, sql.INSERT, sql.SELECT, sql.UPDATE, sql.VALUES) {
+	case sql.DELETE:
+		// DELETE FROM ...
+		p.expectReserved(sql.FROM)
+		s.Stmt = p.parseDelete()
+	case sql.INSERT:
+		// INSERT INTO ...
+		p.expectReserved(sql.INTO)
+		s.Stmt = p.parseInsert()
+	case sql.SELECT:
+		// SELECT ...
+		s.Stmt = p.parseSelect()
+	case sql.UPDATE:
+		// UPDATE ...
+		s.Stmt = p.parseUpdate()
+	case sql.VALUES:
+		// VALUES ...
+		s.Stmt = p.parseValues()
+	}
+
+	return &s
+}
+
+func (p *parser) parseExecute() evaluate.Stmt {
+	// EXECUTE name ['(' expr [',' ...] ')']
+
+	var s misc.Execute
+	s.Name = p.expectIdentifier("expected a prepared statement")
+	if p.maybeToken(token.LParen) {
+		for {
+			s.Params = append(s.Params, p.parseExpr())
+			if p.maybeToken(token.RParen) {
+				break
+			}
+			p.expectTokens(token.Comma)
+		}
+	}
+
+	return &s
 }

@@ -43,10 +43,7 @@ To Do:
 - subquery expressions: EXISTS, IN, NOT IN, ANY/SOME, ALL
 - conditional expressions: CASE, COALESCE, NULLIF, GREATEST, LEAST
 
-- prepared statements
--- parse PREPARE
--- parse EXECUTE
--- parse parameters in expressions
+- test prepared statements
 
 - EXPLAIN
 -- group by fields: need to get name of compiled aggregator

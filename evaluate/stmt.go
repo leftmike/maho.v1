@@ -16,6 +16,7 @@ type PlanContext interface {
 	ResolveTableName(tn sql.TableName) sql.TableName
 	ResolveSchemaName(sn sql.SchemaName) sql.SchemaName
 	PlanParameter(num int) (*sql.Value, error)
+	GetPreparedPlan(nam sql.Identifier) PreparedPlan
 }
 
 type Plan interface {

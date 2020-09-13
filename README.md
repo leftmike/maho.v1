@@ -132,12 +132,20 @@ DROP TABLE [IF EXISTS] [[database '.'] schema '.'] table [',' ...]
 ```
 
 ```
+EXECUTE name ['(' expr [',' ...] ')']
+```
+
+```
 EXPLAIN [VERBOSE] select
 ```
 
 ```
 INSERT INTO [[database '.'] schema '.'] table ['(' column [',' ...] ')']
 	VALUES '(' expr | DEFAULT [',' ...] ')' [',' ...]
+```
+
+```
+PREPARE name AS (delete | insert | select | update | values)
 ```
 
 ```
@@ -210,6 +218,7 @@ expr =
     | '(' expr | select | values | show ')'
     | expr op expr
     | ref ['.' ref ...]
+    | param
     | func '(' [expr [',' ...]] ')'
 op =
       '+' '-' '*' '/' '%'

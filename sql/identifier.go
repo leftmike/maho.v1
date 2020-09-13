@@ -72,6 +72,7 @@ const (
 	DESC
 	DETACH
 	DROP
+	EXECUTE
 	EXISTS
 	EXPLAIN
 	FALSE
@@ -94,6 +95,7 @@ const (
 	OR
 	ORDER
 	OUTER
+	PREPARE
 	PRIMARY
 	REFERENCES
 	RIGHT
@@ -170,6 +172,7 @@ var knownKeywords = map[string]struct {
 	"DETACH":      {DETACH, true},
 	"DOUBLE":      {DOUBLE, false},
 	"DROP":        {DROP, true},
+	"EXECUTE":     {EXECUTE, true},
 	"EXISTS":      {EXISTS, true},
 	"EXPLAIN":     {EXPLAIN, true},
 	"FALSE":       {FALSE, true},
@@ -199,6 +202,7 @@ var knownKeywords = map[string]struct {
 	"OUTER":       {OUTER, true},
 	"PATH":        {PATH, false},
 	"PRECISION":   {PRECISION, false},
+	"PREPARE":     {PREPARE, true},
 	"PRIMARY":     {PRIMARY, true},
 	"REAL":        {REAL, false},
 	"REFERENCES":  {REFERENCES, true},
