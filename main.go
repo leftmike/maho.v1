@@ -43,6 +43,8 @@ To Do:
 - subquery expressions: EXISTS, IN, NOT IN, ANY/SOME, ALL
 - conditional expressions: CASE, COALESCE, NULLIF, GREATEST, LEAST
 
+- sql.Rows.Columns(): change to NumColumns() instead
+
 - EXPLAIN
 -- group by fields: need to get name of compiled aggregator
 -- include full column names
@@ -50,10 +52,10 @@ To Do:
 -- DELETE, INSERT, UPDATE, VALUES
 
 - indexes
--- storage tests of indexes
+-- finish storage tests of indexes
 -- add create unique index test to sqltest/
 -- add create index test to sqltest/
--- engine.Table: IndexRows(...) => engine.IndexRows {Columns, Close, Next, Row}
+-- IndexRows: keyval, kvrows, rowcols
 
 - SELECT
 -- push filters down to scans: col op (literal | param) or (literal | param) op col; and combos

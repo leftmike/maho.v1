@@ -59,7 +59,7 @@ func (tl *TableLayout) addIndexLayout(it sql.IndexType) {
 	var nullKey []sql.ColumnKey
 	if it.Unique && maybeNullColumns(it.Key, tl.tt.ColumnTypes()) {
 		for _, ck := range tl.tt.PrimaryKey() {
-			if !columnInKey(it.Key, ck) {
+			if !sql.ColumnInKey(it.Key, ck) {
 				nullKey = append(nullKey, ck)
 			}
 		}

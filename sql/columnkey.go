@@ -23,3 +23,13 @@ func (ck ColumnKey) Column() int {
 	}
 	return int(ck - 1)
 }
+
+func ColumnInKey(key []ColumnKey, pk ColumnKey) bool {
+	for _, ck := range key {
+		if ck.Column() == pk.Column() {
+			return true
+		}
+	}
+
+	return false
+}

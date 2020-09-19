@@ -50,6 +50,13 @@ type rows struct {
 	rows [][]sql.Value
 }
 
+type indexRows struct {
+	tbl  *table
+	il   storage.IndexLayout
+	idx  int
+	rows [][]sql.Value
+}
+
 func NewStore(dataDir string) (*storage.Store, error) {
 	bst := &basicStore{
 		tree: btree.New(16),
@@ -128,8 +135,10 @@ func (bt *table) toIndexItem(row []sql.Value, il storage.IndexLayout) btree.Item
 	ri := rowItem{
 		rid: (bt.tid << 16) | il.IID,
 	}
-	ri.row = il.RowToIndexRow(row)
-	ri.key = il.MakeKey(encode.MakeKey(il.Key, ri.row), ri.row)
+	if row != nil {
+		ri.row = il.RowToIndexRow(row)
+		ri.key = il.MakeKey(encode.MakeKey(il.Key, ri.row), ri.row)
+	}
 	return ri
 }
 
@@ -166,6 +175,43 @@ func (bt *table) Rows(ctx context.Context, minRow, maxRow []sql.Value) (engine.R
 			return true
 		})
 	return br, nil
+}
+
+func (bt *table) IndexRows(ctx context.Context, iidx int,
+	minRow, maxRow []sql.Value) (engine.IndexRows, error) {
+
+	indexes := bt.tl.Indexes()
+	if iidx >= len(indexes) {
+		panic(fmt.Sprintf("basic: table: %s: %d indexes: out of range: %d", bt.tn, len(indexes),
+			iidx))
+	}
+
+	il := indexes[iidx]
+	bir := &indexRows{
+		tbl: bt,
+		il:  il,
+		idx: 0,
+	}
+
+	var maxItem btree.Item
+	if maxRow != nil {
+		maxItem = bt.toIndexItem(maxRow, il)
+	}
+
+	rid := (bt.tid << 16) | il.IID
+	bt.tx.tree.AscendGreaterOrEqual(bt.toIndexItem(minRow, il),
+		func(item btree.Item) bool {
+			if maxItem != nil && maxItem.Less(item) {
+				return false
+			}
+			ri := item.(rowItem)
+			if ri.rid != rid {
+				return false
+			}
+			bir.rows = append(bir.rows, append(make([]sql.Value, 0, len(ri.row)), ri.row...))
+			return true
+		})
+	return bir, nil
 }
 
 func (bt *table) Insert(ctx context.Context, row []sql.Value) error {
@@ -209,6 +255,21 @@ func (br *rows) Next(ctx context.Context) ([]sql.Value, error) {
 	return br.rows[br.idx-1], nil
 }
 
+func (bt *table) deleteRow(ctx context.Context, row []sql.Value) error {
+	if bt.tx.tree.Delete(bt.toItem(row)) == nil {
+		return fmt.Errorf("basic: table %s: internal error: missing row to delete", bt.tn)
+	}
+
+	for idx, il := range bt.tl.Indexes() {
+		if bt.tx.tree.Delete(bt.toIndexItem(row, il)) == nil {
+			return fmt.Errorf("basic: table %s: %s index: internal error: missing row to delete",
+				bt.tn, bt.tl.IndexName(idx))
+		}
+	}
+
+	return nil
+}
+
 func (br *rows) Delete(ctx context.Context) error {
 	br.tbl.tx.forWrite()
 
@@ -216,18 +277,7 @@ func (br *rows) Delete(ctx context.Context) error {
 		panic(fmt.Sprintf("basic: table %s: no row to delete", br.tbl.tn))
 	}
 
-	if br.tbl.tx.tree.Delete(br.tbl.toItem(br.rows[br.idx-1])) == nil {
-		return fmt.Errorf("basic: table %s: internal error: missing row to delete", br.tbl.tn)
-	}
-
-	for idx, il := range br.tbl.tl.Indexes() {
-		if br.tbl.tx.tree.Delete(br.tbl.toIndexItem(br.rows[br.idx-1], il)) == nil {
-			return fmt.Errorf("basic: table %s: %s index: internal error: missing row to delete",
-				br.tbl.tn, br.tbl.tl.IndexName(idx))
-		}
-	}
-
-	return nil
+	return br.tbl.deleteRow(ctx, br.rows[br.idx-1])
 }
 
 func (bt *table) updateIndexes(ctx context.Context, updatedCols []int,
@@ -256,6 +306,26 @@ func (bt *table) updateIndexes(ctx context.Context, updatedCols []int,
 	return nil
 }
 
+func (bt *table) updateRow(ctx context.Context, updatedCols []int,
+	row, updateRow []sql.Value) error {
+
+	if bt.tl.PrimaryUpdated(updatedCols) {
+		err := bt.deleteRow(ctx, row)
+		if err != nil {
+			return err
+		}
+
+		err = bt.Insert(ctx, updateRow)
+		if err != nil {
+			return err
+		}
+	} else {
+		bt.tx.tree.ReplaceOrInsert(bt.toItem(updateRow))
+	}
+
+	return bt.updateIndexes(ctx, updatedCols, row, updateRow)
+}
+
 func (br *rows) Update(ctx context.Context, updatedCols []int, updateRow []sql.Value) error {
 	br.tbl.tx.forWrite()
 
@@ -263,19 +333,62 @@ func (br *rows) Update(ctx context.Context, updatedCols []int, updateRow []sql.V
 		panic(fmt.Sprintf("basic: table %s no row to update", br.tbl.tn))
 	}
 
-	if br.tbl.tl.PrimaryUpdated(updatedCols) {
-		err := br.Delete(ctx)
-		if err != nil {
-			return err
-		}
+	return br.tbl.updateRow(ctx, updatedCols, br.rows[br.idx-1], updateRow)
+}
 
-		err = br.tbl.Insert(ctx, updateRow)
-		if err != nil {
-			return err
-		}
-	} else {
-		br.tbl.tx.tree.ReplaceOrInsert(br.tbl.toItem(updateRow))
+func (bir *indexRows) Close() error {
+	bir.tbl = nil
+	bir.rows = nil
+	bir.idx = 0
+	return nil
+}
+
+func (bir *indexRows) Next(ctx context.Context) ([]sql.Value, error) {
+	if bir.idx == len(bir.rows) {
+		return nil, io.EOF
 	}
 
-	return br.tbl.updateIndexes(ctx, updatedCols, br.rows[br.idx-1], updateRow)
+	bir.idx += 1
+	return bir.rows[bir.idx-1], nil
+}
+
+func (bir *indexRows) Delete(ctx context.Context) error {
+	bir.tbl.tx.forWrite()
+
+	if bir.idx == 0 {
+		panic(fmt.Sprintf("basic: table %s no row to delete", bir.tbl.tn))
+	}
+
+	return bir.tbl.deleteRow(ctx, bir.getRow())
+}
+
+func (bir *indexRows) Update(ctx context.Context, updatedCols []int, updateRow []sql.Value) error {
+	bir.tbl.tx.forWrite()
+
+	if bir.idx == 0 {
+		panic(fmt.Sprintf("basic: table %s no row to update", bir.tbl.tn))
+	}
+
+	return bir.tbl.updateRow(ctx, updatedCols, bir.getRow(), updateRow)
+}
+
+func (bir *indexRows) getRow() []sql.Value {
+	row := make([]sql.Value, len(bir.tbl.tl.Columns()))
+	bir.il.IndexRowToRow(bir.rows[bir.idx-1], row)
+
+	item := bir.tbl.tx.tree.Get(bir.tbl.toItem(row))
+	if item == nil {
+		panic(fmt.Sprintf("basic: table %s no row to get in tree", bir.tbl.tn))
+	}
+
+	ri := item.(rowItem)
+	return ri.row
+}
+
+func (bir *indexRows) Row(ctx context.Context) ([]sql.Value, error) {
+	if bir.idx == 0 {
+		panic(fmt.Sprintf("basic: table %s no row to get", bir.tbl.tn))
+	}
+
+	return bir.getRow(), nil
 }

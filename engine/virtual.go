@@ -52,6 +52,12 @@ func (vt *virtualTable) Rows(ctx context.Context, minRow, maxRow []sql.Value) (s
 	return &virtualRows{tn: vt.tn, cols: vt.tt.Columns(), rows: vt.values}, nil
 }
 
+func (vt *virtualTable) IndexRows(ctx context.Context, iidx int,
+	minRow, maxRow []sql.Value) (sql.IndexRows, error) {
+
+	panic(fmt.Sprintf("virtual tables don't have indexes: %s", vt.tn))
+}
+
 func (vt *virtualTable) Insert(ctx context.Context, row []sql.Value) error {
 	return fmt.Errorf("virtual: table %s can not be modified", vt.tn)
 }

@@ -72,6 +72,81 @@ func (tt *TableType) Indexes() []sql.IndexType {
 	return tt.indexes
 }
 
+func addColumn(cols []int, num int) []int {
+	for _, col := range cols {
+		if col == num {
+			return cols
+		}
+	}
+
+	return append(cols, num)
+}
+
+func (tt *TableType) makeIndexType(nam sql.Identifier, key []sql.ColumnKey,
+	unique bool) sql.IndexType {
+
+	if !unique {
+		for _, ck := range tt.PrimaryKey() {
+			if !sql.ColumnInKey(key, ck) {
+				key = append(key, ck)
+			}
+		}
+	}
+
+	var cols []int
+	for _, ck := range key {
+		cols = append(cols, ck.Column())
+	}
+
+	for _, ck := range tt.PrimaryKey() {
+		cols = addColumn(cols, ck.Column())
+	}
+
+	return sql.IndexType{
+		Name:    nam,
+		Key:     key,
+		Columns: cols,
+		Unique:  unique,
+	}
+}
+
+func (tt *TableType) AddIndex(idxname sql.Identifier, unique bool,
+	key []sql.ColumnKey) (*TableType, sql.IndexType, bool) {
+
+	var it sql.IndexType
+
+	for _, it := range tt.indexes {
+		if it.Name == idxname {
+			return nil, it, true
+		}
+	}
+
+	tt.ver += 1
+	it = tt.makeIndexType(idxname, key, unique)
+	tt.indexes = append(tt.indexes, it)
+	return tt, it, false
+}
+
+func (tt *TableType) RemoveIndex(idxname sql.Identifier) (*TableType, int) {
+	var rdx int
+	indexes := make([]sql.IndexType, 0, len(tt.indexes))
+	for idx, it := range tt.indexes {
+		if it.Name != idxname {
+			indexes = append(indexes, it)
+		} else {
+			rdx = idx
+		}
+	}
+
+	if len(indexes) == len(tt.indexes) {
+		return nil, -1
+	}
+
+	tt.ver += 1
+	tt.indexes = indexes
+	return tt, rdx
+}
+
 func encodeColumnKey(key []sql.ColumnKey) []*ColumnKey {
 	mdk := make([]*ColumnKey, 0, len(key))
 	for _, k := range key {

@@ -17,6 +17,9 @@ func TestBasic(t *testing.T) {
 	test.RunSchemaTest(t, st)
 	test.RunTableLifecycleTest(t, st)
 	test.RunTableRowsTest(t, st)
+	test.RunIndexLifecycleTest(t, st)
+	test.RunIndexOneColUniqueTest(t, st)
+	test.RunIndexTwoColUniqueTest(t, st)
 	test.RunStressTest(t, st)
 	test.RunParallelTest(t, st)
 }

@@ -337,6 +337,13 @@ func (rct *table) Rows(ctx context.Context, minRow, maxRow []sql.Value) (engine.
 	return rcr, nil
 }
 
+func (rct *table) IndexRows(ctx context.Context, iidx int,
+	minRow, maxRow []sql.Value) (engine.IndexRows, error) {
+
+	// XXX: IndexRows
+	return nil, errors.New("rowcols: not implemented")
+}
+
 func (rct *table) insertItem(ri btree.Item, idxname sql.Identifier) error {
 	if item := rct.tx.delta.Get(ri); item != nil {
 		if (item.(rowItem)).row != nil {

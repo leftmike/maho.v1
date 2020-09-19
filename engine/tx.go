@@ -168,8 +168,7 @@ func (tx *transaction) CreateTable(ctx context.Context, tn sql.TableName, cols [
 					checkExpr: con.CheckExpr,
 				})
 		} else if con.Type == sql.UniqueConstraint {
-			it := tx.e.st.MakeIndexType(tt, con.Name, con.Key, true)
-			tt.indexes = append(tt.indexes, it)
+			tt.indexes = append(tt.indexes, tt.makeIndexType(con.Name, con.Key, true))
 		} else if con.Type == sql.PrimaryConstraint {
 			// Used above; remove from constraints.
 		} else {
@@ -271,18 +270,14 @@ func (tx *transaction) CreateIndex(ctx context.Context, idxname sql.Identifier, 
 		return err
 	}
 
-	for _, it := range tt.indexes {
-		if it.Name == idxname {
-			if ifNotExists {
-				return nil
-			}
-			return fmt.Errorf("engine: table %s: index %s already exists", tn, idxname)
+	tt, it, found := tt.AddIndex(idxname, unique, key)
+	if found {
+		if ifNotExists {
+			return nil
 		}
+		return fmt.Errorf("engine: table %s: index %s already exists", tn, idxname)
 	}
 
-	tt.ver += 1
-	it := tx.e.st.MakeIndexType(tt, idxname, key, unique)
-	tt.indexes = append(tt.indexes, it)
 	return tx.e.st.AddIndex(ctx, tx.tx, tn, tt, it)
 }
 
@@ -301,26 +296,13 @@ func (tx *transaction) DropIndex(ctx context.Context, idxname sql.Identifier, tn
 		return err
 	}
 
-	var rdx int
-	indexes := make([]sql.IndexType, 0, len(tt.indexes))
-	for idx, it := range tt.indexes {
-		if it.Name != idxname {
-			indexes = append(indexes, it)
-		} else {
-			rdx = idx
-		}
-	}
-
-	if len(indexes) == len(tt.indexes) {
+	tt, rdx := tt.RemoveIndex(idxname)
+	if tt == nil {
 		if ifExists {
 			return nil
 		}
 		return fmt.Errorf("engine: table %s: index %s not found", tn, idxname)
 	}
-
-	tt.ver += 1
-	tt.indexes = indexes
-
 	return tx.e.st.RemoveIndex(ctx, tx.tx, tn, tt, rdx)
 }
 

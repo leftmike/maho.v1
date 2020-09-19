@@ -2,6 +2,7 @@ package engine
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"io"
 	"strconv"
@@ -42,6 +43,13 @@ func (tbl *table) Rows(ctx context.Context, minRow, maxRow []sql.Value) (sql.Row
 		tbl:  tbl,
 		rows: r,
 	}, nil
+}
+
+func (tbl *table) IndexRows(ctx context.Context, iidx int,
+	minRow, maxRow []sql.Value) (sql.IndexRows, error) {
+
+	// XXX
+	return nil, errors.New("not implemented")
 }
 
 func convertValue(ct sql.ColumnType, n sql.Identifier, v sql.Value) (sql.Value, error) {

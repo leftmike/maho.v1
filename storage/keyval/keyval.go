@@ -321,6 +321,13 @@ func (kvt *table) Rows(ctx context.Context, minRow, maxRow []sql.Value) (engine.
 	return kvr, nil
 }
 
+func (kvt *table) IndexRows(ctx context.Context, iidx int,
+	minRow, maxRow []sql.Value) (engine.IndexRows, error) {
+
+	// XXX: IndexRows
+	return nil, errors.New("keyval: not implemented")
+}
+
 func (kvt *table) insert(ri rowItem, idxname sql.Identifier) error {
 	if item := kvt.tx.delta.Get(ri); item != nil {
 		if (item.(rowItem)).row != nil {

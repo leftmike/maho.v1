@@ -1,0 +1,313 @@
+package test
+
+import (
+	"testing"
+
+	"github.com/leftmike/maho/sql"
+	"github.com/leftmike/maho/storage"
+)
+
+var (
+	tableRowsTests = []interface{}{
+		"createDatabase",
+		[]storeCmd{
+			{fln: fln(), cmd: cmdBegin},
+			{fln: fln(), cmd: cmdCreateTable, name: sql.ID("tbl1")},
+			{fln: fln(), cmd: cmdLookupTable, name: sql.ID("tbl1")},
+			{fln: fln(), cmd: cmdRows, values: [][]sql.Value{}},
+			{fln: fln(), cmd: cmdCommit},
+		},
+		[]storeCmd{
+			{fln: fln(), cmd: cmdBegin},
+			{fln: fln(), cmd: cmdLookupTable, name: sql.ID("tbl1")},
+			{fln: fln(), cmd: cmdRows, values: [][]sql.Value{}},
+			{fln: fln(), cmd: cmdInsert,
+				row: []sql.Value{i64Val(1), i64Val(1), strVal("first row")}},
+			{fln: fln(), cmd: cmdInsert,
+				row: []sql.Value{i64Val(2), i64Val(4), strVal("second row")}},
+			{fln: fln(), cmd: cmdNextStmt},
+			{fln: fln(), cmd: cmdRows,
+				values: [][]sql.Value{
+					{i64Val(1), i64Val(1), strVal("first row")},
+					{i64Val(2), i64Val(4), strVal("second row")},
+				},
+			},
+			{fln: fln(), cmd: cmdCommit},
+		},
+		[]storeCmd{
+			{fln: fln(), cmd: cmdBegin},
+			{fln: fln(), cmd: cmdLookupTable, name: sql.ID("tbl1")},
+			{fln: fln(), cmd: cmdRows,
+				values: [][]sql.Value{
+					{i64Val(1), i64Val(1), strVal("first row")},
+					{i64Val(2), i64Val(4), strVal("second row")},
+				},
+			},
+			{fln: fln(), cmd: cmdCommit},
+		},
+		[]storeCmd{
+			{fln: fln(), cmd: cmdBegin},
+			{fln: fln(), cmd: cmdLookupTable, name: sql.ID("tbl1")},
+			{fln: fln(), cmd: cmdInsert,
+				row: []sql.Value{i64Val(3), i64Val(9), strVal("third row")}},
+			{fln: fln(), cmd: cmdInsert,
+				row: []sql.Value{i64Val(4), i64Val(16), strVal("fourth row")}},
+			{fln: fln(), cmd: cmdNextStmt},
+			{fln: fln(), cmd: cmdRows,
+				values: [][]sql.Value{
+					{i64Val(1), i64Val(1), strVal("first row")},
+					{i64Val(2), i64Val(4), strVal("second row")},
+					{i64Val(3), i64Val(9), strVal("third row")},
+					{i64Val(4), i64Val(16), strVal("fourth row")},
+				},
+			},
+			{fln: fln(), cmd: cmdRollback},
+		},
+		[]storeCmd{
+			{fln: fln(), cmd: cmdBegin},
+			{fln: fln(), cmd: cmdLookupTable, name: sql.ID("tbl1")},
+			{fln: fln(), cmd: cmdRows,
+				values: [][]sql.Value{
+					{i64Val(1), i64Val(1), strVal("first row")},
+					{i64Val(2), i64Val(4), strVal("second row")},
+				},
+			},
+			{fln: fln(), cmd: cmdCommit},
+		},
+		[]storeCmd{
+			{fln: fln(), cmd: cmdBegin},
+			{fln: fln(), cmd: cmdLookupTable, name: sql.ID("tbl1")},
+			{fln: fln(), cmd: cmdInsert,
+				row: []sql.Value{i64Val(3), i64Val(9), strVal("third row")}},
+			{fln: fln(), cmd: cmdInsert,
+				row: []sql.Value{i64Val(4), i64Val(16), strVal("fourth row")}},
+			{fln: fln(), cmd: cmdNextStmt},
+			{fln: fln(), cmd: cmdRows,
+				values: [][]sql.Value{
+					{i64Val(1), i64Val(1), strVal("first row")},
+					{i64Val(2), i64Val(4), strVal("second row")},
+					{i64Val(3), i64Val(9), strVal("third row")},
+					{i64Val(4), i64Val(16), strVal("fourth row")},
+				},
+			},
+			{fln: fln(), cmd: cmdCommit},
+		},
+		[]storeCmd{
+			{fln: fln(), cmd: cmdBegin},
+			{fln: fln(), cmd: cmdLookupTable, name: sql.ID("tbl1")},
+			{fln: fln(), cmd: cmdRows,
+				values: [][]sql.Value{
+					{i64Val(1), i64Val(1), strVal("first row")},
+					{i64Val(2), i64Val(4), strVal("second row")},
+					{i64Val(3), i64Val(9), strVal("third row")},
+					{i64Val(4), i64Val(16), strVal("fourth row")},
+				},
+			},
+			{fln: fln(), cmd: cmdCommit},
+		},
+		[]storeCmd{
+			{fln: fln(), cmd: cmdBegin},
+			{fln: fln(), cmd: cmdCreateTable, name: sql.ID("tbl2")},
+			{fln: fln(), cmd: cmdLookupTable, name: sql.ID("tbl2")},
+			{fln: fln(), cmd: cmdInsert,
+				row: []sql.Value{i64Val(1), i64Val(1), strVal("first row")}},
+			{fln: fln(), cmd: cmdInsert,
+				row: []sql.Value{i64Val(2), i64Val(4), strVal("second row")}},
+			{fln: fln(), cmd: cmdInsert,
+				row: []sql.Value{i64Val(3), i64Val(9), strVal("third row")}},
+			{fln: fln(), cmd: cmdInsert,
+				row: []sql.Value{i64Val(4), i64Val(16), strVal("fourth row")}},
+			{fln: fln(), cmd: cmdNextStmt},
+			{fln: fln(), cmd: cmdRows,
+				values: [][]sql.Value{
+					{i64Val(1), i64Val(1), strVal("first row")},
+					{i64Val(2), i64Val(4), strVal("second row")},
+					{i64Val(3), i64Val(9), strVal("third row")},
+					{i64Val(4), i64Val(16), strVal("fourth row")},
+				},
+			},
+			{fln: fln(), cmd: cmdCommit},
+		},
+		[]storeCmd{
+			{fln: fln(), cmd: cmdBegin},
+			{fln: fln(), cmd: cmdLookupTable, name: sql.ID("tbl2")},
+			{fln: fln(), cmd: cmdDelete, rowID: 4},
+			{fln: fln(), cmd: cmdNextStmt},
+			{fln: fln(), cmd: cmdRows,
+				values: [][]sql.Value{
+					{i64Val(1), i64Val(1), strVal("first row")},
+					{i64Val(2), i64Val(4), strVal("second row")},
+					{i64Val(3), i64Val(9), strVal("third row")},
+				},
+			},
+			{fln: fln(), cmd: cmdCommit},
+		},
+		[]storeCmd{
+			{fln: fln(), cmd: cmdBegin},
+			{fln: fln(), cmd: cmdLookupTable, name: sql.ID("tbl2")},
+			{fln: fln(), cmd: cmdDelete, rowID: 1},
+			{fln: fln(), cmd: cmdNextStmt},
+			{fln: fln(), cmd: cmdRows,
+				values: [][]sql.Value{
+					{i64Val(2), i64Val(4), strVal("second row")},
+					{i64Val(3), i64Val(9), strVal("third row")},
+				},
+			},
+			{fln: fln(), cmd: cmdCommit},
+		},
+		[]storeCmd{
+			{fln: fln(), cmd: cmdBegin},
+			{fln: fln(), cmd: cmdLookupTable, name: sql.ID("tbl2")},
+			{fln: fln(), cmd: cmdDelete, rowID: 2},
+			{fln: fln(), cmd: cmdNextStmt},
+			{fln: fln(), cmd: cmdRows,
+				values: [][]sql.Value{
+					{i64Val(3), i64Val(9), strVal("third row")},
+				},
+			},
+			{fln: fln(), cmd: cmdRollback},
+		},
+		[]storeCmd{
+			{fln: fln(), cmd: cmdBegin},
+			{fln: fln(), cmd: cmdLookupTable, name: sql.ID("tbl2")},
+			{fln: fln(), cmd: cmdRows,
+				values: [][]sql.Value{
+					{i64Val(2), i64Val(4), strVal("second row")},
+					{i64Val(3), i64Val(9), strVal("third row")},
+				},
+			},
+			{fln: fln(), cmd: cmdCommit},
+		},
+		[]storeCmd{
+			{fln: fln(), cmd: cmdBegin},
+			{fln: fln(), cmd: cmdCreateTable, name: sql.ID("tbl3")},
+			{fln: fln(), cmd: cmdLookupTable, name: sql.ID("tbl3")},
+			{fln: fln(), cmd: cmdInsert,
+				row: []sql.Value{i64Val(1), i64Val(1), strVal("first row")}},
+			{fln: fln(), cmd: cmdInsert,
+				row: []sql.Value{i64Val(2), i64Val(4), strVal("second row")}},
+			{fln: fln(), cmd: cmdInsert,
+				row: []sql.Value{i64Val(3), i64Val(9), strVal("third row")}},
+			{fln: fln(), cmd: cmdInsert,
+				row: []sql.Value{i64Val(4), i64Val(16), strVal("fourth row")}},
+			{fln: fln(), cmd: cmdNextStmt},
+			{fln: fln(), cmd: cmdRows,
+				values: [][]sql.Value{
+					{i64Val(1), i64Val(1), strVal("first row")},
+					{i64Val(2), i64Val(4), strVal("second row")},
+					{i64Val(3), i64Val(9), strVal("third row")},
+					{i64Val(4), i64Val(16), strVal("fourth row")},
+				},
+			},
+			{fln: fln(), cmd: cmdCommit},
+		},
+		[]storeCmd{
+			{fln: fln(), cmd: cmdBegin},
+			{fln: fln(), cmd: cmdLookupTable, name: sql.ID("tbl3")},
+			{fln: fln(), cmd: cmdUpdate, rowID: 1,
+				updates: []sql.ColumnUpdate{{Column: 1, Value: i64Val(10)}}},
+			{fln: fln(), cmd: cmdNextStmt},
+			{fln: fln(), cmd: cmdRows,
+				values: [][]sql.Value{
+					{i64Val(1), i64Val(10), strVal("first row")},
+					{i64Val(2), i64Val(4), strVal("second row")},
+					{i64Val(3), i64Val(9), strVal("third row")},
+					{i64Val(4), i64Val(16), strVal("fourth row")},
+				},
+			},
+			{fln: fln(), cmd: cmdCommit},
+		},
+		[]storeCmd{
+			{fln: fln(), cmd: cmdBegin},
+			{fln: fln(), cmd: cmdLookupTable, name: sql.ID("tbl3")},
+			{fln: fln(), cmd: cmdUpdate, rowID: 2,
+				updates: []sql.ColumnUpdate{{Column: 1, Value: i64Val(40)}}},
+			{fln: fln(), cmd: cmdNextStmt},
+			{fln: fln(), cmd: cmdRows,
+				values: [][]sql.Value{
+					{i64Val(1), i64Val(10), strVal("first row")},
+					{i64Val(2), i64Val(40), strVal("second row")},
+					{i64Val(3), i64Val(9), strVal("third row")},
+					{i64Val(4), i64Val(16), strVal("fourth row")},
+				},
+			},
+			{fln: fln(), cmd: cmdRollback},
+		},
+		[]storeCmd{
+			{fln: fln(), cmd: cmdBegin},
+			{fln: fln(), cmd: cmdLookupTable, name: sql.ID("tbl3")},
+			{fln: fln(), cmd: cmdRows,
+				values: [][]sql.Value{
+					{i64Val(1), i64Val(10), strVal("first row")},
+					{i64Val(2), i64Val(4), strVal("second row")},
+					{i64Val(3), i64Val(9), strVal("third row")},
+					{i64Val(4), i64Val(16), strVal("fourth row")},
+				},
+			},
+			{fln: fln(), cmd: cmdCommit},
+		},
+		[]storeCmd{
+			{fln: fln(), cmd: cmdBegin},
+			{fln: fln(), cmd: cmdLookupTable, name: sql.ID("tbl3")},
+			{fln: fln(), cmd: cmdUpdate, rowID: 3,
+				updates: []sql.ColumnUpdate{
+					{Column: 1, Value: i64Val(90)},
+					{Column: 2, Value: strVal("3rd row")},
+				},
+			},
+			{fln: fln(), cmd: cmdCommit},
+		},
+		[]storeCmd{
+			{fln: fln(), cmd: cmdBegin},
+			{fln: fln(), cmd: cmdLookupTable, name: sql.ID("tbl3")},
+			{fln: fln(), cmd: cmdRows,
+				values: [][]sql.Value{
+					{i64Val(1), i64Val(10), strVal("first row")},
+					{i64Val(2), i64Val(4), strVal("second row")},
+					{i64Val(3), i64Val(90), strVal("3rd row")},
+					{i64Val(4), i64Val(16), strVal("fourth row")},
+				},
+			},
+			{fln: fln(), cmd: cmdCommit},
+		},
+		[]storeCmd{
+			{fln: fln(), cmd: cmdBegin},
+			{fln: fln(), cmd: cmdCreateTable, name: sql.ID("tbl4")},
+			{fln: fln(), cmd: cmdLookupTable, name: sql.ID("tbl4")},
+			{fln: fln(), cmd: cmdInsert,
+				row: []sql.Value{i64Val(1), i64Val(1), strVal("first row")}},
+			{fln: fln(), cmd: cmdInsert,
+				row: []sql.Value{i64Val(2), i64Val(4), strVal("second row")}},
+			{fln: fln(), cmd: cmdNextStmt},
+			{fln: fln(), cmd: cmdRows,
+				values: [][]sql.Value{
+					{i64Val(1), i64Val(1), strVal("first row")},
+					{i64Val(2), i64Val(4), strVal("second row")},
+				},
+			},
+			{fln: fln(), cmd: cmdCommit},
+		},
+		[]storeCmd{
+			{fln: fln(), cmd: cmdBegin},
+			{fln: fln(), cmd: cmdLookupTable, name: sql.ID("tbl4")},
+			{fln: fln(), cmd: cmdDelete, rowID: 1},
+			{fln: fln(), cmd: cmdRollback},
+		},
+		[]storeCmd{
+			{fln: fln(), cmd: cmdBegin},
+			{fln: fln(), cmd: cmdLookupTable, name: sql.ID("tbl4")},
+			{fln: fln(), cmd: cmdUpdate, rowID: 1,
+				updates: []sql.ColumnUpdate{{Column: 1, Value: i64Val(40)}}},
+			{fln: fln(), cmd: cmdCommit},
+		},
+	}
+)
+
+func RunTableRowsTest(t *testing.T, st *storage.Store) {
+	t.Helper()
+
+	dbname := sql.ID("table_rows_test")
+	for _, test := range tableRowsTests {
+		runTest(t, st, dbname, test)
+	}
+}

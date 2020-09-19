@@ -14,6 +14,7 @@ type Transaction interface {
 
 type Table interface {
 	Rows(ctx context.Context, minRow, maxRow []sql.Value) (Rows, error)
+	IndexRows(ctx context.Context, iidx int, minRow, maxRow []sql.Value) (IndexRows, error)
 	Insert(ctx context.Context, row []sql.Value) error
 }
 
@@ -23,6 +24,14 @@ type Rows interface {
 	Next(ctx context.Context) ([]sql.Value, error)
 	Delete(ctx context.Context) error
 	Update(ctx context.Context, updatedCols []int, updateRow []sql.Value) error
+}
+
+type IndexRows interface {
+	Close() error
+	Next(ctx context.Context) ([]sql.Value, error)
+	Delete(ctx context.Context) error
+	Update(ctx context.Context, updatedCols []int, updateRow []sql.Value) error
+	Row(ctx context.Context) ([]sql.Value, error)
 }
 
 type store interface {
@@ -40,8 +49,6 @@ type store interface {
 	DropTable(ctx context.Context, tx Transaction, tn sql.TableName, ifExists bool) error
 	UpdateType(ctx context.Context, tx Transaction, tn sql.TableName, tt *TableType) error
 
-	MakeIndexType(tt *TableType, nam sql.Identifier, key []sql.ColumnKey,
-		unique bool) sql.IndexType
 	AddIndex(ctx context.Context, tx Transaction, tn sql.TableName, tt *TableType,
 		it sql.IndexType) error
 	RemoveIndex(ctx context.Context, tx Transaction, tn sql.TableName, tt *TableType,

@@ -528,6 +528,13 @@ func (kvt *table) Rows(ctx context.Context, minRow, maxRow []sql.Value) (engine.
 	return kvr, nil
 }
 
+func (kvt *table) IndexRows(ctx context.Context, iidx int,
+	minRow, maxRow []sql.Value) (engine.IndexRows, error) {
+
+	// XXX: IndexRows
+	return nil, errors.New("kvrows: not implemented")
+}
+
 func makeKeyVersion(key []byte, ver uint64) []byte {
 	buf := append(make([]byte, 0, len(key)+8), key...)
 	return util.EncodeUint64(buf, ^ver)
