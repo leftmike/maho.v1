@@ -21,6 +21,7 @@ func TestBasic(t *testing.T) {
 	test.RunIndexOneColUniqueTest(t, st)
 	test.RunIndexTwoColUniqueTest(t, st)
 	test.RunIndexOneColTest(t, st)
+	test.RunIndexTwoColTest(t, st)
 	test.RunStressTest(t, st)
 	test.RunParallelTest(t, st)
 }

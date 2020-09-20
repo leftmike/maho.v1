@@ -65,8 +65,11 @@ type storeCmd struct {
 	rowID     int                // Row to update (rows.Update) or delete (rows.Delete)
 	updates   []sql.ColumnUpdate // Updates to a row (rows.Update)
 	idxname   sql.Identifier     // AddIndex and RemoveIndex
-	key       []sql.ColumnKey    // Index key
+	key       []sql.ColumnKey    // Primary or index key
 	unique    bool               // Unique index
+	check     bool
+	cols      []sql.Identifier
+	colTypes  []sql.ColumnType
 }
 
 type transactionState struct {
@@ -291,7 +294,7 @@ func testDatabase(t *testing.T, st *storage.Store, dbname sql.Identifier, cmds [
 				}
 			} else if err != nil {
 				t.Errorf("%sLookupTable(%s) failed with %s", cmd.fln, cmd.name, err)
-			} else {
+			} else if cmd.check {
 				cols := state.tt.Columns()
 				if !reflect.DeepEqual(cols, columns) {
 					t.Errorf("%stbl.Columns() got %v want %v", cmd.fln, cols, columns)
@@ -302,8 +305,14 @@ func testDatabase(t *testing.T, st *storage.Store, dbname sql.Identifier, cmds [
 				}
 			}
 		case cmdCreateTable:
-			err := st.CreateTable(ctx, state.tx, sql.TableName{dbname, scname, cmd.name},
-				engine.MakeTableType(columns, columnTypes, primary), false)
+			var tt *engine.TableType
+			if cmd.cols == nil {
+				tt = engine.MakeTableType(columns, columnTypes, primary)
+			} else {
+				tt = engine.MakeTableType(cmd.cols, cmd.colTypes, cmd.key)
+			}
+			err := st.CreateTable(ctx, state.tx, sql.TableName{dbname, scname, cmd.name}, tt,
+				false)
 			if cmd.fail {
 				if err == nil {
 					t.Errorf("%sCreateTable(%s) did not fail", cmd.fln, cmd.name)

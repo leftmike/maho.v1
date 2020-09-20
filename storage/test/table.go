@@ -21,7 +21,7 @@ var (
 			{fln: fln(), cmd: cmdBegin},
 			{fln: fln(), cmd: cmdLookupTable, name: sql.ID("tbl-a"), fail: true},
 			{fln: fln(), cmd: cmdCreateTable, name: sql.ID("tbl-a")},
-			{fln: fln(), cmd: cmdLookupTable, name: sql.ID("tbl-a")},
+			{fln: fln(), cmd: cmdLookupTable, name: sql.ID("tbl-a"), check: true},
 			{fln: fln(), cmd: cmdCommit},
 		},
 	}
