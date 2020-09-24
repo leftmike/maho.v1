@@ -54,7 +54,6 @@ To Do:
 -- DELETE, INSERT, UPDATE, VALUES
 
 - indexes
--- finish storage tests of indexes
 -- add create unique index test to sqltest/
 -- add create index test to sqltest/
 -- IndexRows: keyval, kvrows, rowcols
