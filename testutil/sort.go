@@ -6,28 +6,33 @@ import (
 	"github.com/leftmike/maho/sql"
 )
 
-type sortValues [][]sql.Value
+type sortValues struct {
+	values [][]sql.Value
+	key    []sql.ColumnKey
+}
 
 func (sv sortValues) Len() int {
-	return len(sv)
+	return len(sv.values)
 }
 
 func (sv sortValues) Swap(i, j int) {
-	sv[i], sv[j] = sv[j], sv[i]
+	sv.values[i], sv.values[j] = sv.values[j], sv.values[i]
 }
 
 func (sv sortValues) Less(i, j int) bool {
-	for cdx, val := range sv[i] {
-		cmp := sql.Compare(val, sv[j][cdx])
+	for _, ck := range sv.key {
+		vi := sv.values[i][ck.Column()]
+		vj := sv.values[j][ck.Column()]
+		cmp := sql.Compare(vi, vj)
 		if cmp < 0 {
-			return true
+			return !ck.Reverse()
 		} else if cmp > 0 {
-			return false
+			return ck.Reverse()
 		}
 	}
 	return false
 }
 
-func SortValues(values [][]sql.Value) {
-	sort.Sort((sortValues)(values))
+func SortValues(key []sql.ColumnKey, values [][]sql.Value) {
+	sort.Sort(sortValues{values: values, key: key})
 }

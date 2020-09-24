@@ -11,6 +11,8 @@ To Do:
 
 - specify a subset of columns to return: Table.Rows(cols []int, ...)
 
+- use olekukonko/tablewriter for table output
+
 - use cockroachdb/pebble as a storage engine with kvrows
 
 - use spf13/cobra for command argument handling

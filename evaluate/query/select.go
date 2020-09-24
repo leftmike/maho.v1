@@ -305,7 +305,7 @@ func (sr *sortRows) Less(i, j int) bool {
 			return by.reverse
 		}
 	}
-	return false // Arbitrary
+	return false
 }
 
 func orderByOutput(order []OrderBy, cols []sql.Identifier) []orderBy {

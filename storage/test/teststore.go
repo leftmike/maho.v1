@@ -70,6 +70,8 @@ type storeCmd struct {
 	check     bool
 	cols      []sql.Identifier
 	colTypes  []sql.ColumnType
+	minRow    []sql.Value
+	maxRow    []sql.Value
 }
 
 type transactionState struct {
@@ -347,7 +349,7 @@ func testDatabase(t *testing.T, st *storage.Store, dbname sql.Identifier, cmds [
 				}
 			}
 		case cmdRows:
-			rows, err := state.tbl.Rows(ctx, nil, nil)
+			rows, err := state.tbl.Rows(ctx, cmd.minRow, cmd.maxRow)
 			if err != nil {
 				t.Errorf("%stable.Rows() failed with %s", cmd.fln, err)
 			} else {
@@ -368,7 +370,7 @@ func testDatabase(t *testing.T, st *storage.Store, dbname sql.Identifier, cmds [
 				t.Errorf("%stable.Insert() failed with %s", cmd.fln, err)
 			}
 		case cmdUpdate:
-			rows, err := state.tbl.Rows(ctx, nil, nil)
+			rows, err := state.tbl.Rows(ctx, cmd.minRow, cmd.maxRow)
 			if err != nil {
 				t.Errorf("%stable.Rows() failed with %s", cmd.fln, err)
 			} else {
@@ -399,7 +401,7 @@ func testDatabase(t *testing.T, st *storage.Store, dbname sql.Identifier, cmds [
 				}
 			}
 		case cmdDelete:
-			rows, err := state.tbl.Rows(ctx, nil, nil)
+			rows, err := state.tbl.Rows(ctx, cmd.minRow, cmd.maxRow)
 			if err != nil {
 				t.Errorf("%stable.Rows() failed with %s", cmd.fln, err)
 			} else {
@@ -489,7 +491,7 @@ func testDatabase(t *testing.T, st *storage.Store, dbname sql.Identifier, cmds [
 				continue
 			}
 
-			idxRows, err := state.tbl.IndexRows(ctx, rdx, nil, nil)
+			idxRows, err := state.tbl.IndexRows(ctx, rdx, cmd.minRow, cmd.maxRow)
 			if err != nil {
 				t.Errorf("%stable.IndexRows() failed with %s", cmd.fln, err)
 			} else {
@@ -519,7 +521,7 @@ func testDatabase(t *testing.T, st *storage.Store, dbname sql.Identifier, cmds [
 				continue
 			}
 
-			idxRows, err := state.tbl.IndexRows(ctx, rdx, nil, nil)
+			idxRows, err := state.tbl.IndexRows(ctx, rdx, cmd.minRow, cmd.maxRow)
 			if err != nil {
 				t.Errorf("%stable.IndexRows() failed with %s", cmd.fln, err)
 				continue
@@ -568,7 +570,7 @@ func testDatabase(t *testing.T, st *storage.Store, dbname sql.Identifier, cmds [
 				continue
 			}
 
-			idxRows, err := state.tbl.IndexRows(ctx, rdx, nil, nil)
+			idxRows, err := state.tbl.IndexRows(ctx, rdx, cmd.minRow, cmd.maxRow)
 			if err != nil {
 				t.Errorf("%stable.IndexRows() failed with %s", cmd.fln, err)
 				continue

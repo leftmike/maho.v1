@@ -1425,5 +1425,3 @@ func RunIndexTwoColTest(t *testing.T, st *storage.Store) {
 		runTest(t, st, dbname, test)
 	}
 }
-
-// minRow and maxRow with primary and all indexes
