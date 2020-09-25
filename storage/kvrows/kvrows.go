@@ -554,10 +554,17 @@ func (kvt *table) IndexRows(ctx context.Context, iidx int,
 	}
 
 	il := indexes[iidx]
-	minKey := kvt.makeIndexKey(il, minRow)
+
+	var minKey []byte
+	if minRow != nil {
+		minKey = kvt.makeIndexKey(il, il.RowToIndexRow(minRow))
+	} else {
+		minKey = kvt.makeIndexKey(il, nil)
+	}
+
 	var maxKey []byte
 	if maxRow != nil {
-		maxKey = kvt.makeIndexKey(il, maxRow)
+		maxKey = kvt.makeIndexKey(il, il.RowToIndexRow(maxRow))
 	}
 
 	vals, err := kvt.fetchRows(ctx, minKey, maxKey)
@@ -895,7 +902,7 @@ func (kvir *indexRows) getRow(ctx context.Context) ([]sql.Value, error) {
 		return nil, err
 	}
 	if len(vals) != 1 {
-		return nil, fmt.Errorf("kvrows: values problem: %v", vals) // XXX
+		return nil, fmt.Errorf("kvrows: table %s unable to get row", kvir.tbl.tn)
 	}
 	return vals[0], nil
 }
