@@ -24,6 +24,15 @@ func TestBadgerKVRows(t *testing.T) {
 	test.RunSchemaTest(t, st)
 	test.RunTableLifecycleTest(t, st)
 	test.RunTableRowsTest(t, st)
+
+	test.RunIndexLifecycleTest(t, st)
+	test.RunIndexOneColUniqueTest(t, st)
+	test.RunIndexTwoColUniqueTest(t, st)
+	test.RunIndexOneColTest(t, st)
+	test.RunIndexTwoColTest(t, st)
+	test.RunPrimaryMinMaxTest(t, st)
+	//test.RunIndexMinMaxTest(t, st) // XXX: fails when maxRows = nil
+
 	test.RunStressTest(t, st)
 	test.RunParallelTest(t, st)
 }

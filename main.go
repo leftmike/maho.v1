@@ -56,7 +56,8 @@ To Do:
 - indexes
 -- add create unique index test to sqltest/
 -- add create index test to sqltest/
--- IndexRows: keyval, kvrows, rowcols
+-- IndexRows: keyval, rowcols
+-- fix kvrows when maxRow = nil
 
 - SELECT
 -- push filters down to scans: col op (literal | param) or (literal | param) op col; and combos
@@ -108,6 +109,7 @@ import (
 	"github.com/leftmike/maho/storage"
 	"github.com/leftmike/maho/storage/basic"
 	"github.com/leftmike/maho/storage/keyval"
+	"github.com/leftmike/maho/storage/kvrows"
 	"github.com/leftmike/maho/storage/rowcols"
 )
 
@@ -250,9 +252,11 @@ func main() {
 		st, err = keyval.NewBadgerStore(*dataDir)
 	case "bbolt":
 		st, err = keyval.NewBBoltStore(*dataDir)
+	case "kvrows":
+		st, err = kvrows.NewBadgerStore(*dataDir)
 	default:
 		fmt.Fprintf(os.Stderr,
-			"maho: got %s for store; want basic, rowcols, badger, or bbolt", *store)
+			"maho: got %s for store; want basic, rowcols, badger, bbolt, or kvrows", *store)
 		return
 	}
 	if err != nil {

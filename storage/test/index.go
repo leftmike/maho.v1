@@ -37,6 +37,7 @@ var (
 		[]storeCmd{
 			{fln: fln(), cmd: cmdBegin},
 			{fln: fln(), cmd: cmdRemoveIndex, name: sql.ID("tbl-a"), idxname: sql.ID("idx-1")},
+			{fln: fln(), cmd: cmdNextStmt},
 			{fln: fln(), cmd: cmdRemoveIndex, name: sql.ID("tbl-a"), idxname: sql.ID("idx-1"),
 				fail: true},
 			{fln: fln(), cmd: cmdCommit},

@@ -85,6 +85,13 @@ type rows struct {
 	rows [][]sql.Value
 }
 
+type indexRows struct {
+	tbl  *table
+	il   storage.IndexLayout
+	idx  int
+	rows [][]sql.Value
+}
+
 func NewBadgerStore(dataDir string) (*storage.Store, error) {
 	kv, err := MakeBadgerKV(dataDir)
 	if err != nil {
@@ -446,23 +453,14 @@ func (kvt *table) makePrimaryKey(row []sql.Value) []byte {
 	return kvt.makeKey(kvt.tl.PrimaryKey(), storage.PrimaryIID, row)
 }
 
-func (kvt *table) Rows(ctx context.Context, minRow, maxRow []sql.Value) (engine.Rows, error) {
-	minKey := kvt.makePrimaryKey(minRow)
-	var maxKey []byte
-	if maxRow != nil {
-		maxKey = kvt.makePrimaryKey(maxRow)
-	}
-
+func (kvt *table) fetchRows(ctx context.Context, minKey, maxKey []byte) ([][]sql.Value, error) {
 	it, err := kvt.st.kv.Iterate(minKey)
 	if err != nil {
 		return nil, err
 	}
 	defer it.Close()
 
-	kvr := &rows{
-		tbl: kvt,
-	}
-
+	var vals [][]sql.Value
 	var prevKey []byte
 	var skipping bool
 	for {
@@ -498,7 +496,7 @@ func (kvt *table) Rows(ctx context.Context, minRow, maxRow []sql.Value) (engine.
 							return err
 						}
 						if row != nil {
-							kvr.rows = append(kvr.rows, row)
+							vals = append(vals, row)
 						}
 					} else if ver <= kvt.tx.ver {
 						if len(val) > 0 {
@@ -506,7 +504,7 @@ func (kvt *table) Rows(ctx context.Context, minRow, maxRow []sql.Value) (engine.
 							if err != nil {
 								return err
 							}
-							kvr.rows = append(kvr.rows, row)
+							vals = append(vals, row)
 						}
 						skipping = true
 					}
@@ -525,14 +523,53 @@ func (kvt *table) Rows(ctx context.Context, minRow, maxRow []sql.Value) (engine.
 		}
 	}
 
-	return kvr, nil
+	return vals, nil
+}
+
+func (kvt *table) Rows(ctx context.Context, minRow, maxRow []sql.Value) (engine.Rows, error) {
+	minKey := kvt.makePrimaryKey(minRow)
+	var maxKey []byte
+	if maxRow != nil {
+		maxKey = kvt.makePrimaryKey(maxRow)
+	}
+
+	vals, err := kvt.fetchRows(ctx, minKey, maxKey)
+	if err != nil {
+		return nil, err
+	}
+
+	return &rows{
+		tbl:  kvt,
+		rows: vals,
+	}, nil
 }
 
 func (kvt *table) IndexRows(ctx context.Context, iidx int,
 	minRow, maxRow []sql.Value) (engine.IndexRows, error) {
 
-	// XXX: IndexRows
-	return nil, errors.New("kvrows: not implemented")
+	indexes := kvt.tl.Indexes()
+	if iidx >= len(indexes) {
+		panic(fmt.Sprintf("kvrows: table: %s: %d indexes: out of range: %d", kvt.tn, len(indexes),
+			iidx))
+	}
+
+	il := indexes[iidx]
+	minKey := kvt.makeIndexKey(il, minRow)
+	var maxKey []byte
+	if maxRow != nil {
+		maxKey = kvt.makeIndexKey(il, maxRow)
+	}
+
+	vals, err := kvt.fetchRows(ctx, minKey, maxKey)
+	if err != nil {
+		return nil, err
+	}
+
+	return &indexRows{
+		tbl:  kvt,
+		il:   il,
+		rows: vals,
+	}, nil
 }
 
 func makeKeyVersion(key []byte, ver uint64) []byte {
@@ -698,25 +735,21 @@ func (kvr *rows) Next(ctx context.Context) ([]sql.Value, error) {
 	return kvr.rows[kvr.idx-1], nil
 }
 
-func (kvr *rows) Delete(ctx context.Context) error {
-	if kvr.idx == 0 {
-		panic(fmt.Sprintf("kvrows: table %s no row to delete", kvr.tbl.tn))
-	}
-
-	upd, err := kvr.tbl.st.kv.Update()
+func (kvt *table) deleteRow(ctx context.Context, row []sql.Value) error {
+	upd, err := kvt.st.kv.Update()
 	if err != nil {
 		return err
 	}
 
-	err = kvr.tbl.proposeUpdate(upd, kvr.tbl.makePrimaryKey(kvr.rows[kvr.idx-1]), nil, true)
+	err = kvt.proposeUpdate(upd, kvt.makePrimaryKey(row), nil, true)
 	if err != nil {
 		upd.Rollback()
 		return err
 	}
 
-	for _, il := range kvr.tbl.tl.Indexes() {
-		indexRow := il.RowToIndexRow(kvr.rows[kvr.idx-1])
-		err = kvr.tbl.proposeUpdate(upd, kvr.tbl.makeIndexKey(il, indexRow), nil, true)
+	for _, il := range kvt.tl.Indexes() {
+		indexRow := il.RowToIndexRow(row)
+		err = kvt.proposeUpdate(upd, kvt.makeIndexKey(il, indexRow), nil, true)
 		if err != nil {
 			upd.Rollback()
 			return err
@@ -724,6 +757,14 @@ func (kvr *rows) Delete(ctx context.Context) error {
 	}
 
 	return upd.Commit()
+}
+
+func (kvr *rows) Delete(ctx context.Context) error {
+	if kvr.idx == 0 {
+		panic(fmt.Sprintf("kvrows: table %s no row to delete", kvr.tbl.tn))
+	}
+
+	return kvr.tbl.deleteRow(ctx, kvr.rows[kvr.idx-1])
 }
 
 func (kvt *table) updateIndexes(upd Updater, updatedCols []int,
@@ -758,41 +799,111 @@ func (kvt *table) updateIndexes(upd Updater, updatedCols []int,
 	return nil
 }
 
-func (kvr *rows) Update(ctx context.Context, updatedCols []int, updateRow []sql.Value) error {
-	if kvr.idx == 0 {
-		panic(fmt.Sprintf("kvrows: table %s no row to update", kvr.tbl.tn))
-	}
+func (kvt *table) updateRow(ctx context.Context, updatedCols []int,
+	row, updateRow []sql.Value) error {
 
-	upd, err := kvr.tbl.st.kv.Update()
+	upd, err := kvt.st.kv.Update()
 	if err != nil {
 		return err
 	}
 
-	if kvr.tbl.tl.PrimaryUpdated(updatedCols) {
-		err = kvr.tbl.proposeUpdate(upd, kvr.tbl.makePrimaryKey(kvr.rows[kvr.idx-1]), nil, true)
+	if kvt.tl.PrimaryUpdated(updatedCols) {
+		err = kvt.proposeUpdate(upd, kvt.makePrimaryKey(row), nil, true)
 		if err != nil {
 			upd.Rollback()
 			return err
 		}
 
-		err = kvr.tbl.proposeUpdate(upd, kvr.tbl.makePrimaryKey(updateRow), updateRow, false)
+		err = kvt.proposeUpdate(upd, kvt.makePrimaryKey(updateRow), updateRow, false)
 		if err != nil {
 			upd.Rollback()
 			return err
 		}
 	} else {
-		err = kvr.tbl.proposeUpdate(upd, kvr.tbl.makePrimaryKey(updateRow), updateRow, true)
+		err = kvt.proposeUpdate(upd, kvt.makePrimaryKey(updateRow), updateRow, true)
 		if err != nil {
 			upd.Rollback()
 			return err
 		}
 	}
 
-	err = kvr.tbl.updateIndexes(upd, updatedCols, kvr.rows[kvr.idx-1], updateRow)
+	err = kvt.updateIndexes(upd, updatedCols, row, updateRow)
 	if err != nil {
 		upd.Rollback()
 		return err
 	}
 
 	return upd.Commit()
+}
+
+func (kvr *rows) Update(ctx context.Context, updatedCols []int, updateRow []sql.Value) error {
+	if kvr.idx == 0 {
+		panic(fmt.Sprintf("kvrows: table %s no row to update", kvr.tbl.tn))
+	}
+
+	return kvr.tbl.updateRow(ctx, updatedCols, kvr.rows[kvr.idx-1], updateRow)
+}
+
+func (kvir *indexRows) Close() error {
+	kvir.tbl = nil
+	kvir.rows = nil
+	kvir.idx = 0
+	return nil
+}
+
+func (kvir *indexRows) Next(ctx context.Context) ([]sql.Value, error) {
+	if kvir.idx == len(kvir.rows) {
+		return nil, io.EOF
+	}
+
+	kvir.idx += 1
+	return kvir.rows[kvir.idx-1], nil
+}
+
+func (kvir *indexRows) Delete(ctx context.Context) error {
+	if kvir.idx == 0 {
+		panic(fmt.Sprintf("kvrows: table %s no row to delete", kvir.tbl.tn))
+	}
+
+	row, err := kvir.getRow(ctx)
+	if err != nil {
+		return err
+	}
+	return kvir.tbl.deleteRow(ctx, row)
+}
+
+func (kvir *indexRows) Update(ctx context.Context, updatedCols []int,
+	updateRow []sql.Value) error {
+
+	if kvir.idx == 0 {
+		panic(fmt.Sprintf("kvrows: table %s no row to update", kvir.tbl.tn))
+	}
+
+	row, err := kvir.getRow(ctx)
+	if err != nil {
+		return err
+	}
+	return kvir.tbl.updateRow(ctx, updatedCols, row, updateRow)
+}
+
+func (kvir *indexRows) getRow(ctx context.Context) ([]sql.Value, error) {
+	row := make([]sql.Value, len(kvir.tbl.tl.Columns()))
+	kvir.il.IndexRowToRow(kvir.rows[kvir.idx-1], row)
+	key := kvir.tbl.makePrimaryKey(row)
+	vals, err := kvir.tbl.fetchRows(ctx, key, key)
+	if err != nil {
+		return nil, err
+	}
+	if len(vals) != 1 {
+		return nil, fmt.Errorf("kvrows: values problem: %v", vals) // XXX
+	}
+	return vals[0], nil
+}
+
+func (kvir *indexRows) Row(ctx context.Context) ([]sql.Value, error) {
+	if kvir.idx == 0 {
+		panic(fmt.Sprintf("kvrows: table %s no row to get", kvir.tbl.tn))
+	}
+
+	return kvir.getRow(ctx)
 }
