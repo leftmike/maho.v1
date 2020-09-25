@@ -56,7 +56,7 @@ To Do:
 - indexes
 -- add create unique index test to sqltest/
 -- add create index test to sqltest/
--- IndexRows: keyval, rowcols
+-- IndexRows: keyval
 -- fix kvrows when maxRow = nil
 
 - SELECT

@@ -60,6 +60,13 @@ type rows struct {
 	rows [][]sql.Value
 }
 
+type indexRows struct {
+	tbl  *table
+	il   storage.IndexLayout
+	idx  int
+	rows [][]sql.Value
+}
+
 func NewStore(dataDir string) (*storage.Store, error) {
 	os.MkdirAll(dataDir, 0755)
 	f, err := os.OpenFile(filepath.Join(dataDir, "maho-rowcols.wal"), os.O_RDWR|os.O_CREATE, 0755)
@@ -237,32 +244,25 @@ func (rct *table) toItem(row []sql.Value, deleted bool) btree.Item {
 }
 
 func (rct *table) toIndexItem(row []sql.Value, deleted bool, il storage.IndexLayout) btree.Item {
-	indexRow := il.RowToIndexRow(row)
 	ri := rowItem{
 		rid: (rct.tid << 16) | il.IID,
-		key: il.MakeKey(encode.MakeKey(il.Key, indexRow), indexRow),
 	}
-	if !deleted {
-		ri.row = indexRow
+	if row != nil {
+		indexRow := il.RowToIndexRow(row)
+		ri.key = il.MakeKey(encode.MakeKey(il.Key, indexRow), indexRow)
+		if !deleted {
+			ri.row = indexRow
+		}
 	}
 	return ri
 }
 
-func (rct *table) Rows(ctx context.Context, minRow, maxRow []sql.Value) (engine.Rows, error) {
-	rcr := &rows{
-		tbl: rct,
-		idx: 0,
-	}
+func (rct *table) fetchRows(ctx context.Context, minItem, maxItem btree.Item,
+	rid int64) [][]sql.Value {
 
-	var maxItem btree.Item
-	if maxRow != nil {
-		maxItem = rct.toItem(maxRow, false)
-	}
-
-	rid := (rct.tid << 16) | storage.PrimaryIID
-
+	var vals [][]sql.Value
 	if rct.tx.delta == nil {
-		rct.tx.tree.AscendGreaterOrEqual(rct.toItem(minRow, false),
+		rct.tx.tree.AscendGreaterOrEqual(minItem,
 			func(item btree.Item) bool {
 				if maxItem != nil && maxItem.Less(item) {
 					return false
@@ -272,15 +272,15 @@ func (rct *table) Rows(ctx context.Context, minRow, maxRow []sql.Value) (engine.
 					return false
 				}
 				if ri.row != nil {
-					rcr.rows = append(rcr.rows, copyRow(ri.row))
+					vals = append(vals, copyRow(ri.row))
 				}
 				return true
 			})
-		return rcr, nil
+		return vals
 	}
 
 	var deltaRows []rowItem
-	rct.tx.delta.AscendGreaterOrEqual(rct.toItem(minRow, false),
+	rct.tx.delta.AscendGreaterOrEqual(minItem,
 		func(item btree.Item) bool {
 			if maxItem != nil && maxItem.Less(item) {
 				return false
@@ -293,7 +293,7 @@ func (rct *table) Rows(ctx context.Context, minRow, maxRow []sql.Value) (engine.
 			return true
 		})
 
-	rct.tx.tree.AscendGreaterOrEqual(rct.toItem(minRow, false),
+	rct.tx.tree.AscendGreaterOrEqual(minItem,
 		func(item btree.Item) bool {
 			if maxItem != nil && maxItem.Less(item) {
 				return false
@@ -309,13 +309,13 @@ func (rct *table) Rows(ctx context.Context, minRow, maxRow []sql.Value) (engine.
 					break
 				} else if cmp > 0 {
 					if deltaRows[0].row != nil {
-						rcr.rows = append(rcr.rows, copyRow(deltaRows[0].row))
+						vals = append(vals, copyRow(deltaRows[0].row))
 					}
 					deltaRows = deltaRows[1:]
 				} else {
 					if deltaRows[0].row != nil {
 						// Must be an update.
-						rcr.rows = append(rcr.rows, copyRow(deltaRows[0].row))
+						vals = append(vals, copyRow(deltaRows[0].row))
 						deltaRows = deltaRows[1:]
 					}
 					return true
@@ -323,25 +323,57 @@ func (rct *table) Rows(ctx context.Context, minRow, maxRow []sql.Value) (engine.
 			}
 
 			if ri.row != nil {
-				rcr.rows = append(rcr.rows, copyRow(ri.row))
+				vals = append(vals, copyRow(ri.row))
 			}
 			return true
 		})
 
 	for _, ri := range deltaRows {
 		if ri.row != nil {
-			rcr.rows = append(rcr.rows, copyRow(ri.row))
+			vals = append(vals, copyRow(ri.row))
 		}
 	}
 
-	return rcr, nil
+	return vals
+}
+
+func (rct *table) Rows(ctx context.Context, minRow, maxRow []sql.Value) (engine.Rows, error) {
+	var maxItem btree.Item
+	if maxRow != nil {
+		maxItem = rct.toItem(maxRow, false)
+	}
+
+	return &rows{
+		tbl: rct,
+		idx: 0,
+		rows: rct.fetchRows(ctx, rct.toItem(minRow, false), maxItem,
+			(rct.tid<<16)|storage.PrimaryIID),
+	}, nil
 }
 
 func (rct *table) IndexRows(ctx context.Context, iidx int,
 	minRow, maxRow []sql.Value) (engine.IndexRows, error) {
 
-	// XXX: IndexRows
-	return nil, errors.New("rowcols: not implemented")
+	indexes := rct.tl.Indexes()
+	if iidx >= len(indexes) {
+		panic(fmt.Sprintf("rowcols: table: %s: %d indexes: out of range: %d", rct.tn, len(indexes),
+			iidx))
+	}
+
+	il := indexes[iidx]
+
+	var maxItem btree.Item
+	if maxRow != nil {
+		maxItem = rct.toIndexItem(maxRow, false, il)
+	}
+
+	return &indexRows{
+		tbl: rct,
+		il:  il,
+		idx: 0,
+		rows: rct.fetchRows(ctx, rct.toIndexItem(minRow, false, il), maxItem,
+			(rct.tid<<16)|il.IID),
+	}, nil
 }
 
 func (rct *table) insertItem(ri btree.Item, idxname sql.Identifier) error {
@@ -396,6 +428,14 @@ func (rcr *rows) Next(ctx context.Context) ([]sql.Value, error) {
 	return rcr.rows[rcr.idx-1], nil
 }
 
+func (rct *table) deleteRow(ctx context.Context, row []sql.Value) {
+	rct.tx.delta.ReplaceOrInsert(rct.toItem(row, true))
+
+	for _, il := range rct.tl.Indexes() {
+		rct.tx.delta.ReplaceOrInsert(rct.toIndexItem(row, true, il))
+	}
+}
+
 func (rcr *rows) Delete(ctx context.Context) error {
 	rcr.tbl.tx.forWrite()
 
@@ -403,12 +443,7 @@ func (rcr *rows) Delete(ctx context.Context) error {
 		panic(fmt.Sprintf("rowcols: table %s no row to delete", rcr.tbl.tn))
 	}
 
-	rcr.tbl.tx.delta.ReplaceOrInsert(rcr.tbl.toItem(rcr.rows[rcr.idx-1], true))
-
-	for _, il := range rcr.tbl.tl.Indexes() {
-		rcr.tbl.tx.delta.ReplaceOrInsert(rcr.tbl.toIndexItem(rcr.rows[rcr.idx-1], true, il))
-	}
-
+	rcr.tbl.deleteRow(ctx, rcr.rows[rcr.idx-1])
 	return nil
 }
 
@@ -431,6 +466,22 @@ func (rct *table) updateIndexes(ctx context.Context, updatedCols []int,
 	return nil
 }
 
+func (rct *table) updateRow(ctx context.Context, updatedCols []int,
+	row, updateRow []sql.Value) error {
+
+	if rct.tl.PrimaryUpdated(updatedCols) {
+		rct.deleteRow(ctx, row)
+		err := rct.Insert(ctx, updateRow)
+		if err != nil {
+			return err
+		}
+	} else {
+		rct.tx.delta.ReplaceOrInsert(rct.toItem(updateRow, false))
+	}
+
+	return rct.updateIndexes(ctx, updatedCols, row, updateRow)
+}
+
 func (rcr *rows) Update(ctx context.Context, updatedCols []int, updateRow []sql.Value) error {
 	rcr.tbl.tx.forWrite()
 
@@ -438,15 +489,72 @@ func (rcr *rows) Update(ctx context.Context, updatedCols []int, updateRow []sql.
 		panic(fmt.Sprintf("rowcols: table %s no row to update", rcr.tbl.tn))
 	}
 
-	if rcr.tbl.tl.PrimaryUpdated(updatedCols) {
-		rcr.Delete(ctx)
-		err := rcr.tbl.Insert(ctx, updateRow)
-		if err != nil {
-			return err
-		}
-	} else {
-		rcr.tbl.tx.delta.ReplaceOrInsert(rcr.tbl.toItem(updateRow, false))
+	return rcr.tbl.updateRow(ctx, updatedCols, rcr.rows[rcr.idx-1], updateRow)
+}
+
+func (rcir *indexRows) Close() error {
+	rcir.tbl = nil
+	rcir.rows = nil
+	rcir.idx = 0
+	return nil
+}
+
+func (rcir *indexRows) Next(ctx context.Context) ([]sql.Value, error) {
+	if rcir.idx == len(rcir.rows) {
+		return nil, io.EOF
 	}
 
-	return rcr.tbl.updateIndexes(ctx, updatedCols, rcr.rows[rcr.idx-1], updateRow)
+	rcir.idx += 1
+	return rcir.rows[rcir.idx-1], nil
+}
+
+func (rcir *indexRows) Delete(ctx context.Context) error {
+	rcir.tbl.tx.forWrite()
+
+	if rcir.idx == 0 {
+		panic(fmt.Sprintf("rowcols: table %s no row to delete", rcir.tbl.tn))
+	}
+
+	rcir.tbl.deleteRow(ctx, rcir.getRow())
+	return nil
+}
+
+func (rcir *indexRows) Update(ctx context.Context, updatedCols []int,
+	updateRow []sql.Value) error {
+
+	rcir.tbl.tx.forWrite()
+
+	if rcir.idx == 0 {
+		panic(fmt.Sprintf("rowcols: table %s no row to update", rcir.tbl.tn))
+	}
+
+	return rcir.tbl.updateRow(ctx, updatedCols, rcir.getRow(), updateRow)
+}
+
+func (rcir *indexRows) getRow() []sql.Value {
+	row := make([]sql.Value, len(rcir.tbl.tl.Columns()))
+	rcir.il.IndexRowToRow(rcir.rows[rcir.idx-1], row)
+	key := rcir.tbl.toItem(row, false)
+
+	var item btree.Item
+	if rcir.tbl.tx.delta != nil {
+		item = rcir.tbl.tx.delta.Get(key)
+	}
+	if item == nil {
+		item = rcir.tbl.tx.tree.Get(key)
+	}
+	if item == nil || (item.(rowItem)).row == nil {
+		panic(fmt.Sprintf("rowcols: table %s no row to get in tree", rcir.tbl.tn))
+	}
+
+	ri := item.(rowItem)
+	return ri.row
+}
+
+func (rcir *indexRows) Row(ctx context.Context) ([]sql.Value, error) {
+	if rcir.idx == 0 {
+		panic(fmt.Sprintf("rowcols: table %s no row to get", rcir.tbl.tn))
+	}
+
+	return rcir.getRow(), nil
 }

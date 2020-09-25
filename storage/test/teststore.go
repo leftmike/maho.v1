@@ -501,11 +501,15 @@ func testDatabase(t *testing.T, st *storage.Store, dbname sql.Identifier, cmds [
 						t.Errorf("%stable.IndexRows() got %v want %v", cmd.fln, idxVals,
 							cmd.idxValues)
 					}
+				} else if cmd.idxValues != nil {
+					t.Errorf("%stable.IndexRows() got %v want %v", cmd.fln, idxVals, cmd.idxValues)
 				}
 				if vals != nil {
 					if !reflect.DeepEqual(vals, cmd.values) {
 						t.Errorf("%stable.IndexRows() got %v want %v", cmd.fln, vals, cmd.values)
 					}
+				} else if cmd.values != nil {
+					t.Errorf("%stable.IndexRows() got %v want %v", cmd.fln, vals, cmd.values)
 				}
 			}
 		case cmdIndexDelete:
