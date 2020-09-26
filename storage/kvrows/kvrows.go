@@ -897,6 +897,7 @@ func (kvir *indexRows) getRow(ctx context.Context) ([]sql.Value, error) {
 	row := make([]sql.Value, len(kvir.tbl.tl.Columns()))
 	kvir.il.IndexRowToRow(kvir.rows[kvir.idx-1], row)
 	key := kvir.tbl.makePrimaryKey(row)
+
 	vals, err := kvir.tbl.fetchRows(ctx, key, key)
 	if err != nil {
 		return nil, err

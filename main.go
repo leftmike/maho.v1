@@ -56,7 +56,6 @@ To Do:
 - indexes
 -- add create unique index test to sqltest/
 -- add create index test to sqltest/
--- IndexRows: keyval
 
 - SELECT
 -- push filters down to scans: col op (literal | param) or (literal | param) op col; and combos

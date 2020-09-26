@@ -19,6 +19,7 @@ func TestBadgerKeyVal(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
+
 	test.RunDatabaseTest(t, st)
 	test.RunTableTest(t, st)
 	test.RunSchemaTest(t, st)
@@ -26,13 +27,12 @@ func TestBadgerKeyVal(t *testing.T) {
 	test.RunTableRowsTest(t, st)
 
 	test.RunIndexLifecycleTest(t, st)
-	// XXX
-	//test.RunIndexOneColUniqueTest(t, st)
-	//test.RunIndexTwoColUniqueTest(t, st)
-	//test.RunIndexOneColTest(t, st)
-	//test.RunIndexTwoColTest(t, st)
+	test.RunIndexOneColUniqueTest(t, st)
+	test.RunIndexTwoColUniqueTest(t, st)
+	test.RunIndexOneColTest(t, st)
+	test.RunIndexTwoColTest(t, st)
 	test.RunPrimaryMinMaxTest(t, st)
-	//test.RunIndexMinMaxTest(t, st)
+	test.RunIndexMinMaxTest(t, st)
 
 	test.RunStressTest(t, st)
 	test.RunParallelTest(t, st)
@@ -68,6 +68,7 @@ func TestBBoltKeyVal(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
+
 	test.RunDatabaseTest(t, st)
 	test.RunTableTest(t, st)
 	test.RunSchemaTest(t, st)
@@ -75,13 +76,12 @@ func TestBBoltKeyVal(t *testing.T) {
 	test.RunTableRowsTest(t, st)
 
 	test.RunIndexLifecycleTest(t, st)
-	// XXX
-	//test.RunIndexOneColUniqueTest(t, st)
-	//test.RunIndexTwoColUniqueTest(t, st)
-	//test.RunIndexOneColTest(t, st)
-	//test.RunIndexTwoColTest(t, st)
+	test.RunIndexOneColUniqueTest(t, st)
+	test.RunIndexTwoColUniqueTest(t, st)
+	test.RunIndexOneColTest(t, st)
+	test.RunIndexTwoColTest(t, st)
 	test.RunPrimaryMinMaxTest(t, st)
-	//test.RunIndexMinMaxTest(t, st)
+	test.RunIndexMinMaxTest(t, st)
 
 	// Work, but are very slow without setting NoSync = true and NoFreelistSync = true
 	test.RunStressTest(t, st)
