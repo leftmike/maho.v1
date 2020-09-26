@@ -75,7 +75,7 @@ func TestValues(t *testing.T) {
 			t.Errorf("(%v).Rows() failed with %s", c.values, err)
 			continue
 		}
-		cols := rows.Columns()
+		cols := rowsPlan.Columns()
 		if !reflect.DeepEqual(cols, c.cols) {
 			t.Errorf("(%v).Plan().Columns() got %v want %v", c.values, cols, c.cols)
 			continue

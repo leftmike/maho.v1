@@ -276,7 +276,7 @@ func (kvt *table) toItem(row []sql.Value, deleted bool) rowItem {
 		key: kvt.makePrimaryKey(row),
 	}
 	if row != nil && !deleted {
-		ri.row = append(make([]sql.Value, 0, len(kvt.tl.Columns())), row...)
+		ri.row = append(make([]sql.Value, 0, kvt.tl.NumColumns()), row...)
 	}
 	return ri
 }
@@ -429,8 +429,8 @@ func (kvt *table) Insert(ctx context.Context, row []sql.Value) error {
 	return nil
 }
 
-func (kvr *rows) Columns() []sql.Identifier {
-	return kvr.tbl.tl.Columns()
+func (kvr *rows) NumColumns() int {
+	return kvr.tbl.tl.NumColumns()
 }
 
 func (kvr *rows) Close() error {
@@ -621,7 +621,7 @@ func (kvir *indexRows) Update(ctx context.Context, updatedCols []int,
 }
 
 func (kvir *indexRows) getRow() []sql.Value {
-	row := make([]sql.Value, len(kvir.tbl.tl.Columns()))
+	row := make([]sql.Value, kvir.tbl.tl.NumColumns())
 	kvir.il.IndexRowToRow(kvir.curRow, row)
 
 	if kvir.tbl.tx.delta != nil {

@@ -67,7 +67,7 @@ func (gbo groupByOp) rows(ctx context.Context, tx sql.Transaction) (sql.Rows, er
 	return &groupRows{
 		tx:          tx,
 		rows:        r,
-		cols:        gbo.cols,
+		numCols:     len(gbo.cols),
 		groupExprs:  gbo.groupExprs,
 		aggregators: gbo.aggregators,
 	}, nil
@@ -82,7 +82,7 @@ type groupRows struct {
 	tx          sql.Transaction
 	rows        sql.Rows
 	dest        []sql.Value
-	cols        []sql.Identifier
+	numCols     int
 	groupExprs  []expr2dest
 	aggregators []aggregator
 	groups      [][]sql.Value
@@ -93,8 +93,8 @@ func (gr *groupRows) EvalRef(idx int) sql.Value {
 	return gr.dest[idx]
 }
 
-func (gr *groupRows) Columns() []sql.Identifier {
-	return gr.cols
+func (gr *groupRows) NumColumns() int {
+	return gr.numCols
 }
 
 func (gr *groupRows) Close() error {
@@ -108,7 +108,7 @@ type groupRow struct {
 }
 
 func (gr *groupRows) group(ctx context.Context) error {
-	gr.dest = make([]sql.Value, len(gr.rows.Columns()))
+	gr.dest = make([]sql.Value, gr.rows.NumColumns())
 	groups := map[string]groupRow{}
 	for {
 		err := gr.rows.Next(ctx, gr.dest)

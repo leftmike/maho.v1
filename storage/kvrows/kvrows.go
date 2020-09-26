@@ -722,8 +722,8 @@ func (kvt *table) Insert(ctx context.Context, row []sql.Value) error {
 	return upd.Commit()
 }
 
-func (kvr *rows) Columns() []sql.Identifier {
-	return kvr.tbl.tl.Columns()
+func (kvr *rows) NumColumns() int {
+	return kvr.tbl.tl.NumColumns()
 }
 
 func (kvr *rows) Close() error {
@@ -894,7 +894,7 @@ func (kvir *indexRows) Update(ctx context.Context, updatedCols []int,
 }
 
 func (kvir *indexRows) getRow(ctx context.Context) ([]sql.Value, error) {
-	row := make([]sql.Value, len(kvir.tbl.tl.Columns()))
+	row := make([]sql.Value, kvir.tbl.tl.NumColumns())
 	kvir.il.IndexRowToRow(kvir.rows[kvir.idx-1], row)
 	key := kvir.tbl.makePrimaryKey(row)
 

@@ -19,7 +19,7 @@ type Table interface {
 }
 
 type Rows interface {
-	Columns() []sql.Identifier
+	NumColumns() int
 	Close() error
 	Next(ctx context.Context) ([]sql.Value, error)
 	Delete(ctx context.Context) error

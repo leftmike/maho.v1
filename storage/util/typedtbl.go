@@ -211,8 +211,8 @@ func (ttbl *typedTable) Insert(ctx context.Context, rowObj interface{}) error {
 	return ttbl.tbl.Insert(ctx, ttbl.rowObjToRow(ctx, "rowObj", rowObj))
 }
 
-func (r *TypedRows) Columns() []sql.Identifier {
-	return r.rows.Columns()
+func (r *TypedRows) NumColumns() int {
+	return r.rows.NumColumns()
 }
 
 func (r *TypedRows) Close() error {

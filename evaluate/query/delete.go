@@ -65,7 +65,7 @@ func (dp *deletePlan) Execute(ctx context.Context, tx sql.Transaction) (int64, e
 	}
 	defer rows.Close()
 
-	dest := make([]sql.Value, len(rows.Columns()))
+	dest := make([]sql.Value, rows.NumColumns())
 	var cnt int64
 	for {
 		err := rows.Next(ctx, dest)

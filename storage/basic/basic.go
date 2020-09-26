@@ -126,7 +126,7 @@ func (bt *table) toItem(row []sql.Value) btree.Item {
 	}
 	if row != nil {
 		ri.key = encode.MakeKey(bt.tl.PrimaryKey(), row)
-		ri.row = append(make([]sql.Value, 0, len(bt.tl.Columns())), row...)
+		ri.row = append(make([]sql.Value, 0, bt.tl.NumColumns()), row...)
 	}
 	return ri
 }
@@ -235,8 +235,8 @@ func (bt *table) Insert(ctx context.Context, row []sql.Value) error {
 	return nil
 }
 
-func (br *rows) Columns() []sql.Identifier {
-	return br.tbl.tl.Columns()
+func (br *rows) NumColumns() int {
+	return br.tbl.tl.NumColumns()
 }
 
 func (br *rows) Close() error {
@@ -373,7 +373,7 @@ func (bir *indexRows) Update(ctx context.Context, updatedCols []int, updateRow [
 }
 
 func (bir *indexRows) getRow() []sql.Value {
-	row := make([]sql.Value, len(bir.tbl.tl.Columns()))
+	row := make([]sql.Value, bir.tbl.tl.NumColumns())
 	bir.il.IndexRowToRow(bir.rows[bir.idx-1], row)
 
 	item := bir.tbl.tx.tree.Get(bir.tbl.toItem(row))

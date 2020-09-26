@@ -18,8 +18,8 @@ type testRows struct {
 	updateCalled bool
 }
 
-func (_ *testRows) Columns() []sql.Identifier {
-	return []sql.Identifier{sql.ID("c1"), sql.ID("c2"), sql.ID("c3")}
+func (_ *testRows) NumColumns() int {
+	return 3
 }
 
 func (tr *testRows) Close() error {

@@ -54,7 +54,7 @@ func replSQL(ses *evaluate.Session, p parser.Parser, w io.Writer) {
 						return err
 					}
 
-					cols := rows.Columns()
+					cols := rowsPlan.Columns()
 					fmt.Fprint(w, "\t")
 					for _, col := range cols {
 						fmt.Fprintf(w, "%s\t", col)

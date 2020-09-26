@@ -45,17 +45,11 @@ To Do:
 - subquery expressions: EXISTS, IN, NOT IN, ANY/SOME, ALL
 - conditional expressions: CASE, COALESCE, NULLIF, GREATEST, LEAST
 
-- sql.Rows.Columns(): change to NumColumns() instead
-
 - EXPLAIN
 -- group by fields: need to get name of compiled aggregator
 -- include full column names
 -- SELECT: track where columns come from, maybe as part of Plan
 -- DELETE, INSERT, UPDATE, VALUES
-
-- indexes
--- add create unique index test to sqltest/
--- add create index test to sqltest/
 
 - SELECT
 -- push filters down to scans: col op (literal | param) or (literal | param) op col; and combos

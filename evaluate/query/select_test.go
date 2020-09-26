@@ -119,7 +119,7 @@ func TestSelect(t *testing.T) {
 			continue
 		}
 
-		cols := rows.Columns()
+		cols := rowsPlan.Columns()
 		if !reflect.DeepEqual(cols, c.cols) {
 			t.Errorf("(%v).Plan().Columns() got %v want %v", c.stmt, cols, c.cols)
 			continue

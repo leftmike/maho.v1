@@ -5,7 +5,7 @@ import (
 )
 
 type Rows interface {
-	Columns() []Identifier
+	NumColumns() int
 	Close() error
 	Next(ctx context.Context, dest []Value) error
 	Delete(ctx context.Context) error

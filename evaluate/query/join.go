@@ -152,7 +152,7 @@ func (jo joinOp) rows(ctx context.Context, tx sql.Transaction) (sql.Rows, error)
 		src2dest:  jo.src2dest,
 		rightLen:  jo.rightLen,
 		on:        jo.on,
-		cols:      jo.cols,
+		numCols:   len(jo.cols),
 	}, nil
 }
 
@@ -186,7 +186,7 @@ type joinRows struct {
 	rightLen   int
 	rightUsed  []bool
 
-	cols []sql.Identifier
+	numCols int
 
 	on sql.CExpr
 
@@ -194,8 +194,8 @@ type joinRows struct {
 	src2dest []int
 }
 
-func (jr *joinRows) Columns() []sql.Identifier {
-	return jr.cols
+func (jr *joinRows) NumColumns() int {
+	return jr.numCols
 }
 
 func (jr *joinRows) Close() error {

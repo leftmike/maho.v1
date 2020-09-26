@@ -78,7 +78,7 @@ func TestValuesSimple(t *testing.T) {
 			t.Errorf("(%v).Rows() failed with %s", c.sql, err)
 			continue
 		}
-		dest := make([]sql.Value, len(rows.Columns()))
+		dest := make([]sql.Value, rows.NumColumns())
 		for i, r := range c.rows {
 			if rows.Next(ctx, dest) != nil {
 				t.Errorf("Plan(%q).Rows() got %d rows; want %d rows", c.sql, i, len(c.rows))

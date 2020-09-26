@@ -237,7 +237,7 @@ func (rct *table) toItem(row []sql.Value, deleted bool) btree.Item {
 	if row != nil {
 		ri.key = encode.MakeKey(rct.tl.PrimaryKey(), row)
 		if !deleted {
-			ri.row = append(make([]sql.Value, 0, len(rct.tl.Columns())), row...)
+			ri.row = append(make([]sql.Value, 0, rct.tl.NumColumns()), row...)
 		}
 	}
 	return ri
@@ -408,8 +408,8 @@ func (rct *table) Insert(ctx context.Context, row []sql.Value) error {
 	return nil
 }
 
-func (rcr *rows) Columns() []sql.Identifier {
-	return rcr.tbl.tl.Columns()
+func (rcr *rows) NumColumns() int {
+	return rcr.tbl.tl.NumColumns()
 }
 
 func (rcr *rows) Close() error {
@@ -532,7 +532,7 @@ func (rcir *indexRows) Update(ctx context.Context, updatedCols []int,
 }
 
 func (rcir *indexRows) getRow() []sql.Value {
-	row := make([]sql.Value, len(rcir.tbl.tl.Columns()))
+	row := make([]sql.Value, rcir.tbl.tl.NumColumns())
 	rcir.il.IndexRowToRow(rcir.rows[rcir.idx-1], row)
 	key := rcir.tbl.toItem(row, false)
 

@@ -235,8 +235,8 @@ type sortRows struct {
 	sorted  bool
 }
 
-func (sr *sortRows) Columns() []sql.Identifier {
-	return sr.rows.Columns()
+func (sr *sortRows) NumColumns() int {
+	return sr.rows.NumColumns()
 }
 
 func (sr *sortRows) Close() error {
@@ -248,7 +248,7 @@ func (sr *sortRows) sort(ctx context.Context) error {
 	sr.sorted = true
 
 	for {
-		dest := make([]sql.Value, len(sr.rows.Columns()))
+		dest := make([]sql.Value, sr.rows.NumColumns())
 		err := sr.rows.Next(ctx, dest)
 		if err == io.EOF {
 			break
@@ -380,8 +380,8 @@ func (fr *filterRows) EvalRef(idx int) sql.Value {
 	return fr.dest[idx]
 }
 
-func (fr *filterRows) Columns() []sql.Identifier {
-	return fr.rows.Columns()
+func (fr *filterRows) NumColumns() int {
+	return fr.rows.NumColumns()
 }
 
 func (fr *filterRows) Close() error {
@@ -493,8 +493,8 @@ type oneEmptyRow struct {
 	one bool
 }
 
-func (oer *oneEmptyRow) Columns() []sql.Identifier {
-	return []sql.Identifier{}
+func (oer *oneEmptyRow) NumColumns() int {
+	return 0
 }
 
 func (oer *oneEmptyRow) Close() error {
@@ -549,7 +549,7 @@ func (aro *allResultsOp) rows(ctx context.Context, tx sql.Transaction) (sql.Rows
 		return nil, err
 	}
 
-	return &allResultRows{r, aro.cols}, nil
+	return &allResultRows{r, len(aro.cols)}, nil
 }
 
 func (aro *allResultsOp) columns() []sql.Identifier {
@@ -557,12 +557,12 @@ func (aro *allResultsOp) columns() []sql.Identifier {
 }
 
 type allResultRows struct {
-	rows sql.Rows
-	cols []sql.Identifier
+	rows    sql.Rows
+	numCols int
 }
 
-func (arr *allResultRows) Columns() []sql.Identifier {
-	return arr.cols
+func (arr *allResultRows) NumColumns() int {
+	return arr.numCols
 }
 
 func (arr *allResultRows) Close() error {
@@ -625,7 +625,7 @@ func (ro *resultsOp) rows(ctx context.Context, tx sql.Transaction) (sql.Rows, er
 	return &resultRows{
 		tx:        tx,
 		rows:      r,
-		cols:      ro.cols,
+		numCols:   len(ro.cols),
 		destCols:  ro.destCols,
 		destExprs: ro.destExprs,
 	}, nil
@@ -649,7 +649,7 @@ type resultRows struct {
 	tx        sql.Transaction
 	rows      sql.Rows
 	dest      []sql.Value
-	cols      []sql.Identifier
+	numCols   int
 	destCols  []src2dest
 	destExprs []expr2dest
 }
@@ -658,8 +658,8 @@ func (rr *resultRows) EvalRef(idx int) sql.Value {
 	return rr.dest[idx]
 }
 
-func (rr *resultRows) Columns() []sql.Identifier {
-	return rr.cols
+func (rr *resultRows) NumColumns() int {
+	return rr.numCols
 }
 
 func (rr *resultRows) Close() error {
@@ -668,7 +668,7 @@ func (rr *resultRows) Close() error {
 
 func (rr *resultRows) Next(ctx context.Context, dest []sql.Value) error {
 	if rr.dest == nil {
-		rr.dest = make([]sql.Value, len(rr.rows.Columns()))
+		rr.dest = make([]sql.Value, rr.rows.NumColumns())
 	}
 	err := rr.rows.Next(ctx, rr.dest)
 	if err != nil {

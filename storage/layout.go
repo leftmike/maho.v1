@@ -91,8 +91,8 @@ func makeTableLayout(tt *engine.TableType) *TableLayout {
 	return &tl
 }
 
-func (tl *TableLayout) Columns() []sql.Identifier {
-	return tl.tt.Columns()
+func (tl *TableLayout) NumColumns() int {
+	return len(tl.tt.Columns())
 }
 
 func (tl *TableLayout) PrimaryKey() []sql.ColumnKey {

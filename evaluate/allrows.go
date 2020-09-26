@@ -10,7 +10,7 @@ import (
 // AllRows returns all of the rows from a Rows as slices of values.
 func AllRows(ctx context.Context, rows sql.Rows) ([][]sql.Value, error) {
 	all := [][]sql.Value{}
-	l := len(rows.Columns())
+	l := rows.NumColumns()
 	for {
 		dest := make([]sql.Value, l)
 		err := rows.Next(ctx, dest)

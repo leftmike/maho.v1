@@ -27,10 +27,10 @@ type virtualTable struct {
 }
 
 type virtualRows struct {
-	tn    sql.TableName
-	cols  []sql.Identifier
-	rows  [][]sql.Value
-	index int
+	tn      sql.TableName
+	numCols int
+	rows    [][]sql.Value
+	index   int
 }
 
 func (vt *virtualTable) Columns(ctx context.Context) []sql.Identifier {
@@ -49,7 +49,7 @@ func (vt *virtualTable) Rows(ctx context.Context, minRow, maxRow []sql.Value) (s
 	if minRow != nil || maxRow != nil {
 		panic("virtual: not implemented: minRow != nil || maxRow != nil")
 	}
-	return &virtualRows{tn: vt.tn, cols: vt.tt.Columns(), rows: vt.values}, nil
+	return &virtualRows{tn: vt.tn, numCols: len(vt.tt.Columns()), rows: vt.values}, nil
 }
 
 func (vt *virtualTable) IndexRows(ctx context.Context, iidx int,
@@ -62,8 +62,8 @@ func (vt *virtualTable) Insert(ctx context.Context, row []sql.Value) error {
 	return fmt.Errorf("virtual: table %s can not be modified", vt.tn)
 }
 
-func (vr *virtualRows) Columns() []sql.Identifier {
-	return vr.cols
+func (vr *virtualRows) NumColumns() int {
+	return vr.numCols
 }
 
 func (vr *virtualRows) Close() error {

@@ -106,13 +106,13 @@ func (ses *Session) Set(v sql.Identifier, s string) error {
 }
 
 type values struct {
-	cols  []sql.Identifier
-	rows  [][]sql.Value
-	index int
+	numCols int
+	rows    [][]sql.Value
+	index   int
 }
 
-func (v *values) Columns() []sql.Identifier {
-	return v.cols
+func (v *values) NumColumns() int {
+	return v.numCols
 }
 
 func (v *values) Close() error {
@@ -151,17 +151,17 @@ func (ses *Session) Columns(v sql.Identifier) []sql.Identifier {
 func (ses *Session) Show(v sql.Identifier) (sql.Rows, error) {
 	if v == sql.DATABASE {
 		return &values{
-			cols: []sql.Identifier{sql.DATABASE},
-			rows: [][]sql.Value{{sql.StringValue(ses.defaultDatabase.String())}},
+			numCols: 1,
+			rows:    [][]sql.Value{{sql.StringValue(ses.defaultDatabase.String())}},
 		}, nil
 	} else if v == sql.SCHEMA {
 		return &values{
-			cols: []sql.Identifier{sql.SCHEMA},
-			rows: [][]sql.Value{{sql.StringValue(ses.defaultSchema.String())}},
+			numCols: 1,
+			rows:    [][]sql.Value{{sql.StringValue(ses.defaultSchema.String())}},
 		}, nil
 	} else if cv, ok := config.Lookup(v.String()); ok {
 		return &values{
-			cols: []sql.Identifier{sql.ID("name"), sql.ID("by"), sql.ID("value")},
+			numCols: 3,
 			rows: [][]sql.Value{
 				{sql.StringValue(cv.Name()), sql.StringValue(cv.By()), sql.StringValue(cv.Val())},
 			},

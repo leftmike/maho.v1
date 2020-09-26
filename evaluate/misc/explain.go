@@ -115,6 +115,10 @@ func (er *explainRows) Columns() []sql.Identifier {
 	return er.cols
 }
 
+func (er *explainRows) NumColumns() int {
+	return len(er.cols)
+}
+
 func (er *explainRows) Close() error {
 	er.rows = nil
 	return nil

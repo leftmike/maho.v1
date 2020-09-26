@@ -219,7 +219,7 @@ func statement(ctx context.Context, ses *evaluate.Session, tx sql.Transaction, s
 
 func allRows(ctx context.Context, rows sql.Rows, numCols int) ([][]sql.Value, error) {
 	all := [][]sql.Value{}
-	l := len(rows.Columns())
+	l := rows.NumColumns()
 	for {
 		dest := make([]sql.Value, l)
 		err := rows.Next(ctx, dest)

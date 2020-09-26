@@ -247,7 +247,7 @@ func (re *rowsExpr) eval(ctx context.Context, tx sql.Transaction) (sql.Value, er
 	}
 	defer rows.Close()
 
-	if len(rows.Columns()) != 1 {
+	if rows.NumColumns() != 1 {
 		return nil, errors.New("engine: expected one column for scalar subquery")
 	}
 	dest := []sql.Value{nil}

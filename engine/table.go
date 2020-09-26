@@ -260,8 +260,8 @@ func (tbl *table) update(ctx context.Context, r Rows, updates []sql.ColumnUpdate
 	return r.Update(ctx, updatedCols, updateRow)
 }
 
-func (r *rows) Columns() []sql.Identifier {
-	return r.rows.Columns()
+func (r *rows) NumColumns() int {
+	return r.rows.NumColumns()
 }
 
 func (r *rows) Close() error {

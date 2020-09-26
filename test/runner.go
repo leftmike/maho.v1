@@ -91,7 +91,7 @@ func (run *Runner) RunQuery(tst *sqltestdb.Test) ([]string, [][]string, error) {
 				return err
 			}
 
-			cols := rows.Columns()
+			cols := rowsPlan.Columns()
 			lenCols := len(cols)
 			resultCols = make([]string, 0, lenCols)
 			for _, col := range cols {

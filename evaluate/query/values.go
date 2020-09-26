@@ -76,21 +76,21 @@ func (vp valuesPlan) Columns() []sql.Identifier {
 
 func (vp valuesPlan) Rows(ctx context.Context, tx sql.Transaction) (sql.Rows, error) {
 	return &exprValues{
-		tx:   tx,
-		cols: vp.cols,
-		rows: vp.rows,
+		tx:      tx,
+		numCols: len(vp.cols),
+		rows:    vp.rows,
 	}, nil
 }
 
 type exprValues struct {
-	tx    sql.Transaction
-	cols  []sql.Identifier
-	rows  [][]sql.CExpr
-	index int
+	tx      sql.Transaction
+	numCols int
+	rows    [][]sql.CExpr
+	index   int
 }
 
-func (ev *exprValues) Columns() []sql.Identifier {
-	return ev.cols
+func (ev *exprValues) NumColumns() int {
+	return ev.numCols
 }
 
 func (ev *exprValues) Close() error {
