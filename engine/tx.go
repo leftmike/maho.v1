@@ -308,7 +308,13 @@ func (tx *transaction) CreateIndex(ctx context.Context, idxname sql.Identifier, 
 		return fmt.Errorf("engine: table %s: index %s already exists", tn, idxname)
 	}
 
-	return tx.e.st.AddIndex(ctx, tx.tx, tn, tt, it)
+	err = tx.e.st.AddIndex(ctx, tx.tx, tn, tt, it)
+	if err != nil {
+		return err
+	}
+	delete(tx.tables, tn)
+	delete(tx.tableTypes, tn)
+	return nil
 }
 
 func (tx *transaction) DropIndex(ctx context.Context, idxname sql.Identifier, tn sql.TableName,
@@ -333,7 +339,14 @@ func (tx *transaction) DropIndex(ctx context.Context, idxname sql.Identifier, tn
 		}
 		return fmt.Errorf("engine: table %s: index %s not found", tn, idxname)
 	}
-	return tx.e.st.RemoveIndex(ctx, tx.tx, tn, tt, rdx)
+
+	err = tx.e.st.RemoveIndex(ctx, tx.tx, tn, tt, rdx)
+	if err != nil {
+		return err
+	}
+	delete(tx.tables, tn)
+	delete(tx.tableTypes, tn)
+	return nil
 }
 
 func (tx *transaction) ListDatabases(ctx context.Context) ([]sql.Identifier, error) {
