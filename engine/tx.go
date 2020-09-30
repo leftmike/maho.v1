@@ -18,15 +18,19 @@ type actionKey struct {
 }
 
 type transaction struct {
-	e       *Engine
-	tx      Transaction
-	actions map[actionKey]action
+	e          *Engine
+	tx         Transaction
+	tables     map[sql.TableName]*table
+	tableTypes map[sql.TableName]sql.TableType
+	actions    map[actionKey]action
 }
 
 func (e *Engine) Begin(sesid uint64) sql.Transaction {
 	return &transaction{
-		e:  e,
-		tx: e.st.Begin(sesid),
+		e:          e,
+		tx:         e.st.Begin(sesid),
+		tables:     map[sql.TableName]*table{},
+		tableTypes: map[sql.TableName]sql.TableType{},
 	}
 }
 
@@ -85,11 +89,17 @@ func (tx *transaction) LookupTableType(ctx context.Context, tn sql.TableName) (s
 		return tt, err
 	}
 
+	tt, ok = tx.tableTypes[tn]
+	if ok {
+		return tt, nil
+	}
+
 	tt, err = tx.e.st.LookupTableType(ctx, tx.tx, tn)
 	if err != nil {
 		return nil, err
 	}
-	return tt, err
+	tx.tableTypes[tn] = tt
+	return tt, nil
 }
 
 func (tx *transaction) LookupTable(ctx context.Context, tn sql.TableName, ttVer int64) (sql.Table,
@@ -103,6 +113,14 @@ func (tx *transaction) LookupTable(ctx context.Context, tn sql.TableName, ttVer 
 		return vtbl, err
 	}
 
+	tbl, ok := tx.tables[tn]
+	if ok {
+		if tbl.tt.Version() != ttVer {
+			return nil, fmt.Errorf("engine: table %s: type version mismatch", tn)
+		}
+		return tbl, nil
+	}
+
 	stbl, stt, err := tx.e.st.LookupTable(ctx, tx.tx, tn)
 	if err != nil {
 		return nil, err
@@ -110,7 +128,10 @@ func (tx *transaction) LookupTable(ctx context.Context, tn sql.TableName, ttVer 
 	if stt.Version() != ttVer {
 		return nil, fmt.Errorf("engine: table %s: type version mismatch", tn)
 	}
-	return makeTable(tx, tn, stbl, stt), nil
+
+	tbl = makeTable(tx, tn, stbl, stt)
+	tx.tables[tn] = tbl
+	return tbl, nil
 }
 
 func (tx *transaction) CreateTable(ctx context.Context, tn sql.TableName, cols []sql.Identifier,
@@ -206,7 +227,14 @@ func (tx *transaction) DropTable(ctx context.Context, tn sql.TableName, ifExists
 	if tn.Schema == sql.METADATA {
 		return fmt.Errorf("engine: schema %s may not be modified", tn.Schema)
 	}
-	return tx.e.st.DropTable(ctx, tx.tx, tn, ifExists)
+
+	err := tx.e.st.DropTable(ctx, tx.tx, tn, ifExists)
+	if err != nil {
+		return err
+	}
+	delete(tx.tables, tn)
+	delete(tx.tableTypes, tn)
+	return nil
 }
 
 func (tx *transaction) AddForeignKey(ctx context.Context, con sql.Identifier, fktn sql.TableName,
@@ -236,6 +264,8 @@ func (tx *transaction) AddForeignKey(ctx context.Context, con sql.Identifier, fk
 	if err != nil {
 		return err
 	}
+	delete(tx.tables, fktn)
+	delete(tx.tableTypes, fktn)
 
 	if rtn.Database == sql.SYSTEM {
 		return fmt.Errorf("engine: database %s may not be modified", rtn.Database)

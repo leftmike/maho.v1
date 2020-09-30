@@ -58,6 +58,15 @@ To Do:
 
 - ALTER TABLE ONLY table ADD CONSTRAINT constraint FOREIGN KEY ...
 
+- triggers
+-- change actions to triggers
+-- sqlite:
+    1. Execute applicable BEFORE trigger programs,
+    2. Check local (non foreign key) constraints,
+    3. Update or delete the row in the parent table,
+    4. Perform any required foreign key actions,
+    5. Execute applicable AFTER trigger programs.
+
 - foreign key references
 -- check fkey against ref table on update
 -- sqlite: fkey IS NULL OR EXISTS(SELECT 1 FROM reftbl WHERE fkey=refkey)

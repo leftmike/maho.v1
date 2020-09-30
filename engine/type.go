@@ -30,6 +30,31 @@ type foreignKey struct {
 	refIndex sql.Identifier
 }
 
+/*
+type Trigger interface {
+	Encode() ([]byte, error)
+	AfterRows(ctx context.Context, e *Engine, tx *transaction, deferred bool,
+		oldRows, newRows sql.Rows) error
+}
+
+type trigger struct {
+	typ     string
+	name    sql.Identifier
+	events  int
+	trigger Trigger
+}
+
+func (tt *TableType) AddTrigger(typ string, name sql.Identifier, events int, trig Tigger) {
+
+}
+
+const (
+	DeleteEvent = 1 << iota
+	InsertEvent
+	UpdateEvent
+)
+*/
+
 type TableType struct {
 	ver         int64
 	cols        []sql.Identifier
@@ -39,7 +64,16 @@ type TableType struct {
 	constraints []constraint
 	checks      []checkConstraint
 	foreignKeys []foreignKey
+	//triggers    []trigger
 }
+
+/*
+type DecodeTrigger func(buf []byte) (Trigger, error)
+
+var (
+	triggerDecoders = map[string]DecodeTrigger{}
+)
+*/
 
 func MakeTableType(cols []sql.Identifier, colTypes []sql.ColumnType,
 	primary []sql.ColumnKey) *TableType {
