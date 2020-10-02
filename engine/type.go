@@ -30,31 +30,6 @@ type foreignKey struct {
 	refIndex sql.Identifier
 }
 
-/*
-type Trigger interface {
-	Encode() ([]byte, error)
-	AfterRows(ctx context.Context, e *Engine, tx *transaction, deferred bool,
-		oldRows, newRows sql.Rows) error
-}
-
-type trigger struct {
-	typ     string
-	name    sql.Identifier
-	events  int
-	trigger Trigger
-}
-
-func (tt *TableType) AddTrigger(typ string, name sql.Identifier, events int, trig Tigger) {
-
-}
-
-const (
-	DeleteEvent = 1 << iota
-	InsertEvent
-	UpdateEvent
-)
-*/
-
 type TableType struct {
 	ver         int64
 	cols        []sql.Identifier
@@ -64,16 +39,9 @@ type TableType struct {
 	constraints []constraint
 	checks      []checkConstraint
 	foreignKeys []foreignKey
-	//triggers    []trigger
+	triggers    []trigger
+	events      int64
 }
-
-/*
-type DecodeTrigger func(buf []byte) (Trigger, error)
-
-var (
-	triggerDecoders = map[string]DecodeTrigger{}
-)
-*/
 
 func MakeTableType(cols []sql.Identifier, colTypes []sql.ColumnType,
 	primary []sql.ColumnKey) *TableType {
@@ -104,6 +72,22 @@ func (tt *TableType) PrimaryKey() []sql.ColumnKey {
 
 func (tt *TableType) Indexes() []sql.IndexType {
 	return tt.indexes
+}
+
+func (tt *TableType) AddTrigger(typ string, name sql.Identifier, events int64, trig Trigger) {
+	_, ok := triggerDecoders[typ]
+	if !ok {
+		panic(fmt.Sprintf("engine: unknown trigger type: %s", typ))
+	}
+
+	tt.triggers = append(tt.triggers,
+		trigger{
+			typ:    typ,
+			name:   name,
+			events: events,
+			trig:   trig,
+		})
+	tt.events |= events
 }
 
 func addColumn(cols []int, num int) []int {
@@ -264,6 +248,22 @@ func (tt *TableType) Encode() ([]byte, error) {
 			})
 	}
 
+	md.Triggers = make([]*TriggerMetadata, 0, len(tt.triggers))
+	for _, t := range tt.triggers {
+		buf, err := t.trig.Encode()
+		if err != nil {
+			return nil, err
+		}
+
+		md.Triggers = append(md.Triggers,
+			&TriggerMetadata{
+				Type:    t.typ,
+				Name:    t.name.String(),
+				Events:  t.events,
+				Trigger: buf,
+			})
+	}
+
 	return proto.Marshal(&md)
 }
 
@@ -359,6 +359,29 @@ func DecodeTableType(tn sql.TableName, buf []byte) (*TableType, error) {
 				refIndex: sql.QuotedID(fk.ReferenceIndex),
 			})
 	}
+
+	var events int64
+	triggers := make([]trigger, 0, len(md.Triggers))
+	for _, t := range md.Triggers {
+		decoder, ok := triggerDecoders[t.Type]
+		if !ok {
+			return nil, fmt.Errorf("engine: missing trigger type: %s", t.Type)
+		}
+		trig, err := decoder(t.Trigger)
+		if err != nil {
+			return nil, err
+		}
+
+		triggers = append(triggers,
+			trigger{
+				typ:    t.Type,
+				name:   sql.QuotedID(t.Name),
+				events: t.Events,
+				trig:   trig,
+			})
+		events |= t.Events
+	}
+
 	return &TableType{
 		ver:         md.Version,
 		cols:        cols,
@@ -368,5 +391,7 @@ func DecodeTableType(tn sql.TableName, buf []byte) (*TableType, error) {
 		constraints: constraints,
 		checks:      checks,
 		foreignKeys: foreignKeys,
+		triggers:    triggers,
+		events:      events,
 	}, nil
 }

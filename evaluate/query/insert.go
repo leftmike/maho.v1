@@ -135,7 +135,7 @@ func (plan *insertValuesPlan) Execute(ctx context.Context, tx sql.Transaction) (
 	if err != nil {
 		return -1, err
 	}
-	err = tbl.ModifyStart(sql.InsertEvent)
+	err = tbl.ModifyStart(ctx, sql.InsertEvent)
 	if err != nil {
 		return -1, err
 	}
@@ -163,5 +163,5 @@ func (plan *insertValuesPlan) Execute(ctx context.Context, tx sql.Transaction) (
 		}
 	}
 
-	return tbl.ModifyDone(sql.InsertEvent, int64(len(plan.rows)))
+	return tbl.ModifyDone(ctx, sql.InsertEvent, int64(len(plan.rows)))
 }

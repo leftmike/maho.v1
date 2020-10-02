@@ -13,10 +13,14 @@ import (
 )
 
 type table struct {
-	tx   *transaction
-	tn   sql.TableName
-	stbl Table
-	tt   *TableType
+	tx             *transaction
+	tn             sql.TableName
+	stbl           Table
+	tt             *TableType
+	deletedRows    [][]sql.Value
+	insertedRows   [][]sql.Value
+	updatedOldRows [][]sql.Value
+	updatedNewRows [][]sql.Value
 }
 
 type rows struct {
@@ -32,16 +36,6 @@ func makeTable(tx *transaction, tn sql.TableName, stbl Table, tt *TableType) *ta
 		stbl: stbl,
 		tt:   tt,
 	}
-}
-
-func (tbl *table) ModifyStart(event int) error {
-
-	return nil
-}
-
-func (tbl *table) ModifyDone(event int, cnt int64) (int64, error) {
-
-	return cnt, nil
 }
 
 func (tbl *table) Rows(ctx context.Context, minRow, maxRow []sql.Value) (sql.Rows, error) {
@@ -222,10 +216,14 @@ func (tbl *table) Insert(ctx context.Context, row []sql.Value) error {
 			})
 	}
 
+	if tbl.tt.events&sql.InsertEvent != 0 {
+		tbl.insertedRows = append(tbl.insertedRows, row)
+	}
+
 	return tbl.stbl.Insert(ctx, row)
 }
 
-func (tbl *table) update(ctx context.Context, r Rows, updates []sql.ColumnUpdate,
+func (tbl *table) updateRow(ctx context.Context, r Rows, updates []sql.ColumnUpdate,
 	curRow []sql.Value) error {
 
 	cols := tbl.tt.cols
@@ -260,6 +258,11 @@ func (tbl *table) update(ctx context.Context, r Rows, updates []sql.ColumnUpdate
 		}
 	}
 
+	if tbl.tt.events&sql.UpdateEvent != 0 {
+		tbl.updatedOldRows = append(tbl.updatedOldRows,
+			append(make([]sql.Value, 0, len(curRow)), curRow...))
+		tbl.updatedNewRows = append(tbl.updatedNewRows, updateRow)
+	}
 	/*
 		for _, fk := range tbl.tt.foreignKeys {
 			// XXX: check if any fk.keyCols are not null and updated
@@ -268,6 +271,15 @@ func (tbl *table) update(ctx context.Context, r Rows, updates []sql.ColumnUpdate
 	*/
 
 	return r.Update(ctx, updatedCols, updateRow)
+}
+
+func (tbl *table) deleteRow(ctx context.Context, r Rows, curRow []sql.Value) error {
+	if tbl.tt.events&sql.DeleteEvent != 0 {
+		tbl.deletedRows = append(tbl.deletedRows,
+			append(make([]sql.Value, 0, len(curRow)), curRow...))
+	}
+
+	return r.Delete(ctx)
 }
 
 func (r *rows) NumColumns() int {
@@ -292,7 +304,11 @@ func (r *rows) Next(ctx context.Context, dest []sql.Value) error {
 }
 
 func (r *rows) Delete(ctx context.Context) error {
-	return r.rows.Delete(ctx)
+	if r.curRow == nil {
+		panic(fmt.Sprintf("engine: table %s no row to delete", r.tbl.tn))
+	}
+
+	return r.tbl.deleteRow(ctx, r.rows, r.curRow)
 }
 
 func (r *rows) Update(ctx context.Context, updates []sql.ColumnUpdate) error {
@@ -300,5 +316,5 @@ func (r *rows) Update(ctx context.Context, updates []sql.ColumnUpdate) error {
 		panic(fmt.Sprintf("engine: table %s no row to update", r.tbl.tn))
 	}
 
-	return r.tbl.update(ctx, r.rows, updates, r.curRow)
+	return r.tbl.updateRow(ctx, r.rows, updates, r.curRow)
 }

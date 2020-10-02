@@ -56,7 +56,7 @@ func (dp *deletePlan) Execute(ctx context.Context, tx sql.Transaction) (int64, e
 	if err != nil {
 		return -1, err
 	}
-	err = tbl.ModifyStart(sql.DeleteEvent)
+	err = tbl.ModifyStart(ctx, sql.DeleteEvent)
 	if err != nil {
 		return -1, err
 	}
@@ -75,7 +75,7 @@ func (dp *deletePlan) Execute(ctx context.Context, tx sql.Transaction) (int64, e
 	for {
 		err := rows.Next(ctx, dest)
 		if err == io.EOF {
-			return tbl.ModifyDone(sql.DeleteEvent, cnt)
+			return tbl.ModifyDone(ctx, sql.DeleteEvent, cnt)
 		} else if err != nil {
 			return cnt, err
 		}
