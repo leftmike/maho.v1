@@ -34,6 +34,16 @@ func makeTable(tx *transaction, tn sql.TableName, stbl Table, tt *TableType) *ta
 	}
 }
 
+func (tbl *table) ModifyStart(event int) error {
+
+	return nil
+}
+
+func (tbl *table) ModifyDone(event int, cnt int64) (int64, error) {
+
+	return cnt, nil
+}
+
 func (tbl *table) Rows(ctx context.Context, minRow, maxRow []sql.Value) (sql.Rows, error) {
 	r, err := tbl.stbl.Rows(ctx, minRow, maxRow)
 	if err != nil {

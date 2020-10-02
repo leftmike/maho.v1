@@ -42,7 +42,15 @@ type TableType interface {
 	Indexes() []IndexType
 }
 
+const (
+	DeleteEvent = 1 << iota
+	InsertEvent
+	UpdateEvent
+)
+
 type Table interface {
+	ModifyStart(event int) error
+	ModifyDone(event int, cnt int64) (int64, error)
 	Rows(ctx context.Context, minRow, maxRow []Value) (Rows, error)
 	IndexRows(ctx context.Context, iidx int, minRow, maxRow []Value) (IndexRows, error)
 	Insert(ctx context.Context, row []Value) error

@@ -45,6 +45,14 @@ func (vt *virtualTable) PrimaryKey(ctx context.Context) []sql.ColumnKey {
 	return vt.tt.PrimaryKey()
 }
 
+func (vt *virtualTable) ModifyStart(event int) error {
+	return fmt.Errorf("virtual: table %s can not be modified", vt.tn)
+}
+
+func (vt *virtualTable) ModifyDone(event int, cnt int64) (int64, error) {
+	panic(fmt.Sprintf("virtual: table %s can not be modified", vt.tn))
+}
+
 func (vt *virtualTable) Rows(ctx context.Context, minRow, maxRow []sql.Value) (sql.Rows, error) {
 	if minRow != nil || maxRow != nil {
 		panic("virtual: not implemented: minRow != nil || maxRow != nil")
@@ -59,7 +67,7 @@ func (vt *virtualTable) IndexRows(ctx context.Context, iidx int,
 }
 
 func (vt *virtualTable) Insert(ctx context.Context, row []sql.Value) error {
-	return fmt.Errorf("virtual: table %s can not be modified", vt.tn)
+	panic(fmt.Sprintf("virtual: table %s can not be modified", vt.tn))
 }
 
 func (vr *virtualRows) NumColumns() int {
@@ -85,11 +93,11 @@ func (vr *virtualRows) Next(ctx context.Context, dest []sql.Value) error {
 }
 
 func (vr *virtualRows) Delete(ctx context.Context) error {
-	return fmt.Errorf("virtual: table %s can not be modified", vr.tn)
+	panic(fmt.Sprintf("virtual: table %s can not be modified", vr.tn))
 }
 
 func (vr *virtualRows) Update(ctx context.Context, updates []sql.ColumnUpdate) error {
-	return fmt.Errorf("virtual: table %s can not be modified", vr.tn)
+	panic(fmt.Sprintf("virtual: table %s can not be modified", vr.tn))
 }
 
 func (e *Engine) listSchemas(ctx context.Context, tx sql.Transaction,

@@ -104,6 +104,10 @@ func (plan *copyPlan) Execute(ctx context.Context, tx sql.Transaction) (int64, e
 	if err != nil {
 		return -1, err
 	}
+	err = tbl.ModifyStart(sql.InsertEvent)
+	if err != nil {
+		return -1, err
+	}
 
 	var cnt int64
 	err = copy.CopyFromText(plan.from, len(plan.fromToRow), plan.delimiter,
@@ -130,5 +134,5 @@ func (plan *copyPlan) Execute(ctx context.Context, tx sql.Transaction) (int64, e
 	if err != nil {
 		return -1, err
 	}
-	return cnt, nil
+	return tbl.ModifyDone(sql.InsertEvent, cnt)
 }
