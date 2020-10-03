@@ -67,7 +67,7 @@ To Do:
 -- create SQL (as structs) to check and update foreign key relations
 -- use prepared statements so only has to be planned once, but executed multiple times
 -- tests to verify that the structs match expected SQL
--- check foreign keys on update, insert, and delete
+-- check foreign keys on update and delete
 
 - constraints
 -- DROP TABLE: CASCADE: to remove foreign key constraint of another table

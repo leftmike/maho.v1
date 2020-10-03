@@ -2,7 +2,6 @@ package engine
 
 import (
 	"context"
-	"errors"
 	"fmt"
 	"strconv"
 	"strings"
@@ -25,6 +24,13 @@ type table struct {
 type rows struct {
 	tbl    *table
 	rows   Rows
+	curRow []sql.Value
+}
+
+type indexRows struct {
+	tbl    *table
+	ir     IndexRows
+	next   bool
 	curRow []sql.Value
 }
 
@@ -51,8 +57,14 @@ func (tbl *table) Rows(ctx context.Context, minRow, maxRow []sql.Value) (sql.Row
 func (tbl *table) IndexRows(ctx context.Context, iidx int,
 	minRow, maxRow []sql.Value) (sql.IndexRows, error) {
 
-	// XXX
-	return nil, errors.New("not implemented")
+	ir, err := tbl.stbl.IndexRows(ctx, iidx, minRow, maxRow)
+	if err != nil {
+		return nil, err
+	}
+	return &indexRows{
+		tbl: tbl,
+		ir:  ir,
+	}, nil
 }
 
 func convertValue(ct sql.ColumnType, n sql.Identifier, v sql.Value) (sql.Value, error) {
@@ -160,7 +172,9 @@ func (tbl *table) Insert(ctx context.Context, row []sql.Value) error {
 	return tbl.stbl.Insert(ctx, row)
 }
 
-func (tbl *table) updateRow(ctx context.Context, r Rows, updates []sql.ColumnUpdate,
+type updateRow func(ctx context.Context, updatedCols []int, updateRow []sql.Value) error
+
+func (tbl *table) updateRow(ctx context.Context, ufn updateRow, updates []sql.ColumnUpdate,
 	curRow []sql.Value) error {
 
 	cols := tbl.tt.cols
@@ -201,16 +215,18 @@ func (tbl *table) updateRow(ctx context.Context, r Rows, updates []sql.ColumnUpd
 		tbl.updatedNewRows = append(tbl.updatedNewRows, updateRow)
 	}
 
-	return r.Update(ctx, updatedCols, updateRow)
+	return ufn(ctx, updatedCols, updateRow)
 }
 
-func (tbl *table) deleteRow(ctx context.Context, r Rows, curRow []sql.Value) error {
+type deleteRow func(ctx context.Context) error
+
+func (tbl *table) deleteRow(ctx context.Context, dfn deleteRow, curRow []sql.Value) error {
 	if tbl.tt.events&sql.DeleteEvent != 0 {
 		tbl.deletedRows = append(tbl.deletedRows,
 			append(make([]sql.Value, 0, len(curRow)), curRow...))
 	}
 
-	return r.Delete(ctx)
+	return dfn(ctx)
 }
 
 func (r *rows) NumColumns() int {
@@ -239,7 +255,7 @@ func (r *rows) Delete(ctx context.Context) error {
 		panic(fmt.Sprintf("engine: table %s no row to delete", r.tbl.tn))
 	}
 
-	return r.tbl.deleteRow(ctx, r.rows, r.curRow)
+	return r.tbl.deleteRow(ctx, r.rows.Delete, r.curRow)
 }
 
 func (r *rows) Update(ctx context.Context, updates []sql.ColumnUpdate) error {
@@ -247,5 +263,70 @@ func (r *rows) Update(ctx context.Context, updates []sql.ColumnUpdate) error {
 		panic(fmt.Sprintf("engine: table %s no row to update", r.tbl.tn))
 	}
 
-	return r.tbl.updateRow(ctx, r.rows, updates, r.curRow)
+	return r.tbl.updateRow(ctx, r.rows.Update, updates, r.curRow)
+}
+
+func (ir *indexRows) Close() error {
+	err := ir.ir.Close()
+	ir.ir = nil
+	return err
+}
+
+func (ir *indexRows) Next(ctx context.Context, dest []sql.Value) error {
+	ir.curRow = nil
+	r, err := ir.ir.Next(ctx)
+	if err != nil {
+		ir.next = false
+		return err
+	}
+	copy(dest, r)
+	ir.next = true
+	return nil
+}
+
+func (ir *indexRows) Delete(ctx context.Context) error {
+	if !ir.next {
+		panic(fmt.Sprintf("engine: table %s no row to delete", ir.tbl.tn))
+	}
+
+	if ir.curRow == nil {
+		var err error
+		ir.curRow, err = ir.ir.Row(ctx)
+		if err != nil {
+			return err
+		}
+	}
+
+	return ir.tbl.deleteRow(ctx, ir.ir.Delete, ir.curRow)
+}
+
+func (ir *indexRows) Update(ctx context.Context, updates []sql.ColumnUpdate) error {
+	if !ir.next {
+		panic(fmt.Sprintf("engine: table %s no row to update", ir.tbl.tn))
+	}
+
+	if ir.curRow == nil {
+		var err error
+		ir.curRow, err = ir.ir.Row(ctx)
+		if err != nil {
+			return err
+		}
+	}
+
+	return ir.tbl.updateRow(ctx, ir.ir.Update, updates, ir.curRow)
+
+}
+
+func (ir *indexRows) Row(ctx context.Context, dest []sql.Value) error {
+	if !ir.next {
+		panic(fmt.Sprintf("engine: table %s no row to get", ir.tbl.tn))
+	}
+
+	var err error
+	ir.curRow, err = ir.ir.Row(ctx)
+	if err != nil {
+		return err
+	}
+	copy(dest, ir.curRow)
+	return nil
 }
