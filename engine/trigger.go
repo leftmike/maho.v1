@@ -2,28 +2,20 @@ package engine
 
 import (
 	"context"
+	"fmt"
 	"io"
 
 	"github.com/leftmike/maho/sql"
 )
 
 type Trigger interface {
-	Encode() ([]byte, error)
-	AfterRows(ctx context.Context, e *Engine, tx *transaction, oldRows, newRows Rows) error
+	AfterRows(ctx context.Context, tbl *table, oldRows, newRows Rows) error
 }
 
 type trigger struct {
-	typ    string
-	name   sql.Identifier
 	events int64
 	trig   Trigger
 }
-
-type decodeTrigger func(buf []byte) (Trigger, error)
-
-var (
-	triggerDecoders = map[string]decodeTrigger{}
-)
 
 type triggerRows struct {
 	numCols int
@@ -73,7 +65,7 @@ func (tbl *table) ModifyDone(ctx context.Context, event, cnt int64) (int64, erro
 				numCols: len(tbl.tt.Columns()),
 				vals:    tbl.deletedRows,
 			}
-			err := t.trig.AfterRows(ctx, tbl.tx.e, tbl.tx, oldRows, nil)
+			err := t.trig.AfterRows(ctx, tbl, oldRows, nil)
 			if err != nil {
 				return -1, err
 			}
@@ -84,7 +76,7 @@ func (tbl *table) ModifyDone(ctx context.Context, event, cnt int64) (int64, erro
 				numCols: len(tbl.tt.Columns()),
 				vals:    tbl.insertedRows,
 			}
-			err := t.trig.AfterRows(ctx, tbl.tx.e, tbl.tx, nil, newRows)
+			err := t.trig.AfterRows(ctx, tbl, nil, newRows)
 			if err != nil {
 				return -1, err
 			}
@@ -99,7 +91,7 @@ func (tbl *table) ModifyDone(ctx context.Context, event, cnt int64) (int64, erro
 				numCols: len(tbl.tt.Columns()),
 				vals:    tbl.updatedNewRows,
 			}
-			err := t.trig.AfterRows(ctx, tbl.tx.e, tbl.tx, oldRows, newRows)
+			err := t.trig.AfterRows(ctx, tbl, oldRows, newRows)
 			if err != nil {
 				return -1, err
 			}
@@ -107,4 +99,65 @@ func (tbl *table) ModifyDone(ctx context.Context, event, cnt int64) (int64, erro
 	}
 
 	return cnt, nil
+}
+
+func hasNullColumns(fk foreignKey, row []sql.Value) bool {
+	for _, col := range fk.keyCols {
+		if row[col] == nil {
+			return true
+		}
+	}
+
+	return false
+}
+
+type foreignKeyTrigger struct {
+	fk foreignKey
+}
+
+func (fkt *foreignKeyTrigger) AfterRows(ctx context.Context, tbl *table,
+	oldRows, newRows Rows) error {
+
+	rtbl, rtt, err := tbl.tx.e.st.LookupTable(ctx, tbl.tx.tx, fkt.fk.refTable)
+	if err != nil {
+		return err
+	}
+	rpkey := rtt.PrimaryKey()
+
+	for {
+		row, err := newRows.Next(ctx)
+		if err == io.EOF {
+			break
+		} else if err != nil {
+			return err
+		}
+
+		if hasNullColumns(fkt.fk, row) {
+			continue
+		}
+
+		if fkt.fk.refIndex == 0 {
+			keyRow := make([]sql.Value, len(rtt.Columns()))
+			for cdx, col := range fkt.fk.keyCols {
+				keyRow[rpkey[cdx].Column()] = row[col]
+			}
+
+			r, err := rtbl.Rows(ctx, keyRow, keyRow)
+			if err != nil {
+				return err
+			}
+			_, err = r.Next(ctx)
+			r.Close()
+			if err == io.EOF {
+				return fmt.Errorf("engine: table %s: insert violates foreign key constraint: %s",
+					tbl.tn, fkt.fk.name)
+			} else if err != nil {
+				return err
+			}
+		} else {
+			// XXX: lookup and use the index
+		}
+	}
+
+	return nil
 }

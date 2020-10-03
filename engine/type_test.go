@@ -84,7 +84,6 @@ func TestEncodeDecode(t *testing.T) {
 			},
 		},
 		foreignKeys: []foreignKey{},
-		triggers:    []trigger{},
 	}
 
 	buf, err := tt.Encode()

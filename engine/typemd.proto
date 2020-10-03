@@ -10,7 +10,7 @@ message TableTypeMetadata {
     repeated ConstraintMetadata Constraints = 5;
     repeated CheckConstraint Checks = 6;
     repeated ForeignKey ForeignKeys = 7;
-    repeated TriggerMetadata Triggers = 8;
+    //repeated ForeignRef ForeignRefs = 8;
 }
 
 // These need to match the values in maho/sql/datatype.go
@@ -78,11 +78,4 @@ message ForeignKey {
     repeated int32 KeyColumns = 2;
     TableName ReferenceTable = 3;
     string ReferenceIndex = 4;
-}
-
-message TriggerMetadata {
-    string Type = 1;
-    string Name = 2;
-    int64 Events = 3;
-    bytes Trigger = 4;
 }

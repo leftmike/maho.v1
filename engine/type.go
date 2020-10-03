@@ -39,8 +39,9 @@ type TableType struct {
 	constraints []constraint
 	checks      []checkConstraint
 	foreignKeys []foreignKey
-	triggers    []trigger
-	events      int64
+	//foreignRefs []foreignRef
+	triggers []trigger
+	events   int64
 }
 
 func MakeTableType(cols []sql.Identifier, colTypes []sql.ColumnType,
@@ -74,16 +75,9 @@ func (tt *TableType) Indexes() []sql.IndexType {
 	return tt.indexes
 }
 
-func (tt *TableType) AddTrigger(typ string, name sql.Identifier, events int64, trig Trigger) {
-	_, ok := triggerDecoders[typ]
-	if !ok {
-		panic(fmt.Sprintf("engine: unknown trigger type: %s", typ))
-	}
-
+func (tt *TableType) addTrigger(events int64, trig Trigger) {
 	tt.triggers = append(tt.triggers,
 		trigger{
-			typ:    typ,
-			name:   name,
 			events: events,
 			trig:   trig,
 		})
@@ -248,22 +242,6 @@ func (tt *TableType) Encode() ([]byte, error) {
 			})
 	}
 
-	md.Triggers = make([]*TriggerMetadata, 0, len(tt.triggers))
-	for _, t := range tt.triggers {
-		buf, err := t.trig.Encode()
-		if err != nil {
-			return nil, err
-		}
-
-		md.Triggers = append(md.Triggers,
-			&TriggerMetadata{
-				Type:    t.typ,
-				Name:    t.name.String(),
-				Events:  t.events,
-				Trigger: buf,
-			})
-	}
-
 	return proto.Marshal(&md)
 }
 
@@ -360,29 +338,7 @@ func DecodeTableType(tn sql.TableName, buf []byte) (*TableType, error) {
 			})
 	}
 
-	var events int64
-	triggers := make([]trigger, 0, len(md.Triggers))
-	for _, t := range md.Triggers {
-		decoder, ok := triggerDecoders[t.Type]
-		if !ok {
-			return nil, fmt.Errorf("engine: missing trigger type: %s", t.Type)
-		}
-		trig, err := decoder(t.Trigger)
-		if err != nil {
-			return nil, err
-		}
-
-		triggers = append(triggers,
-			trigger{
-				typ:    t.Type,
-				name:   sql.QuotedID(t.Name),
-				events: t.Events,
-				trig:   trig,
-			})
-		events |= t.Events
-	}
-
-	return &TableType{
+	tt := &TableType{
 		ver:         md.Version,
 		cols:        cols,
 		colTypes:    colTypes,
@@ -391,7 +347,16 @@ func DecodeTableType(tn sql.TableName, buf []byte) (*TableType, error) {
 		constraints: constraints,
 		checks:      checks,
 		foreignKeys: foreignKeys,
-		triggers:    triggers,
-		events:      events,
-	}, nil
+	}
+
+	for _, fk := range tt.foreignKeys {
+		tt.addTrigger(sql.InsertEvent|sql.UpdateEvent, &foreignKeyTrigger{fk: fk})
+	}
+	/*
+		for _, fr := range tt.foreignRefs {
+			tt.addTrigger(sql.DeleteEvent|sql.UpdateEvent, &foreignRefTrigger{fr: fr})
+		}
+	*/
+
+	return tt, nil
 }

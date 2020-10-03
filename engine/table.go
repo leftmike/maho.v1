@@ -4,7 +4,6 @@ import (
 	"context"
 	"errors"
 	"fmt"
-	"io"
 	"strconv"
 	"strings"
 	"unicode/utf8"
@@ -132,48 +131,6 @@ func (rc rowContext) EvalRef(idx int) sql.Value {
 	return rc[idx]
 }
 
-type foreignKeyAction struct {
-	tn   sql.TableName
-	fk   foreignKey
-	keys [][]sql.Value
-}
-
-func (fka *foreignKeyAction) execute(ctx context.Context, e *Engine, tx *transaction) (int64,
-	error) {
-
-	rtbl, rtt, err := e.st.LookupTable(ctx, tx.tx, fka.fk.refTable)
-	if err != nil {
-		return -1, err
-	}
-
-	if fka.fk.refIndex == 0 {
-		keyRow := make([]sql.Value, len(rtt.Columns()))
-		for _, key := range fka.keys {
-			for cdx, ck := range rtt.PrimaryKey() {
-				keyRow[ck.Column()] = key[cdx]
-			}
-
-			r, err := rtbl.Rows(ctx, keyRow, keyRow)
-			if err != nil {
-				return -1, err
-			}
-			_, err = r.Next(ctx)
-			r.Close()
-			if err == io.EOF {
-				return -1,
-					fmt.Errorf("engine: table %s: insert violates foreign key constraint: %s",
-						fka.tn, fka.fk.name)
-			} else if err != nil {
-				return -1, err
-			}
-		}
-	} else {
-		// XXX: lookup and use the index
-	}
-
-	return -1, nil
-}
-
 func (tbl *table) Insert(ctx context.Context, row []sql.Value) error {
 	cols := tbl.tt.cols
 	for rdx, ct := range tbl.tt.colTypes {
@@ -194,26 +151,6 @@ func (tbl *table) Insert(ctx context.Context, row []sql.Value) error {
 				return fmt.Errorf("engine: table %s: check: %s: failed", tbl.tn, chk.name)
 			}
 		}
-	}
-
-	for _, fk := range tbl.tt.foreignKeys {
-		// XXX: check if any fk.keyCols are null and continue
-
-		tbl.tx.addAction(tbl.tn, fk.name,
-			func() action {
-				return &foreignKeyAction{
-					tn: tbl.tn,
-					fk: fk,
-				}
-			},
-			func(act action) {
-				key := make([]sql.Value, len(fk.keyCols))
-				for cdx, col := range fk.keyCols {
-					key[cdx] = row[col]
-				}
-				fka := act.(*foreignKeyAction)
-				fka.keys = append(fka.keys, key)
-			})
 	}
 
 	if tbl.tt.events&sql.InsertEvent != 0 {
@@ -263,12 +200,6 @@ func (tbl *table) updateRow(ctx context.Context, r Rows, updates []sql.ColumnUpd
 			append(make([]sql.Value, 0, len(curRow)), curRow...))
 		tbl.updatedNewRows = append(tbl.updatedNewRows, updateRow)
 	}
-	/*
-		for _, fk := range tbl.tt.foreignKeys {
-			// XXX: check if any fk.keyCols are not null and updated
-			// XXX: add foreignKeyAction
-		}
-	*/
 
 	return r.Update(ctx, updatedCols, updateRow)
 }
