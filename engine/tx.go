@@ -101,16 +101,17 @@ func (tx *transaction) LookupTable(ctx context.Context, tn sql.TableName, ttVer 
 		return tbl, nil
 	}
 
-	stbl, stt, err := tx.e.st.LookupTable(ctx, tx.tx, tn)
+	stbl, tt, err := tx.e.st.LookupTable(ctx, tx.tx, tn)
 	if err != nil {
 		return nil, err
 	}
-	if stt.Version() != ttVer {
+	if tt.Version() != ttVer {
 		return nil, fmt.Errorf("engine: table %s: type version mismatch", tn)
 	}
 
-	tbl = makeTable(tx, tn, stbl, stt)
+	tbl = makeTable(tx, tn, stbl, tt)
 	tx.tables[tn] = tbl
+	tx.tableTypes[tn] = tt
 	return tbl, nil
 }
 

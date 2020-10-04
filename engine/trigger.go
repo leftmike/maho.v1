@@ -8,13 +8,9 @@ import (
 	"github.com/leftmike/maho/sql"
 )
 
-type trigger interface {
-	afterRows(ctx context.Context, tbl *table, oldRows, newRows sql.Rows) error
-}
-
-type triggerConfig struct {
+type trigger struct {
 	events int64
-	trig   trigger
+	trig   sql.Trigger
 }
 
 type triggerRows struct {
@@ -57,30 +53,30 @@ func (tbl *table) ModifyStart(ctx context.Context, event int64) error {
 }
 
 func (tbl *table) ModifyDone(ctx context.Context, event, cnt int64) (int64, error) {
-	for _, tc := range tbl.tt.triggers {
-		if tc.events&sql.DeleteEvent != 0 && tbl.deletedRows != nil {
+	for _, trig := range tbl.tt.triggers {
+		if trig.events&sql.DeleteEvent != 0 && tbl.deletedRows != nil {
 			oldRows := &triggerRows{
 				numCols: len(tbl.tt.Columns()),
 				vals:    tbl.deletedRows,
 			}
-			err := tc.trig.afterRows(ctx, tbl, oldRows, nil)
+			err := trig.trig.AfterRows(ctx, tbl.tx, tbl, oldRows, nil)
 			if err != nil {
 				return -1, err
 			}
 		}
 
-		if tc.events&sql.InsertEvent != 0 && tbl.insertedRows != nil {
+		if trig.events&sql.InsertEvent != 0 && tbl.insertedRows != nil {
 			newRows := &triggerRows{
 				numCols: len(tbl.tt.Columns()),
 				vals:    tbl.insertedRows,
 			}
-			err := tc.trig.afterRows(ctx, tbl, nil, newRows)
+			err := trig.trig.AfterRows(ctx, tbl.tx, tbl, nil, newRows)
 			if err != nil {
 				return -1, err
 			}
 		}
 
-		if tc.events&sql.UpdateEvent != 0 && tbl.updatedOldRows != nil {
+		if trig.events&sql.UpdateEvent != 0 && tbl.updatedOldRows != nil {
 			oldRows := &triggerRows{
 				numCols: len(tbl.tt.Columns()),
 				vals:    tbl.updatedOldRows,
@@ -89,7 +85,7 @@ func (tbl *table) ModifyDone(ctx context.Context, event, cnt int64) (int64, erro
 				numCols: len(tbl.tt.Columns()),
 				vals:    tbl.updatedNewRows,
 			}
-			err := tc.trig.afterRows(ctx, tbl, oldRows, newRows)
+			err := trig.trig.AfterRows(ctx, tbl.tx, tbl, oldRows, newRows)
 			if err != nil {
 				return -1, err
 			}
@@ -110,18 +106,24 @@ func hasNullColumns(fk foreignKey, row []sql.Value) bool {
 }
 
 type foreignKeyTrigger struct {
+	tn sql.TableName
 	fk foreignKey
 }
 
-func (fkt *foreignKeyTrigger) afterRows(ctx context.Context, tbl *table,
+func (fkt *foreignKeyTrigger) AfterRows(ctx context.Context, tx sql.Transaction, tbl sql.Table,
 	oldRows, newRows sql.Rows) error {
 
-	rtbl, rtt, err := tbl.tx.e.st.LookupTable(ctx, tbl.tx.tx, fkt.fk.refTable)
+	rtt, err := tx.LookupTableType(ctx, fkt.fk.refTable)
+	if err != nil {
+		return err
+	}
+	rtbl, err := tx.LookupTable(ctx, fkt.fk.refTable, rtt.Version())
 	if err != nil {
 		return err
 	}
 	rpkey := rtt.PrimaryKey()
 
+	refRow := make([]sql.Value, len(rtt.Columns()))
 	row := make([]sql.Value, newRows.NumColumns())
 	for {
 		err := newRows.Next(ctx, row)
@@ -145,11 +147,11 @@ func (fkt *foreignKeyTrigger) afterRows(ctx context.Context, tbl *table,
 			if err != nil {
 				return err
 			}
-			_, err = r.Next(ctx)
+			err = r.Next(ctx, refRow)
 			r.Close()
 			if err == io.EOF {
 				return fmt.Errorf("engine: table %s: insert violates foreign key constraint: %s",
-					tbl.tn, fkt.fk.name)
+					fkt.tn, fkt.fk.name)
 			} else if err != nil {
 				return err
 			}

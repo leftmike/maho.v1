@@ -40,7 +40,7 @@ type TableType struct {
 	checks      []checkConstraint
 	foreignKeys []foreignKey
 	//foreignRefs []foreignRef
-	triggers []triggerConfig
+	triggers []trigger
 	events   int64
 }
 
@@ -75,9 +75,9 @@ func (tt *TableType) Indexes() []sql.IndexType {
 	return tt.indexes
 }
 
-func (tt *TableType) addTrigger(events int64, trig trigger) {
+func (tt *TableType) AddTrigger(events int64, trig sql.Trigger) {
 	tt.triggers = append(tt.triggers,
-		triggerConfig{
+		trigger{
 			events: events,
 			trig:   trig,
 		})
@@ -350,11 +350,11 @@ func DecodeTableType(tn sql.TableName, buf []byte) (*TableType, error) {
 	}
 
 	for _, fk := range tt.foreignKeys {
-		tt.addTrigger(sql.InsertEvent|sql.UpdateEvent, &foreignKeyTrigger{fk: fk})
+		tt.AddTrigger(sql.InsertEvent|sql.UpdateEvent, &foreignKeyTrigger{tn: tn, fk: fk})
 	}
 	/*
 		for _, fr := range tt.foreignRefs {
-			tt.addTrigger(sql.DeleteEvent|sql.UpdateEvent, &foreignRefTrigger{fr: fr})
+			tt.AddTrigger(sql.DeleteEvent|sql.UpdateEvent, &foreignRefTrigger{fr: fr})
 		}
 	*/
 

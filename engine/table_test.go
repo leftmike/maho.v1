@@ -183,6 +183,11 @@ func deleteIndexRow(t *testing.T, tx sql.Transaction, tn sql.TableName, iidx int
 		t.Fatal(err)
 	}
 
+	err = tbl.ModifyStart(ctx, sql.DeleteEvent)
+	if err != nil {
+		t.Fatal(err)
+	}
+
 	dest := make([]sql.Value, 4)
 	for {
 		err = ir.Next(ctx, dest)
@@ -197,6 +202,14 @@ func deleteIndexRow(t *testing.T, tx sql.Transaction, tn sql.TableName, iidx int
 			}
 			break
 		}
+	}
+
+	n, err := tbl.ModifyDone(ctx, sql.DeleteEvent, 1)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if n != 1 {
+		t.Errorf("ModifyDone: got %d, want 1", n)
 	}
 
 	err = tx.Commit(ctx)
@@ -216,6 +229,11 @@ func updateIndexRow(t *testing.T, tx sql.Transaction, tn sql.TableName, iidx int
 		t.Fatal(err)
 	}
 
+	err = tbl.ModifyStart(ctx, sql.UpdateEvent)
+	if err != nil {
+		t.Fatal(err)
+	}
+
 	dest := make([]sql.Value, 4)
 	for {
 		err = ir.Next(ctx, dest)
@@ -230,6 +248,14 @@ func updateIndexRow(t *testing.T, tx sql.Transaction, tn sql.TableName, iidx int
 			}
 			break
 		}
+	}
+
+	n, err := tbl.ModifyDone(ctx, sql.UpdateEvent, 1)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if n != 1 {
+		t.Errorf("ModifyDone: got %d, want 1", n)
 	}
 
 	err = tx.Commit(ctx)
