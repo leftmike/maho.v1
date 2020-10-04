@@ -5,10 +5,24 @@ import (
 	"fmt"
 	"io"
 
+	"github.com/golang/protobuf/proto"
 	"github.com/leftmike/maho/sql"
 )
 
+const (
+	fkTriggerType = "foreignKeyTriggerType"
+)
+
+type triggerDecoder func(buf []byte) (sql.Trigger, error)
+
+var (
+	TriggerDecoders = map[string]triggerDecoder{
+		fkTriggerType: decodeFKTrigger,
+	}
+)
+
 type trigger struct {
+	typ    string
 	events int64
 	trig   sql.Trigger
 }
@@ -108,6 +122,33 @@ func hasNullColumns(fk foreignKey, row []sql.Value) bool {
 type foreignKeyTrigger struct {
 	tn sql.TableName
 	fk foreignKey
+}
+
+func (fkt *foreignKeyTrigger) Encode() ([]byte, error) {
+	return proto.Marshal(&ForeignKeyTrigger{
+		Table: &TableName{
+			Database: fkt.tn.Database.String(),
+			Schema:   fkt.tn.Schema.String(),
+			Table:    fkt.tn.Table.String(),
+		},
+		ForeignKey: encodeForeignKey(fkt.fk),
+	})
+}
+
+func decodeFKTrigger(buf []byte) (sql.Trigger, error) {
+	var fkt ForeignKeyTrigger
+	err := proto.Unmarshal(buf, &fkt)
+	if err != nil {
+		return nil, fmt.Errorf("engine: trigger type: %s: %s", fkTriggerType, err)
+	}
+	return &foreignKeyTrigger{
+		tn: sql.TableName{
+			Database: sql.QuotedID(fkt.Table.Database),
+			Schema:   sql.QuotedID(fkt.Table.Schema),
+			Table:    sql.QuotedID(fkt.Table.Table),
+		},
+		fk: decodeForeignKey(fkt.ForeignKey),
+	}, nil
 }
 
 func (fkt *foreignKeyTrigger) AfterRows(ctx context.Context, tx sql.Transaction, tbl sql.Table,

@@ -57,6 +57,7 @@ type Table interface {
 }
 
 type Trigger interface {
+	Encode() ([]byte, error)
 	AfterRows(ctx context.Context, tx Transaction, tbl Table, oldRows, newRows Rows) error
 }
 

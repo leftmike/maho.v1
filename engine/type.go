@@ -75,9 +75,15 @@ func (tt *TableType) Indexes() []sql.IndexType {
 	return tt.indexes
 }
 
-func (tt *TableType) AddTrigger(events int64, trig sql.Trigger) {
+func (tt *TableType) addTrigger(typ string, events int64, trig sql.Trigger) {
+	_, ok := TriggerDecoders[typ]
+	if !ok {
+		panic(fmt.Sprintf("engine: missing trigger decoder: %s", typ))
+	}
+
 	tt.triggers = append(tt.triggers,
 		trigger{
+			typ:    typ,
 			events: events,
 			trig:   trig,
 		})
@@ -171,6 +177,23 @@ func encodeColumnKey(key []sql.ColumnKey) []*ColumnKey {
 	return mdk
 }
 
+func encodeForeignKey(fk foreignKey) *ForeignKey {
+	keyCols := make([]int32, 0, len(fk.keyCols))
+	for _, col := range fk.keyCols {
+		keyCols = append(keyCols, int32(col))
+	}
+	return &ForeignKey{
+		Name:       fk.name.String(),
+		KeyColumns: keyCols,
+		ReferenceTable: &TableName{
+			Database: fk.refTable.Database.String(),
+			Schema:   fk.refTable.Schema.String(),
+			Table:    fk.refTable.Table.String(),
+		},
+		ReferenceIndex: fk.refIndex.String(),
+	}
+}
+
 func (tt *TableType) Encode() ([]byte, error) {
 	cols := tt.Columns()
 	colTypes := tt.ColumnTypes()
@@ -225,20 +248,20 @@ func (tt *TableType) Encode() ([]byte, error) {
 
 	md.ForeignKeys = make([]*ForeignKey, 0, len(tt.foreignKeys))
 	for _, fk := range tt.foreignKeys {
-		keyCols := make([]int32, 0, len(fk.keyCols))
-		for _, col := range fk.keyCols {
-			keyCols = append(keyCols, int32(col))
+		md.ForeignKeys = append(md.ForeignKeys, encodeForeignKey(fk))
+	}
+
+	md.Triggers = make([]*TriggerMetadata, 0, len(tt.triggers))
+	for _, trig := range tt.triggers {
+		buf, err := trig.trig.Encode()
+		if err != nil {
+			return nil, err
 		}
-		md.ForeignKeys = append(md.ForeignKeys,
-			&ForeignKey{
-				Name:       fk.name.String(),
-				KeyColumns: keyCols,
-				ReferenceTable: &TableName{
-					Database: fk.refTable.Database.String(),
-					Schema:   fk.refTable.Schema.String(),
-					Table:    fk.refTable.Table.String(),
-				},
-				ReferenceIndex: fk.refIndex.String(),
+		md.Triggers = append(md.Triggers,
+			&TriggerMetadata{
+				Type:    trig.typ,
+				Events:  trig.events,
+				Trigger: buf,
 			})
 	}
 
@@ -255,6 +278,23 @@ func decodeColumnKey(mdk []*ColumnKey) []sql.ColumnKey {
 		key = append(key, sql.MakeColumnKey(int(k.Number), k.Reverse))
 	}
 	return key
+}
+
+func decodeForeignKey(fk *ForeignKey) foreignKey {
+	keyCols := make([]int, 0, len(fk.KeyColumns))
+	for _, col := range fk.KeyColumns {
+		keyCols = append(keyCols, int(col))
+	}
+	return foreignKey{
+		name:    sql.QuotedID(fk.Name),
+		keyCols: keyCols,
+		refTable: sql.TableName{
+			Database: sql.QuotedID(fk.ReferenceTable.Database),
+			Schema:   sql.QuotedID(fk.ReferenceTable.Schema),
+			Table:    sql.QuotedID(fk.ReferenceTable.Table),
+		},
+		refIndex: sql.QuotedID(fk.ReferenceIndex),
+	}
 }
 
 func DecodeTableType(tn sql.TableName, buf []byte) (*TableType, error) {
@@ -321,24 +361,30 @@ func DecodeTableType(tn sql.TableName, buf []byte) (*TableType, error) {
 
 	foreignKeys := make([]foreignKey, 0, len(md.ForeignKeys))
 	for _, fk := range md.ForeignKeys {
-		keyCols := make([]int, 0, len(fk.KeyColumns))
-		for _, col := range fk.KeyColumns {
-			keyCols = append(keyCols, int(col))
-		}
-		foreignKeys = append(foreignKeys,
-			foreignKey{
-				name:    sql.QuotedID(fk.Name),
-				keyCols: keyCols,
-				refTable: sql.TableName{
-					Database: sql.QuotedID(fk.ReferenceTable.Database),
-					Schema:   sql.QuotedID(fk.ReferenceTable.Schema),
-					Table:    sql.QuotedID(fk.ReferenceTable.Table),
-				},
-				refIndex: sql.QuotedID(fk.ReferenceIndex),
-			})
+		foreignKeys = append(foreignKeys, decodeForeignKey(fk))
 	}
 
-	tt := &TableType{
+	var events int64
+	triggers := make([]trigger, 0, len(md.Triggers))
+	for _, tmd := range md.Triggers {
+		td, ok := TriggerDecoders[tmd.Type]
+		if !ok {
+			return nil, fmt.Errorf("engine: missing trigger decoder: %s", tmd.Type)
+		}
+		trig, err := td(tmd.Trigger)
+		if err != nil {
+			return nil, err
+		}
+		triggers = append(triggers,
+			trigger{
+				typ:    tmd.Type,
+				events: tmd.Events,
+				trig:   trig,
+			})
+		events |= tmd.Events
+	}
+
+	return &TableType{
 		ver:         md.Version,
 		cols:        cols,
 		colTypes:    colTypes,
@@ -347,16 +393,7 @@ func DecodeTableType(tn sql.TableName, buf []byte) (*TableType, error) {
 		constraints: constraints,
 		checks:      checks,
 		foreignKeys: foreignKeys,
-	}
-
-	for _, fk := range tt.foreignKeys {
-		tt.AddTrigger(sql.InsertEvent|sql.UpdateEvent, &foreignKeyTrigger{tn: tn, fk: fk})
-	}
-	/*
-		for _, fr := range tt.foreignRefs {
-			tt.AddTrigger(sql.DeleteEvent|sql.UpdateEvent, &foreignRefTrigger{fr: fr})
-		}
-	*/
-
-	return tt, nil
+		triggers:    triggers,
+		events:      events,
+	}, nil
 }

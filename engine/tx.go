@@ -233,13 +233,19 @@ func (tx *transaction) AddForeignKey(ctx context.Context, con sql.Identifier, fk
 		return err
 	}
 
-	fktt.foreignKeys = append(fktt.foreignKeys,
-		foreignKey{
-			name:     con,
-			keyCols:  fkCols,
-			refTable: rtn,
-			refIndex: ridx,
+	fk := foreignKey{
+		name:     con,
+		keyCols:  fkCols,
+		refTable: rtn,
+		refIndex: ridx,
+	}
+	fktt.foreignKeys = append(fktt.foreignKeys, fk)
+	fktt.addTrigger(fkTriggerType, sql.InsertEvent|sql.UpdateEvent,
+		&foreignKeyTrigger{
+			tn: fktn,
+			fk: fk,
 		})
+
 	fktt.ver += 1
 	err = tx.e.st.UpdateType(ctx, tx.tx, fktn, fktt)
 	if err != nil {
@@ -261,7 +267,7 @@ func (tx *transaction) AddForeignKey(ctx context.Context, con sql.Identifier, fk
 			return err
 		}
 	*/
-	// XXX
+	// XXX: foreign reference
 
 	return nil
 }
