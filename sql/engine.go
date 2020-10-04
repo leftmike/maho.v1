@@ -19,6 +19,7 @@ type Transaction interface {
 	DropTable(ctx context.Context, tn TableName, ifExists bool) error
 	AddForeignKey(ctx context.Context, con Identifier, fktn TableName, fkCols []int, rtn TableName,
 		ridx Identifier) error
+	AddTrigger(ctx context.Context, tn TableName, events int64, trig Trigger) error
 
 	CreateIndex(ctx context.Context, idxname Identifier, tn TableName, unique bool,
 		keys []ColumnKey, ifNotExists bool) error
@@ -57,6 +58,7 @@ type Table interface {
 }
 
 type Trigger interface {
+	Type() string
 	Encode() ([]byte, error)
 	AfterRows(ctx context.Context, tx Transaction, tbl Table, oldRows, newRows Rows) error
 }

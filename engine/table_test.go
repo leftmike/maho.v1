@@ -218,6 +218,50 @@ func deleteIndexRow(t *testing.T, tx sql.Transaction, tn sql.TableName, iidx int
 	}
 }
 
+func deleteRow(t *testing.T, tx sql.Transaction, tn sql.TableName, val sql.Value) {
+	ctx := context.Background()
+	tbl := lookupTable(t, tx, tn)
+
+	r, err := tbl.Rows(ctx, nil, nil)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	err = tbl.ModifyStart(ctx, sql.DeleteEvent)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	dest := make([]sql.Value, 4)
+	for {
+		err = r.Next(ctx, dest)
+		if err != nil {
+			t.Errorf("Rows.Next: failed with %s", err)
+			break
+		}
+		if reflect.DeepEqual(dest[0], val) {
+			err = r.Delete(ctx)
+			if err != nil {
+				t.Errorf("Rows.Delete: failed with %s", err)
+			}
+			break
+		}
+	}
+
+	n, err := tbl.ModifyDone(ctx, sql.DeleteEvent, 1)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if n != 1 {
+		t.Errorf("ModifyDone: got %d, want 1", n)
+	}
+
+	err = tx.Commit(ctx)
+	if err != nil {
+		t.Fatal(err)
+	}
+}
+
 func updateIndexRow(t *testing.T, tx sql.Transaction, tn sql.TableName, iidx int, val sql.Value,
 	updates []sql.ColumnUpdate) {
 
@@ -243,6 +287,52 @@ func updateIndexRow(t *testing.T, tx sql.Transaction, tn sql.TableName, iidx int
 		}
 		if reflect.DeepEqual(dest[0], val) {
 			err = ir.Update(ctx, updates)
+			if err != nil {
+				t.Errorf("IndexRows.Update: failed with %s", err)
+			}
+			break
+		}
+	}
+
+	n, err := tbl.ModifyDone(ctx, sql.UpdateEvent, 1)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if n != 1 {
+		t.Errorf("ModifyDone: got %d, want 1", n)
+	}
+
+	err = tx.Commit(ctx)
+	if err != nil {
+		t.Fatal(err)
+	}
+}
+
+func updateRow(t *testing.T, tx sql.Transaction, tn sql.TableName, val sql.Value,
+	updates []sql.ColumnUpdate) {
+
+	ctx := context.Background()
+	tbl := lookupTable(t, tx, tn)
+
+	r, err := tbl.Rows(ctx, nil, nil)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	err = tbl.ModifyStart(ctx, sql.UpdateEvent)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	dest := make([]sql.Value, 4)
+	for {
+		err = r.Next(ctx, dest)
+		if err != nil {
+			t.Errorf("Rows.Next: failed with %s", err)
+			break
+		}
+		if reflect.DeepEqual(dest[0], val) {
+			err = r.Update(ctx, updates)
 			if err != nil {
 				t.Errorf("IndexRows.Update: failed with %s", err)
 			}

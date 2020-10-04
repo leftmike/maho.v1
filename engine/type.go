@@ -75,7 +75,8 @@ func (tt *TableType) Indexes() []sql.IndexType {
 	return tt.indexes
 }
 
-func (tt *TableType) addTrigger(typ string, events int64, trig sql.Trigger) {
+func (tt *TableType) addTrigger(events int64, trig sql.Trigger) {
+	typ := trig.Type()
 	_, ok := TriggerDecoders[typ]
 	if !ok {
 		panic(fmt.Sprintf("engine: missing trigger decoder: %s", typ))

@@ -124,6 +124,10 @@ type foreignKeyTrigger struct {
 	fk foreignKey
 }
 
+func (fkt *foreignKeyTrigger) Type() string {
+	return fkTriggerType
+}
+
 func (fkt *foreignKeyTrigger) Encode() ([]byte, error) {
 	return proto.Marshal(&ForeignKeyTrigger{
 		Table: &TableName{

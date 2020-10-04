@@ -2,42 +2,160 @@ package engine_test
 
 import (
 	"context"
+	"fmt"
+	"io"
+	"reflect"
 	"testing"
 
+	"github.com/leftmike/maho/engine"
 	"github.com/leftmike/maho/sql"
 )
 
-type triggerAdder interface {
-	AddTrigger(events int64, trig sql.Trigger)
-}
+const (
+	deleteTriggerType = "deleteTriggerType"
+	insertTriggerType = "insertTriggerType"
+	updateTriggerType = "updateTriggerType"
+)
 
 func addTrigger(t *testing.T, tx sql.Transaction, tn sql.TableName, events int64,
 	trig sql.Trigger) {
 
 	ctx := context.Background()
-	tt, err := tx.LookupTableType(ctx, tn)
+	err := tx.AddTrigger(ctx, tn, events, trig)
 	if err != nil {
 		t.Fatal(err)
 	}
-	ta, ok := tt.(triggerAdder)
-	if !ok {
-		t.Fatalf("AddTrigger: not available on table type: %v", tt)
+
+	err = tx.Commit(ctx)
+	if err != nil {
+		t.Fatal(err)
 	}
-	ta.AddTrigger(events, trig)
 }
 
-type testTrigger struct {
-	t         *testing.T
-	called    bool
-	oldValues [][]sql.Value
-	newValues [][]sql.Value
+var (
+	triggerT         *testing.T
+	triggerEvent     int64
+	triggerOldValues [][]sql.Value
+	triggerNewValues [][]sql.Value
+)
+
+func expectTrigger(t *testing.T, oldValues, newValues [][]sql.Value) {
+	triggerT = t
+	triggerEvent = 0
+	triggerOldValues = oldValues
+	triggerNewValues = newValues
 }
 
-func (ttrig *testTrigger) AfterRows(ctx context.Context, tx sql.Transaction, tbl sql.Table,
+func checkRows(t *testing.T, rows sql.Rows, values [][]sql.Value) {
+	if rows == nil {
+		if len(values) != 0 {
+			t.Errorf("trigger: have values, but no rows: %v", values)
+		}
+		return
+	}
+
+	ctx := context.Background()
+	dest := make([]sql.Value, rows.NumColumns())
+	for {
+		err := rows.Next(ctx, dest)
+		if err != nil {
+			if err == io.EOF {
+				if len(values) != 0 {
+					t.Errorf("trigger: have values, but no more rows: %v", values)
+				}
+			} else {
+				t.Errorf("trigger: Rows.Next() failed with %s", err)
+			}
+			break
+		}
+
+		if len(values) == 0 {
+			t.Errorf("trigger: have row, but no more values: %v", dest)
+			break
+		}
+
+		if !reflect.DeepEqual(values[0], dest) {
+			t.Errorf("trigger: got %v, want %v", dest, values[0])
+		}
+		values = values[1:]
+	}
+}
+
+type deleteTrigger struct{}
+
+func (_ deleteTrigger) Type() string {
+	return deleteTriggerType
+}
+
+func (_ deleteTrigger) Encode() ([]byte, error) {
+	return []byte{0}, nil
+}
+
+func decodeDeleteTrigger(buf []byte) (sql.Trigger, error) {
+	if len(buf) != 1 || buf[0] != 0 {
+		return nil, fmt.Errorf("unable to decode test trigger: %v", buf)
+	}
+	return deleteTrigger{}, nil
+}
+
+func (_ deleteTrigger) AfterRows(ctx context.Context, tx sql.Transaction, tbl sql.Table,
 	oldRows, newRows sql.Rows) error {
 
-	ttrig.called = true
+	triggerEvent = sql.DeleteEvent
+	checkRows(triggerT, oldRows, triggerOldValues)
+	checkRows(triggerT, newRows, triggerNewValues)
+	return nil
+}
 
+type insertTrigger struct{}
+
+func (_ insertTrigger) Type() string {
+	return insertTriggerType
+}
+
+func (_ insertTrigger) Encode() ([]byte, error) {
+	return []byte{0}, nil
+}
+
+func decodeInsertTrigger(buf []byte) (sql.Trigger, error) {
+	if len(buf) != 1 || buf[0] != 0 {
+		return nil, fmt.Errorf("unable to decode test trigger: %v", buf)
+	}
+	return insertTrigger{}, nil
+}
+
+func (_ insertTrigger) AfterRows(ctx context.Context, tx sql.Transaction, tbl sql.Table,
+	oldRows, newRows sql.Rows) error {
+
+	triggerEvent = sql.InsertEvent
+	checkRows(triggerT, oldRows, triggerOldValues)
+	checkRows(triggerT, newRows, triggerNewValues)
+	return nil
+}
+
+type updateTrigger struct{}
+
+func (_ updateTrigger) Type() string {
+	return updateTriggerType
+}
+
+func (_ updateTrigger) Encode() ([]byte, error) {
+	return []byte{0}, nil
+}
+
+func decodeUpdateTrigger(buf []byte) (sql.Trigger, error) {
+	if len(buf) != 1 || buf[0] != 0 {
+		return nil, fmt.Errorf("unable to decode test trigger: %v", buf)
+	}
+	return updateTrigger{}, nil
+}
+
+func (_ updateTrigger) AfterRows(ctx context.Context, tx sql.Transaction, tbl sql.Table,
+	oldRows, newRows sql.Rows) error {
+
+	triggerEvent = sql.UpdateEvent
+	checkRows(triggerT, oldRows, triggerOldValues)
+	checkRows(triggerT, newRows, triggerNewValues)
 	return nil
 }
 
@@ -45,25 +163,60 @@ func TestTriggers(t *testing.T) {
 	e := startEngine(t, sql.ID("db"))
 	tn := sql.TableName{sql.ID("db"), sql.PUBLIC, sql.ID("tbl1")}
 	createTable(t, e.Begin(0), tn)
+	addTrigger(t, e.Begin(0), tn, sql.DeleteEvent, deleteTrigger{})
+	addTrigger(t, e.Begin(0), tn, sql.InsertEvent, insertTrigger{})
+	addTrigger(t, e.Begin(0), tn, sql.UpdateEvent, updateTrigger{})
 
-	/*
-		ttrig := &testTrigger{
-			t:         t,
-			newValues: [][]sql.Value{},
-		}
-		addTrigger(t, e.Begin(0), tn, sql.InsertEvent, ttrig)
-	*/
+	expectTrigger(t, nil, [][]sql.Value{
+		{i64Val(1), strVal("8"), i64Val(0), i64Val(0)},
+		{i64Val(2), strVal("7"), i64Val(0), i64Val(1)},
+		{i64Val(3), strVal("6"), i64Val(1), i64Val(2)},
+		{i64Val(4), strVal("5"), i64Val(1), i64Val(3)},
+		{i64Val(5), strVal("4"), i64Val(2), i64Val(4)},
+		{i64Val(6), strVal("3"), i64Val(2), i64Val(5)},
+		{i64Val(7), strVal("2"), i64Val(3), i64Val(6)},
+		{i64Val(8), strVal("1"), i64Val(3), i64Val(7)},
+	})
 	insertRows(t, e.Begin(0), tn, 1, 8)
-	/*
-		if !ttrig.called {
-			t.Error("AfterRows not called for insert")
-		}
-	*/
+	if triggerEvent != sql.InsertEvent {
+		t.Error("AfterRows not called for insert")
+	}
 
+	expectTrigger(t, [][]sql.Value{
+		{i64Val(3), strVal("6"), i64Val(1), i64Val(2)},
+	}, nil)
 	deleteIndexRow(t, e.Begin(0), tn, 0, strVal("6"))
-	deleteIndexRow(t, e.Begin(0), tn, 1, i64Val(2))
+	if triggerEvent != sql.DeleteEvent {
+		t.Error("AfterRows not called for delete")
+	}
+
+	expectTrigger(t, [][]sql.Value{
+		{i64Val(5), strVal("4"), i64Val(2), i64Val(4)},
+	}, nil)
+	deleteRow(t, e.Begin(0), tn, i64Val(5))
+	if triggerEvent != sql.DeleteEvent {
+		t.Error("AfterRows not called for delete")
+	}
+
+	expectTrigger(t, [][]sql.Value{
+		{i64Val(4), strVal("5"), i64Val(1), i64Val(3)},
+	}, [][]sql.Value{
+		{i64Val(4), strVal("5"), i64Val(1), i64Val(30)},
+	})
 	updateIndexRow(t, e.Begin(0), tn, 0, strVal("5"), []sql.ColumnUpdate{{3, i64Val(30)}})
-	updateIndexRow(t, e.Begin(0), tn, 1, i64Val(2), []sql.ColumnUpdate{{1, strVal("6")}})
+	if triggerEvent != sql.UpdateEvent {
+		t.Error("AfterRows not called for update")
+	}
+
+	expectTrigger(t, [][]sql.Value{
+		{i64Val(6), strVal("3"), i64Val(2), i64Val(5)},
+	}, [][]sql.Value{
+		{i64Val(6), strVal("6"), i64Val(2), i64Val(5)},
+	})
+	updateRow(t, e.Begin(0), tn, i64Val(6), []sql.ColumnUpdate{{1, strVal("6")}})
+	if triggerEvent != sql.UpdateEvent {
+		t.Error("AfterRows not called for update")
+	}
 
 	indexRows(t, e.Begin(0), tn, 0,
 		[][]sql.Value{
@@ -82,5 +235,10 @@ func TestTriggers(t *testing.T) {
 			{i64Val(2), strVal("7"), i64Val(0), i64Val(1)},
 			{i64Val(1), strVal("8"), i64Val(0), i64Val(0)},
 		})
+}
 
+func init() {
+	engine.TriggerDecoders[deleteTriggerType] = decodeDeleteTrigger
+	engine.TriggerDecoders[insertTriggerType] = decodeInsertTrigger
+	engine.TriggerDecoders[updateTriggerType] = decodeUpdateTrigger
 }

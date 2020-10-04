@@ -240,7 +240,7 @@ func (tx *transaction) AddForeignKey(ctx context.Context, con sql.Identifier, fk
 		refIndex: ridx,
 	}
 	fktt.foreignKeys = append(fktt.foreignKeys, fk)
-	fktt.addTrigger(fkTriggerType, sql.InsertEvent|sql.UpdateEvent,
+	fktt.addTrigger(sql.InsertEvent|sql.UpdateEvent,
 		&foreignKeyTrigger{
 			tn: fktn,
 			fk: fk,
@@ -269,6 +269,32 @@ func (tx *transaction) AddForeignKey(ctx context.Context, con sql.Identifier, fk
 	*/
 	// XXX: foreign reference
 
+	return nil
+}
+
+func (tx *transaction) AddTrigger(ctx context.Context, tn sql.TableName, events int64,
+	trig sql.Trigger) error {
+
+	if tn.Database == sql.SYSTEM {
+		return fmt.Errorf("engine: database %s may not be modified", tn.Database)
+	}
+	if tn.Schema == sql.METADATA {
+		return fmt.Errorf("engine: schema %s may not be modified", tn.Schema)
+	}
+
+	tt, err := tx.e.st.LookupTableType(ctx, tx.tx, tn)
+	if err != nil {
+		return err
+	}
+
+	tt.addTrigger(events, trig)
+	tt.ver += 1
+	err = tx.e.st.UpdateType(ctx, tx.tx, tn, tt)
+	if err != nil {
+		return err
+	}
+	delete(tx.tables, tn)
+	delete(tx.tableTypes, tn)
 	return nil
 }
 
