@@ -56,6 +56,10 @@ type Table interface {
 	Insert(ctx context.Context, row []Value) error
 }
 
+type Trigger interface {
+	AfterRows(ctx context.Context, tx Transaction, tbl Table, oldRows, newRows Rows) error
+}
+
 type MakeVirtual func(ctx context.Context, tx Transaction, tn TableName) (Table, TableType, error)
 
 type Engine interface {

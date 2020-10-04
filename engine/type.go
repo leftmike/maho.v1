@@ -40,7 +40,7 @@ type TableType struct {
 	checks      []checkConstraint
 	foreignKeys []foreignKey
 	//foreignRefs []foreignRef
-	triggers []trigger
+	triggers []triggerConfig
 	events   int64
 }
 
@@ -75,9 +75,9 @@ func (tt *TableType) Indexes() []sql.IndexType {
 	return tt.indexes
 }
 
-func (tt *TableType) addTrigger(events int64, trig Trigger) {
+func (tt *TableType) addTrigger(events int64, trig trigger) {
 	tt.triggers = append(tt.triggers,
-		trigger{
+		triggerConfig{
 			events: events,
 			trig:   trig,
 		})

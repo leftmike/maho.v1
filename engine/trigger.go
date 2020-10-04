@@ -8,13 +8,13 @@ import (
 	"github.com/leftmike/maho/sql"
 )
 
-type Trigger interface {
-	AfterRows(ctx context.Context, tbl *table, oldRows, newRows Rows) error
+type trigger interface {
+	afterRows(ctx context.Context, tbl *table, oldRows, newRows sql.Rows) error
 }
 
-type trigger struct {
+type triggerConfig struct {
 	events int64
-	trig   Trigger
+	trig   trigger
 }
 
 type triggerRows struct {
@@ -31,22 +31,20 @@ func (tr *triggerRows) Close() error {
 	return nil
 }
 
-func (tr *triggerRows) Next(ctx context.Context) ([]sql.Value, error) {
+func (tr *triggerRows) Next(ctx context.Context, dest []sql.Value) error {
 	if len(tr.vals) == 0 {
-		return nil, io.EOF
+		return io.EOF
 	}
-	row := tr.vals[0]
+	copy(dest, tr.vals[0])
 	tr.vals = tr.vals[1:]
-	return row, nil
+	return nil
 }
 
 func (tr *triggerRows) Delete(ctx context.Context) error {
 	panic("engine: trigger rows may not be deleted")
 }
 
-func (tr *triggerRows) Update(ctx context.Context, updatedCols []int,
-	updateRow []sql.Value) error {
-
+func (tr *triggerRows) Update(ctx context.Context, updates []sql.ColumnUpdate) error {
 	panic("engine: trigger rows may not be updated")
 }
 
@@ -59,30 +57,30 @@ func (tbl *table) ModifyStart(ctx context.Context, event int64) error {
 }
 
 func (tbl *table) ModifyDone(ctx context.Context, event, cnt int64) (int64, error) {
-	for _, t := range tbl.tt.triggers {
-		if t.events&sql.DeleteEvent != 0 && tbl.deletedRows != nil {
+	for _, tc := range tbl.tt.triggers {
+		if tc.events&sql.DeleteEvent != 0 && tbl.deletedRows != nil {
 			oldRows := &triggerRows{
 				numCols: len(tbl.tt.Columns()),
 				vals:    tbl.deletedRows,
 			}
-			err := t.trig.AfterRows(ctx, tbl, oldRows, nil)
+			err := tc.trig.afterRows(ctx, tbl, oldRows, nil)
 			if err != nil {
 				return -1, err
 			}
 		}
 
-		if t.events&sql.InsertEvent != 0 && tbl.insertedRows != nil {
+		if tc.events&sql.InsertEvent != 0 && tbl.insertedRows != nil {
 			newRows := &triggerRows{
 				numCols: len(tbl.tt.Columns()),
 				vals:    tbl.insertedRows,
 			}
-			err := t.trig.AfterRows(ctx, tbl, nil, newRows)
+			err := tc.trig.afterRows(ctx, tbl, nil, newRows)
 			if err != nil {
 				return -1, err
 			}
 		}
 
-		if t.events&sql.UpdateEvent != 0 && tbl.updatedOldRows != nil {
+		if tc.events&sql.UpdateEvent != 0 && tbl.updatedOldRows != nil {
 			oldRows := &triggerRows{
 				numCols: len(tbl.tt.Columns()),
 				vals:    tbl.updatedOldRows,
@@ -91,7 +89,7 @@ func (tbl *table) ModifyDone(ctx context.Context, event, cnt int64) (int64, erro
 				numCols: len(tbl.tt.Columns()),
 				vals:    tbl.updatedNewRows,
 			}
-			err := t.trig.AfterRows(ctx, tbl, oldRows, newRows)
+			err := tc.trig.afterRows(ctx, tbl, oldRows, newRows)
 			if err != nil {
 				return -1, err
 			}
@@ -115,8 +113,8 @@ type foreignKeyTrigger struct {
 	fk foreignKey
 }
 
-func (fkt *foreignKeyTrigger) AfterRows(ctx context.Context, tbl *table,
-	oldRows, newRows Rows) error {
+func (fkt *foreignKeyTrigger) afterRows(ctx context.Context, tbl *table,
+	oldRows, newRows sql.Rows) error {
 
 	rtbl, rtt, err := tbl.tx.e.st.LookupTable(ctx, tbl.tx.tx, fkt.fk.refTable)
 	if err != nil {
@@ -124,8 +122,9 @@ func (fkt *foreignKeyTrigger) AfterRows(ctx context.Context, tbl *table,
 	}
 	rpkey := rtt.PrimaryKey()
 
+	row := make([]sql.Value, newRows.NumColumns())
 	for {
-		row, err := newRows.Next(ctx)
+		err := newRows.Next(ctx, row)
 		if err == io.EOF {
 			break
 		} else if err != nil {
