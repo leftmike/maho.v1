@@ -46,23 +46,18 @@ func makeAvgAggregator() Aggregator {
 }
 
 type countAggregator struct {
-	count   int64
-	nonNull bool
+	count int64
 }
 
 func (ca *countAggregator) Accumulate(vals []sql.Value) error {
 	if vals[0] != nil {
 		ca.count += 1
-		ca.nonNull = true
 	}
 	return nil
 }
 
 func (ca *countAggregator) Total() (sql.Value, error) {
-	if ca.nonNull {
-		return sql.Int64Value(ca.count), nil
-	}
-	return nil, nil
+	return sql.Int64Value(ca.count), nil
 }
 
 func makeCountAggregator() Aggregator {

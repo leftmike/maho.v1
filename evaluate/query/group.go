@@ -153,6 +153,19 @@ func (gr *groupRows) group(ctx context.Context) error {
 	}
 	gr.rows.Close()
 
+	// If not a GROUP BY aggregration and no matching result rows, still need to output the
+	// zero values of the aggregrators in the results.
+	if len(groups) == 0 && len(gr.groupExprs) == 0 {
+		group := groupRow{
+			row:         make([]sql.Value, len(gr.aggregators)),
+			aggregators: make([]expr.Aggregator, len(gr.aggregators)),
+		}
+		for adx := range gr.aggregators {
+			group.aggregators[adx] = gr.aggregators[adx].maker()
+		}
+		groups[""] = group
+	}
+
 	gr.groups = make([][]sql.Value, 0, len(groups))
 	for _, group := range groups {
 		cdx := len(gr.groupExprs)
