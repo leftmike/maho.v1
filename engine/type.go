@@ -175,8 +175,7 @@ func (tt *TableType) addForeignKey(con sql.Identifier, fktn sql.TableName, fkCol
 		s += rtn.String()
 		rkey = rtt.primary
 	} else {
-		// XXX: stmt += fmt.Sprintf("%s@%s", ridx, rtn)
-		s += rtn.String()
+		s += fmt.Sprintf("%s@%s", rtn.String(), ridx)
 		for _, it := range rtt.indexes {
 			if it.Name == ridx {
 				rkey = it.Key
