@@ -13,6 +13,7 @@ type Rows interface {
 }
 
 type IndexRows interface {
+	NumColumns() int
 	Close() error
 	Next(ctx context.Context, dest []Value) error
 	Delete(ctx context.Context) error

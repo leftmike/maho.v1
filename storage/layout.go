@@ -184,7 +184,7 @@ func hasNullKeyColumn(key []sql.ColumnKey, row []sql.Value) bool {
 }
 
 func (il IndexLayout) MakeKey(key []byte, row []sql.Value) []byte {
-	if il.NullKey != nil && hasNullKeyColumn(il.Key, row) {
+	if row != nil && il.NullKey != nil && hasNullKeyColumn(il.Key, row) {
 		return append(key, encode.MakeKey(il.NullKey, row)...)
 	}
 	return key

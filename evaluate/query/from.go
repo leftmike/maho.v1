@@ -51,7 +51,7 @@ type scanTableOp struct {
 }
 
 func (sto scanTableOp) Name() string {
-	return "scan"
+	return "scan table"
 }
 
 func (sto scanTableOp) Columns() []string {
@@ -78,6 +78,95 @@ func (sto scanTableOp) rows(ctx context.Context, tx sql.Transaction) (sql.Rows, 
 		return nil, err
 	}
 	return tbl.Rows(ctx, nil, nil)
+}
+
+type FromIndexAlias struct {
+	sql.TableName
+	Index sql.Identifier
+	Alias sql.Identifier
+}
+
+func (fia FromIndexAlias) String() string {
+	s := fmt.Sprintf("%s@%s", fia.TableName, fia.Index)
+	if fia.Alias != 0 {
+		s += fmt.Sprintf(" AS %s", fia.Alias)
+	}
+	return s
+}
+
+func (fia FromIndexAlias) plan(ctx context.Context, pctx evaluate.PlanContext,
+	tx sql.Transaction) (rowsOp, *fromContext, error) {
+
+	tn := pctx.ResolveTableName(fia.TableName)
+	tt, err := tx.LookupTableType(ctx, tn)
+	if err != nil {
+		return nil, nil, err
+	}
+
+	var cols []sql.Identifier
+	iidx := -1
+	for idx, it := range tt.Indexes() {
+		if it.Name == fia.Index {
+			iidx = idx
+			tblCols := tt.Columns()
+			if len(it.Columns) == 0 {
+				panic("YYY")
+			}
+			for _, col := range it.Columns {
+				cols = append(cols, tblCols[col])
+			}
+			break
+		}
+	}
+	if iidx < 0 {
+		return nil, nil,
+			fmt.Errorf("engine: table %s: index %s not found", fia.TableName, fia.Index)
+	}
+
+	nam := fia.Index
+	if fia.Alias != 0 {
+		nam = fia.Alias
+	}
+	return scanIndexOp{tn, fia.Index, iidx, tt.Version(), cols}, makeFromContext(nam, cols), nil
+}
+
+type scanIndexOp struct {
+	tn    sql.TableName
+	index sql.Identifier
+	iidx  int
+	ttVer int64
+	cols  []sql.Identifier
+}
+
+func (sio scanIndexOp) Name() string {
+	return "scan index"
+}
+
+func (sio scanIndexOp) Columns() []string {
+	var cols []string
+	for _, col := range sio.cols {
+		cols = append(cols, col.String())
+	}
+	return cols
+}
+
+func (sio scanIndexOp) Fields() []evaluate.FieldDescription {
+	return []evaluate.FieldDescription{
+		{Field: "table", Description: sio.tn.String()},
+		{Field: "index", Description: sio.index.String()},
+	}
+}
+
+func (_ scanIndexOp) Children() []evaluate.ExplainTree {
+	return nil
+}
+
+func (sio scanIndexOp) rows(ctx context.Context, tx sql.Transaction) (sql.Rows, error) {
+	tbl, err := tx.LookupTable(ctx, sio.tn, sio.ttVer)
+	if err != nil {
+		return nil, err
+	}
+	return tbl.IndexRows(ctx, sio.iidx, nil, nil)
 }
 
 type FromStmt struct {

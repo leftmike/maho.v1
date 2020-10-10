@@ -54,7 +54,7 @@ To Do:
 - SELECT
 -- push filters down to scans: col op (literal | param) or (literal | param) op col; and combos
 -- use primary index if possible
--- add index '@' table to FROM in select
+-- use index if possible on from index scans
 
 - ALTER TABLE ONLY table ADD CONSTRAINT constraint FOREIGN KEY ...
 

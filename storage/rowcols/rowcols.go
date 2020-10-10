@@ -492,6 +492,10 @@ func (rcr *rows) Update(ctx context.Context, updatedCols []int, updateRow []sql.
 	return rcr.tbl.updateRow(ctx, updatedCols, rcr.rows[rcr.idx-1], updateRow)
 }
 
+func (rcir *indexRows) NumColumns() int {
+	return len(rcir.il.Columns)
+}
+
 func (rcir *indexRows) Close() error {
 	rcir.tbl = nil
 	rcir.rows = nil

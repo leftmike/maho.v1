@@ -42,7 +42,8 @@ message ColumnKey {
 message IndexMetadata {
     string Name = 1;
     repeated ColumnKey Key = 2;
-    bool Unique = 3;
+    repeated int32 Columns = 3;
+    bool Unique = 4;
 }
 
 // These need to match the values in maho/sql/constraint.go

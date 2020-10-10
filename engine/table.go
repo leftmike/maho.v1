@@ -266,6 +266,10 @@ func (r *rows) Update(ctx context.Context, updates []sql.ColumnUpdate) error {
 	return r.tbl.updateRow(ctx, r.rows.Update, updates, r.curRow)
 }
 
+func (ir *indexRows) NumColumns() int {
+	return ir.ir.NumColumns()
+}
+
 func (ir *indexRows) Close() error {
 	err := ir.ir.Close()
 	ir.ir = nil

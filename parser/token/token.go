@@ -31,6 +31,7 @@ const (
 	Dot    = '.'
 	LParen = '('
 	RParen = ')'
+	AtSign = '@'
 )
 
 const (

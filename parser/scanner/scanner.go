@@ -235,7 +235,7 @@ SkipWhitespace:
 			s.unreadRune()
 			return r
 		}
-	} else if r == '.' || r == ',' || r == '(' || r == ')' {
+	} else if r == '.' || r == ',' || r == '(' || r == ')' || r == '@' {
 		return r
 	} else if r == '$' {
 		r = s.readRune(sctx)

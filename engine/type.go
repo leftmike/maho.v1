@@ -266,11 +266,16 @@ func (tt *TableType) Encode() ([]byte, error) {
 
 	md.Indexes = make([]*IndexMetadata, 0, len(tt.indexes))
 	for _, it := range tt.indexes {
+		cols := make([]int32, 0, len(it.Columns))
+		for _, col := range it.Columns {
+			cols = append(cols, int32(col))
+		}
 		md.Indexes = append(md.Indexes,
 			&IndexMetadata{
-				Name:   it.Name.String(),
-				Key:    encodeColumnKey(it.Key),
-				Unique: it.Unique,
+				Name:    it.Name.String(),
+				Key:     encodeColumnKey(it.Key),
+				Columns: cols,
+				Unique:  it.Unique,
 			})
 	}
 
@@ -375,11 +380,16 @@ func DecodeTableType(tn sql.TableName, buf []byte) (*TableType, error) {
 
 	indexes := make([]sql.IndexType, 0, len(md.Indexes))
 	for _, it := range md.Indexes {
+		cols := make([]int, 0, len(it.Columns))
+		for _, col := range it.Columns {
+			cols = append(cols, int(col))
+		}
 		indexes = append(indexes,
 			sql.IndexType{
-				Name:   sql.QuotedID(it.Name),
-				Key:    decodeColumnKey(it.Key),
-				Unique: it.Unique,
+				Name:    sql.QuotedID(it.Name),
+				Key:     decodeColumnKey(it.Key),
+				Columns: cols,
+				Unique:  it.Unique,
 			})
 	}
 

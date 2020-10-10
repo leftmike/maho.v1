@@ -394,8 +394,15 @@ func (p *parser) parseAlias(required bool) sql.Identifier {
 	return 0
 }
 
-func (p *parser) parseTableAlias() *query.FromTableAlias {
+func (p *parser) parseTableAlias() query.FromItem {
 	tn := p.parseTableName()
+	if p.maybeToken(token.AtSign) {
+		return &query.FromIndexAlias{
+			TableName: tn,
+			Index:     p.expectIdentifier("expected an index"),
+			Alias:     p.parseAlias(false),
+		}
+	}
 	return &query.FromTableAlias{TableName: tn, Alias: p.parseAlias(false)}
 }
 
@@ -1307,7 +1314,7 @@ func (p *parser) parseSelect() *query.Select {
 }
 
 /*
-from-item = [database '.'] table [[AS] alias]
+from-item = [[database '.'] schema '.'] table ['@' index] [[AS] alias]
     | '(' select | values | show ')' [AS] alias ['(' column-alias [',' ...] ')']
     | '(' from-item [',' ...] ')'
     | from-item join-type from-item [ON expr | USING '(' join-column [',' ...] ')']

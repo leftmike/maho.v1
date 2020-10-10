@@ -922,6 +922,26 @@ func TestSelect(t *testing.T) {
 			},
 		},
 		{
+			sql: "select * from t@i",
+			stmt: query.Select{
+				From: &query.FromIndexAlias{
+					TableName: sql.TableName{Table: sql.ID("t")},
+					Index:     sql.ID("i"),
+				},
+			},
+		},
+		{
+			sql: "select * from t@i where x > 1",
+			stmt: query.Select{
+				From: &query.FromIndexAlias{
+					TableName: sql.TableName{Table: sql.ID("t")},
+					Index:     sql.ID("i"),
+				},
+				Where: &expr.Binary{Op: expr.GreaterThanOp, Left: expr.Ref{sql.ID("x")},
+					Right: expr.Int64Literal(1)},
+			},
+		},
+		{
 			sql: "select * from t where x = (show schema)",
 			stmt: query.Select{
 				From: &query.FromTableAlias{TableName: sql.TableName{Table: sql.ID("t")}},

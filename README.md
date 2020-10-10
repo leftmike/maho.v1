@@ -167,7 +167,7 @@ select-item =
     | [table '.' ] column [[AS] column-alias]
     | expr [[AS] column-alias]
 from-item =
-      [[database '.'] schema '.'] table [[AS] alias]
+      [[database '.'] schema '.'] table ['@' index] [[AS] alias]
     | '(' select | values | show ')' [AS] alias ['(' column-alias [',' ...] ')']
     | '(' from-item [',' ...] ')'
     | from-item join-type from-item [ON expr | USING '(' join-column [',' ...] ')']

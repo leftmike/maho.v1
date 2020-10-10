@@ -851,6 +851,10 @@ func (kvr *rows) Update(ctx context.Context, updatedCols []int, updateRow []sql.
 	return kvr.tbl.updateRow(ctx, updatedCols, kvr.rows[kvr.idx-1], updateRow)
 }
 
+func (kvir *indexRows) NumColumns() int {
+	return len(kvir.il.Columns)
+}
+
 func (kvir *indexRows) Close() error {
 	kvir.tbl = nil
 	kvir.rows = nil

@@ -336,6 +336,10 @@ func (br *rows) Update(ctx context.Context, updatedCols []int, updateRow []sql.V
 	return br.tbl.updateRow(ctx, updatedCols, br.rows[br.idx-1], updateRow)
 }
 
+func (bir *indexRows) NumColumns() int {
+	return len(bir.il.Columns)
+}
+
 func (bir *indexRows) Close() error {
 	bir.tbl = nil
 	bir.rows = nil
