@@ -97,7 +97,7 @@ func orderFKCols(fkCols []int, rkey []sql.ColumnKey, refColIDs, refCols []sql.Id
 }
 
 func (fk *ForeignKey) Prepare(fktt, rtt sql.TableType) ([]int, sql.Identifier, error) {
-	var ridx sql.Identifier
+	ridx := sql.PRIMARY_QUOTED
 	var rkey []sql.ColumnKey
 	if len(fk.RefCols) == 0 {
 		rkey = rtt.PrimaryKey()

@@ -90,4 +90,5 @@ message TriggerMetadata {
 message ForeignKeyTrigger {
     TableName Table = 1;
     ForeignKey ForeignKey = 2;
+    string SqlStmt = 3;
 }

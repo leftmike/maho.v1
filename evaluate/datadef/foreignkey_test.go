@@ -130,6 +130,7 @@ func TestFKPrepare(t *testing.T) {
 			fktt:   &tt1,
 			rtt:    &tt2,
 			fkCols: []int{2},
+			ridx:   sql.PRIMARY_QUOTED,
 		},
 		{
 			fln: fln(),
@@ -144,6 +145,7 @@ func TestFKPrepare(t *testing.T) {
 			fktt:   &tt1,
 			rtt:    &tt2,
 			fkCols: []int{2},
+			ridx:   sql.PRIMARY_QUOTED,
 		},
 		{
 			fln: fln(),
@@ -196,6 +198,7 @@ func TestFKPrepare(t *testing.T) {
 			fktt:   &tt2,
 			rtt:    &tt1,
 			fkCols: []int{2, 1},
+			ridx:   sql.PRIMARY_QUOTED,
 		},
 		{
 			fln: fln(),
@@ -210,6 +213,7 @@ func TestFKPrepare(t *testing.T) {
 			fktt:   &tt2,
 			rtt:    &tt1,
 			fkCols: []int{2, 1},
+			ridx:   sql.PRIMARY_QUOTED,
 		},
 		{
 			fln: fln(),
@@ -224,6 +228,7 @@ func TestFKPrepare(t *testing.T) {
 			fktt:   &tt2,
 			rtt:    &tt1,
 			fkCols: []int{2, 1},
+			ridx:   sql.PRIMARY_QUOTED,
 		},
 		{
 			fln: fln(),

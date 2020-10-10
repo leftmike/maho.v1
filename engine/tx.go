@@ -2,6 +2,7 @@ package engine
 
 import (
 	"context"
+	"errors"
 	"fmt"
 
 	"github.com/leftmike/maho/evaluate/expr"
@@ -130,6 +131,8 @@ func (tx *transaction) CreateTable(ctx context.Context, tn sql.TableName, cols [
 		if con.Type == sql.PrimaryConstraint {
 			primary = con.Key
 			break
+		} else if con.Name == sql.PRIMARY_QUOTED {
+			return errors.New("engine: primary not allowed as constraint name")
 		}
 	}
 
@@ -233,27 +236,6 @@ func (tx *transaction) AddForeignKey(ctx context.Context, con sql.Identifier, fk
 		return err
 	}
 
-	fk := foreignKey{
-		name:     con,
-		keyCols:  fkCols,
-		refTable: rtn,
-		refIndex: ridx,
-	}
-	fktt.foreignKeys = append(fktt.foreignKeys, fk)
-	fktt.addTrigger(sql.InsertEvent|sql.UpdateEvent,
-		&foreignKeyTrigger{
-			tn: fktn,
-			fk: fk,
-		})
-
-	fktt.ver += 1
-	err = tx.e.st.UpdateType(ctx, tx.tx, fktn, fktt)
-	if err != nil {
-		return err
-	}
-	delete(tx.tables, fktn)
-	delete(tx.tableTypes, fktn)
-
 	if rtn.Database == sql.SYSTEM {
 		return fmt.Errorf("engine: database %s may not be modified", rtn.Database)
 	}
@@ -261,12 +243,19 @@ func (tx *transaction) AddForeignKey(ctx context.Context, con sql.Identifier, fk
 		return fmt.Errorf("engine: schema %s may not be modified", rtn.Schema)
 	}
 
-	/*
-		rtt, err := tx.e.st.LookupTableType(ctx, tx.tx, rtn)
-		if err != nil {
-			return err
-		}
-	*/
+	rtt, err := tx.e.st.LookupTableType(ctx, tx.tx, rtn)
+	if err != nil {
+		return err
+	}
+
+	fktt = fktt.addForeignKey(con, fktn, fkCols, rtn, ridx, rtt)
+	err = tx.e.st.UpdateType(ctx, tx.tx, fktn, fktt)
+	if err != nil {
+		return err
+	}
+	delete(tx.tables, fktn)
+	delete(tx.tableTypes, fktn)
+
 	// XXX: foreign reference
 
 	return nil
@@ -306,6 +295,9 @@ func (tx *transaction) CreateIndex(ctx context.Context, idxname sql.Identifier, 
 	}
 	if tn.Schema == sql.METADATA {
 		return fmt.Errorf("engine: schema %s may not be modified", tn.Schema)
+	}
+	if idxname == sql.PRIMARY_QUOTED {
+		return errors.New("engine: primary not allowed as index name")
 	}
 
 	tt, err := tx.e.st.LookupTableType(ctx, tx.tx, tn)

@@ -242,3 +242,47 @@ func init() {
 	engine.TriggerDecoders[insertTriggerType] = decodeInsertTrigger
 	engine.TriggerDecoders[updateTriggerType] = decodeUpdateTrigger
 }
+
+func addForeignKey(t *testing.T, tx sql.Transaction, con sql.Identifier, fktn sql.TableName,
+	fkCols []int, rtn sql.TableName, ridx sql.Identifier) {
+
+	ctx := context.Background()
+	err := tx.AddForeignKey(ctx, con, fktn, fkCols, rtn, ridx)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	err = tx.Commit(ctx)
+	if err != nil {
+		t.Fatal(err)
+	}
+}
+
+func createIndex(t *testing.T, tx sql.Transaction, idxname sql.Identifier, tn sql.TableName,
+	unique bool, key []sql.ColumnKey) {
+
+	ctx := context.Background()
+	err := tx.CreateIndex(ctx, idxname, tn, unique, key, false)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	err = tx.Commit(ctx)
+	if err != nil {
+		t.Fatal(err)
+	}
+}
+
+func TestForeignKeys(t *testing.T) {
+	e := startEngine(t, sql.ID("db"))
+	tn1 := sql.TableName{sql.ID("db"), sql.PUBLIC, sql.ID("tbl1")}
+	tn2 := sql.TableName{sql.ID("db"), sql.PUBLIC, sql.ID("tbl2")}
+	createTable(t, e.Begin(0), tn1)
+	createTable(t, e.Begin(0), tn2)
+	addForeignKey(t, e.Begin(0), sql.ID("fk1"), tn1, []int{2}, tn2, sql.PRIMARY_QUOTED)
+
+	idx1 := sql.ID("idx1")
+	createIndex(t, e.Begin(0), idx1, tn1, true,
+		[]sql.ColumnKey{sql.MakeColumnKey(3, false), sql.MakeColumnKey(2, false)})
+	addForeignKey(t, e.Begin(0), sql.ID("fk2"), tn2, []int{4, 1}, tn1, idx1)
+}

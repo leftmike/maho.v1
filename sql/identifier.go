@@ -37,6 +37,7 @@ const (
 	INTEGER
 	METADATA
 	PATH
+	PRIMARY_QUOTED
 	PRIVATE
 	PUBLIC
 	PRECISION
@@ -131,6 +132,7 @@ var knownIdentifiers = map[string]Identifier{
 	"indexes":     INDEXES,
 	"info":        INFO,
 	"metadata":    METADATA,
+	"primary":     PRIMARY_QUOTED,
 	"private":     PRIVATE,
 	"public":      PUBLIC,
 	"schemas":     SCHEMAS,
@@ -237,6 +239,7 @@ var (
 	identifiers    = map[string]Identifier{
 		"": Identifier(0),
 	}
+
 	keywords = map[string]Identifier{}
 	Names    = map[Identifier]string{
 		Identifier(0): "",

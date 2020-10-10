@@ -126,6 +126,9 @@ func TestKeywords(t *testing.T) {
 
 func TestKnownIdentifiers(t *testing.T) {
 	for s, id := range knownIdentifiers {
+		if id == PRIMARY_QUOTED {
+			continue
+		}
 		if UnquotedID(s) != id {
 			t.Errorf("ID(%q) != knownIdentifiers[%q]", s, s)
 		}

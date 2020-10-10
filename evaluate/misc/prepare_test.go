@@ -288,7 +288,7 @@ func TestPreparePlan(t *testing.T) {
 		if c.stmt.String() != c.s {
 			t.Errorf("(%v).String() got %q want %q", c.stmt, c.stmt.String(), c.s)
 		}
-		prep, err := c.stmt.PreparePlan(ctx, ses, tx)
+		prep, err := evaluate.PreparePlan(ctx, c.stmt.Stmt, ses, tx)
 		if c.fail {
 			if err == nil {
 				t.Errorf("(%v).PreparePlan() did not fail", c.stmt)

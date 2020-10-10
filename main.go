@@ -54,13 +54,12 @@ To Do:
 - SELECT
 -- push filters down to scans: col op (literal | param) or (literal | param) op col; and combos
 -- use primary index if possible
--- use indexes when available
+-- add index '@' table to FROM in select
 
 - ALTER TABLE ONLY table ADD CONSTRAINT constraint FOREIGN KEY ...
 
 - foreign key references
--- sqlite: fkey IS NULL OR EXISTS(SELECT 1 FROM reftbl WHERE fkey=refkey)
--- create SQL to check references
+-- use prepared SQL to check references
 -- need read lock on referenced keys
 
 - references from foreign keys (ForeignRef?)

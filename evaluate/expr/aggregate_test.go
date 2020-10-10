@@ -71,7 +71,7 @@ func TestAggregate(t *testing.T) {
 				{nil},
 				{nil},
 			},
-			result: nil,
+			result: sql.Int64Value(0),
 		},
 		{
 			maker: makeCountAllAggregator,

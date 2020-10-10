@@ -166,6 +166,53 @@ func (tt *TableType) RemoveIndex(idxname sql.Identifier) (*TableType, int) {
 	return tt, rdx
 }
 
+func (tt *TableType) addForeignKey(con sql.Identifier, fktn sql.TableName, fkCols []int,
+	rtn sql.TableName, ridx sql.Identifier, rtt *TableType) *TableType {
+
+	var rkey []sql.ColumnKey
+	s := "SELECT COUNT(*) FROM "
+	if ridx == sql.PRIMARY_QUOTED {
+		s += rtn.String()
+		rkey = rtt.primary
+	} else {
+		// XXX: stmt += fmt.Sprintf("%s@%s", ridx, rtn)
+		s += rtn.String()
+		for _, it := range rtt.indexes {
+			if it.Name == ridx {
+				rkey = it.Key
+				break
+			}
+		}
+		if rkey == nil {
+			panic(fmt.Sprintf("table %s: can't find index %d", rtn, ridx))
+		}
+	}
+	s += " WHERE"
+	for cdx, ck := range rkey {
+		if cdx > 0 {
+			s += " AND"
+		}
+		s += fmt.Sprintf(" %s = $%d", rtt.cols[ck.Column()], cdx+1)
+	}
+
+	fk := foreignKey{
+		name:     con,
+		keyCols:  fkCols,
+		refTable: rtn,
+		refIndex: ridx,
+	}
+	tt.foreignKeys = append(tt.foreignKeys, fk)
+	tt.addTrigger(sql.InsertEvent|sql.UpdateEvent,
+		&foreignKeyTrigger{
+			tn:      fktn,
+			fk:      fk,
+			sqlStmt: s,
+		})
+
+	tt.ver += 1
+	return tt
+}
+
 func encodeColumnKey(key []sql.ColumnKey) []*ColumnKey {
 	mdk := make([]*ColumnKey, 0, len(key))
 	for _, k := range key {

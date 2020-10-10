@@ -4,8 +4,11 @@ import (
 	"context"
 	"fmt"
 	"io"
+	"strings"
 
 	"github.com/golang/protobuf/proto"
+	"github.com/leftmike/maho/evaluate"
+	"github.com/leftmike/maho/parser"
 	"github.com/leftmike/maho/sql"
 )
 
@@ -109,6 +112,28 @@ func (tbl *table) ModifyDone(ctx context.Context, event, cnt int64) (int64, erro
 	return cnt, nil
 }
 
+type planContext struct{}
+
+func (_ planContext) ResolveTableName(tn sql.TableName) sql.TableName {
+	return tn
+}
+
+func (_ planContext) ResolveSchemaName(sn sql.SchemaName) sql.SchemaName {
+	panic("unexpected, should never be called")
+}
+
+func (_ planContext) PlanParameter(num int) (*sql.Value, error) {
+	panic("unexpected, should never be called")
+}
+
+func (_ planContext) SetPreparedPlan(nam sql.Identifier, prep evaluate.PreparedPlan) error {
+	panic("unexpected, should never be called")
+}
+
+func (_ planContext) GetPreparedPlan(nam sql.Identifier) evaluate.PreparedPlan {
+	panic("unexpected, should never be called")
+}
+
 func hasNullColumns(fk foreignKey, row []sql.Value) bool {
 	for _, col := range fk.keyCols {
 		if row[col] == nil {
@@ -122,6 +147,9 @@ func hasNullColumns(fk foreignKey, row []sql.Value) bool {
 type foreignKeyTrigger struct {
 	tn sql.TableName
 	fk foreignKey
+
+	sqlStmt string
+	prep    *evaluate.PreparedRowsPlan
 }
 
 func (fkt *foreignKeyTrigger) Type() string {
@@ -136,6 +164,7 @@ func (fkt *foreignKeyTrigger) Encode() ([]byte, error) {
 			Table:    fkt.tn.Table.String(),
 		},
 		ForeignKey: encodeForeignKey(fkt.fk),
+		SqlStmt:    fkt.sqlStmt,
 	})
 }
 
@@ -151,12 +180,27 @@ func decodeFKTrigger(buf []byte) (sql.Trigger, error) {
 			Schema:   sql.QuotedID(fkt.Table.Schema),
 			Table:    sql.QuotedID(fkt.Table.Table),
 		},
-		fk: decodeForeignKey(fkt.ForeignKey),
+		fk:      decodeForeignKey(fkt.ForeignKey),
+		sqlStmt: fkt.SqlStmt,
 	}, nil
 }
 
 func (fkt *foreignKeyTrigger) AfterRows(ctx context.Context, tx sql.Transaction, tbl sql.Table,
 	oldRows, newRows sql.Rows) error {
+
+	if fkt.prep == nil {
+		p := parser.NewParser(strings.NewReader(fkt.sqlStmt), fkt.sqlStmt)
+		stmt, err := p.Parse()
+		if err != nil {
+			return fmt.Errorf("engine: table %s: foreign key: %s: %s", fkt.tn, fkt.fk.name, err)
+		}
+		prep, err := evaluate.PreparePlan(ctx, stmt, planContext{}, tx)
+		if err != nil {
+			return fmt.Errorf("engine: table %s: foreign key: %s: %s", fkt.tn, fkt.fk.name, err)
+		}
+		fkt.prep = prep.(*evaluate.PreparedRowsPlan)
+	}
+	// XXX: use fkt.prep
 
 	rtt, err := tx.LookupTableType(ctx, fkt.fk.refTable)
 	if err != nil {
@@ -182,7 +226,7 @@ func (fkt *foreignKeyTrigger) AfterRows(ctx context.Context, tx sql.Transaction,
 			continue
 		}
 
-		if fkt.fk.refIndex == 0 {
+		if fkt.fk.refIndex == sql.PRIMARY_QUOTED {
 			keyRow := make([]sql.Value, len(rtt.Columns()))
 			for cdx, col := range fkt.fk.keyCols {
 				keyRow[rpkey[cdx].Column()] = row[col]
@@ -195,13 +239,15 @@ func (fkt *foreignKeyTrigger) AfterRows(ctx context.Context, tx sql.Transaction,
 			err = r.Next(ctx, refRow)
 			r.Close()
 			if err == io.EOF {
-				return fmt.Errorf("engine: table %s: insert violates foreign key constraint: %s",
+				return fmt.Errorf(
+					"engine: table %s: insert or update violates foreign key constraint: %s",
 					fkt.tn, fkt.fk.name)
 			} else if err != nil {
 				return err
 			}
 		} else {
 			// XXX: lookup and use the index
+			panic(fmt.Sprintf("[%s] %d %d", fkt.fk.refIndex, fkt.fk.refIndex, sql.PRIMARY_QUOTED))
 		}
 	}
 
