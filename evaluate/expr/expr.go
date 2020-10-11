@@ -275,3 +275,57 @@ func (p Param) Equal(e Expr) bool {
 func (p Param) HasRef() bool {
 	return false
 }
+
+type ColVal struct {
+	Col int
+	Val Expr // *Literal or Param
+}
+
+func AndEqualRef(cctx CompileContext, e Expr) []ColVal {
+	be, ok := e.(*Binary)
+	if !ok {
+		return nil
+	}
+
+	if be.Op == AndOp {
+		left := AndEqualRef(cctx, be.Left)
+		if left == nil {
+			return nil
+		}
+		right := AndEqualRef(cctx, be.Right)
+		if right == nil {
+			return nil
+		}
+		return append(left, right...)
+	} else if be.Op == EqualOp {
+		_, ok := be.Left.(*Literal)
+		if !ok {
+			_, ok = be.Left.(Param)
+		}
+		if ok {
+			if r, ok := be.Right.(Ref); ok {
+				col, err := cctx.CompileRef(r)
+				if err != nil {
+					return nil
+				}
+				return []ColVal{{col, be.Left}}
+			}
+		} else if r, ok := be.Left.(Ref); ok {
+			col, err := cctx.CompileRef(r)
+			if err != nil {
+				return nil
+			}
+			_, ok := be.Right.(*Literal)
+			if !ok {
+				_, ok = be.Right.(Param)
+			}
+			if !ok {
+				return nil
+			}
+			return []ColVal{{col, be.Right}}
+		} else {
+			return nil
+		}
+	}
+	return nil
+}
