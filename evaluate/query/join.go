@@ -346,13 +346,13 @@ func (_ *joinRows) Update(ctx context.Context, updates []sql.ColumnUpdate) error
 }
 
 func (fj FromJoin) plan(ctx context.Context, pctx evaluate.PlanContext,
-	tx sql.Transaction) (rowsOp, *fromContext, error) {
+	tx sql.Transaction, cond expr.Expr) (rowsOp, *fromContext, error) {
 
-	leftRowsOp, leftCtx, err := fj.Left.plan(ctx, pctx, tx)
+	leftRowsOp, leftCtx, err := fj.Left.plan(ctx, pctx, tx, nil)
 	if err != nil {
 		return nil, nil, err
 	}
-	rightRowsOp, rightCtx, err := fj.Right.plan(ctx, pctx, tx)
+	rightRowsOp, rightCtx, err := fj.Right.plan(ctx, pctx, tx, nil)
 	if err != nil {
 		return nil, nil, err
 	}
@@ -401,5 +401,9 @@ func (fj FromJoin) plan(ctx context.Context, pctx evaluate.PlanContext,
 	}
 
 	jop.cols = fctx.columns()
-	return jop, fctx, nil
+	rop, err := where(ctx, pctx, tx, jop, fctx, cond)
+	if err != nil {
+		return nil, nil, err
+	}
+	return rop, fctx, nil
 }

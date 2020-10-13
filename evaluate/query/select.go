@@ -122,18 +122,16 @@ func (stmt *Select) Plan(ctx context.Context, pctx evaluate.PlanContext,
 	var err error
 
 	if stmt.From == nil {
-		rop = oneEmptyOp{}
 		fctx = &fromContext{}
-	} else {
-		rop, fctx, err = stmt.From.plan(ctx, pctx, tx)
+		rop, err = where(ctx, pctx, tx, oneEmptyOp{}, fctx, stmt.Where)
 		if err != nil {
 			return nil, err
 		}
-	}
-
-	rop, err = where(ctx, pctx, tx, rop, fctx, stmt.Where)
-	if err != nil {
-		return nil, err
+	} else {
+		rop, fctx, err = stmt.From.plan(ctx, pctx, tx, stmt.Where)
+		if err != nil {
+			return nil, err
+		}
 	}
 
 	if stmt.GroupBy == nil && stmt.Having == nil {

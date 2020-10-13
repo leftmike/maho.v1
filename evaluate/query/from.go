@@ -11,8 +11,8 @@ import (
 
 type FromItem interface {
 	fmt.Stringer
-	plan(ctx context.Context, pctx evaluate.PlanContext, tx sql.Transaction) (rowsOp, *fromContext,
-		error)
+	plan(ctx context.Context, pctx evaluate.PlanContext, tx sql.Transaction,
+		cond expr.Expr) (rowsOp, *fromContext, error)
 }
 
 type FromTableAlias struct {
@@ -29,7 +29,7 @@ func (fta FromTableAlias) String() string {
 }
 
 func (fta FromTableAlias) plan(ctx context.Context, pctx evaluate.PlanContext,
-	tx sql.Transaction) (rowsOp, *fromContext, error) {
+	tx sql.Transaction, cond expr.Expr) (rowsOp, *fromContext, error) {
 
 	tn := pctx.ResolveTableName(fta.TableName)
 	tt, err := tx.LookupTableType(ctx, tn)
@@ -41,7 +41,13 @@ func (fta FromTableAlias) plan(ctx context.Context, pctx evaluate.PlanContext,
 	if fta.Alias != 0 {
 		nam = fta.Alias
 	}
-	return scanTableOp{tn, tt.Version(), tt.Columns()}, makeFromContext(nam, tt.Columns()), nil
+
+	fctx := makeFromContext(nam, tt.Columns())
+	rop, err := where(ctx, pctx, tx, scanTableOp{tn, tt.Version(), tt.Columns()}, fctx, cond)
+	if err != nil {
+		return nil, nil, err
+	}
+	return rop, fctx, nil
 }
 
 type scanTableOp struct {
@@ -95,7 +101,7 @@ func (fia FromIndexAlias) String() string {
 }
 
 func (fia FromIndexAlias) plan(ctx context.Context, pctx evaluate.PlanContext,
-	tx sql.Transaction) (rowsOp, *fromContext, error) {
+	tx sql.Transaction, cond expr.Expr) (rowsOp, *fromContext, error) {
 
 	tn := pctx.ResolveTableName(fia.TableName)
 	tt, err := tx.LookupTableType(ctx, tn)
@@ -127,7 +133,14 @@ func (fia FromIndexAlias) plan(ctx context.Context, pctx evaluate.PlanContext,
 	if fia.Alias != 0 {
 		nam = fia.Alias
 	}
-	return scanIndexOp{tn, fia.Index, iidx, tt.Version(), cols}, makeFromContext(nam, cols), nil
+
+	fctx := makeFromContext(nam, cols)
+	rop, err := where(ctx, pctx, tx, scanIndexOp{tn, fia.Index, iidx, tt.Version(), cols}, fctx,
+		cond)
+	if err != nil {
+		return nil, nil, err
+	}
+	return rop, fctx, nil
 }
 
 type scanIndexOp struct {
@@ -191,7 +204,7 @@ func (fs FromStmt) String() string {
 }
 
 func (fs FromStmt) plan(ctx context.Context, pctx evaluate.PlanContext,
-	tx sql.Transaction) (rowsOp, *fromContext, error) {
+	tx sql.Transaction, cond expr.Expr) (rowsOp, *fromContext, error) {
 
 	plan, err := fs.Stmt.Plan(ctx, pctx, tx)
 	if err != nil {
@@ -211,7 +224,12 @@ func (fs FromStmt) plan(ctx context.Context, pctx evaluate.PlanContext,
 	if rp, ok := rowsPlan.(rowsOpPlan); ok {
 		return rp.rop, fctx, nil
 	}
-	return fromPlanOp{rowsPlan, fs.Stmt.String(), cols}, fctx, nil
+
+	rop, err := where(ctx, pctx, tx, fromPlanOp{rowsPlan, fs.Stmt.String(), cols}, fctx, cond)
+	if err != nil {
+		return nil, nil, err
+	}
+	return rop, fctx, nil
 }
 
 type fromPlanOp struct {
