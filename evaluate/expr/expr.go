@@ -276,53 +276,61 @@ func (p Param) HasRef() bool {
 	return false
 }
 
-type ColVal struct {
-	Col int
-	Val Expr // *Literal or Param
+type ColExpr struct {
+	Col   int
+	Param int
+	Val   sql.Value
 }
 
-func AndEqualRef(cctx CompileContext, e Expr) []ColVal {
+func EqualColExpr(cctx CompileContext, e Expr) []ColExpr {
 	be, ok := e.(*Binary)
 	if !ok {
 		return nil
 	}
 
 	if be.Op == AndOp {
-		left := AndEqualRef(cctx, be.Left)
+		left := EqualColExpr(cctx, be.Left)
 		if left == nil {
 			return nil
 		}
-		right := AndEqualRef(cctx, be.Right)
+		right := EqualColExpr(cctx, be.Right)
 		if right == nil {
 			return nil
 		}
 		return append(left, right...)
 	} else if be.Op == EqualOp {
-		_, ok := be.Left.(*Literal)
-		if !ok {
-			_, ok = be.Left.(Param)
-		}
-		if ok {
+		if l, ok := be.Left.(*Literal); ok {
 			if r, ok := be.Right.(Ref); ok {
 				col, err := cctx.CompileRef(r)
 				if err != nil {
 					return nil
 				}
-				return []ColVal{{col, be.Left}}
+				return []ColExpr{{col, -1, l.Value}}
+			} else {
+				return nil
+			}
+		} else if p, ok := be.Left.(Param); ok {
+			if r, ok := be.Right.(Ref); ok {
+				col, err := cctx.CompileRef(r)
+				if err != nil {
+					return nil
+				}
+				return []ColExpr{{col, p.Num, nil}}
+			} else {
+				return nil
 			}
 		} else if r, ok := be.Left.(Ref); ok {
 			col, err := cctx.CompileRef(r)
 			if err != nil {
 				return nil
 			}
-			_, ok := be.Right.(*Literal)
-			if !ok {
-				_, ok = be.Right.(Param)
-			}
-			if !ok {
+			if l, ok := be.Right.(*Literal); ok {
+				return []ColExpr{{col, -1, l.Value}}
+			} else if p, ok := be.Right.(Param); ok {
+				return []ColExpr{{col, p.Num, nil}}
+			} else {
 				return nil
 			}
-			return []ColVal{{col, be.Right}}
 		} else {
 			return nil
 		}

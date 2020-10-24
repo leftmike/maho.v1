@@ -15,6 +15,7 @@ import (
 var (
 	errMissingQuote     = errors.New(`scanner: missing terminating "'"`)
 	errIncompleteEscape = errors.New("scanner: incomplete escape")
+	errZeroParameter    = errors.New("scanner: zero parameter")
 )
 
 type Position struct {
@@ -358,6 +359,10 @@ func (s *Scanner) scanParameter(sctx *ScanCtx, r rune) rune {
 	sctx.Integer, err = strconv.ParseInt(s.buffer.String(), 10, 64)
 	if err != nil {
 		sctx.Error = err
+		return token.Error
+	}
+	if sctx.Integer == 0 {
+		sctx.Error = errZeroParameter
 		return token.Error
 	}
 

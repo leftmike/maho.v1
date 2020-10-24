@@ -74,10 +74,10 @@ func (_ andEqualRefContext) CompileRef(r Ref) (int, error) {
 	return i, nil
 }
 
-func TestAndEqualRef(t *testing.T) {
+func TestEqualColExpr(t *testing.T) {
 	cases := []struct {
 		s  string
-		cv []ColVal
+		ce []ColExpr
 	}{
 		{s: "c1 > 12"},
 		{s: "c1 and c2"},
@@ -85,27 +85,31 @@ func TestAndEqualRef(t *testing.T) {
 		{s: "c1 = 12 and c2 > 12"},
 		{
 			s:  "12 == c1",
-			cv: []ColVal{{1, Int64Literal(12)}},
+			ce: []ColExpr{{1, -1, sql.Int64Value(12)}},
 		},
 		{
 			s:  "tbl.c2 = 'abc'",
-			cv: []ColVal{{2, StringLiteral("abc")}},
+			ce: []ColExpr{{2, -1, sql.StringValue("abc")}},
 		},
 		{
 			s:  "$2 == c3",
-			cv: []ColVal{{3, Param{2}}},
+			ce: []ColExpr{{3, 2, nil}},
 		},
 		{
 			s:  "c4 = $5",
-			cv: []ColVal{{4, Param{5}}},
+			ce: []ColExpr{{4, 5, nil}},
 		},
 		{
 			s:  "c1 = 1 and 2 = c2",
-			cv: []ColVal{{1, Int64Literal(1)}, {2, Int64Literal(2)}},
+			ce: []ColExpr{{1, -1, sql.Int64Value(1)}, {2, -1, sql.Int64Value(2)}},
 		},
 		{
-			s:  "c1 = 1 and 2 = c2 and c3 = $3",
-			cv: []ColVal{{1, Int64Literal(1)}, {2, Int64Literal(2)}, {3, Param{3}}},
+			s: "c1 = 1 and 2 = c2 and c3 = $3",
+			ce: []ColExpr{
+				{1, -1, sql.Int64Value(1)},
+				{2, -1, sql.Int64Value(2)},
+				{3, 3, nil},
+			},
 		},
 		{s: "c1 = 1 and 2 = c2 or c3 = $3"},
 		{s: "c1 = 1 and 2 = c2 and c3 > $3"},
@@ -117,9 +121,9 @@ func TestAndEqualRef(t *testing.T) {
 		if err != nil {
 			t.Errorf("ParseExpr(%q) failed with %s", c.s, err)
 		}
-		cv := AndEqualRef(andEqualRefContext{}, e)
-		if !reflect.DeepEqual(c.cv, cv) {
-			t.Errorf("AndEqualRef(%q) got %v want %v", c.s, cv, c.cv)
+		ce := EqualColExpr(andEqualRefContext{}, e)
+		if !reflect.DeepEqual(c.ce, ce) {
+			t.Errorf("EqualColExpr(%q) got %v want %v", c.s, ce, c.ce)
 		}
 	}
 }

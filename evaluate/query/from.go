@@ -28,6 +28,34 @@ func (fta FromTableAlias) String() string {
 	return s
 }
 
+func equalKeyExpr(fctx expr.CompileContext, cond expr.Expr,
+	key []sql.ColumnKey) []expr.ColExpr {
+
+	if cond == nil {
+		return nil
+	}
+
+	ce := expr.EqualColExpr(fctx, cond)
+	if len(key) != len(ce) {
+		return nil
+	}
+
+	for _, ck := range key {
+		found := false
+		for cdx := range ce {
+			if ck.Column() == ce[cdx].Col {
+				found = true
+				break
+			}
+		}
+		if !found {
+			return nil
+		}
+	}
+
+	return ce
+}
+
 func (fta FromTableAlias) plan(ctx context.Context, pctx evaluate.PlanContext,
 	tx sql.Transaction, cond expr.Expr) (rowsOp, *fromContext, error) {
 
@@ -43,17 +71,43 @@ func (fta FromTableAlias) plan(ctx context.Context, pctx evaluate.PlanContext,
 	}
 
 	fctx := makeFromContext(nam, tt.Columns())
-	rop, err := where(ctx, pctx, tx, scanTableOp{tn, tt.Version(), tt.Columns()}, fctx, cond)
-	if err != nil {
-		return nil, nil, err
+	var rop rowsOp
+
+	if colExpr := equalKeyExpr(fctx, cond, tt.PrimaryKey()); colExpr != nil {
+		valKey := make([]*sql.Value, len(tt.Columns()))
+		for _, ce := range colExpr {
+			if ce.Param > 0 {
+				ptr, err := pctx.PlanParameter(ce.Param)
+				if err != nil {
+					return nil, nil, err
+				}
+				valKey[ce.Col] = ptr
+			} else {
+				valKey[ce.Col] = &ce.Val
+			}
+		}
+
+		rop = scanTableOp{
+			tn:     tn,
+			ttVer:  tt.Version(),
+			cols:   tt.Columns(),
+			valKey: valKey,
+		}
+	} else {
+		rop, err = where(ctx, pctx, tx, scanTableOp{tn: tn, ttVer: tt.Version(), cols: tt.Columns()},
+			fctx, cond)
+		if err != nil {
+			return nil, nil, err
+		}
 	}
 	return rop, fctx, nil
 }
 
 type scanTableOp struct {
-	tn    sql.TableName
-	ttVer int64
-	cols  []sql.Identifier
+	tn     sql.TableName
+	ttVer  int64
+	cols   []sql.Identifier
+	valKey []*sql.Value
 }
 
 func (sto scanTableOp) Name() string {
@@ -83,7 +137,16 @@ func (sto scanTableOp) rows(ctx context.Context, tx sql.Transaction) (sql.Rows, 
 	if err != nil {
 		return nil, err
 	}
-	return tbl.Rows(ctx, nil, nil)
+	var keyRow []sql.Value
+	if sto.valKey != nil {
+		keyRow = make([]sql.Value, len(sto.cols))
+		for col, ptr := range sto.valKey {
+			if ptr != nil {
+				keyRow[col] = *ptr
+			}
+		}
+	}
+	return tbl.Rows(ctx, keyRow, keyRow)
 }
 
 type FromIndexAlias struct {
