@@ -15,4 +15,4 @@ CREATE TABLE tbl1 (
 
 SELECT * FROM metadata.constraints where table_name = 'tbl1';
 
-
+SHOW CONSTRAINTS FROM tbl1;

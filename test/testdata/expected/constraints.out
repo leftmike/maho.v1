@@ -21,3 +21,14 @@ SELECT * FROM metadata.constraints where table_name = 'tbl1';
  6          test      public       tbl1       c3_unique          UNIQUE          (c3 ASC)
  7          test      public       tbl1         check_1           CHECK        (c2 >= 10)
 (7 rows)
+SHOW CONSTRAINTS FROM tbl1;
+   database_name schema_name table_name constraint_name constraint_type           details
+   ------------- ----------- ---------- --------------- ---------------           -------
+ 1          test      public       tbl1                         DEFAULT     column c5: -1
+ 2          test      public       tbl1                        NOT NULL         column c1
+ 3          test      public       tbl1                        NOT NULL         column c4
+ 4          test      public       tbl1                         PRIMARY          (c1 ASC)
+ 5          test      public       tbl1    c2_c3_unique          UNIQUE (c2 DESC, c3 ASC)
+ 6          test      public       tbl1       c3_unique          UNIQUE          (c3 ASC)
+ 7          test      public       tbl1         check_1           CHECK        (c2 >= 10)
+(7 rows)

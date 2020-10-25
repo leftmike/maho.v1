@@ -51,8 +51,15 @@ To Do:
 -- SELECT: track where columns come from, maybe as part of Plan
 -- DELETE, INSERT, UPDATE, VALUES
 
+- Flags
+-- SHOW <flag>
+-- SET <flag>
+
 - SELECT
+-- test index scans
+-- test primary filter
 -- use index if possible on from index scans
+-- test index filter
 
 - ALTER TABLE ONLY table ADD CONSTRAINT constraint FOREIGN KEY ...
 
@@ -61,7 +68,7 @@ To Do:
 -- need read lock on referenced keys
 
 - references from foreign keys (ForeignRef?)
--- create SQL (as structs) to check and update foreign key relations
+-- use prepared statements to check and update foreign key relations
 -- use prepared statements so only has to be planned once, but executed multiple times
 -- tests to verify that the structs match expected SQL
 -- check foreign keys on update and delete

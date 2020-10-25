@@ -66,7 +66,6 @@ func (fta FromTableAlias) plan(ctx context.Context, pctx evaluate.PlanContext,
 	if fta.Alias != 0 {
 		nam = fta.Alias
 	}
-
 	fctx := makeFromContext(nam, tt.Columns())
 
 	if cond != nil && pctx.GetFlag(flags.PushdownWhere) {
@@ -122,9 +121,24 @@ func (sto scanTableOp) Columns() []string {
 }
 
 func (sto scanTableOp) Fields() []evaluate.FieldDescription {
-	return []evaluate.FieldDescription{
+	fd := []evaluate.FieldDescription{
 		{Field: "table", Description: sto.tn.String()},
 	}
+
+	if sto.valKey != nil {
+		var desc string
+		for col, ptr := range sto.valKey {
+			if ptr != nil {
+				if desc != "" {
+					desc += ", "
+				}
+				desc += fmt.Sprintf("%s = %s", sto.cols[col], *ptr)
+			}
+		}
+		fd = append(fd, evaluate.FieldDescription{Field: "filter", Description: desc})
+	}
+
+	return fd
 }
 
 func (_ scanTableOp) Children() []evaluate.ExplainTree {
@@ -171,24 +185,23 @@ func (fia FromIndexAlias) plan(ctx context.Context, pctx evaluate.PlanContext,
 		return nil, nil, err
 	}
 
-	var cols []sql.Identifier
 	iidx := -1
 	for idx, it := range tt.Indexes() {
 		if it.Name == fia.Index {
 			iidx = idx
-			tblCols := tt.Columns()
-			if len(it.Columns) == 0 {
-				panic("YYY")
-			}
-			for _, col := range it.Columns {
-				cols = append(cols, tblCols[col])
-			}
 			break
 		}
 	}
 	if iidx < 0 {
 		return nil, nil,
 			fmt.Errorf("engine: table %s: index %s not found", fia.TableName, fia.Index)
+	}
+
+	it := tt.Indexes()[iidx]
+	ttCols := tt.Columns()
+	var cols []sql.Identifier
+	for _, col := range it.Columns {
+		cols = append(cols, ttCols[col])
 	}
 
 	nam := fia.Index
