@@ -9,6 +9,7 @@ import (
 
 	"github.com/leftmike/maho/engine"
 	"github.com/leftmike/maho/evaluate"
+	"github.com/leftmike/maho/flags"
 	"github.com/leftmike/maho/parser"
 	"github.com/leftmike/maho/sql"
 	"github.com/leftmike/maho/storage/basic"
@@ -38,7 +39,7 @@ func TestValuesSimple(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	e := engine.NewEngine(st)
+	e := engine.NewEngine(st, flags.Default())
 
 	err = e.CreateDatabase(sql.ID("core_test"), nil)
 	if err != nil {

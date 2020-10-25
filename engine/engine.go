@@ -5,24 +5,26 @@ import (
 	"fmt"
 	"sync"
 
+	"github.com/leftmike/maho/flags"
 	"github.com/leftmike/maho/sql"
 )
 
 type Engine struct {
 	mutex            sync.RWMutex
 	st               store
+	flgs             flags.Flags
 	systemInfoTables map[sql.Identifier]sql.MakeVirtual
 	metadataTables   map[sql.Identifier]sql.MakeVirtual
 }
 
-func NewEngine(st store) sql.Engine {
+func NewEngine(st store, flgs flags.Flags) sql.Engine {
 	e := &Engine{
 		st:               st,
+		flgs:             flgs,
 		systemInfoTables: map[sql.Identifier]sql.MakeVirtual{},
 		metadataTables:   map[sql.Identifier]sql.MakeVirtual{},
 	}
 
-	e.CreateSystemInfoTable(sql.ID("config"), makeConfigTable)
 	e.CreateSystemInfoTable(sql.DATABASES, e.makeDatabasesTable)
 	e.CreateSystemInfoTable(sql.ID("identifiers"), makeIdentifiersTable)
 
@@ -32,6 +34,10 @@ func NewEngine(st store) sql.Engine {
 	e.CreateMetadataTable(sql.TABLES, e.makeTablesTable)
 
 	return e
+}
+
+func (e *Engine) GetFlag(f flags.Flag) bool {
+	return e.flgs.GetFlag(f)
 }
 
 func (e *Engine) CreateSystemInfoTable(tblname sql.Identifier, maker sql.MakeVirtual) {

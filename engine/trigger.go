@@ -8,6 +8,7 @@ import (
 
 	"github.com/golang/protobuf/proto"
 	"github.com/leftmike/maho/evaluate"
+	"github.com/leftmike/maho/flags"
 	"github.com/leftmike/maho/parser"
 	"github.com/leftmike/maho/sql"
 )
@@ -112,8 +113,13 @@ func (tbl *table) ModifyDone(ctx context.Context, event, cnt int64) (int64, erro
 	return cnt, nil
 }
 
-type planContext struct{}
+type planContext struct {
+	e *Engine
+}
 
+func (pctx planContext) GetFlag(f flags.Flag) bool {
+	return pctx.e.GetFlag(f)
+}
 func (_ planContext) ResolveTableName(tn sql.TableName) sql.TableName {
 	return tn
 }
@@ -194,7 +200,7 @@ func (fkt *foreignKeyTrigger) AfterRows(ctx context.Context, tx sql.Transaction,
 		if err != nil {
 			return fmt.Errorf("engine: table %s: foreign key: %s: %s", fkt.tn, fkt.fk.name, err)
 		}
-		prep, err := evaluate.PreparePlan(ctx, stmt, planContext{}, tx)
+		prep, err := evaluate.PreparePlan(ctx, stmt, planContext{tx.(*transaction).e}, tx)
 		if err != nil {
 			return fmt.Errorf("engine: table %s: foreign key: %s: %s", fkt.tn, fkt.fk.name, err)
 		}

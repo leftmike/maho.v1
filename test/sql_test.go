@@ -11,6 +11,7 @@ import (
 
 	"github.com/leftmike/maho/engine"
 	"github.com/leftmike/maho/evaluate"
+	"github.com/leftmike/maho/flags"
 	"github.com/leftmike/maho/sql"
 	"github.com/leftmike/maho/storage"
 	"github.com/leftmike/maho/storage/basic"
@@ -150,7 +151,7 @@ func TestSQL(t *testing.T) {
 				t.Fatal(err)
 			}
 
-			testSQL(t, cfg.name, engine.NewEngine(st), tst.testData, tst.psql)
+			testSQL(t, cfg.name, engine.NewEngine(st, flags.Default()), tst.testData, tst.psql)
 		}
 	}
 }

@@ -10,6 +10,7 @@ import (
 
 	"github.com/leftmike/maho/engine"
 	"github.com/leftmike/maho/evaluate"
+	"github.com/leftmike/maho/flags"
 	"github.com/leftmike/maho/server"
 	"github.com/leftmike/maho/storage/basic"
 )
@@ -94,7 +95,7 @@ func testSSHServer(t *testing.T, fail bool, cfg *ssh.ClientConfig, port int, aut
 		Handler: func(ses *evaluate.Session, rr io.RuneReader, w io.Writer) {
 			served <- struct{}{}
 		},
-		Engine: engine.NewEngine(st),
+		Engine: engine.NewEngine(st, flags.Default()),
 	}
 
 	go func() {

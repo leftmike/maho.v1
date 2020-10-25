@@ -6,7 +6,7 @@ import (
 	"fmt"
 	"io"
 
-	"github.com/leftmike/maho/config"
+	"github.com/leftmike/maho/flags"
 	"github.com/leftmike/maho/sql"
 )
 
@@ -142,8 +142,6 @@ func (ses *Session) Columns(v sql.Identifier) []sql.Identifier {
 		return []sql.Identifier{sql.DATABASE}
 	} else if v == sql.SCHEMA {
 		return []sql.Identifier{sql.SCHEMA}
-	} else if _, ok := config.Lookup(v.String()); ok {
-		return []sql.Identifier{sql.ID("name"), sql.ID("by"), sql.ID("value")}
 	}
 	return nil
 }
@@ -159,15 +157,12 @@ func (ses *Session) Show(v sql.Identifier) (sql.Rows, error) {
 			numCols: 1,
 			rows:    [][]sql.Value{{sql.StringValue(ses.defaultSchema.String())}},
 		}, nil
-	} else if cv, ok := config.Lookup(v.String()); ok {
-		return &values{
-			numCols: 3,
-			rows: [][]sql.Value{
-				{sql.StringValue(cv.Name()), sql.StringValue(cv.By()), sql.StringValue(cv.Val())},
-			},
-		}, nil
 	}
 	return nil, fmt.Errorf("show: %s not found", v)
+}
+
+func (ses *Session) GetFlag(f flags.Flag) bool {
+	return ses.e.GetFlag(f)
 }
 
 func (ses *Session) ResolveTableName(tn sql.TableName) sql.TableName {

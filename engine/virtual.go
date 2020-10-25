@@ -5,7 +5,6 @@ import (
 	"fmt"
 	"io"
 
-	"github.com/leftmike/maho/config"
 	"github.com/leftmike/maho/sql"
 )
 
@@ -482,23 +481,4 @@ func makeIdentifiersTable(ctx context.Context, tx sql.Transaction, tn sql.TableN
 	return MakeVirtualTable(tn,
 		[]sql.Identifier{sql.ID("name"), sql.ID("id"), sql.ID("reserved")},
 		[]sql.ColumnType{sql.IdColType, sql.Int32ColType, sql.BoolColType}, values)
-}
-
-func makeConfigTable(ctx context.Context, tx sql.Transaction, tn sql.TableName) (sql.Table,
-	sql.TableType, error) {
-
-	values := [][]sql.Value{}
-
-	for _, v := range config.Vars() {
-		values = append(values,
-			[]sql.Value{
-				sql.StringValue(v.Name()),
-				sql.StringValue(v.By()),
-				sql.StringValue(v.Val()),
-			})
-	}
-
-	return MakeVirtualTable(tn,
-		[]sql.Identifier{sql.ID("name"), sql.ID("by"), sql.ID("value")},
-		[]sql.ColumnType{sql.IdColType, sql.IdColType, sql.StringColType}, values)
 }

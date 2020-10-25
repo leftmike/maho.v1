@@ -52,7 +52,6 @@ To Do:
 -- DELETE, INSERT, UPDATE, VALUES
 
 - SELECT
--- add a switch to turn off predicate pushdown
 -- use index if possible on from index scans
 
 - ALTER TABLE ONLY table ADD CONSTRAINT constraint FOREIGN KEY ...
@@ -92,6 +91,7 @@ import (
 	"github.com/leftmike/maho/config"
 	"github.com/leftmike/maho/engine"
 	"github.com/leftmike/maho/evaluate"
+	"github.com/leftmike/maho/flags"
 	"github.com/leftmike/maho/parser"
 	"github.com/leftmike/maho/server"
 	"github.com/leftmike/maho/sql"
@@ -103,22 +103,23 @@ import (
 )
 
 var (
-	database = config.Var(new(string), "database").Usage("default `database` (maho)").String("maho")
-	store    = config.Var(new(string), "store").Usage("`store` (basic)").String("basic")
-	dataDir  = config.Var(new(string), "data-directory").
+	cfg      = config.NewConfig(flag.CommandLine)
+	database = cfg.Var(new(string), "database").Usage("default `database` (maho)").String("maho")
+	store    = cfg.Var(new(string), "store").Usage("`store` (basic)").String("basic")
+	dataDir  = cfg.Var(new(string), "data-directory").
 			Flag("data", "`directory` containing databases (testdata)").String("testdata")
-	sshServer = config.Var(new(bool), "ssh").
+	sshServer = cfg.Var(new(bool), "ssh").
 			Usage("`flag` to control serving ssh (false)").Bool(false)
-	sshPort = config.Var(new(string), "ssh-port").
+	sshPort = cfg.Var(new(string), "ssh-port").
 		Usage("`port` used to serve ssh (localhost:8241)").String("localhost:8241")
-	logFile = config.Var(new(string), "log-file").Usage("`file` to use for logging (maho.log)").
+	logFile = cfg.Var(new(string), "log-file").Usage("`file` to use for logging (maho.log)").
 		String("maho.log")
-	logLevel = config.Var(new(string), "log-level").
+	logLevel = cfg.Var(new(string), "log-level").
 			Usage("log level: debug, info, warn, error, fatal, or panic (info)").String("info")
-	authorizedKeys = config.Var(new(string), "ssh-authorized-keys").
+	authorizedKeys = cfg.Var(new(string), "ssh-authorized-keys").
 			Usage("`file` containing authorized ssh keys").String("")
 
-	accounts = config.Var(new(config.Array), "accounts").Array()
+	accounts = cfg.Var(new(config.Array), "accounts").Array()
 
 	configFile = flag.String("config-file", "", "`file` to load config from (maho.hcl)")
 	noConfig   = flag.Bool("no-config", false, "don't load config file")
@@ -158,6 +159,23 @@ func parseAccounts(accounts config.Array) (map[string]string, bool) {
 	return userPasswords, true
 }
 
+func makeConfigTable(tn sql.TableName, cfg *config.Config) (sql.Table, sql.TableType, error) {
+	values := [][]sql.Value{}
+
+	for _, v := range cfg.Vars() {
+		values = append(values,
+			[]sql.Value{
+				sql.StringValue(v.Name()),
+				sql.StringValue(v.By()),
+				sql.StringValue(v.Val()),
+			})
+	}
+
+	return engine.MakeVirtualTable(tn,
+		[]sql.Identifier{sql.ID("name"), sql.ID("by"), sql.ID("value")},
+		[]sql.ColumnType{sql.IdColType, sql.IdColType, sql.StringColType}, values)
+}
+
 func main() {
 	log.SetFormatter(&log.TextFormatter{
 		DisableLevelTruncation: true,
@@ -173,22 +191,23 @@ func main() {
 		flag.BoolVar(&logStderr, s, false, "`flag` to control logging to standard error (false)")
 	}
 
+	flgs := flags.Config(cfg)
 	flag.Parse()
-	config.Env()
+	cfg.Env()
 
 	if *noConfig == false {
 		filename := "maho.hcl"
 		if *configFile != "" {
 			filename = *configFile
 		}
-		err := config.Load(filename)
+		err := cfg.Load(filename)
 		if err != nil {
 			fmt.Fprintf(os.Stderr, "maho: %s: %s\n", *configFile, err)
 			return
 		}
 	}
 	if *listConfig {
-		for _, v := range config.Vars() {
+		for _, v := range cfg.Vars() {
 			fmt.Fprintf(os.Stdout, "[%s] %s = %s\n", v.By(), v.Name(), v.Val())
 		}
 		return
@@ -253,7 +272,14 @@ func main() {
 		return
 	}
 
-	e := engine.NewEngine(st)
+	e := engine.NewEngine(st, flgs)
+	e.CreateSystemInfoTable(sql.ID("config"),
+		func(ctx context.Context, tx sql.Transaction, tn sql.TableName) (sql.Table, sql.TableType,
+			error) {
+
+			return makeConfigTable(tn, cfg)
+		})
+
 	svr := server.Server{
 		Handler: func(ses *evaluate.Session, rr io.RuneReader, w io.Writer) {
 			src := fmt.Sprintf("%s@%s", ses.User, ses.Type)

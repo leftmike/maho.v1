@@ -6,6 +6,7 @@ import (
 
 	"github.com/leftmike/maho/evaluate"
 	"github.com/leftmike/maho/evaluate/expr"
+	"github.com/leftmike/maho/flags"
 	"github.com/leftmike/maho/sql"
 )
 
@@ -30,10 +31,6 @@ func (fta FromTableAlias) String() string {
 
 func equalKeyExpr(fctx expr.CompileContext, cond expr.Expr,
 	key []sql.ColumnKey) []expr.ColExpr {
-
-	if cond == nil {
-		return nil
-	}
 
 	ce := expr.EqualColExpr(fctx, cond)
 	if len(key) != len(ce) {
@@ -71,35 +68,37 @@ func (fta FromTableAlias) plan(ctx context.Context, pctx evaluate.PlanContext,
 	}
 
 	fctx := makeFromContext(nam, tt.Columns())
-	var rop rowsOp
 
-	if colExpr := equalKeyExpr(fctx, cond, tt.PrimaryKey()); colExpr != nil {
-		valKey := make([]*sql.Value, len(tt.Columns()))
-		for _, ce := range colExpr {
-			if ce.Param > 0 {
-				ptr, err := pctx.PlanParameter(ce.Param)
-				if err != nil {
-					return nil, nil, err
+	if cond != nil && pctx.GetFlag(flags.PushdownWhere) {
+		if colExpr := equalKeyExpr(fctx, cond, tt.PrimaryKey()); colExpr != nil {
+			valKey := make([]*sql.Value, len(tt.Columns()))
+			for _, ce := range colExpr {
+				if ce.Param > 0 {
+					ptr, err := pctx.PlanParameter(ce.Param)
+					if err != nil {
+						return nil, nil, err
+					}
+					valKey[ce.Col] = ptr
+				} else {
+					valKey[ce.Col] = &ce.Val
 				}
-				valKey[ce.Col] = ptr
-			} else {
-				valKey[ce.Col] = &ce.Val
 			}
-		}
 
-		rop = scanTableOp{
-			tn:     tn,
-			ttVer:  tt.Version(),
-			cols:   tt.Columns(),
-			valKey: valKey,
-		}
-	} else {
-		rop, err = where(ctx, pctx, tx, scanTableOp{tn: tn, ttVer: tt.Version(), cols: tt.Columns()},
-			fctx, cond)
-		if err != nil {
-			return nil, nil, err
+			return scanTableOp{
+				tn:     tn,
+				ttVer:  tt.Version(),
+				cols:   tt.Columns(),
+				valKey: valKey,
+			}, fctx, nil
 		}
 	}
+
+	rop, err := where(ctx, pctx, tx, scanTableOp{tn: tn, ttVer: tt.Version(), cols: tt.Columns()},
+		fctx, cond)
+	if err != nil {
+		return nil, nil, err
+	}
+
 	return rop, fctx, nil
 }
 

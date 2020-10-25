@@ -2,6 +2,8 @@ package sql
 
 import (
 	"context"
+
+	"github.com/leftmike/maho/flags"
 )
 
 type Transaction interface {
@@ -66,6 +68,8 @@ type Trigger interface {
 type MakeVirtual func(ctx context.Context, tx Transaction, tn TableName) (Table, TableType, error)
 
 type Engine interface {
+	GetFlag(f flags.Flag) bool
+
 	CreateSystemInfoTable(tblname Identifier, maker MakeVirtual)
 	CreateMetadataTable(tblname Identifier, maker MakeVirtual)
 

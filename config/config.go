@@ -49,8 +49,6 @@ type Variable struct {
 	noConfig bool
 }
 
-var cfg = NewConfig(flag.CommandLine)
-
 type Config struct {
 	vars    map[string]*Variable
 	flags   map[string]*Variable
@@ -89,10 +87,6 @@ func (c *Config) Env() error {
 	return nil
 }
 
-func Env() error {
-	return cfg.Env()
-}
-
 func (c *Config) flagVars() {
 	c.flagSet.Visit(func(f *flag.Flag) {
 		if v, ok := c.flags[f.Name]; ok {
@@ -114,20 +108,12 @@ func (c *Config) Load(filename string) error {
 	return c.load(b)
 }
 
-func Load(filename string) error {
-	return cfg.Load(filename)
-}
-
 func (c *Config) Vars() []*Variable {
 	var vars []*Variable
 	for _, v := range c.vars {
 		vars = append(vars, v)
 	}
 	return vars
-}
-
-func Vars() []*Variable {
-	return cfg.Vars()
 }
 
 func (c *Config) Var(val interface{}, name string) *Variable {
@@ -169,17 +155,9 @@ func (c *Config) Var(val interface{}, name string) *Variable {
 	return nv
 }
 
-func Var(val interface{}, name string) *Variable {
-	return cfg.Var(val, name)
-}
-
 func (c *Config) Lookup(name string) (*Variable, bool) {
 	v, ok := c.vars[name]
 	return v, ok
-}
-
-func Lookup(name string) (*Variable, bool) {
-	return cfg.Lookup(name)
 }
 
 func (v *Variable) Name() string {

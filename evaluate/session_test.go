@@ -7,6 +7,7 @@ import (
 
 	"github.com/leftmike/maho/engine"
 	"github.com/leftmike/maho/evaluate"
+	"github.com/leftmike/maho/flags"
 	"github.com/leftmike/maho/sql"
 )
 
@@ -173,7 +174,7 @@ func TestSessionCommit(t *testing.T) {
 		},
 	}
 
-	ses := evaluate.NewSession(engine.NewEngine(st), 0, 0)
+	ses := evaluate.NewSession(engine.NewEngine(st, flags.Default()), 0, 0)
 	ses.SetSessionID(123)
 	if ses.String() != "session-123" {
 		t.Errorf("SetSessionID: got %s want session-123", ses.String())
@@ -208,7 +209,7 @@ func TestSessionRollback(t *testing.T) {
 		},
 	}
 
-	ses := evaluate.NewSession(engine.NewEngine(st), 0, 0)
+	ses := evaluate.NewSession(engine.NewEngine(st, flags.Default()), 0, 0)
 	err := ses.Begin()
 	if err != nil {
 		t.Errorf("Begin failed with %s", err)
@@ -235,7 +236,7 @@ func TestSessionRunExplicit(t *testing.T) {
 		},
 	}
 
-	ses := evaluate.NewSession(engine.NewEngine(st), 0, 0)
+	ses := evaluate.NewSession(engine.NewEngine(st, flags.Default()), 0, 0)
 	err := ses.Begin()
 	if err != nil {
 		t.Errorf("Begin failed with %s", err)
@@ -283,7 +284,7 @@ func TestSessionRunImplicit(t *testing.T) {
 		},
 	}
 
-	ses := evaluate.NewSession(engine.NewEngine(st), 0, 0)
+	ses := evaluate.NewSession(engine.NewEngine(st, flags.Default()), 0, 0)
 
 	var ran bool
 	err := ses.Run(nil,

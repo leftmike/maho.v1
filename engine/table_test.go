@@ -8,6 +8,7 @@ import (
 	"testing"
 
 	"github.com/leftmike/maho/engine"
+	"github.com/leftmike/maho/flags"
 	"github.com/leftmike/maho/sql"
 	"github.com/leftmike/maho/storage/basic"
 )
@@ -20,7 +21,7 @@ func startEngine(t *testing.T, db sql.Identifier) sql.Engine {
 	if err != nil {
 		t.Fatal(err)
 	}
-	e := engine.NewEngine(st)
+	e := engine.NewEngine(st, flags.Default())
 	err = e.CreateDatabase(db, nil)
 	if err != nil {
 		t.Fatal(err)

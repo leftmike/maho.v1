@@ -5,12 +5,17 @@ import (
 	"errors"
 	"fmt"
 
+	"github.com/leftmike/maho/flags"
 	"github.com/leftmike/maho/sql"
 )
 
 type prepareContext struct {
 	pctx   PlanContext
 	params []*sql.Value
+}
+
+func (prep *prepareContext) GetFlag(f flags.Flag) bool {
+	return prep.pctx.GetFlag(f)
 }
 
 func (prep *prepareContext) ResolveTableName(tn sql.TableName) sql.TableName {

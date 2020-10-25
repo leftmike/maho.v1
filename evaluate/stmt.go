@@ -4,6 +4,7 @@ import (
 	"context"
 	"fmt"
 
+	"github.com/leftmike/maho/flags"
 	"github.com/leftmike/maho/sql"
 )
 
@@ -13,6 +14,7 @@ type Stmt interface {
 }
 
 type PlanContext interface {
+	GetFlag(f flags.Flag) bool
 	ResolveTableName(tn sql.TableName) sql.TableName
 	ResolveSchemaName(sn sql.SchemaName) sql.SchemaName
 	PlanParameter(num int) (*sql.Value, error)
