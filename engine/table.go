@@ -3,9 +3,6 @@ package engine
 import (
 	"context"
 	"fmt"
-	"strconv"
-	"strings"
-	"unicode/utf8"
 
 	"github.com/leftmike/maho/sql"
 )
@@ -75,66 +72,11 @@ func convertValue(ct sql.ColumnType, n sql.Identifier, v sql.Value) (sql.Value, 
 		return nil, nil
 	}
 
-	switch ct.Type {
-	case sql.BooleanType:
-		if sv, ok := v.(sql.StringValue); ok {
-			s := strings.Trim(string(sv), " \t\n")
-			if s == "t" || s == "true" || s == "y" || s == "yes" || s == "on" || s == "1" {
-				return sql.BoolValue(true), nil
-			} else if s == "f" || s == "false" || s == "n" || s == "no" || s == "off" || s == "0" {
-				return sql.BoolValue(false), nil
-			} else {
-				return nil, fmt.Errorf("column \"%s\": expected a boolean value: %v", n, v)
-			}
-		} else if _, ok := v.(sql.BoolValue); !ok {
-			return nil, fmt.Errorf("column \"%s\": expected a boolean value: %v", n, v)
-		}
-	case sql.StringType:
-		if i, ok := v.(sql.Int64Value); ok {
-			return sql.StringValue(strconv.FormatInt(int64(i), 10)), nil
-		} else if f, ok := v.(sql.Float64Value); ok {
-			return sql.StringValue(strconv.FormatFloat(float64(f), 'g', -1, 64)), nil
-		} else if b, ok := v.(sql.BytesValue); ok {
-			if !utf8.Valid([]byte(b)) {
-				return nil, fmt.Errorf(`column "%s": expected a valid utf8 string: %v`, n, v)
-			}
-			return sql.StringValue(b), nil
-		} else if _, ok := v.(sql.StringValue); !ok {
-			return nil, fmt.Errorf(`column "%s": expected a string value: %v`, n, v)
-		}
-	case sql.BytesType:
-		if s, ok := v.(sql.StringValue); ok {
-			return sql.BytesValue(s), nil
-		} else if _, ok := v.(sql.BytesValue); !ok {
-			return nil, fmt.Errorf(`column "%s": expected a bytes value: %v`, n, v)
-		}
-	case sql.FloatType:
-		if i, ok := v.(sql.Int64Value); ok {
-			return sql.Float64Value(i), nil
-		} else if s, ok := v.(sql.StringValue); ok {
-			d, err := strconv.ParseFloat(strings.Trim(string(s), " \t\n"), 64)
-			if err != nil {
-				return nil, fmt.Errorf("column \"%s\": expected a float: %v: %s", n, v, err)
-			}
-			return sql.Float64Value(d), nil
-		} else if _, ok := v.(sql.Float64Value); !ok {
-			return nil, fmt.Errorf("column \"%s\": expected a float value: %v", n, v)
-		}
-	case sql.IntegerType:
-		if f, ok := v.(sql.Float64Value); ok {
-			return sql.Int64Value(f), nil
-		} else if s, ok := v.(sql.StringValue); ok {
-			i, err := strconv.ParseInt(strings.Trim(string(s), " \t\n"), 10, 64)
-			if err != nil {
-				return nil, fmt.Errorf("column \"%s\": expected an integer: %v: %s", n, v, err)
-			}
-			return sql.Int64Value(i), nil
-		} else if _, ok := v.(sql.Int64Value); !ok {
-			return nil, fmt.Errorf("column \"%s\": expected an integer value: %v", n, v)
-		}
+	cv, err := sql.ConvertValue(ct.Type, v)
+	if err != nil {
+		return nil, fmt.Errorf("column %s: %s", n, err)
 	}
-
-	return v, nil
+	return cv, nil
 }
 
 type rowContext []sql.Value

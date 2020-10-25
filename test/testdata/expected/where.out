@@ -95,6 +95,12 @@ SELECT * FROM tbl1@idx3;
  12  -2  2
  13  -1  1
 (13 rows)
+SET pushdown_where = true;
+SHOW pushdown_where;
+   pushdown_where
+   --------------
+ 1           true
+(1 row)
 EXPLAIN SELECT * FROM tbl1 WHERE c1 = 5;
               tree  field      description
               ----  -----      -----------
@@ -103,6 +109,41 @@ EXPLAIN SELECT * FROM tbl1 WHERE c1 = 5;
  3               |  table test.public.tbl1
  4               | filter           c1 = 5
 (4 rows)
+SELECT * FROM tbl1 WHERE c1 = 5;
+   c1 c2  c3 c4 c5
+   -- --  -- -- --
+ 1  5 20 200 -4 -5
+(1 row)
+EXPLAIN SELECT * FROM tbl1@idx1 WHERE c2 = 5;
+                   tree field      description
+                   ---- -----      -----------
+ 1               select                       
+ 2           +-- filter                       
+ 3                    |  expr     "=="([0], 5)
+ 4       +-- scan index                       
+ 5                    | table test.public.tbl1
+ 6                    | index             idx1
+(6 rows)
+SET pushdown_where = false;
+SHOW pushdown_where;
+   pushdown_where
+   --------------
+ 1          false
+(1 row)
+EXPLAIN SELECT * FROM tbl1 WHERE c1 = 5;
+                   tree field      description
+                   ---- -----      -----------
+ 1               select                       
+ 2           +-- filter                       
+ 3                    |  expr     "=="([0], 5)
+ 4       +-- scan table                       
+ 5                    | table test.public.tbl1
+(5 rows)
+SELECT * FROM tbl1 WHERE c1 = 5;
+   c1 c2  c3 c4 c5
+   -- --  -- -- --
+ 1  5 20 200 -4 -5
+(1 row)
 EXPLAIN SELECT * FROM tbl1@idx1 WHERE c2 = 5;
                    tree field      description
                    ---- -----      -----------

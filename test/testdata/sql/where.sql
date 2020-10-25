@@ -42,6 +42,22 @@ SELECT * FROM tbl1@idx2;
 
 SELECT * FROM tbl1@idx3;
 
+SET pushdown_where = true;
+
+SHOW pushdown_where;
+
 EXPLAIN SELECT * FROM tbl1 WHERE c1 = 5;
+
+SELECT * FROM tbl1 WHERE c1 = 5;
+
+EXPLAIN SELECT * FROM tbl1@idx1 WHERE c2 = 5;
+
+SET pushdown_where = false;
+
+SHOW pushdown_where;
+
+EXPLAIN SELECT * FROM tbl1 WHERE c1 = 5;
+
+SELECT * FROM tbl1 WHERE c1 = 5;
 
 EXPLAIN SELECT * FROM tbl1@idx1 WHERE c2 = 5;

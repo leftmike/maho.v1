@@ -21,6 +21,7 @@ type Session struct {
 	sesid           uint64
 	tx              sql.Transaction
 	preparedPlans   map[sql.Identifier]PreparedPlan
+	flgs            map[flags.Flag]bool
 }
 
 func NewSession(e sql.Engine, defaultDatabase, defaultSchema sql.Identifier) *Session {
@@ -99,6 +100,15 @@ func (ses *Session) Set(v sql.Identifier, s string) error {
 		ses.defaultDatabase = sql.ID(s)
 	} else if v == sql.SCHEMA {
 		ses.defaultSchema = sql.ID(s)
+	} else if f, ok := flags.LookupFlag(v.String()); ok {
+		v, err := sql.ConvertValue(sql.BooleanType, sql.StringValue(s))
+		if err != nil {
+			return err
+		}
+		if ses.flgs == nil {
+			ses.flgs = map[flags.Flag]bool{}
+		}
+		ses.flgs[f] = (bool)(v.(sql.BoolValue))
 	} else {
 		return fmt.Errorf("set: %s not found", v)
 	}
@@ -142,6 +152,8 @@ func (ses *Session) Columns(v sql.Identifier) []sql.Identifier {
 		return []sql.Identifier{sql.DATABASE}
 	} else if v == sql.SCHEMA {
 		return []sql.Identifier{sql.SCHEMA}
+	} else if _, ok := flags.LookupFlag(v.String()); ok {
+		return []sql.Identifier{v}
 	}
 	return nil
 }
@@ -157,11 +169,24 @@ func (ses *Session) Show(v sql.Identifier) (sql.Rows, error) {
 			numCols: 1,
 			rows:    [][]sql.Value{{sql.StringValue(ses.defaultSchema.String())}},
 		}, nil
+	} else if f, ok := flags.LookupFlag(v.String()); ok {
+		b, ok := ses.flgs[f]
+		if !ok {
+			b = ses.e.GetFlag(f)
+		}
+		return &values{
+			numCols: 1,
+			rows:    [][]sql.Value{{sql.BoolValue(b)}},
+		}, nil
 	}
 	return nil, fmt.Errorf("show: %s not found", v)
 }
 
 func (ses *Session) GetFlag(f flags.Flag) bool {
+	b, ok := ses.flgs[f]
+	if ok {
+		return b
+	}
 	return ses.e.GetFlag(f)
 }
 

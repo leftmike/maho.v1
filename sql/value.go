@@ -3,7 +3,9 @@ package sql
 import (
 	"bytes"
 	"fmt"
+	"strconv"
 	"strings"
+	"unicode/utf8"
 )
 
 const (
@@ -204,6 +206,71 @@ func Format(v Value) string {
 	}
 
 	return v.String()
+}
+
+func ConvertValue(dt DataType, v Value) (Value, error) {
+	switch dt {
+	case BooleanType:
+		if sv, ok := v.(StringValue); ok {
+			s := strings.Trim(string(sv), " \t\n")
+			if s == "t" || s == "true" || s == "y" || s == "yes" || s == "on" || s == "1" {
+				return BoolValue(true), nil
+			} else if s == "f" || s == "false" || s == "n" || s == "no" || s == "off" || s == "0" {
+				return BoolValue(false), nil
+			} else {
+				return nil, fmt.Errorf("expected a boolean value: %v", v)
+			}
+		} else if _, ok := v.(BoolValue); !ok {
+			return nil, fmt.Errorf("expected a boolean value: %v", v)
+		}
+	case StringType:
+		if i, ok := v.(Int64Value); ok {
+			return StringValue(strconv.FormatInt(int64(i), 10)), nil
+		} else if f, ok := v.(Float64Value); ok {
+			return StringValue(strconv.FormatFloat(float64(f), 'g', -1, 64)), nil
+		} else if b, ok := v.(BytesValue); ok {
+			if !utf8.Valid([]byte(b)) {
+				return nil, fmt.Errorf("expected a valid utf8 string: %v", v)
+			}
+			return StringValue(b), nil
+		} else if _, ok := v.(StringValue); !ok {
+			return nil, fmt.Errorf("expected a string value: %v", v)
+		}
+	case BytesType:
+		if s, ok := v.(StringValue); ok {
+			return BytesValue(s), nil
+		} else if _, ok := v.(BytesValue); !ok {
+			return nil, fmt.Errorf("expected a bytes value: %v", v)
+		}
+	case FloatType:
+		if i, ok := v.(Int64Value); ok {
+			return Float64Value(i), nil
+		} else if s, ok := v.(StringValue); ok {
+			d, err := strconv.ParseFloat(strings.Trim(string(s), " \t\n"), 64)
+			if err != nil {
+				return nil, fmt.Errorf("expected a float: %v: %s", v, err)
+			}
+			return Float64Value(d), nil
+		} else if _, ok := v.(Float64Value); !ok {
+			return nil, fmt.Errorf("expected a float value: %v", v)
+		}
+	case IntegerType:
+		if f, ok := v.(Float64Value); ok {
+			return Int64Value(f), nil
+		} else if s, ok := v.(StringValue); ok {
+			i, err := strconv.ParseInt(strings.Trim(string(s), " \t\n"), 10, 64)
+			if err != nil {
+				return nil, fmt.Errorf("expected an integer: %v: %s", v, err)
+			}
+			return Int64Value(i), nil
+		} else if _, ok := v.(Int64Value); !ok {
+			return nil, fmt.Errorf("expected an integer value: %v", v)
+		}
+	default:
+		panic(fmt.Sprintf("expected a valid data type; got %v", dt))
+	}
+
+	return v, nil
 }
 
 /*

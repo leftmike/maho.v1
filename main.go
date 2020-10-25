@@ -51,13 +51,7 @@ To Do:
 -- SELECT: track where columns come from, maybe as part of Plan
 -- DELETE, INSERT, UPDATE, VALUES
 
-- Flags
--- SHOW <flag>
--- SET <flag>
-
 - SELECT
--- test index scans
--- test primary filter
 -- use index if possible on from index scans
 -- test index filter
 

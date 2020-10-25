@@ -1,6 +1,8 @@
 package flags
 
 import (
+	"strings"
+
 	"github.com/leftmike/maho/config"
 )
 
@@ -17,9 +19,14 @@ type flagDefault struct {
 
 var (
 	defaultFlags = map[string]flagDefault{
-		"pushdown-where": {PushdownWhere, true},
+		"pushdown_where": {PushdownWhere, true},
 	}
 )
+
+func LookupFlag(nam string) (Flag, bool) {
+	fd, ok := defaultFlags[strings.ToLower(nam)]
+	return fd.flag, ok
+}
 
 type Flags []bool
 
