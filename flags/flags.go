@@ -28,6 +28,12 @@ func LookupFlag(nam string) (Flag, bool) {
 	return fd.flag, ok
 }
 
+func ListFlags(fn func(nam string, f Flag)) {
+	for nam, fd := range defaultFlags {
+		fn(nam, fd.flag)
+	}
+}
+
 type Flags []bool
 
 func (flgs Flags) GetFlag(f Flag) bool {
@@ -38,7 +44,7 @@ func Config(cfg *config.Config) Flags {
 	flgs := make([]bool, len(defaultFlags))
 	for nam, fd := range defaultFlags {
 		flgs[fd.flag] = fd.def
-		cfg.Var(&flgs[fd.flag], nam)
+		cfg.Var(&flgs[fd.flag], nam).Hide()
 	}
 	return flgs
 }

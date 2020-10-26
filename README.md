@@ -182,16 +182,20 @@ join-type =
 ```
 SET DATABASE (TO | '=') database
 SET SCHEMA (TO | '=') schema
+SET flag (TO | '=') value
 ```
 
 ```
 SHOW COLUMNS FROM [[database '.'] schema '.'] table
+SHOW CONFIG
+SHOW CONSTRAINTS FROM [[database '.'] schema '.'] table
 SHOW DATABASE
 SHOW DATABASES
+SHOW FLAGS
 SHOW SCHEMA
 SHOW SCHEMAS [FROM database]
 SHOW TABLES [FROM [database '.'] schema]
-SHOW variable
+SHOW flag
 ```
 
 ```

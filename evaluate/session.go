@@ -152,6 +152,8 @@ func (ses *Session) Columns(v sql.Identifier) []sql.Identifier {
 		return []sql.Identifier{sql.DATABASE}
 	} else if v == sql.SCHEMA {
 		return []sql.Identifier{sql.SCHEMA}
+	} else if v == sql.FLAGS {
+		return []sql.Identifier{sql.ID("name"), sql.ID("value")}
 	} else if _, ok := flags.LookupFlag(v.String()); ok {
 		return []sql.Identifier{v}
 	}
@@ -168,6 +170,15 @@ func (ses *Session) Show(v sql.Identifier) (sql.Rows, error) {
 		return &values{
 			numCols: 1,
 			rows:    [][]sql.Value{{sql.StringValue(ses.defaultSchema.String())}},
+		}, nil
+	} else if v == sql.FLAGS {
+		var rows [][]sql.Value
+		flags.ListFlags(func(nam string, f flags.Flag) {
+			rows = append(rows, []sql.Value{sql.StringValue(nam), sql.BoolValue(ses.GetFlag(f))})
+		})
+		return &values{
+			numCols: 2,
+			rows:    rows,
 		}, nil
 	} else if f, ok := flags.LookupFlag(v.String()); ok {
 		b, ok := ses.flgs[f]

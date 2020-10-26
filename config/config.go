@@ -17,24 +17,21 @@ type setBy int
 
 const (
 	byDefault setBy = iota
-	byFlag
+	byCommandLine
 	byEnv
 	byConfig
-	bySet
 )
 
 func (b setBy) String() string {
 	switch b {
 	case byDefault:
 		return "default"
-	case byFlag:
-		return "flag"
+	case byCommandLine:
+		return "command-line"
 	case byEnv:
 		return "environment"
 	case byConfig:
 		return "config-file"
-	case bySet:
-		return "set"
 	}
 	panic(fmt.Sprintf("set-by: unexpected value: %d", b))
 }
@@ -43,10 +40,10 @@ type Variable struct {
 	cfg      *Config
 	name     string
 	val      valueSetter
-	flag     string
 	env      []string
 	by       setBy
 	noConfig bool
+	hidden   bool
 }
 
 type Config struct {
@@ -90,7 +87,7 @@ func (c *Config) Env() error {
 func (c *Config) flagVars() {
 	c.flagSet.Visit(func(f *flag.Flag) {
 		if v, ok := c.flags[f.Name]; ok {
-			v.by = byFlag
+			v.by = byCommandLine
 		}
 	})
 }
@@ -172,19 +169,23 @@ func (v *Variable) By() string {
 	return v.by.String()
 }
 
-func (v *Variable) Flag(name, usage string) *Variable {
-	fv, ok := v.val.(flag.Value)
-	if !ok {
-		panic(fmt.Sprintf("%T does not implement Set", v.val))
-	}
-	v.flag = name
-	v.cfg.flags[v.flag] = v
-	v.cfg.flagSet.Var(fv, v.flag, usage)
+func (v *Variable) Hidden() bool {
+	return v.hidden
+}
+
+func (v *Variable) Hide() *Variable {
+	v.hidden = true
 	return v
 }
 
 func (v *Variable) Usage(usage string) *Variable {
-	return v.Flag(v.name, usage)
+	fv, ok := v.val.(flag.Value)
+	if !ok {
+		panic(fmt.Sprintf("%T does not implement Set", v.val))
+	}
+	v.cfg.flags[v.name] = v
+	v.cfg.flagSet.Var(fv, v.name, usage)
+	return v
 }
 
 func (v *Variable) Env(vars ...string) *Variable {

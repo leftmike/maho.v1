@@ -1489,13 +1489,14 @@ func (p *parser) parseShowFromTable() (sql.TableName, *expr.Binary) {
 
 func (p *parser) parseShow() evaluate.Stmt {
 	// SHOW COLUMNS FROM [[database '.'] schema '.'] table
+	// SHOW CONFIG
 	// SHOW CONSTRAINTS FROM [[database '.'] schema '.'] table
 	// SHOW DATABASE
 	// SHOW DATABASES
 	// SHOW SCHEMA
 	// SHOW SCHEMAS [FROM database]
 	// SHOW TABLES [FROM [database '.'] schema]
-	// SHOW variable
+	// SHOW flag
 
 	t := p.scan()
 	if t != token.Reserved && t != token.Identifier {
@@ -1524,6 +1525,26 @@ func (p *parser) parseShow() evaluate.Stmt {
 					Right: expr.StringLiteral(tn.Table.String()),
 				},
 				Right: schemaTest,
+			},
+		}
+	case sql.CONFIG:
+		return &query.Select{
+			Results: []query.SelectResult{
+				query.ExprResult{Expr: expr.Ref{sql.ID("name")}},
+				query.ExprResult{Expr: expr.Ref{sql.ID("value")}},
+				query.ExprResult{Expr: expr.Ref{sql.ID("by")}},
+			},
+			From: &query.FromTableAlias{
+				TableName: sql.TableName{
+					Database: sql.SYSTEM,
+					Schema:   sql.INFO,
+					Table:    sql.CONFIG,
+				},
+			},
+			Where: &expr.Binary{
+				Op:    expr.EqualOp,
+				Left:  expr.Ref{sql.ID("hidden")},
+				Right: expr.False(),
 			},
 		}
 	case sql.CONSTRAINTS:

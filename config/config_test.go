@@ -13,7 +13,7 @@ func TestFlags(t *testing.T) {
 	fs := flag.NewFlagSet("test_flags", flag.ContinueOnError)
 	cfg := config.NewConfig(fs)
 	b := cfg.Var(new(bool), "bool").Usage("bool variable").Bool(true)
-	i := cfg.Var(new(int), "int").Flag("int-flag", "int variable").Int(123)
+	i := cfg.Var(new(int), "int").Usage("int variable").Int(123)
 	s := cfg.Var(new(string), "string").String("default")
 	if *b != true {
 		t.Errorf("*b != true")
@@ -24,7 +24,7 @@ func TestFlags(t *testing.T) {
 	if *s != "default" {
 		t.Errorf("*s != \"default\"")
 	}
-	err := fs.Parse([]string{"-bool=false", "-int-flag", "456"})
+	err := fs.Parse([]string{"-bool=false", "-int", "456"})
 	if err != nil {
 		t.Fatalf("fs.Parse() failed with %s", err)
 	}
@@ -43,7 +43,7 @@ func TestEnv(t *testing.T) {
 	fs := flag.NewFlagSet("test_flags", flag.ContinueOnError)
 	cfg := config.NewConfig(fs)
 	b := cfg.Var(new(bool), "bool").Env("X-BOOL").Usage("bool variable").Bool(true)
-	i := cfg.Var(new(int), "int").Flag("int-flag", "int variable").Env("X-INT").Int(123)
+	i := cfg.Var(new(int), "int").Usage("int variable").Env("X-INT").Int(123)
 	s := cfg.Var(new(string), "string").Usage("string variable").Env("X-STRING").String("default")
 	if *b != true {
 		t.Errorf("*b != true")
@@ -62,7 +62,7 @@ func TestEnv(t *testing.T) {
 	if err != nil {
 		t.Fatalf("os.Setenv() failed with %s", err)
 	}
-	err = fs.Parse([]string{"-bool=false", "-int-flag", "456"})
+	err = fs.Parse([]string{"-bool=false", "-int", "456"})
 	if err != nil {
 		t.Fatalf("fs.Parse() failed with %s", err)
 	}
@@ -102,7 +102,7 @@ func TestMapFlag(t *testing.T) {
 	}()
 
 	c := config.NewConfig(flag.NewFlagSet("test", flag.ContinueOnError))
-	c.Var(make(config.Map), "map").Flag("map", "map")
+	c.Var(make(config.Map), "map").Usage("map")
 }
 
 func TestMapEnv(t *testing.T) {

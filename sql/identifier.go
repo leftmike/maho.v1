@@ -21,12 +21,14 @@ const (
 	CHAR
 	CHARACTER
 	COLUMNS
+	CONFIG
 	CONSTRAINTS
 	COUNT
 	COUNT_ALL
 	DATABASES
 	DESCRIPTION
 	DOUBLE
+	FLAGS
 	FIELD
 	INDEXES
 	INFO
@@ -123,12 +125,14 @@ const (
 var knownIdentifiers = map[string]Identifier{
 	"btree":       BTREE,
 	"columns":     COLUMNS,
+	"config":      CONFIG,
 	"constraints": CONSTRAINTS,
 	"count":       COUNT,
 	"count_all":   COUNT_ALL,
 	"databases":   DATABASES,
 	"description": DESCRIPTION,
 	"field":       FIELD,
+	"flags":       FLAGS,
 	"indexes":     INDEXES,
 	"info":        INFO,
 	"metadata":    METADATA,

@@ -107,8 +107,8 @@ var (
 	cfg      = config.NewConfig(flag.CommandLine)
 	database = cfg.Var(new(string), "database").Usage("default `database` (maho)").String("maho")
 	store    = cfg.Var(new(string), "store").Usage("`store` (basic)").String("basic")
-	dataDir  = cfg.Var(new(string), "data-directory").
-			Flag("data", "`directory` containing databases (testdata)").String("testdata")
+	dataDir  = cfg.Var(new(string), "data").
+			Usage("`directory` containing databases (testdata)").String("testdata")
 	sshServer = cfg.Var(new(bool), "ssh").
 			Usage("`flag` to control serving ssh (false)").Bool(false)
 	sshPort = cfg.Var(new(string), "ssh-port").
@@ -120,7 +120,7 @@ var (
 	authorizedKeys = cfg.Var(new(string), "ssh-authorized-keys").
 			Usage("`file` containing authorized ssh keys").String("")
 
-	accounts = cfg.Var(new(config.Array), "accounts").Array()
+	accounts = cfg.Var(new(config.Array), "accounts").Hide().Array()
 
 	configFile = flag.String("config-file", "", "`file` to load config from (maho.hcl)")
 	noConfig   = flag.Bool("no-config", false, "don't load config file")
@@ -168,13 +168,14 @@ func makeConfigTable(tn sql.TableName, cfg *config.Config) (sql.Table, sql.Table
 			[]sql.Value{
 				sql.StringValue(v.Name()),
 				sql.StringValue(v.By()),
+				sql.BoolValue(v.Hidden()),
 				sql.StringValue(v.Val()),
 			})
 	}
 
 	return engine.MakeVirtualTable(tn,
-		[]sql.Identifier{sql.ID("name"), sql.ID("by"), sql.ID("value")},
-		[]sql.ColumnType{sql.IdColType, sql.IdColType, sql.StringColType}, values)
+		[]sql.Identifier{sql.ID("name"), sql.ID("by"), sql.ID("hidden"), sql.ID("value")},
+		[]sql.ColumnType{sql.IdColType, sql.IdColType, sql.BoolColType, sql.StringColType}, values)
 }
 
 func main() {
@@ -274,7 +275,7 @@ func main() {
 	}
 
 	e := engine.NewEngine(st, flgs)
-	e.CreateSystemInfoTable(sql.ID("config"),
+	e.CreateSystemInfoTable(sql.CONFIG,
 		func(ctx context.Context, tx sql.Transaction, tn sql.TableName) (sql.Table, sql.TableType,
 			error) {
 
