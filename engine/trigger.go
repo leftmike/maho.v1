@@ -234,7 +234,7 @@ func (fkt *foreignKeyTrigger) AfterRows(ctx context.Context, tx sql.Transaction,
 		if err != nil {
 			panic(fmt.Sprintf("engine: table %s: foreign key: %s: %s", fkt.tn, fkt.fk.name, err))
 		}
-		// XXX: rows.Close()
+		rows.Close()
 		cnt := cntRow[0].(sql.Int64Value)
 		if cnt == 0 {
 			return fmt.Errorf(

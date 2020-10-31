@@ -99,7 +99,13 @@ func (gr *groupRows) NumColumns() int {
 
 func (gr *groupRows) Close() error {
 	gr.index = len(gr.groups)
-	return gr.rows.Close()
+	if gr.rows == nil {
+		return nil
+	}
+
+	err := gr.rows.Close()
+	gr.rows = nil
+	return err
 }
 
 type groupRow struct {
@@ -152,6 +158,7 @@ func (gr *groupRows) group(ctx context.Context) error {
 		}
 	}
 	gr.rows.Close()
+	gr.rows = nil
 
 	// If not a GROUP BY aggregration and no matching result rows, still need to output the
 	// zero values of the aggregrators in the results.
