@@ -140,16 +140,6 @@ func (_ planContext) GetPreparedPlan(nam sql.Identifier) evaluate.PreparedPlan {
 	panic("unexpected, should never be called")
 }
 
-func hasNullColumns(fk foreignKey, row []sql.Value) bool {
-	for _, col := range fk.keyCols {
-		if row[col] == nil {
-			return true
-		}
-	}
-
-	return false
-}
-
 type foreignKeyTrigger struct {
 	tn sql.TableName
 	fk foreignKey
@@ -198,27 +188,16 @@ func (fkt *foreignKeyTrigger) AfterRows(ctx context.Context, tx sql.Transaction,
 		p := parser.NewParser(strings.NewReader(fkt.sqlStmt), fkt.sqlStmt)
 		stmt, err := p.Parse()
 		if err != nil {
-			return fmt.Errorf("engine: table %s: foreign key: %s: %s", fkt.tn, fkt.fk.name, err)
+			panic(fmt.Sprintf("engine: table %s: foreign key: %s: %s", fkt.tn, fkt.fk.name, err))
 		}
 		prep, err := evaluate.PreparePlan(ctx, stmt, planContext{tx.(*transaction).e}, tx)
 		if err != nil {
-			return fmt.Errorf("engine: table %s: foreign key: %s: %s", fkt.tn, fkt.fk.name, err)
+			panic(fmt.Sprintf("engine: table %s: foreign key: %s: %s", fkt.tn, fkt.fk.name, err))
 		}
 		fkt.prep = prep.(*evaluate.PreparedRowsPlan)
 	}
-	// XXX: use fkt.prep
 
-	rtt, err := tx.LookupTableType(ctx, fkt.fk.refTable)
-	if err != nil {
-		return err
-	}
-	rtbl, err := tx.LookupTable(ctx, fkt.fk.refTable, rtt.Version())
-	if err != nil {
-		return err
-	}
-	rpkey := rtt.PrimaryKey()
-
-	refRow := make([]sql.Value, len(rtt.Columns()))
+	params := make([]sql.Value, len(fkt.fk.keyCols))
 	row := make([]sql.Value, newRows.NumColumns())
 	for {
 		err := newRows.Next(ctx, row)
@@ -228,32 +207,39 @@ func (fkt *foreignKeyTrigger) AfterRows(ctx context.Context, tx sql.Transaction,
 			return err
 		}
 
-		if hasNullColumns(fkt.fk, row) {
+		var hasNull bool
+		for kdx, col := range fkt.fk.keyCols {
+			if row[col] == nil {
+				hasNull = true
+				break
+			}
+			params[kdx] = row[col]
+		}
+		if hasNull {
 			continue
 		}
 
-		if fkt.fk.refIndex == sql.PRIMARY_QUOTED {
-			keyRow := make([]sql.Value, len(rtt.Columns()))
-			for cdx, col := range fkt.fk.keyCols {
-				keyRow[rpkey[cdx].Column()] = row[col]
-			}
+		err = fkt.prep.SetParameters(params)
+		if err != nil {
+			panic(fmt.Sprintf("engine: table %s: foreign key: %s: %s", fkt.tn, fkt.fk.name, err))
+		}
 
-			r, err := rtbl.Rows(ctx, keyRow, keyRow)
-			if err != nil {
-				return err
-			}
-			err = r.Next(ctx, refRow)
-			r.Close()
-			if err == io.EOF {
-				return fmt.Errorf(
-					"engine: table %s: insert or update violates foreign key constraint: %s",
-					fkt.tn, fkt.fk.name)
-			} else if err != nil {
-				return err
-			}
-		} else {
-			// XXX: lookup and use the index
-			panic(fmt.Sprintf("[%s] %d %d", fkt.fk.refIndex, fkt.fk.refIndex, sql.PRIMARY_QUOTED))
+		rows, err := fkt.prep.Rows(ctx, tx)
+		if err != nil {
+			panic(fmt.Sprintf("engine: table %s: foreign key: %s: %s", fkt.tn, fkt.fk.name, err))
+		}
+
+		cntRow := []sql.Value{nil}
+		err = rows.Next(ctx, cntRow)
+		if err != nil {
+			panic(fmt.Sprintf("engine: table %s: foreign key: %s: %s", fkt.tn, fkt.fk.name, err))
+		}
+		// XXX: rows.Close()
+		cnt := cntRow[0].(sql.Int64Value)
+		if cnt == 0 {
+			return fmt.Errorf(
+				"engine: table %s: insert or update violates foreign key constraint: %s",
+				fkt.tn, fkt.fk.name)
 		}
 	}
 

@@ -54,13 +54,10 @@ To Do:
 - ALTER TABLE ONLY table ADD CONSTRAINT constraint FOREIGN KEY ...
 
 - foreign key references
--- use prepared SQL to check references
 -- need read lock on referenced keys
 
 - references from foreign keys (ForeignRef?)
 -- use prepared statements to check and update foreign key relations
--- use prepared statements so only has to be planned once, but executed multiple times
--- tests to verify that the structs match expected SQL
 -- check foreign keys on update and delete
 
 - constraints
