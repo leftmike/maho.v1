@@ -51,10 +51,6 @@ To Do:
 -- SELECT: track where columns come from, maybe as part of Plan
 -- DELETE, INSERT, UPDATE, VALUES
 
-- SELECT
--- use index if possible on from index scans
--- test index filter
-
 - ALTER TABLE ONLY table ADD CONSTRAINT constraint FOREIGN KEY ...
 
 - foreign key references

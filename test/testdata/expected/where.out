@@ -114,16 +114,45 @@ SELECT * FROM tbl1 WHERE c1 = 5;
    -- --  -- -- --
  1  5 20 200 -4 -5
 (1 row)
-EXPLAIN SELECT * FROM tbl1@idx1 WHERE c2 = 5;
+EXPLAIN SELECT * FROM tbl1@idx1 WHERE c2 = 50;
                    tree field      description
                    ---- -----      -----------
  1               select                       
  2           +-- filter                       
- 3                    |  expr     "=="([0], 5)
+ 3                    |  expr    "=="([0], 50)
  4       +-- scan index                       
  5                    | table test.public.tbl1
  6                    | index             idx1
 (6 rows)
+SELECT * FROM tbl1@idx1 WHERE c2 = 50;
+   c2 c1
+   -- --
+ 1 50 10
+(1 row)
+SELECT * FROM tbl1@idx1 WHERE c2 = 40;
+   c2 c1
+   -- --
+ 1 40  7
+ 2 40  8
+ 3 40  9
+(3 rows)
+SELECT * FROM tbl1@idx2 WHERE c4 = -5 AND c3 = 300;
+    c3 c4 c1
+    -- -- --
+ 1 300 -5  6
+ 2 300 -5  7
+ 3 300 -5  8
+(3 rows)
+SELECT * FROM tbl1@idx2 WHERE c3 = 300 AND c4 = -6;
+    c3 c4 c1
+    -- -- --
+ 1 300 -6  9
+(1 row)
+SELECT * FROM tbl1@idx3 WHERE c5 = -11;
+    c5 c1
+    -- --
+ 1 -11 11
+(1 row)
 SET pushdown_where = false;
 SHOW pushdown_where;
    pushdown_where
@@ -144,13 +173,42 @@ SELECT * FROM tbl1 WHERE c1 = 5;
    -- --  -- -- --
  1  5 20 200 -4 -5
 (1 row)
-EXPLAIN SELECT * FROM tbl1@idx1 WHERE c2 = 5;
+EXPLAIN SELECT * FROM tbl1@idx1 WHERE c2 = 50;
                    tree field      description
                    ---- -----      -----------
  1               select                       
  2           +-- filter                       
- 3                    |  expr     "=="([0], 5)
+ 3                    |  expr    "=="([0], 50)
  4       +-- scan index                       
  5                    | table test.public.tbl1
  6                    | index             idx1
 (6 rows)
+SELECT * FROM tbl1@idx1 WHERE c2 = 50;
+   c2 c1
+   -- --
+ 1 50 10
+(1 row)
+SELECT * FROM tbl1@idx1 WHERE c2 = 40;
+   c2 c1
+   -- --
+ 1 40  7
+ 2 40  8
+ 3 40  9
+(3 rows)
+SELECT * FROM tbl1@idx2 WHERE c4 = -5 AND c3 = 300;
+    c3 c4 c1
+    -- -- --
+ 1 300 -5  6
+ 2 300 -5  7
+ 3 300 -5  8
+(3 rows)
+SELECT * FROM tbl1@idx2 WHERE c3 = 300 AND c4 = -6;
+    c3 c4 c1
+    -- -- --
+ 1 300 -6  9
+(1 row)
+SELECT * FROM tbl1@idx3 WHERE c5 = -11;
+    c5 c1
+    -- --
+ 1 -11 11
+(1 row)

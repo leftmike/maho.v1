@@ -50,7 +50,17 @@ EXPLAIN SELECT * FROM tbl1 WHERE c1 = 5;
 
 SELECT * FROM tbl1 WHERE c1 = 5;
 
-EXPLAIN SELECT * FROM tbl1@idx1 WHERE c2 = 5;
+EXPLAIN SELECT * FROM tbl1@idx1 WHERE c2 = 50;
+
+SELECT * FROM tbl1@idx1 WHERE c2 = 50;
+
+SELECT * FROM tbl1@idx1 WHERE c2 = 40;
+
+SELECT * FROM tbl1@idx2 WHERE c4 = -5 AND c3 = 300;
+
+SELECT * FROM tbl1@idx2 WHERE c3 = 300 AND c4 = -6;
+
+SELECT * FROM tbl1@idx3 WHERE c5 = -11;
 
 SET pushdown_where = false;
 
@@ -60,4 +70,14 @@ EXPLAIN SELECT * FROM tbl1 WHERE c1 = 5;
 
 SELECT * FROM tbl1 WHERE c1 = 5;
 
-EXPLAIN SELECT * FROM tbl1@idx1 WHERE c2 = 5;
+EXPLAIN SELECT * FROM tbl1@idx1 WHERE c2 = 50;
+
+SELECT * FROM tbl1@idx1 WHERE c2 = 50;
+
+SELECT * FROM tbl1@idx1 WHERE c2 = 40;
+
+SELECT * FROM tbl1@idx2 WHERE c4 = -5 AND c3 = 300;
+
+SELECT * FROM tbl1@idx2 WHERE c3 = 300 AND c4 = -6;
+
+SELECT * FROM tbl1@idx3 WHERE c5 = -11;

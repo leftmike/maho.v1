@@ -30,11 +30,17 @@ func (fta FromTableAlias) String() string {
 }
 
 func equalKeyExpr(fctx expr.CompileContext, cond expr.Expr,
-	key []sql.ColumnKey) []expr.ColExpr {
+	key []sql.ColumnKey, cols []int) []expr.ColExpr {
 
 	ce := expr.EqualColExpr(fctx, cond)
 	if len(key) != len(ce) {
 		return nil
+	}
+
+	if cols != nil {
+		for cdx := range ce {
+			ce[cdx].Col = cols[ce[cdx].Col]
+		}
 	}
 
 	for _, ck := range key {
@@ -69,7 +75,7 @@ func (fta FromTableAlias) plan(ctx context.Context, pctx evaluate.PlanContext,
 	fctx := makeFromContext(nam, tt.Columns())
 
 	if cond != nil && pctx.GetFlag(flags.PushdownWhere) {
-		if colExpr := equalKeyExpr(fctx, cond, tt.PrimaryKey()); colExpr != nil {
+		if colExpr := equalKeyExpr(fctx, cond, tt.PrimaryKey(), nil); colExpr != nil {
 			valKey := make([]*sql.Value, len(tt.Columns()))
 			for _, ce := range colExpr {
 				if ce.Param > 0 {
@@ -79,7 +85,8 @@ func (fta FromTableAlias) plan(ctx context.Context, pctx evaluate.PlanContext,
 					}
 					valKey[ce.Col] = ptr
 				} else {
-					valKey[ce.Col] = &ce.Val
+					val := ce.Val
+					valKey[ce.Col] = &val
 				}
 			}
 
@@ -120,24 +127,28 @@ func (sto scanTableOp) Columns() []string {
 	return cols
 }
 
+func filterField(valKey []*sql.Value, cols []sql.Identifier) evaluate.FieldDescription {
+	var desc string
+	for col, ptr := range valKey {
+		if ptr != nil {
+			if desc != "" {
+				desc += ", "
+			}
+			desc += fmt.Sprintf("%s = %s", cols[col], *ptr)
+		}
+	}
+
+	return evaluate.FieldDescription{Field: "filter", Description: desc}
+}
+
 func (sto scanTableOp) Fields() []evaluate.FieldDescription {
 	fd := []evaluate.FieldDescription{
 		{Field: "table", Description: sto.tn.String()},
 	}
 
 	if sto.valKey != nil {
-		var desc string
-		for col, ptr := range sto.valKey {
-			if ptr != nil {
-				if desc != "" {
-					desc += ", "
-				}
-				desc += fmt.Sprintf("%s = %s", sto.cols[col], *ptr)
-			}
-		}
-		fd = append(fd, evaluate.FieldDescription{Field: "filter", Description: desc})
+		fd = append(fd, filterField(sto.valKey, sto.cols))
 	}
-
 	return fd
 }
 
@@ -150,6 +161,7 @@ func (sto scanTableOp) rows(ctx context.Context, tx sql.Transaction) (sql.Rows, 
 	if err != nil {
 		return nil, err
 	}
+
 	var keyRow []sql.Value
 	if sto.valKey != nil {
 		keyRow = make([]sql.Value, len(sto.cols))
@@ -208,10 +220,38 @@ func (fia FromIndexAlias) plan(ctx context.Context, pctx evaluate.PlanContext,
 	if fia.Alias != 0 {
 		nam = fia.Alias
 	}
-
 	fctx := makeFromContext(nam, cols)
-	rop, err := where(ctx, pctx, tx, scanIndexOp{tn, fia.Index, iidx, tt.Version(), cols}, fctx,
-		cond)
+	sio := scanIndexOp{
+		tn:    tn,
+		index: fia.Index,
+		iidx:  iidx,
+		ttVer: tt.Version(),
+		cols:  cols,
+	}
+
+	if cond != nil && pctx.GetFlag(flags.PushdownWhere) {
+		if colExpr := equalKeyExpr(fctx, cond, it.Key, it.Columns); colExpr != nil {
+			valKey := make([]*sql.Value, len(tt.Columns()))
+			for _, ce := range colExpr {
+				if ce.Param > 0 {
+					ptr, err := pctx.PlanParameter(ce.Param)
+					if err != nil {
+						return nil, nil, err
+					}
+					valKey[ce.Col] = ptr
+				} else {
+					val := ce.Val
+					valKey[ce.Col] = &val
+				}
+			}
+
+			sio.valKey = valKey
+			sio.ttCols = ttCols
+			return sio, fctx, nil
+		}
+	}
+
+	rop, err := where(ctx, pctx, tx, sio, fctx, cond)
 	if err != nil {
 		return nil, nil, err
 	}
@@ -219,11 +259,13 @@ func (fia FromIndexAlias) plan(ctx context.Context, pctx evaluate.PlanContext,
 }
 
 type scanIndexOp struct {
-	tn    sql.TableName
-	index sql.Identifier
-	iidx  int
-	ttVer int64
-	cols  []sql.Identifier
+	tn     sql.TableName
+	index  sql.Identifier
+	iidx   int
+	ttVer  int64
+	cols   []sql.Identifier
+	ttCols []sql.Identifier
+	valKey []*sql.Value
 }
 
 func (sio scanIndexOp) Name() string {
@@ -239,10 +281,15 @@ func (sio scanIndexOp) Columns() []string {
 }
 
 func (sio scanIndexOp) Fields() []evaluate.FieldDescription {
-	return []evaluate.FieldDescription{
+	fd := []evaluate.FieldDescription{
 		{Field: "table", Description: sio.tn.String()},
 		{Field: "index", Description: sio.index.String()},
 	}
+
+	if sio.valKey != nil {
+		fd = append(fd, filterField(sio.valKey, sio.ttCols))
+	}
+	return fd
 }
 
 func (_ scanIndexOp) Children() []evaluate.ExplainTree {
@@ -254,7 +301,17 @@ func (sio scanIndexOp) rows(ctx context.Context, tx sql.Transaction) (sql.Rows, 
 	if err != nil {
 		return nil, err
 	}
-	return tbl.IndexRows(ctx, sio.iidx, nil, nil)
+
+	var keyRow []sql.Value
+	if sio.valKey != nil {
+		keyRow = make([]sql.Value, len(sio.ttCols))
+		for col, ptr := range sio.valKey {
+			if ptr != nil {
+				keyRow[col] = *ptr
+			}
+		}
+	}
+	return tbl.IndexRows(ctx, sio.iidx, keyRow, keyRow)
 }
 
 type FromStmt struct {
