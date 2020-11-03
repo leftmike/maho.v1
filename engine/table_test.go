@@ -91,14 +91,9 @@ func insertRows(t *testing.T, tx sql.Transaction, tn sql.TableName, min, max int
 	ctx := context.Background()
 	tbl := lookupTable(t, tx, tn)
 
-	err := tbl.ModifyStart(ctx, sql.InsertEvent)
-	if err != nil {
-		t.Fatal(err)
-	}
-
 	cnt := 0
 	for min+cnt <= max {
-		err = tbl.Insert(ctx,
+		err := tbl.Insert(ctx,
 			[]sql.Value{
 				i64Val(cnt + min),
 				strVal(strconv.FormatInt(int64(max-cnt), 10)),
@@ -112,12 +107,9 @@ func insertRows(t *testing.T, tx sql.Transaction, tn sql.TableName, min, max int
 		cnt += 1
 	}
 
-	n, err := tbl.ModifyDone(ctx, sql.InsertEvent, int64(cnt))
+	err := tx.NextStmt(ctx)
 	if err != nil {
 		t.Fatal(err)
-	}
-	if n != int64(cnt) {
-		t.Errorf("ModifyDone: got %d, want %d", n, cnt)
 	}
 
 	err = tx.Commit(ctx)
@@ -169,6 +161,11 @@ func indexRows(t *testing.T, tx sql.Transaction, tn sql.TableName, iidx int,
 		rows = rows[1:]
 	}
 
+	err = tx.NextStmt(ctx)
+	if err != nil {
+		t.Fatal(err)
+	}
+
 	err = tx.Commit(ctx)
 	if err != nil {
 		t.Fatal(err)
@@ -180,11 +177,6 @@ func deleteIndexRow(t *testing.T, tx sql.Transaction, tn sql.TableName, iidx int
 	tbl := lookupTable(t, tx, tn)
 
 	ir, err := tbl.IndexRows(ctx, iidx, nil, nil)
-	if err != nil {
-		t.Fatal(err)
-	}
-
-	err = tbl.ModifyStart(ctx, sql.DeleteEvent)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -205,12 +197,9 @@ func deleteIndexRow(t *testing.T, tx sql.Transaction, tn sql.TableName, iidx int
 		}
 	}
 
-	n, err := tbl.ModifyDone(ctx, sql.DeleteEvent, 1)
+	err = tx.NextStmt(ctx)
 	if err != nil {
 		t.Fatal(err)
-	}
-	if n != 1 {
-		t.Errorf("ModifyDone: got %d, want 1", n)
 	}
 
 	err = tx.Commit(ctx)
@@ -224,11 +213,6 @@ func deleteRow(t *testing.T, tx sql.Transaction, tn sql.TableName, val sql.Value
 	tbl := lookupTable(t, tx, tn)
 
 	r, err := tbl.Rows(ctx, nil, nil)
-	if err != nil {
-		t.Fatal(err)
-	}
-
-	err = tbl.ModifyStart(ctx, sql.DeleteEvent)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -249,12 +233,9 @@ func deleteRow(t *testing.T, tx sql.Transaction, tn sql.TableName, val sql.Value
 		}
 	}
 
-	n, err := tbl.ModifyDone(ctx, sql.DeleteEvent, 1)
+	err = tx.NextStmt(ctx)
 	if err != nil {
 		t.Fatal(err)
-	}
-	if n != 1 {
-		t.Errorf("ModifyDone: got %d, want 1", n)
 	}
 
 	err = tx.Commit(ctx)
@@ -270,11 +251,6 @@ func updateIndexRow(t *testing.T, tx sql.Transaction, tn sql.TableName, iidx int
 	tbl := lookupTable(t, tx, tn)
 
 	ir, err := tbl.IndexRows(ctx, iidx, nil, nil)
-	if err != nil {
-		t.Fatal(err)
-	}
-
-	err = tbl.ModifyStart(ctx, sql.UpdateEvent)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -295,12 +271,9 @@ func updateIndexRow(t *testing.T, tx sql.Transaction, tn sql.TableName, iidx int
 		}
 	}
 
-	n, err := tbl.ModifyDone(ctx, sql.UpdateEvent, 1)
+	err = tx.NextStmt(ctx)
 	if err != nil {
 		t.Fatal(err)
-	}
-	if n != 1 {
-		t.Errorf("ModifyDone: got %d, want 1", n)
 	}
 
 	err = tx.Commit(ctx)
@@ -316,11 +289,6 @@ func updateRow(t *testing.T, tx sql.Transaction, tn sql.TableName, val sql.Value
 	tbl := lookupTable(t, tx, tn)
 
 	r, err := tbl.Rows(ctx, nil, nil)
-	if err != nil {
-		t.Fatal(err)
-	}
-
-	err = tbl.ModifyStart(ctx, sql.UpdateEvent)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -341,12 +309,9 @@ func updateRow(t *testing.T, tx sql.Transaction, tn sql.TableName, val sql.Value
 		}
 	}
 
-	n, err := tbl.ModifyDone(ctx, sql.UpdateEvent, 1)
+	err = tx.NextStmt(ctx)
 	if err != nil {
 		t.Fatal(err)
-	}
-	if n != 1 {
-		t.Errorf("ModifyDone: got %d, want 1", n)
 	}
 
 	err = tx.Commit(ctx)

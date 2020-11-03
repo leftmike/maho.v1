@@ -12,6 +12,7 @@ type table struct {
 	tn             sql.TableName
 	stbl           Table
 	tt             *TableType
+	modified       bool
 	deletedRows    [][]sql.Value
 	insertedRows   [][]sql.Value
 	updatedOldRows [][]sql.Value
@@ -109,6 +110,10 @@ func (tbl *table) Insert(ctx context.Context, row []sql.Value) error {
 
 	if tbl.tt.events&sql.InsertEvent != 0 {
 		tbl.insertedRows = append(tbl.insertedRows, row)
+		if !tbl.modified {
+			tbl.modified = true
+			tbl.tx.modified = append(tbl.tx.modified, tbl)
+		}
 	}
 
 	return tbl.stbl.Insert(ctx, row)
@@ -155,6 +160,10 @@ func (tbl *table) updateRow(ctx context.Context, ufn updateRow, updates []sql.Co
 		tbl.updatedOldRows = append(tbl.updatedOldRows,
 			append(make([]sql.Value, 0, len(curRow)), curRow...))
 		tbl.updatedNewRows = append(tbl.updatedNewRows, updateRow)
+		if !tbl.modified {
+			tbl.modified = true
+			tbl.tx.modified = append(tbl.tx.modified, tbl)
+		}
 	}
 
 	return ufn(ctx, updatedCols, updateRow)
@@ -166,6 +175,10 @@ func (tbl *table) deleteRow(ctx context.Context, dfn deleteRow, curRow []sql.Val
 	if tbl.tt.events&sql.DeleteEvent != 0 {
 		tbl.deletedRows = append(tbl.deletedRows,
 			append(make([]sql.Value, 0, len(curRow)), curRow...))
+		if !tbl.modified {
+			tbl.modified = true
+			tbl.tx.modified = append(tbl.tx.modified, tbl)
+		}
 	}
 
 	return dfn(ctx)

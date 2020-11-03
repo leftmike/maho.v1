@@ -62,8 +62,6 @@ const (
 )
 
 type Table interface {
-	ModifyStart(ctx context.Context, event int64) error
-	ModifyDone(ctx context.Context, event, cnt int64) (int64, error)
 	Rows(ctx context.Context, minRow, maxRow []Value) (Rows, error)
 	IndexRows(ctx context.Context, iidx int, minRow, maxRow []Value) (IndexRows, error)
 	Insert(ctx context.Context, row []Value) error

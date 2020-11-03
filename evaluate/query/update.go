@@ -99,10 +99,6 @@ func (up *updatePlan) Execute(ctx context.Context, tx sql.Transaction) (int64, e
 	if err != nil {
 		return -1, err
 	}
-	err = tbl.ModifyStart(ctx, sql.UpdateEvent)
-	if err != nil {
-		return -1, err
-	}
 
 	rows, err := tbl.Rows(ctx, nil, nil)
 	if err != nil {
@@ -118,7 +114,7 @@ func (up *updatePlan) Execute(ctx context.Context, tx sql.Transaction) (int64, e
 	for {
 		err := rows.Next(ctx, up.dest)
 		if err == io.EOF {
-			return tbl.ModifyDone(ctx, sql.UpdateEvent, cnt)
+			return cnt, nil
 		} else if err != nil {
 			return -1, err
 		}

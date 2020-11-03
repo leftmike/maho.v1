@@ -14,6 +14,7 @@ type transaction struct {
 	tx         Transaction
 	tables     map[sql.TableName]*table
 	tableTypes map[sql.TableName]sql.TableType
+	modified   []*table
 }
 
 func (e *Engine) Begin(sesid uint64) sql.Transaction {
@@ -26,7 +27,13 @@ func (e *Engine) Begin(sesid uint64) sql.Transaction {
 }
 
 func (tx *transaction) Commit(ctx context.Context) error {
-	err := tx.tx.Commit(ctx)
+	err := tx.stmtTriggers(ctx)
+	if err != nil {
+		tx.Rollback()
+		return err
+	}
+
+	err = tx.tx.Commit(ctx)
 	tx.tx = nil
 	return err
 }
@@ -38,6 +45,11 @@ func (tx *transaction) Rollback() error {
 }
 
 func (tx *transaction) NextStmt(ctx context.Context) error {
+	err := tx.stmtTriggers(ctx)
+	if err != nil {
+		return err
+	}
+
 	tx.tx.NextStmt()
 	return nil
 }

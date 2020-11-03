@@ -44,14 +44,6 @@ func (vt *virtualTable) PrimaryKey(ctx context.Context) []sql.ColumnKey {
 	return vt.tt.PrimaryKey()
 }
 
-func (vt *virtualTable) ModifyStart(ctx context.Context, event int64) error {
-	return fmt.Errorf("virtual: table %s can not be modified", vt.tn)
-}
-
-func (vt *virtualTable) ModifyDone(ctx context.Context, event, cnt int64) (int64, error) {
-	panic(fmt.Sprintf("virtual: table %s can not be modified", vt.tn))
-}
-
 func (vt *virtualTable) Rows(ctx context.Context, minRow, maxRow []sql.Value) (sql.Rows, error) {
 	if minRow != nil || maxRow != nil {
 		panic("virtual: not implemented: minRow != nil || maxRow != nil")

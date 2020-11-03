@@ -62,55 +62,63 @@ func (tr *triggerRows) Update(ctx context.Context, updates []sql.ColumnUpdate) e
 	panic("engine: trigger rows may not be updated")
 }
 
-func (tbl *table) ModifyStart(ctx context.Context, event int64) error {
-	tbl.deletedRows = nil
-	tbl.insertedRows = nil
-	tbl.updatedOldRows = nil
-	tbl.updatedNewRows = nil
-	return nil
-}
+func (tx *transaction) stmtTriggers(ctx context.Context) error {
+	for len(tx.modified) > 0 {
+		tbl := tx.modified[0]
+		tx.modified = tx.modified[1:]
 
-func (tbl *table) ModifyDone(ctx context.Context, event, cnt int64) (int64, error) {
-	for _, trig := range tbl.tt.triggers {
-		if trig.events&sql.DeleteEvent != 0 && tbl.deletedRows != nil {
-			oldRows := &triggerRows{
-				numCols: len(tbl.tt.Columns()),
-				vals:    tbl.deletedRows,
-			}
-			err := trig.trig.AfterRows(ctx, tbl.tx, tbl, oldRows, nil)
-			if err != nil {
-				return -1, err
-			}
-		}
+		deletedRows := tbl.deletedRows
+		insertedRows := tbl.insertedRows
+		updatedOldRows := tbl.updatedOldRows
+		updatedNewRows := tbl.updatedNewRows
 
-		if trig.events&sql.InsertEvent != 0 && tbl.insertedRows != nil {
-			newRows := &triggerRows{
-				numCols: len(tbl.tt.Columns()),
-				vals:    tbl.insertedRows,
-			}
-			err := trig.trig.AfterRows(ctx, tbl.tx, tbl, nil, newRows)
-			if err != nil {
-				return -1, err
-			}
-		}
+		tbl.deletedRows = nil
+		tbl.insertedRows = nil
+		tbl.updatedOldRows = nil
+		tbl.updatedNewRows = nil
+		tbl.modified = false
 
-		if trig.events&sql.UpdateEvent != 0 && tbl.updatedOldRows != nil {
-			oldRows := &triggerRows{
-				numCols: len(tbl.tt.Columns()),
-				vals:    tbl.updatedOldRows,
+		numCols := len(tbl.tt.Columns())
+		for _, trig := range tbl.tt.triggers {
+			if trig.events&sql.DeleteEvent != 0 && deletedRows != nil {
+				oldRows := &triggerRows{
+					numCols: numCols,
+					vals:    deletedRows,
+				}
+				err := trig.trig.AfterRows(ctx, tbl.tx, tbl, oldRows, nil)
+				if err != nil {
+					return err
+				}
 			}
-			newRows := &triggerRows{
-				numCols: len(tbl.tt.Columns()),
-				vals:    tbl.updatedNewRows,
+
+			if trig.events&sql.InsertEvent != 0 && insertedRows != nil {
+				newRows := &triggerRows{
+					numCols: numCols,
+					vals:    insertedRows,
+				}
+				err := trig.trig.AfterRows(ctx, tbl.tx, tbl, nil, newRows)
+				if err != nil {
+					return err
+				}
 			}
-			err := trig.trig.AfterRows(ctx, tbl.tx, tbl, oldRows, newRows)
-			if err != nil {
-				return -1, err
+
+			if trig.events&sql.UpdateEvent != 0 && updatedOldRows != nil {
+				oldRows := &triggerRows{
+					numCols: numCols,
+					vals:    updatedOldRows,
+				}
+				newRows := &triggerRows{
+					numCols: numCols,
+					vals:    updatedNewRows,
+				}
+				err := trig.trig.AfterRows(ctx, tbl.tx, tbl, oldRows, newRows)
+				if err != nil {
+					return err
+				}
 			}
 		}
 	}
-
-	return cnt, nil
+	return nil
 }
 
 type planContext struct {
