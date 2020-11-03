@@ -6,6 +6,16 @@ import (
 	"github.com/leftmike/maho/flags"
 )
 
+type RefAction int
+
+const (
+	NoAction RefAction = iota
+	Restrict
+	Cascade
+	SetNull
+	SetDefault
+)
+
 type Transaction interface {
 	Commit(ctx context.Context) error
 	Rollback() error
@@ -20,7 +30,7 @@ type Transaction interface {
 		cons []Constraint, ifNotExists bool) error
 	DropTable(ctx context.Context, tn TableName, ifExists bool) error
 	AddForeignKey(ctx context.Context, con Identifier, fktn TableName, fkCols []int, rtn TableName,
-		ridx Identifier) error
+		ridx Identifier, onDel, onUpd RefAction) error
 	AddTrigger(ctx context.Context, tn TableName, events int64, trig Trigger) error
 
 	CreateIndex(ctx context.Context, idxname Identifier, tn TableName, unique bool,

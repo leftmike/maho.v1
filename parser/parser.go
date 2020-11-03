@@ -470,6 +470,47 @@ func (p *parser) parseKey(unique bool) datadef.IndexKey {
 	return key
 }
 
+func (p *parser) parseRefAction() sql.RefAction {
+	switch p.expectReserved(sql.NO, sql.RESTRICT, sql.CASCADE, sql.SET) {
+	case sql.NO:
+		p.expectReserved(sql.ACTION)
+		return sql.NoAction
+	case sql.RESTRICT:
+		return sql.Restrict
+	case sql.CASCADE:
+		return sql.Cascade
+	case sql.SET:
+		switch p.expectReserved(sql.NULL, sql.DEFAULT) {
+		case sql.NULL:
+			return sql.SetNull
+		case sql.DEFAULT:
+			return sql.SetDefault
+		}
+	}
+	panic("never reached")
+}
+
+func (p *parser) parseOnActions(fk *datadef.ForeignKey) *datadef.ForeignKey {
+	var onDelete, onUpdate bool
+	for p.optionalReserved(sql.ON) {
+		if p.expectReserved(sql.DELETE, sql.UPDATE) == sql.DELETE {
+			if onDelete {
+				p.error("ON DELETE may be specified once per foreign key")
+			}
+			fk.OnDelete = p.parseRefAction()
+			onDelete = true
+		} else {
+			if onUpdate {
+				p.error("ON UPDATE may be specified once per foreign key")
+			}
+			fk.OnUpdate = p.parseRefAction()
+			onUpdate = true
+		}
+	}
+
+	return fk
+}
+
 func (p *parser) parseCreateDetails(s *datadef.CreateTable) {
 	/*
 		CREATE TABLE [[database '.'] schema '.'] table
@@ -480,8 +521,10 @@ func (p *parser) parseCreateDetails(s *datadef.CreateTable) {
 			| UNIQUE key_columns
 			| CHECK '(' expr ')'
 			| FOREIGN KEY columns REFERENCES [[database '.'] schema '.'] table [columns]
+			  [ON DELETE referential_action] [ON UPDATE referential_action]
 		key_columns = '(' column [ASC | DESC] [',' ...] ')'
 		columns = '(' column [',' ...] ')'
+		referential_action = NO ACTION | RESTRICT | CASCADE | SET NULL | SET DEFAULT
 	*/
 
 	for {
@@ -537,12 +580,13 @@ func (p *parser) parseCreateDetails(s *datadef.CreateTable) {
 			}
 
 			s.ForeignKeys = append(s.ForeignKeys,
-				&datadef.ForeignKey{
-					Name:     p.makeConstraintName(cn, s, "foreign_"),
-					FKCols:   cols,
-					RefTable: rtn,
-					RefCols:  refCols,
-				})
+				p.parseOnActions(
+					&datadef.ForeignKey{
+						Name:     p.makeConstraintName(cn, s, "foreign_"),
+						FKCols:   cols,
+						RefTable: rtn,
+						RefCols:  refCols,
+					}))
 		} else if cn != 0 {
 			p.error("CONSTRAINT name specified without a constraint")
 		} else {
@@ -729,6 +773,8 @@ func (p *parser) parseColumn(s *datadef.CreateTable) {
 			| UNIQUE
 			| CHECK '(' expr ')'
 			| REFERENCES [[database '.'] schema '.'] table ['(' column ')']
+			  [ON DELETE referential_action] [ON UPDATE referential_action]
+		referential_action = NO ACTION | RESTRICT | CASCADE | SET NULL | SET DEFAULT
 	*/
 
 	nam := p.expectIdentifier("expected a column name")
@@ -806,12 +852,13 @@ func (p *parser) parseColumn(s *datadef.CreateTable) {
 			}
 
 			s.ForeignKeys = append(s.ForeignKeys,
-				&datadef.ForeignKey{
-					Name:     p.makeConstraintName(cn, s, "foreign_"),
-					FKCols:   []sql.Identifier{nam},
-					RefTable: rtn,
-					RefCols:  refCols,
-				})
+				p.parseOnActions(
+					&datadef.ForeignKey{
+						Name:     p.makeConstraintName(cn, s, "foreign_"),
+						FKCols:   []sql.Identifier{nam},
+						RefTable: rtn,
+						RefCols:  refCols,
+					}))
 		} else if cn != 0 {
 			p.error("CONSTRAINT name specified without a constraint")
 		} else {

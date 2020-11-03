@@ -53,6 +53,9 @@ To Do:
 
 - ALTER TABLE ONLY table ADD CONSTRAINT constraint FOREIGN KEY ...
 
+- run triggers on NextStmt and Commit rather than ModifyDone
+-- loop until no more triggers to run; check for infinite loop
+
 - foreign key references
 -- need read lock on referenced keys
 

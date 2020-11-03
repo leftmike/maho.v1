@@ -222,7 +222,7 @@ func (tx *transaction) DropTable(ctx context.Context, tn sql.TableName, ifExists
 }
 
 func (tx *transaction) AddForeignKey(ctx context.Context, con sql.Identifier, fktn sql.TableName,
-	fkCols []int, rtn sql.TableName, ridx sql.Identifier) error {
+	fkCols []int, rtn sql.TableName, ridx sql.Identifier, onDel, onUpd sql.RefAction) error {
 
 	if fktn.Database == sql.SYSTEM {
 		return fmt.Errorf("engine: database %s may not be modified", fktn.Database)

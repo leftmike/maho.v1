@@ -57,11 +57,13 @@ const (
 )
 
 const (
-	AND Identifier = -(iota + 1)
+	ACTION Identifier = -(iota + 1)
+	AND
 	AS
 	ASC
 	BEGIN
 	BY
+	CASCADE
 	CHECK
 	COMMIT
 	CONSTRAINT
@@ -92,6 +94,7 @@ const (
 	JOIN
 	KEY
 	LEFT
+	NO
 	NOT
 	NULL
 	ON
@@ -101,6 +104,7 @@ const (
 	PREPARE
 	PRIMARY
 	REFERENCES
+	RESTRICT
 	RIGHT
 	ROLLBACK
 	SCHEMA
@@ -150,6 +154,7 @@ var knownKeywords = map[string]struct {
 	id       Identifier
 	reserved bool
 }{
+	"ACTION":      {ACTION, true},
 	"AND":         {AND, true},
 	"AS":          {AS, true},
 	"ASC":         {ASC, true},
@@ -162,6 +167,7 @@ var knownKeywords = map[string]struct {
 	"BOOLEAN":     {BOOLEAN, false},
 	"BYTEA":       {BYTEA, false},
 	"BYTES":       {BYTES, false},
+	"CASCADE":     {CASCADE, true},
 	"CHAR":        {CHAR, false},
 	"CHARACTER":   {CHARACTER, false},
 	"CHECK":       {CHECK, true},
@@ -200,6 +206,7 @@ var knownKeywords = map[string]struct {
 	"JOIN":        {JOIN, true},
 	"KEY":         {KEY, true},
 	"LEFT":        {LEFT, true},
+	"NO":          {NO, true},
 	"NOT":         {NOT, true},
 	"NULL":        {NULL, true},
 	"ON":          {ON, true},
@@ -211,6 +218,7 @@ var knownKeywords = map[string]struct {
 	"PREPARE":     {PREPARE, true},
 	"PRIMARY":     {PRIMARY, true},
 	"REAL":        {REAL, false},
+	"RESTRICT":    {RESTRICT, true},
 	"REFERENCES":  {REFERENCES, true},
 	"RIGHT":       {RIGHT, true},
 	"ROLLBACK":    {ROLLBACK, true},

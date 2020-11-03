@@ -14,6 +14,8 @@ type ForeignKey struct {
 	FKCols   []sql.Identifier
 	RefTable sql.TableName
 	RefCols  []sql.Identifier
+	OnDelete sql.RefAction
+	OnUpdate sql.RefAction
 }
 
 func (fk ForeignKey) String() string {
@@ -167,5 +169,6 @@ func (fk *ForeignKey) execute(ctx context.Context, tx sql.Transaction) (int64, e
 		return -1, err
 	}
 
-	return -1, tx.AddForeignKey(ctx, fk.Name, fk.FKTable, fkCols, fk.RefTable, ridx)
+	return -1, tx.AddForeignKey(ctx, fk.Name, fk.FKTable, fkCols, fk.RefTable, ridx,
+		fk.OnDelete, fk.OnUpdate)
 }

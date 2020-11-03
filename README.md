@@ -78,6 +78,7 @@ table_constraint =
     | UNIQUE key_columns
     | CHECK '(' expr ')'
     | FOREIGN KEY columns REFERENCES [[database '.'] schema '.'] table [columns]
+      [ON DELETE referential_action] [ON UPDATE referential_action]
 key_columns = '(' column [ASC | DESC] [',' ...] ')'
 columns = '(' column [',' ...] ')'
 column_constraint =
@@ -87,6 +88,7 @@ column_constraint =
     | UNIQUE
     | CHECK '(' expr ')'
     | REFERENCES [[database '.'] schema '.'] table ['(' column ')']
+      [ON DELETE referential_action] [ON UPDATE referential_action]
 data_type =
 	  BINARY ['(' length ')']
 	| VARBINARY ['(' length ')']
@@ -109,6 +111,7 @@ data_type =
 	| INTEGER
 	| BIGINT
 	| INT8
+referential_action = NO ACTION | RESTRICT | CASCADE | SET NULL | SET DEFAULT
 ```
 
 ```
