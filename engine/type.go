@@ -175,12 +175,11 @@ func (tt *TableType) RemoveIndex(idxname sql.Identifier) (*TableType, int) {
 
 func generateFKeySQL(rtt *TableType, rtn sql.TableName, ridx sql.Identifier, fkCols []int) string {
 	var rkey []sql.ColumnKey
-	s := "SELECT COUNT(*) FROM "
+	s := fmt.Sprintf(`SELECT COUNT(*) FROM "%s"."%s"."%s"`, rtn.Database, rtn.Schema, rtn.Table)
 	if ridx == sql.PRIMARY_QUOTED {
-		s += rtn.String()
 		rkey = rtt.primary
 	} else {
-		s += fmt.Sprintf("%s@%s", rtn.String(), ridx)
+		s += fmt.Sprintf(`@"%s"`, ridx)
 		for _, it := range rtt.indexes {
 			if it.Name == ridx {
 				rkey = it.Key
@@ -196,7 +195,7 @@ func generateFKeySQL(rtt *TableType, rtn sql.TableName, ridx sql.Identifier, fkC
 		if cdx > 0 {
 			s += " AND"
 		}
-		s += fmt.Sprintf(" %s = $%d", rtt.cols[ck.Column()], cdx+1)
+		s += fmt.Sprintf(` "%s" = $%d`, rtt.cols[ck.Column()], cdx+1)
 	}
 
 	return s

@@ -54,7 +54,6 @@ To Do:
 - ALTER TABLE ONLY table ADD CONSTRAINT constraint FOREIGN KEY ...
 
 - foreign key references
--- used quoted identifiers in sql for names
 -- need read lock on referenced keys
 
 - references from foreign keys (ForeignRef?)
