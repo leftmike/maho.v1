@@ -28,6 +28,13 @@ type foreignKey struct {
 	keyCols  []int
 	refTable sql.TableName
 	refIndex sql.Identifier
+	//onDelete sql.RefAction
+	//onUpdate sql.RefAction
+}
+
+type foreignRef struct {
+	name sql.Identifier
+	tn   sql.TableName
 }
 
 type TableType struct {
@@ -39,9 +46,9 @@ type TableType struct {
 	constraints []constraint
 	checks      []checkConstraint
 	foreignKeys []foreignKey
-	//foreignRefs []foreignRef
-	triggers []trigger
-	events   int64
+	foreignRefs []foreignRef
+	triggers    []trigger
+	events      int64
 }
 
 func MakeTableType(cols []sql.Identifier, colTypes []sql.ColumnType,
@@ -166,9 +173,7 @@ func (tt *TableType) RemoveIndex(idxname sql.Identifier) (*TableType, int) {
 	return tt, rdx
 }
 
-func (tt *TableType) addForeignKey(con sql.Identifier, fktn sql.TableName, fkCols []int,
-	rtn sql.TableName, ridx sql.Identifier, rtt *TableType) *TableType {
-
+func generateFKeySQL(rtt *TableType, rtn sql.TableName, ridx sql.Identifier, fkCols []int) string {
 	var rkey []sql.ColumnKey
 	s := "SELECT COUNT(*) FROM "
 	if ridx == sql.PRIMARY_QUOTED {
@@ -194,6 +199,73 @@ func (tt *TableType) addForeignKey(con sql.Identifier, fktn sql.TableName, fkCol
 		s += fmt.Sprintf(" %s = $%d", rtt.cols[ck.Column()], cdx+1)
 	}
 
+	return s
+}
+
+func addForeignKey(con sql.Identifier, fktn sql.TableName, fkCols []int, fktt *TableType,
+	rtn sql.TableName, ridx sql.Identifier, rtt *TableType, onDel, onUpd sql.RefAction) {
+
+	fktt.foreignKeys = append(fktt.foreignKeys,
+		foreignKey{
+			name:     con,
+			keyCols:  fkCols,
+			refTable: rtn,
+			refIndex: ridx,
+			//onDelete: onDel,
+			//onUpdate: onUpd,
+		})
+
+	rtt.foreignRefs = append(rtt.foreignRefs,
+		foreignRef{
+			name: con,
+			tn:   fktn,
+		})
+
+	fktt.addTrigger(sql.InsertEvent|sql.UpdateEvent,
+		&foreignKeyTrigger{
+			name:    con,
+			tn:      fktn,
+			keyCols: fkCols,
+			sqlStmt: generateFKeySQL(rtt, rtn, ridx, fkCols),
+		})
+
+	// foreignRefTrigger
+
+	fktt.ver += 1
+	if rtt != fktt {
+		rtt.ver += 1
+	}
+}
+
+/*
+func (tt *TableType) addForeignKey(con sql.Identifier, fktn sql.TableName, fkCols []int,
+	rtn sql.TableName, ridx sql.Identifier, rtt *TableType) *TableType {
+
+		var rkey []sql.ColumnKey
+		s := "SELECT COUNT(*) FROM "
+		if ridx == sql.PRIMARY_QUOTED {
+			s += rtn.String()
+			rkey = rtt.primary
+		} else {
+			s += fmt.Sprintf("%s@%s", rtn.String(), ridx)
+			for _, it := range rtt.indexes {
+				if it.Name == ridx {
+					rkey = it.Key
+					break
+				}
+			}
+			if rkey == nil {
+				panic(fmt.Sprintf("table %s: can't find index %d", rtn, ridx))
+			}
+		}
+		s += " WHERE"
+		for cdx, ck := range rkey {
+			if cdx > 0 {
+				s += " AND"
+			}
+			s += fmt.Sprintf(" %s = $%d", rtt.cols[ck.Column()], cdx+1)
+		}
+
 	fk := foreignKey{
 		name:     con,
 		keyCols:  fkCols,
@@ -203,14 +275,84 @@ func (tt *TableType) addForeignKey(con sql.Identifier, fktn sql.TableName, fkCol
 	tt.foreignKeys = append(tt.foreignKeys, fk)
 	tt.addTrigger(sql.InsertEvent|sql.UpdateEvent,
 		&foreignKeyTrigger{
+			name:    con,
 			tn:      fktn,
-			fk:      fk,
-			sqlStmt: s,
+			keyCols: fkCols,
+			sqlStmt: generateFKeySQL(rtt, rtn, ridx, fkCols),
 		})
 
 	tt.ver += 1
 	return tt
 }
+
+func foreignRefSql(fktn sql.TableName, fkCols []int, fktt *TableType, act sql.RefAction,
+	del bool) string {
+
+	switch act {
+	case sql.NoAction, sql.Restrict:
+		s := fmt.Sprintf("SELECT COUNT(*) FROM %s WHERE", fktn)
+		for cdx, col := range fkCols {
+			if cdx > 0 {
+				s += " AND"
+			}
+			s += fmt.Sprintf(" %s = $%d", fktt.cols[col], cdx+1)
+		}
+		return s
+
+	case sql.Cascade:
+		// DELETE FROM fktn WHERE ...
+		// UPDATE fktn SET fkCols[0] = $4, fkCols[1] = $5 ... WHERE ...
+		panic("casade ref action not implemented")
+
+	case sql.SetNull, sql.SetDefault:
+		// check if Null is allowed for the column
+		// UPDATE fktn SET fkCols[0] = NULL/DEFAULT, fkCols[1] = NULL/DEFAULT WHERE ...
+		panic("set ref action not implemented")
+
+	default:
+		panic(fmt.Sprintf("unexpected ref action: %v", act))
+	}
+	return ""
+}
+
+func (tt *TableType) addForeignRef(con sql.Identifier, fktn sql.TableName, fkCols []int,
+	fktt *TableType, rtn sql.TableName, ridx sql.Identifier,
+	onDel, onUpd sql.RefAction) *TableType {
+
+	delSql := foreignRefSql(fktn, fkCols, fktt, onDel, true)
+	var updSql string
+	if (onDel == sql.NoAction || onDel == sql.Restrict) &&
+		(onUpd == sql.NoAction || onUpd == sql.Restrict) {
+		updSql = delSql
+	} else {
+		updSql = foreignRefSql(fktn, fkCols, fktt, onUpd, false)
+	}
+
+	tt.foreignRefs = append(tt.foreignRefs,
+		foreignRef{
+			name: con,
+			tn:   fktn,
+		})
+
+	_ = delSql
+	_ = updSql
+	//tt.addTrigger(sql.DeleteEvent|sql.UpdateEvent
+
+		&foreignRefTrigger{
+			name:     con,
+			tn:       fktn,
+			keyCols:  fkCols,
+			delSql:   delSql,
+			updSql:   updSql,
+			onDelete: onDel,
+			onUpdate: onUpd,
+		}
+
+
+	tt.ver += 1
+	return tt
+}
+*/
 
 func encodeColumnKey(key []sql.ColumnKey) []*ColumnKey {
 	mdk := make([]*ColumnKey, 0, len(key))
@@ -224,21 +366,12 @@ func encodeColumnKey(key []sql.ColumnKey) []*ColumnKey {
 	return mdk
 }
 
-func encodeForeignKey(fk foreignKey) *ForeignKey {
-	keyCols := make([]int32, 0, len(fk.keyCols))
-	for _, col := range fk.keyCols {
-		keyCols = append(keyCols, int32(col))
+func encodeIntSlice(is []int) []int32 {
+	i32s := make([]int32, 0, len(is))
+	for _, i := range is {
+		i32s = append(i32s, int32(i))
 	}
-	return &ForeignKey{
-		Name:       fk.name.String(),
-		KeyColumns: keyCols,
-		ReferenceTable: &TableName{
-			Database: fk.refTable.Database.String(),
-			Schema:   fk.refTable.Schema.String(),
-			Table:    fk.refTable.Table.String(),
-		},
-		ReferenceIndex: fk.refIndex.String(),
-	}
+	return i32s
 }
 
 func (tt *TableType) Encode() ([]byte, error) {
@@ -265,15 +398,11 @@ func (tt *TableType) Encode() ([]byte, error) {
 
 	md.Indexes = make([]*IndexMetadata, 0, len(tt.indexes))
 	for _, it := range tt.indexes {
-		cols := make([]int32, 0, len(it.Columns))
-		for _, col := range it.Columns {
-			cols = append(cols, int32(col))
-		}
 		md.Indexes = append(md.Indexes,
 			&IndexMetadata{
 				Name:    it.Name.String(),
 				Key:     encodeColumnKey(it.Key),
-				Columns: cols,
+				Columns: encodeIntSlice(it.Columns),
 				Unique:  it.Unique,
 			})
 	}
@@ -300,7 +429,17 @@ func (tt *TableType) Encode() ([]byte, error) {
 
 	md.ForeignKeys = make([]*ForeignKey, 0, len(tt.foreignKeys))
 	for _, fk := range tt.foreignKeys {
-		md.ForeignKeys = append(md.ForeignKeys, encodeForeignKey(fk))
+		md.ForeignKeys = append(md.ForeignKeys,
+			&ForeignKey{
+				Name:       fk.name.String(),
+				KeyColumns: encodeIntSlice(fk.keyCols),
+				ReferenceTable: &TableName{
+					Database: fk.refTable.Database.String(),
+					Schema:   fk.refTable.Schema.String(),
+					Table:    fk.refTable.Table.String(),
+				},
+				ReferenceIndex: fk.refIndex.String(),
+			})
 	}
 
 	md.Triggers = make([]*TriggerMetadata, 0, len(tt.triggers))
@@ -332,21 +471,12 @@ func decodeColumnKey(mdk []*ColumnKey) []sql.ColumnKey {
 	return key
 }
 
-func decodeForeignKey(fk *ForeignKey) foreignKey {
-	keyCols := make([]int, 0, len(fk.KeyColumns))
-	for _, col := range fk.KeyColumns {
-		keyCols = append(keyCols, int(col))
+func decodeIntSlice(i32s []int32) []int {
+	is := make([]int, 0, len(i32s))
+	for _, i32 := range i32s {
+		is = append(is, int(i32))
 	}
-	return foreignKey{
-		name:    sql.QuotedID(fk.Name),
-		keyCols: keyCols,
-		refTable: sql.TableName{
-			Database: sql.QuotedID(fk.ReferenceTable.Database),
-			Schema:   sql.QuotedID(fk.ReferenceTable.Schema),
-			Table:    sql.QuotedID(fk.ReferenceTable.Table),
-		},
-		refIndex: sql.QuotedID(fk.ReferenceIndex),
-	}
+	return is
 }
 
 func DecodeTableType(tn sql.TableName, buf []byte) (*TableType, error) {
@@ -379,15 +509,11 @@ func DecodeTableType(tn sql.TableName, buf []byte) (*TableType, error) {
 
 	indexes := make([]sql.IndexType, 0, len(md.Indexes))
 	for _, it := range md.Indexes {
-		cols := make([]int, 0, len(it.Columns))
-		for _, col := range it.Columns {
-			cols = append(cols, int(col))
-		}
 		indexes = append(indexes,
 			sql.IndexType{
 				Name:    sql.QuotedID(it.Name),
 				Key:     decodeColumnKey(it.Key),
-				Columns: cols,
+				Columns: decodeIntSlice(it.Columns),
 				Unique:  it.Unique,
 			})
 	}
@@ -418,7 +544,17 @@ func DecodeTableType(tn sql.TableName, buf []byte) (*TableType, error) {
 
 	foreignKeys := make([]foreignKey, 0, len(md.ForeignKeys))
 	for _, fk := range md.ForeignKeys {
-		foreignKeys = append(foreignKeys, decodeForeignKey(fk))
+		foreignKeys = append(foreignKeys,
+			foreignKey{
+				name:    sql.QuotedID(fk.Name),
+				keyCols: decodeIntSlice(fk.KeyColumns),
+				refTable: sql.TableName{
+					Database: sql.QuotedID(fk.ReferenceTable.Database),
+					Schema:   sql.QuotedID(fk.ReferenceTable.Schema),
+					Table:    sql.QuotedID(fk.ReferenceTable.Table),
+				},
+				refIndex: sql.QuotedID(fk.ReferenceIndex),
+			})
 	}
 
 	var events int64

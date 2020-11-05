@@ -284,5 +284,5 @@ func TestForeignKeys(t *testing.T) {
 	idx1 := sql.ID("idx1")
 	createIndex(t, e.Begin(0), idx1, tn1, true,
 		[]sql.ColumnKey{sql.MakeColumnKey(3, false), sql.MakeColumnKey(2, false)})
-	addForeignKey(t, e.Begin(0), sql.ID("fk2"), tn2, []int{4, 1}, tn1, idx1)
+	addForeignKey(t, e.Begin(0), sql.ID("fk2"), tn2, []int{3, 0}, tn1, idx1)
 }

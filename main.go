@@ -54,11 +54,16 @@ To Do:
 - ALTER TABLE ONLY table ADD CONSTRAINT constraint FOREIGN KEY ...
 
 - foreign key references
+-- add onDelete and onUpdate to foreignKey
+-- used quoted identifiers in sql for names
 -- need read lock on referenced keys
 
 - references from foreign keys (ForeignRef?)
+-- used quoted identifiers in sql for names
 -- use prepared statements to check and update foreign key relations
 -- check foreign keys on update and delete
+-- use index on foreign key table if available
+-- encode / decode tt.foreignRefs
 
 - constraints
 -- DROP TABLE: CASCADE: to remove foreign key constraint of another table

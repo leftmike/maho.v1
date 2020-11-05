@@ -260,15 +260,40 @@ func (tx *transaction) AddForeignKey(ctx context.Context, con sql.Identifier, fk
 		return err
 	}
 
-	fktt = fktt.addForeignKey(con, fktn, fkCols, rtn, ridx, rtt)
+	addForeignKey(con, fktn, fkCols, fktt, rtn, ridx, rtt, onDel, onUpd)
+
 	err = tx.e.st.UpdateType(ctx, tx.tx, fktn, fktt)
 	if err != nil {
 		return err
 	}
+
+	if fktt != rtt {
+		err = tx.e.st.UpdateType(ctx, tx.tx, rtn, rtt)
+		if err != nil {
+			return err
+		}
+	}
+	/*
+		fktt = fktt.addForeignKey(con, fktn, fkCols, rtn, ridx, rtt)
+		err = tx.e.st.UpdateType(ctx, tx.tx, fktn, fktt)
+		if err != nil {
+			return err
+		}
+
+		if rtn == fktn {
+			rtt = fktt
+		}
+
+		rtt = rtt.addForeignRef(con, fktn, fkCols, fktt, rtn, ridx, onDel, onUpd)
+		err = tx.e.st.UpdateType(ctx, tx.tx, rtn, rtt)
+		if err != nil {
+			return err
+		}
+	*/
 	delete(tx.tables, fktn)
 	delete(tx.tableTypes, fktn)
-
-	// XXX: foreign reference
+	delete(tx.tables, rtn)
+	delete(tx.tableTypes, rtn)
 
 	return nil
 }
