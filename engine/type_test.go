@@ -85,6 +85,7 @@ func TestEncodeDecode(t *testing.T) {
 			},
 		},
 		foreignKeys: []foreignKey{},
+		foreignRefs: []foreignRef{},
 		triggers:    []trigger{},
 	}
 
