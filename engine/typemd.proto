@@ -99,5 +99,15 @@ message ForeignKeyTrigger {
     string Name = 1;
     TableName Table = 2;
     repeated int32 KeyColumns = 3;
-    string SqlStmt = 4;
+    string SQLStmt = 4;
+}
+
+message ForeignRefTrigger {
+    string Name = 1;
+    TableName Table = 2;
+    repeated int32 KeyColumns = 3;
+    int32 OnDelete = 4;
+    int32 OnUpdate = 5;
+    string DeleteSQL = 6;
+    string UpdateSQL = 7;
 }

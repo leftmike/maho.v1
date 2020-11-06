@@ -14,16 +14,16 @@ import (
 )
 
 const (
-	fkTriggerType = "foreignKeyTriggerType"
-	frTriggerType = "foreignRefTriggerType"
+	foreignKeyTriggerType = "foreignKeyTriggerType"
+	foreignRefTriggerType = "foreignRefTriggerType"
 )
 
 type triggerDecoder func(buf []byte) (sql.Trigger, error)
 
 var (
 	TriggerDecoders = map[string]triggerDecoder{
-		fkTriggerType: decodeFKTrigger,
-		//		frTriggerType: decodeFRTrigger,
+		foreignKeyTriggerType: decodeFKeyTrigger,
+		foreignRefTriggerType: decodeFRefTrigger,
 	}
 )
 
@@ -159,7 +159,7 @@ type foreignKeyTrigger struct {
 }
 
 func (fkt *foreignKeyTrigger) Type() string {
-	return fkTriggerType
+	return foreignKeyTriggerType
 }
 
 func (fkt *foreignKeyTrigger) Encode() ([]byte, error) {
@@ -171,15 +171,15 @@ func (fkt *foreignKeyTrigger) Encode() ([]byte, error) {
 			Table:    fkt.tn.Table.String(),
 		},
 		KeyColumns: encodeIntSlice(fkt.keyCols),
-		SqlStmt:    fkt.sqlStmt,
+		SQLStmt:    fkt.sqlStmt,
 	})
 }
 
-func decodeFKTrigger(buf []byte) (sql.Trigger, error) {
+func decodeFKeyTrigger(buf []byte) (sql.Trigger, error) {
 	var fkt ForeignKeyTrigger
 	err := proto.Unmarshal(buf, &fkt)
 	if err != nil {
-		return nil, fmt.Errorf("engine: trigger type: %s: %s", fkTriggerType, err)
+		return nil, fmt.Errorf("engine: trigger type: %s: %s", foreignKeyTriggerType, err)
 	}
 	return &foreignKeyTrigger{
 		name: sql.QuotedID(fkt.Name),
@@ -189,7 +189,7 @@ func decodeFKTrigger(buf []byte) (sql.Trigger, error) {
 			Table:    sql.QuotedID(fkt.Table.Table),
 		},
 		keyCols: decodeIntSlice(fkt.KeyColumns),
-		sqlStmt: fkt.SqlStmt,
+		sqlStmt: fkt.SQLStmt,
 	}, nil
 }
 
@@ -258,51 +258,62 @@ func (fkt *foreignKeyTrigger) AfterRows(ctx context.Context, tx sql.Transaction,
 	return nil
 }
 
-/*
 type foreignRefTrigger struct {
-	tn sql.TableName
-	fk foreignKey
-	sqlStmt string
-	prep    *evaluate.PreparedRowsPlan
+	name     sql.Identifier
+	tn       sql.TableName
+	keyCols  []int
+	onDelete sql.RefAction
+	onUpdate sql.RefAction
+	delSQL   string
+	updSQL   string
+	delPrep  evaluate.PreparedPlan
+	updPrep  evaluate.PreparedPlan
 }
 
 func (frt *foreignRefTrigger) Type() string {
-	return frTriggerType
+	return foreignRefTriggerType
 }
 
 func (frt *foreignRefTrigger) Encode() ([]byte, error) {
-	return proto.Marshal(&ForeignKeyTrigger{
-		Name: frt.tn.
+	return proto.Marshal(&ForeignRefTrigger{
+		Name: frt.name.String(),
 		Table: &TableName{
 			Database: frt.tn.Database.String(),
 			Schema:   frt.tn.Schema.String(),
 			Table:    frt.tn.Table.String(),
 		},
-		ForeignKey: encodeForeignKey(frt.fk),
-		SqlStmt:    frt.sqlStmt,
+		KeyColumns: encodeIntSlice(frt.keyCols),
+		OnDelete:   int32(frt.onDelete),
+		OnUpdate:   int32(frt.onUpdate),
+		DeleteSQL:  frt.delSQL,
+		UpdateSQL:  frt.updSQL,
 	})
 }
 
-func decodeFRTrigger(buf []byte) (sql.Trigger, error) {
-	var frt ForeignKeyTrigger
+func decodeFRefTrigger(buf []byte) (sql.Trigger, error) {
+	var frt ForeignRefTrigger
 	err := proto.Unmarshal(buf, &frt)
 	if err != nil {
-		return nil, fmt.Errorf("engine: trigger type: %s: %s", frTriggerType, err)
+		return nil, fmt.Errorf("engine: trigger type: %s: %s", foreignRefTriggerType, err)
 	}
 	return &foreignRefTrigger{
+		name: sql.QuotedID(frt.Name),
 		tn: sql.TableName{
 			Database: sql.QuotedID(frt.Table.Database),
 			Schema:   sql.QuotedID(frt.Table.Schema),
 			Table:    sql.QuotedID(frt.Table.Table),
 		},
-		fk:      decodeForeignKey(frt.ForeignKey),
-		sqlStmt: frt.SqlStmt,
+		keyCols:  decodeIntSlice(frt.KeyColumns),
+		onDelete: sql.RefAction(frt.OnDelete),
+		onUpdate: sql.RefAction(frt.OnUpdate),
+		delSQL:   frt.DeleteSQL,
+		updSQL:   frt.UpdateSQL,
 	}, nil
 }
 
 func (frt *foreignRefTrigger) AfterRows(ctx context.Context, tx sql.Transaction, tbl sql.Table,
 	oldRows, newRows sql.Rows) error {
 
+	// XXX
 	return nil
 }
-*/

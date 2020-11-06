@@ -228,19 +228,16 @@ func addForeignKey(con sql.Identifier, fktn sql.TableName, fkCols []int, fktt *T
 			sqlStmt: generateFKeySQL(rtt, rtn, ridx, fkCols),
 		})
 
-	// foreignRefTrigger
-	// tt.addTrigger(sql.DeleteEvent|sql.UpdateEvent
-	/*
-	   &foreignRefTrigger{
-	   	name:     con,
-	   	tn:       fktn,
-	   	keyCols:  fkCols,
-	   	delSql:   delSql,
-	   	updSql:   updSql,
-	   	onDelete: onDel,
-	   	onUpdate: onUpd,
-	   }
-	*/
+	rtt.addTrigger(sql.DeleteEvent|sql.UpdateEvent,
+		&foreignRefTrigger{
+			name:    con,
+			tn:      fktn,
+			keyCols: fkCols,
+			//delSQL:   delSQL,
+			//updSQL:   updSQL,
+			onDelete: onDel,
+			onUpdate: onUpd,
+		})
 
 	fktt.ver += 1
 	if rtt != fktt {
@@ -249,7 +246,7 @@ func addForeignKey(con sql.Identifier, fktn sql.TableName, fkCols []int, fktt *T
 }
 
 /*
-func foreignRefSql(fktn sql.TableName, fkCols []int, fktt *TableType, act sql.RefAction,
+func foreignRefSQL(fktn sql.TableName, fkCols []int, fktt *TableType, act sql.RefAction,
 	del bool) string {
 
 	switch act {
@@ -279,13 +276,13 @@ func foreignRefSql(fktn sql.TableName, fkCols []int, fktt *TableType, act sql.Re
 	return ""
 }
 
-	delSql := foreignRefSql(fktn, fkCols, fktt, onDel, true)
-	var updSql string
+	delSQL := foreignRefSQL(fktn, fkCols, fktt, onDel, true)
+	var updSQL string
 	if (onDel == sql.NoAction || onDel == sql.Restrict) &&
 		(onUpd == sql.NoAction || onUpd == sql.Restrict) {
-		updSql = delSql
+		updSQL = delSQL
 	} else {
-		updSql = foreignRefSql(fktn, fkCols, fktt, onUpd, false)
+		updSQL = foreignRefSQL(fktn, fkCols, fktt, onUpd, false)
 	}
 */
 
