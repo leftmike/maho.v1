@@ -173,22 +173,12 @@ func (tt *TableType) RemoveIndex(idxname sql.Identifier) (*TableType, int) {
 	return tt, rdx
 }
 
-func generateFKeySQL(rtt *TableType, rtn sql.TableName, ridx sql.Identifier, fkCols []int) string {
-	var rkey []sql.ColumnKey
+func generateMatchSQL(rtt *TableType, rtn sql.TableName, ridx sql.Identifier, rkey []sql.ColumnKey,
+	fkCols []int) string {
+
 	s := fmt.Sprintf(`SELECT COUNT(*) FROM "%s"."%s"."%s"`, rtn.Database, rtn.Schema, rtn.Table)
-	if ridx == sql.PRIMARY_QUOTED {
-		rkey = rtt.primary
-	} else {
+	if ridx != sql.PRIMARY_QUOTED {
 		s += fmt.Sprintf(`@"%s"`, ridx)
-		for _, it := range rtt.indexes {
-			if it.Name == ridx {
-				rkey = it.Key
-				break
-			}
-		}
-		if rkey == nil {
-			panic(fmt.Sprintf("table %s: can't find index %d", rtn, ridx))
-		}
 	}
 	s += " WHERE"
 	for cdx, ck := range rkey {
@@ -198,6 +188,17 @@ func generateFKeySQL(rtt *TableType, rtn sql.TableName, ridx sql.Identifier, fkC
 		s += fmt.Sprintf(` "%s" = $%d`, rtt.cols[ck.Column()], cdx+1)
 	}
 
+	return s
+}
+
+func generateRestrictSQL(fktn sql.TableName, fkCols []int, fktt *TableType) string {
+	s := fmt.Sprintf("SELECT COUNT(*) FROM %s WHERE", fktn)
+	for cdx, col := range fkCols {
+		if cdx > 0 {
+			s += " AND"
+		}
+		s += fmt.Sprintf(" %s = $%d", fktt.cols[col], cdx+1)
+	}
 	return s
 }
 
@@ -220,71 +221,90 @@ func addForeignKey(con sql.Identifier, fktn sql.TableName, fkCols []int, fktt *T
 			tn:   fktn,
 		})
 
+	var rkey []sql.ColumnKey
+	if ridx == sql.PRIMARY_QUOTED {
+		rkey = rtt.primary
+	} else {
+		for _, it := range rtt.indexes {
+			if it.Name == ridx {
+				rkey = it.Key
+				break
+			}
+		}
+		if rkey == nil {
+			panic(fmt.Sprintf("table %s: can't find index %d", rtn, ridx))
+		}
+	}
+
 	fktt.addTrigger(sql.InsertEvent|sql.UpdateEvent,
-		&foreignKeyTrigger{
-			name:    con,
-			tn:      fktn,
+		&fkMatchTrigger{
+			con:     con,
+			fktn:    fktn,
 			keyCols: fkCols,
-			sqlStmt: generateFKeySQL(rtt, rtn, ridx, fkCols),
+			sqlStmt: generateMatchSQL(rtt, rtn, ridx, rkey, fkCols),
 		})
 
-	rtt.addTrigger(sql.DeleteEvent|sql.UpdateEvent,
-		&foreignRefTrigger{
-			name:    con,
-			tn:      fktn,
-			keyCols: fkCols,
-			//delSQL:   delSQL,
-			//updSQL:   updSQL,
-			onDelete: onDel,
-			onUpdate: onUpd,
-		})
+	frCols := make([]int, 0, len(rkey))
+	for _, ck := range rkey {
+		frCols = append(frCols, ck.Column())
+	}
+
+	switch onDel {
+	case sql.NoAction, sql.Restrict:
+		// Since constraints can't be deferred (yet), NoAction is the same as Restrict.
+		rtt.addTrigger(sql.DeleteEvent,
+			&fkRestrictTrigger{
+				con:     con,
+				fktn:    fktn,
+				rtn:     rtn,
+				keyCols: frCols,
+				sqlStmt: generateRestrictSQL(fktn, fkCols, fktt),
+			})
+	case sql.Cascade:
+		// XXX: fkCascadeDeleteTrigger
+		// DELETE FROM fktn WHERE ...
+		panic("on delete casade ref action not implemented")
+	case sql.SetNull, sql.SetDefault:
+		// XXX: fkSetTrigger
+		// check if Null is allowed for the column
+		// UPDATE fktn SET fkCols[0] = NULL/DEFAULT, fkCols[1] = NULL/DEFAULT WHERE ...
+		panic("on delete set ref action not implemented")
+
+	default:
+		panic(fmt.Sprintf("unexpected delete ref action: %v", onDel))
+	}
+
+	switch onUpd {
+	case sql.NoAction, sql.Restrict:
+		// Since constraints can't be deferred (yet), NoAction is the same as Restrict.
+		rtt.addTrigger(sql.UpdateEvent,
+			&fkRestrictTrigger{
+				con:     con,
+				fktn:    fktn,
+				rtn:     rtn,
+				keyCols: frCols,
+				sqlStmt: generateRestrictSQL(fktn, fkCols, fktt),
+			})
+	case sql.Cascade:
+		// XXX: fkCascadeUpdateTrigger
+		// UPDATE fktn SET fkCols[0] = $4, fkCols[1] = $5 ... WHERE ...
+		panic("on update cascade ref action not implemented")
+
+	case sql.SetNull, sql.SetDefault:
+		// XXX: fkSetTrigger
+		// check if Null is allowed for the column
+		// UPDATE fktn SET fkCols[0] = NULL/DEFAULT, fkCols[1] = NULL/DEFAULT WHERE ...
+		panic("on update set ref action not implemented")
+
+	default:
+		panic(fmt.Sprintf("unexpected update ref action: %v", onUpd))
+	}
 
 	fktt.ver += 1
 	if rtt != fktt {
 		rtt.ver += 1
 	}
 }
-
-/*
-func foreignRefSQL(fktn sql.TableName, fkCols []int, fktt *TableType, act sql.RefAction,
-	del bool) string {
-
-	switch act {
-	case sql.NoAction, sql.Restrict:
-		s := fmt.Sprintf("SELECT COUNT(*) FROM %s WHERE", fktn)
-		for cdx, col := range fkCols {
-			if cdx > 0 {
-				s += " AND"
-			}
-			s += fmt.Sprintf(" %s = $%d", fktt.cols[col], cdx+1)
-		}
-		return s
-
-	case sql.Cascade:
-		// DELETE FROM fktn WHERE ...
-		// UPDATE fktn SET fkCols[0] = $4, fkCols[1] = $5 ... WHERE ...
-		panic("casade ref action not implemented")
-
-	case sql.SetNull, sql.SetDefault:
-		// check if Null is allowed for the column
-		// UPDATE fktn SET fkCols[0] = NULL/DEFAULT, fkCols[1] = NULL/DEFAULT WHERE ...
-		panic("set ref action not implemented")
-
-	default:
-		panic(fmt.Sprintf("unexpected ref action: %v", act))
-	}
-	return ""
-}
-
-	delSQL := foreignRefSQL(fktn, fkCols, fktt, onDel, true)
-	var updSQL string
-	if (onDel == sql.NoAction || onDel == sql.Restrict) &&
-		(onUpd == sql.NoAction || onUpd == sql.Restrict) {
-		updSQL = delSQL
-	} else {
-		updSQL = foreignRefSQL(fktn, fkCols, fktt, onUpd, false)
-	}
-*/
 
 func encodeColumnKey(key []sql.ColumnKey) []*ColumnKey {
 	mdk := make([]*ColumnKey, 0, len(key))

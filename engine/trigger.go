@@ -14,16 +14,16 @@ import (
 )
 
 const (
-	foreignKeyTriggerType = "foreignKeyTriggerType"
-	foreignRefTriggerType = "foreignRefTriggerType"
+	fkMatchTriggerType    = "fkMatchTriggerType"
+	fkRestrictTriggerType = "fkRestrictTriggerType"
 )
 
 type triggerDecoder func(buf []byte) (sql.Trigger, error)
 
 var (
 	TriggerDecoders = map[string]triggerDecoder{
-		foreignKeyTriggerType: decodeFKeyTrigger,
-		foreignRefTriggerType: decodeFRefTrigger,
+		fkMatchTriggerType:    decodeFKMatchTrigger,
+		fkRestrictTriggerType: decodeFKRestrictTrigger,
 	}
 )
 
@@ -150,66 +150,66 @@ func (_ planContext) GetPreparedPlan(nam sql.Identifier) evaluate.PreparedPlan {
 	panic("unexpected, should never be called")
 }
 
-type foreignKeyTrigger struct {
-	name    sql.Identifier
-	tn      sql.TableName
+type fkMatchTrigger struct {
+	con     sql.Identifier
+	fktn    sql.TableName
 	keyCols []int
 	sqlStmt string
 	prep    *evaluate.PreparedRowsPlan
 }
 
-func (fkt *foreignKeyTrigger) Type() string {
-	return foreignKeyTriggerType
+func (fkm *fkMatchTrigger) Type() string {
+	return fkMatchTriggerType
 }
 
-func (fkt *foreignKeyTrigger) Encode() ([]byte, error) {
-	return proto.Marshal(&ForeignKeyTrigger{
-		Name: fkt.name.String(),
-		Table: &TableName{
-			Database: fkt.tn.Database.String(),
-			Schema:   fkt.tn.Schema.String(),
-			Table:    fkt.tn.Table.String(),
+func (fkm *fkMatchTrigger) Encode() ([]byte, error) {
+	return proto.Marshal(&FKMatchTrigger{
+		Constraint: fkm.con.String(),
+		FKeyTable: &TableName{
+			Database: fkm.fktn.Database.String(),
+			Schema:   fkm.fktn.Schema.String(),
+			Table:    fkm.fktn.Table.String(),
 		},
-		KeyColumns: encodeIntSlice(fkt.keyCols),
-		SQLStmt:    fkt.sqlStmt,
+		KeyColumns: encodeIntSlice(fkm.keyCols),
+		SQLStmt:    fkm.sqlStmt,
 	})
 }
 
-func decodeFKeyTrigger(buf []byte) (sql.Trigger, error) {
-	var fkt ForeignKeyTrigger
-	err := proto.Unmarshal(buf, &fkt)
+func decodeFKMatchTrigger(buf []byte) (sql.Trigger, error) {
+	var fkm FKMatchTrigger
+	err := proto.Unmarshal(buf, &fkm)
 	if err != nil {
-		return nil, fmt.Errorf("engine: trigger type: %s: %s", foreignKeyTriggerType, err)
+		return nil, fmt.Errorf("engine: trigger type: %s: %s", fkMatchTriggerType, err)
 	}
-	return &foreignKeyTrigger{
-		name: sql.QuotedID(fkt.Name),
-		tn: sql.TableName{
-			Database: sql.QuotedID(fkt.Table.Database),
-			Schema:   sql.QuotedID(fkt.Table.Schema),
-			Table:    sql.QuotedID(fkt.Table.Table),
+	return &fkMatchTrigger{
+		con: sql.QuotedID(fkm.Constraint),
+		fktn: sql.TableName{
+			Database: sql.QuotedID(fkm.FKeyTable.Database),
+			Schema:   sql.QuotedID(fkm.FKeyTable.Schema),
+			Table:    sql.QuotedID(fkm.FKeyTable.Table),
 		},
-		keyCols: decodeIntSlice(fkt.KeyColumns),
-		sqlStmt: fkt.SQLStmt,
+		keyCols: decodeIntSlice(fkm.KeyColumns),
+		sqlStmt: fkm.SQLStmt,
 	}, nil
 }
 
-func (fkt *foreignKeyTrigger) AfterRows(ctx context.Context, tx sql.Transaction, tbl sql.Table,
+func (fkm *fkMatchTrigger) AfterRows(ctx context.Context, tx sql.Transaction, tbl sql.Table,
 	oldRows, newRows sql.Rows) error {
 
-	if fkt.prep == nil {
-		p := parser.NewParser(strings.NewReader(fkt.sqlStmt), fkt.sqlStmt)
+	if fkm.prep == nil {
+		p := parser.NewParser(strings.NewReader(fkm.sqlStmt), fkm.sqlStmt)
 		stmt, err := p.Parse()
 		if err != nil {
-			panic(fmt.Sprintf("engine: table %s: foreign key: %s: %s", fkt.tn, fkt.name, err))
+			panic(fmt.Sprintf("engine: table %s: foreign key: %s: %s", fkm.fktn, fkm.con, err))
 		}
 		prep, err := evaluate.PreparePlan(ctx, stmt, planContext{tx.(*transaction).e}, tx)
 		if err != nil {
-			panic(fmt.Sprintf("engine: table %s: foreign key: %s: %s", fkt.tn, fkt.name, err))
+			panic(fmt.Sprintf("engine: table %s: foreign key: %s: %s", fkm.fktn, fkm.con, err))
 		}
-		fkt.prep = prep.(*evaluate.PreparedRowsPlan)
+		fkm.prep = prep.(*evaluate.PreparedRowsPlan)
 	}
 
-	params := make([]sql.Value, len(fkt.keyCols))
+	params := make([]sql.Value, len(fkm.keyCols))
 	row := make([]sql.Value, newRows.NumColumns())
 	for {
 		err := newRows.Next(ctx, row)
@@ -220,7 +220,7 @@ func (fkt *foreignKeyTrigger) AfterRows(ctx context.Context, tx sql.Transaction,
 		}
 
 		var hasNull bool
-		for kdx, col := range fkt.keyCols {
+		for kdx, col := range fkm.keyCols {
 			if row[col] == nil {
 				hasNull = true
 				break
@@ -231,87 +231,87 @@ func (fkt *foreignKeyTrigger) AfterRows(ctx context.Context, tx sql.Transaction,
 			continue
 		}
 
-		err = fkt.prep.SetParameters(params)
+		err = fkm.prep.SetParameters(params)
 		if err != nil {
-			panic(fmt.Sprintf("engine: table %s: foreign key: %s: %s", fkt.tn, fkt.name, err))
+			panic(fmt.Sprintf("engine: table %s: foreign key: %s: %s", fkm.fktn, fkm.con, err))
 		}
 
-		rows, err := fkt.prep.Rows(ctx, tx)
+		rows, err := fkm.prep.Rows(ctx, tx)
 		if err != nil {
-			panic(fmt.Sprintf("engine: table %s: foreign key: %s: %s", fkt.tn, fkt.name, err))
+			panic(fmt.Sprintf("engine: table %s: foreign key: %s: %s", fkm.fktn, fkm.con, err))
 		}
 
 		cntRow := []sql.Value{nil}
 		err = rows.Next(ctx, cntRow)
 		if err != nil {
-			panic(fmt.Sprintf("engine: table %s: foreign key: %s: %s", fkt.tn, fkt.name, err))
+			panic(fmt.Sprintf("engine: table %s: foreign key: %s: %s", fkm.fktn, fkm.con, err))
 		}
 		rows.Close()
 		cnt := cntRow[0].(sql.Int64Value)
 		if cnt == 0 {
 			return fmt.Errorf(
 				"engine: table %s: insert or update violates foreign key constraint: %s",
-				fkt.tn, fkt.name)
+				fkm.fktn, fkm.con)
 		}
 	}
 
 	return nil
 }
 
-type foreignRefTrigger struct {
-	name     sql.Identifier
-	tn       sql.TableName
-	keyCols  []int
-	onDelete sql.RefAction
-	onUpdate sql.RefAction
-	delSQL   string
-	updSQL   string
-	delPrep  evaluate.PreparedPlan
-	updPrep  evaluate.PreparedPlan
+type fkRestrictTrigger struct {
+	con     sql.Identifier
+	fktn    sql.TableName
+	rtn     sql.TableName
+	keyCols []int
+	sqlStmt string
+	prep    *evaluate.PreparedRowsPlan
 }
 
-func (frt *foreignRefTrigger) Type() string {
-	return foreignRefTriggerType
+func (fkr *fkRestrictTrigger) Type() string {
+	return fkRestrictTriggerType
 }
 
-func (frt *foreignRefTrigger) Encode() ([]byte, error) {
-	return proto.Marshal(&ForeignRefTrigger{
-		Name: frt.name.String(),
-		Table: &TableName{
-			Database: frt.tn.Database.String(),
-			Schema:   frt.tn.Schema.String(),
-			Table:    frt.tn.Table.String(),
+func (fkr *fkRestrictTrigger) Encode() ([]byte, error) {
+	return proto.Marshal(&FKRestrictTrigger{
+		Constraint: fkr.con.String(),
+		FKeyTable: &TableName{
+			Database: fkr.fktn.Database.String(),
+			Schema:   fkr.fktn.Schema.String(),
+			Table:    fkr.fktn.Table.String(),
 		},
-		KeyColumns: encodeIntSlice(frt.keyCols),
-		OnDelete:   int32(frt.onDelete),
-		OnUpdate:   int32(frt.onUpdate),
-		DeleteSQL:  frt.delSQL,
-		UpdateSQL:  frt.updSQL,
+		RefTable: &TableName{
+			Database: fkr.rtn.Database.String(),
+			Schema:   fkr.rtn.Schema.String(),
+			Table:    fkr.rtn.Table.String(),
+		},
+		KeyColumns: encodeIntSlice(fkr.keyCols),
+		SQLStmt:    fkr.sqlStmt,
 	})
 }
 
-func decodeFRefTrigger(buf []byte) (sql.Trigger, error) {
-	var frt ForeignRefTrigger
-	err := proto.Unmarshal(buf, &frt)
+func decodeFKRestrictTrigger(buf []byte) (sql.Trigger, error) {
+	var fkr FKRestrictTrigger
+	err := proto.Unmarshal(buf, &fkr)
 	if err != nil {
-		return nil, fmt.Errorf("engine: trigger type: %s: %s", foreignRefTriggerType, err)
+		return nil, fmt.Errorf("engine: trigger type: %s: %s", fkRestrictTriggerType, err)
 	}
-	return &foreignRefTrigger{
-		name: sql.QuotedID(frt.Name),
-		tn: sql.TableName{
-			Database: sql.QuotedID(frt.Table.Database),
-			Schema:   sql.QuotedID(frt.Table.Schema),
-			Table:    sql.QuotedID(frt.Table.Table),
+	return &fkRestrictTrigger{
+		con: sql.QuotedID(fkr.Constraint),
+		fktn: sql.TableName{
+			Database: sql.QuotedID(fkr.FKeyTable.Database),
+			Schema:   sql.QuotedID(fkr.FKeyTable.Schema),
+			Table:    sql.QuotedID(fkr.FKeyTable.Table),
 		},
-		keyCols:  decodeIntSlice(frt.KeyColumns),
-		onDelete: sql.RefAction(frt.OnDelete),
-		onUpdate: sql.RefAction(frt.OnUpdate),
-		delSQL:   frt.DeleteSQL,
-		updSQL:   frt.UpdateSQL,
+		rtn: sql.TableName{
+			Database: sql.QuotedID(fkr.RefTable.Database),
+			Schema:   sql.QuotedID(fkr.RefTable.Schema),
+			Table:    sql.QuotedID(fkr.RefTable.Table),
+		},
+		sqlStmt: fkr.SQLStmt,
 	}, nil
 }
 
-func (frt *foreignRefTrigger) AfterRows(ctx context.Context, tx sql.Transaction, tbl sql.Table,
+func (fkr *fkRestrictTrigger) AfterRows(ctx context.Context, tx sql.Transaction, tbl sql.Table,
 	oldRows, newRows sql.Rows) error {
 
 	// XXX
