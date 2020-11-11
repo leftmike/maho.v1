@@ -173,10 +173,14 @@ func (tt *TableType) RemoveIndex(idxname sql.Identifier) (*TableType, int) {
 	return tt, rdx
 }
 
+func generateTableName(tn sql.TableName) string {
+	return fmt.Sprintf(`"%s"."%s"."%s"`, tn.Database, tn.Schema, tn.Table)
+}
+
 func generateMatchSQL(rtt *TableType, rtn sql.TableName, ridx sql.Identifier, rkey []sql.ColumnKey,
 	fkCols []int) string {
 
-	s := fmt.Sprintf(`SELECT COUNT(*) FROM "%s"."%s"."%s"`, rtn.Database, rtn.Schema, rtn.Table)
+	s := "SELECT COUNT(*) FROM " + generateTableName(rtn)
 	if ridx != sql.PRIMARY_QUOTED {
 		s += fmt.Sprintf(`@"%s"`, ridx)
 	}
@@ -192,7 +196,7 @@ func generateMatchSQL(rtt *TableType, rtn sql.TableName, ridx sql.Identifier, rk
 }
 
 func generateRestrictSQL(fktn sql.TableName, fkCols []int, fktt *TableType) string {
-	s := fmt.Sprintf("SELECT COUNT(*) FROM %s WHERE", fktn)
+	s := fmt.Sprintf("SELECT COUNT(*) FROM %s WHERE", generateTableName(fktn))
 	for cdx, col := range fkCols {
 		if cdx > 0 {
 			s += " AND"

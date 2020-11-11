@@ -57,10 +57,8 @@ To Do:
 -- need read lock on referenced keys
 
 - references from foreign keys (ForeignRef?)
--- used quoted identifiers in sql for names
--- use prepared statements to check and update foreign key relations
--- check foreign keys on update and delete
 -- use index on foreign key table if available
+-- CASCADE, SET NULL, SET DEFAULT
 
 - constraints
 -- DROP TABLE: CASCADE: to remove foreign key constraint of another table

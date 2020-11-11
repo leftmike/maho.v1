@@ -200,11 +200,13 @@ func (fkm *fkMatchTrigger) AfterRows(ctx context.Context, tx sql.Transaction, tb
 		p := parser.NewParser(strings.NewReader(fkm.sqlStmt), fkm.sqlStmt)
 		stmt, err := p.Parse()
 		if err != nil {
-			panic(fmt.Sprintf("engine: table %s: foreign key: %s: %s", fkm.fktn, fkm.con, err))
+			panic(fmt.Sprintf("engine: table %s: foreign key match: %s: %s", fkm.fktn, fkm.con,
+				err))
 		}
 		prep, err := evaluate.PreparePlan(ctx, stmt, planContext{tx.(*transaction).e}, tx)
 		if err != nil {
-			panic(fmt.Sprintf("engine: table %s: foreign key: %s: %s", fkm.fktn, fkm.con, err))
+			panic(fmt.Sprintf("engine: table %s: foreign key match: %s: %s", fkm.fktn, fkm.con,
+				err))
 		}
 		fkm.prep = prep.(*evaluate.PreparedRowsPlan)
 	}
@@ -220,12 +222,12 @@ func (fkm *fkMatchTrigger) AfterRows(ctx context.Context, tx sql.Transaction, tb
 		}
 
 		var hasNull bool
-		for kdx, col := range fkm.keyCols {
+		for cdx, col := range fkm.keyCols {
 			if row[col] == nil {
 				hasNull = true
 				break
 			}
-			params[kdx] = row[col]
+			params[cdx] = row[col]
 		}
 		if hasNull {
 			continue
@@ -233,18 +235,21 @@ func (fkm *fkMatchTrigger) AfterRows(ctx context.Context, tx sql.Transaction, tb
 
 		err = fkm.prep.SetParameters(params)
 		if err != nil {
-			panic(fmt.Sprintf("engine: table %s: foreign key: %s: %s", fkm.fktn, fkm.con, err))
+			panic(fmt.Sprintf("engine: table %s: foreign key match: %s: %s", fkm.fktn, fkm.con,
+				err))
 		}
 
 		rows, err := fkm.prep.Rows(ctx, tx)
 		if err != nil {
-			panic(fmt.Sprintf("engine: table %s: foreign key: %s: %s", fkm.fktn, fkm.con, err))
+			panic(fmt.Sprintf("engine: table %s: foreign key match: %s: %s", fkm.fktn, fkm.con,
+				err))
 		}
 
 		cntRow := []sql.Value{nil}
 		err = rows.Next(ctx, cntRow)
 		if err != nil {
-			panic(fmt.Sprintf("engine: table %s: foreign key: %s: %s", fkm.fktn, fkm.con, err))
+			panic(fmt.Sprintf("engine: table %s: foreign key match: %s: %s", fkm.fktn, fkm.con,
+				err))
 		}
 		rows.Close()
 		cnt := cntRow[0].(sql.Int64Value)
@@ -307,6 +312,7 @@ func decodeFKRestrictTrigger(buf []byte) (sql.Trigger, error) {
 			Schema:   sql.QuotedID(fkr.RefTable.Schema),
 			Table:    sql.QuotedID(fkr.RefTable.Table),
 		},
+		keyCols: decodeIntSlice(fkr.KeyColumns),
 		sqlStmt: fkr.SQLStmt,
 	}, nil
 }
@@ -314,6 +320,61 @@ func decodeFKRestrictTrigger(buf []byte) (sql.Trigger, error) {
 func (fkr *fkRestrictTrigger) AfterRows(ctx context.Context, tx sql.Transaction, tbl sql.Table,
 	oldRows, newRows sql.Rows) error {
 
-	// XXX
+	if fkr.prep == nil {
+		p := parser.NewParser(strings.NewReader(fkr.sqlStmt), fkr.sqlStmt)
+		stmt, err := p.Parse()
+		if err != nil {
+			panic(fmt.Sprintf("engine: table %s: foreign key restrict: %s: %s", fkr.fktn, fkr.con,
+				err))
+		}
+		prep, err := evaluate.PreparePlan(ctx, stmt, planContext{tx.(*transaction).e}, tx)
+		if err != nil {
+			panic(fmt.Sprintf("engine: table %s: foreign key restrict: %s: %s", fkr.fktn, fkr.con,
+				err))
+		}
+		fkr.prep = prep.(*evaluate.PreparedRowsPlan)
+	}
+
+	params := make([]sql.Value, len(fkr.keyCols))
+	row := make([]sql.Value, oldRows.NumColumns())
+	for {
+		err := oldRows.Next(ctx, row)
+		if err == io.EOF {
+			break
+		} else if err != nil {
+			return err
+		}
+
+		for cdx, col := range fkr.keyCols {
+			params[cdx] = row[col]
+		}
+
+		err = fkr.prep.SetParameters(params)
+		if err != nil {
+			panic(fmt.Sprintf("engine: table %s: foreign key restrict: %s: %s", fkr.fktn, fkr.con,
+				err))
+		}
+
+		rows, err := fkr.prep.Rows(ctx, tx)
+		if err != nil {
+			panic(fmt.Sprintf("engine: table %s: foreign key restrict: %s: %s", fkr.fktn, fkr.con,
+				err))
+		}
+
+		cntRow := []sql.Value{nil}
+		err = rows.Next(ctx, cntRow)
+		if err != nil {
+			panic(fmt.Sprintf("engine: table %s: foreign key restrict: %s: %s", fkr.fktn, fkr.con,
+				err))
+		}
+		rows.Close()
+		cnt := cntRow[0].(sql.Int64Value)
+		if cnt > 0 {
+			return fmt.Errorf(
+				"engine: table %s: delete or update violates foreign key constraint %s on table %s",
+				fkr.fktn, fkr.con, fkr.rtn)
+		}
+	}
+
 	return nil
 }

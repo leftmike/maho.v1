@@ -89,6 +89,7 @@ column_constraint =
     | CHECK '(' expr ')'
     | REFERENCES [[database '.'] schema '.'] table ['(' column ')']
       [ON DELETE referential_action] [ON UPDATE referential_action]
+referential_action = NO ACTION | RESTRICT | CASCADE | SET NULL | SET DEFAULT
 data_type =
 	  BINARY ['(' length ')']
 	| VARBINARY ['(' length ')']
@@ -111,7 +112,6 @@ data_type =
 	| INTEGER
 	| BIGINT
 	| INT8
-referential_action = NO ACTION | RESTRICT | CASCADE | SET NULL | SET DEFAULT
 ```
 
 ```
