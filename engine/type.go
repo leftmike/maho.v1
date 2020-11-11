@@ -242,10 +242,13 @@ func addForeignKey(con sql.Identifier, fktn sql.TableName, fkCols []int, fktt *T
 
 	fktt.addTrigger(sql.InsertEvent|sql.UpdateEvent,
 		&fkMatchTrigger{
-			con:     con,
-			fktn:    fktn,
-			keyCols: fkCols,
-			sqlStmt: generateMatchSQL(rtt, rtn, ridx, rkey, fkCols),
+			fkTrigger: fkTrigger{
+				con:     con,
+				fktn:    fktn,
+				rtn:     rtn,
+				keyCols: fkCols,
+				sqlStmt: generateMatchSQL(rtt, rtn, ridx, rkey, fkCols),
+			},
 		})
 
 	frCols := make([]int, 0, len(rkey))
@@ -258,16 +261,18 @@ func addForeignKey(con sql.Identifier, fktn sql.TableName, fkCols []int, fktt *T
 		// Since constraints can't be deferred (yet), NoAction is the same as Restrict.
 		rtt.addTrigger(sql.DeleteEvent,
 			&fkRestrictTrigger{
-				con:     con,
-				fktn:    fktn,
-				rtn:     rtn,
-				keyCols: frCols,
-				sqlStmt: generateRestrictSQL(fktn, fkCols, fktt),
+				fkTrigger: fkTrigger{
+					con:     con,
+					fktn:    fktn,
+					rtn:     rtn,
+					keyCols: frCols,
+					sqlStmt: generateRestrictSQL(fktn, fkCols, fktt),
+				},
 			})
 	case sql.Cascade:
 		// XXX: fkCascadeDeleteTrigger
 		// DELETE FROM fktn WHERE ...
-		panic("on delete casade ref action not implemented")
+		panic("on delete cascade ref action not implemented")
 	case sql.SetNull, sql.SetDefault:
 		// XXX: fkSetTrigger
 		// check if Null is allowed for the column
@@ -283,11 +288,13 @@ func addForeignKey(con sql.Identifier, fktn sql.TableName, fkCols []int, fktt *T
 		// Since constraints can't be deferred (yet), NoAction is the same as Restrict.
 		rtt.addTrigger(sql.UpdateEvent,
 			&fkRestrictTrigger{
-				con:     con,
-				fktn:    fktn,
-				rtn:     rtn,
-				keyCols: frCols,
-				sqlStmt: generateRestrictSQL(fktn, fkCols, fktt),
+				fkTrigger: fkTrigger{
+					con:     con,
+					fktn:    fktn,
+					rtn:     rtn,
+					keyCols: frCols,
+					sqlStmt: generateRestrictSQL(fktn, fkCols, fktt),
+				},
 			})
 	case sql.Cascade:
 		// XXX: fkCascadeUpdateTrigger

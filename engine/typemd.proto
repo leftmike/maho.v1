@@ -95,14 +95,7 @@ message TriggerMetadata {
     bytes Trigger = 3;
 }
 
-message FKMatchTrigger {
-    string Constraint = 1;
-    TableName FKeyTable = 2;
-    repeated int32 KeyColumns = 3;
-    string SQLStmt = 4;
-}
-
-message FKRestrictTrigger {
+message FKTrigger {
     string Constraint = 1;
     TableName FKeyTable = 2;
     TableName RefTable = 3;

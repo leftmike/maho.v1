@@ -150,47 +150,71 @@ func (_ planContext) GetPreparedPlan(nam sql.Identifier) evaluate.PreparedPlan {
 	panic("unexpected, should never be called")
 }
 
-type fkMatchTrigger struct {
+type fkTrigger struct {
 	con     sql.Identifier
 	fktn    sql.TableName
+	rtn     sql.TableName
 	keyCols []int
 	sqlStmt string
-	prep    *evaluate.PreparedRowsPlan
+}
+
+func (fkt *fkTrigger) Encode() ([]byte, error) {
+	return proto.Marshal(&FKTrigger{
+		Constraint: fkt.con.String(),
+		FKeyTable: &TableName{
+			Database: fkt.fktn.Database.String(),
+			Schema:   fkt.fktn.Schema.String(),
+			Table:    fkt.fktn.Table.String(),
+		},
+		RefTable: &TableName{
+			Database: fkt.rtn.Database.String(),
+			Schema:   fkt.rtn.Schema.String(),
+			Table:    fkt.rtn.Table.String(),
+		},
+		KeyColumns: encodeIntSlice(fkt.keyCols),
+		SQLStmt:    fkt.sqlStmt,
+	})
+}
+
+func decodeFKTrigger(buf []byte, fkt *fkTrigger) error {
+	var fktmd FKTrigger
+	err := proto.Unmarshal(buf, &fktmd)
+	if err != nil {
+		return fmt.Errorf("engine: foreign key trigger: %s", err)
+	}
+
+	fkt.con = sql.QuotedID(fktmd.Constraint)
+	fkt.fktn = sql.TableName{
+		Database: sql.QuotedID(fktmd.FKeyTable.Database),
+		Schema:   sql.QuotedID(fktmd.FKeyTable.Schema),
+		Table:    sql.QuotedID(fktmd.FKeyTable.Table),
+	}
+	fkt.rtn = sql.TableName{
+		Database: sql.QuotedID(fktmd.RefTable.Database),
+		Schema:   sql.QuotedID(fktmd.RefTable.Schema),
+		Table:    sql.QuotedID(fktmd.RefTable.Table),
+	}
+	fkt.keyCols = decodeIntSlice(fktmd.KeyColumns)
+	fkt.sqlStmt = fktmd.SQLStmt
+	return nil
+}
+
+type fkMatchTrigger struct {
+	fkTrigger
+	prep *evaluate.PreparedRowsPlan
 }
 
 func (fkm *fkMatchTrigger) Type() string {
 	return fkMatchTriggerType
 }
 
-func (fkm *fkMatchTrigger) Encode() ([]byte, error) {
-	return proto.Marshal(&FKMatchTrigger{
-		Constraint: fkm.con.String(),
-		FKeyTable: &TableName{
-			Database: fkm.fktn.Database.String(),
-			Schema:   fkm.fktn.Schema.String(),
-			Table:    fkm.fktn.Table.String(),
-		},
-		KeyColumns: encodeIntSlice(fkm.keyCols),
-		SQLStmt:    fkm.sqlStmt,
-	})
-}
-
 func decodeFKMatchTrigger(buf []byte) (sql.Trigger, error) {
-	var fkm FKMatchTrigger
-	err := proto.Unmarshal(buf, &fkm)
+	var fkm fkMatchTrigger
+	err := decodeFKTrigger(buf, &fkm.fkTrigger)
 	if err != nil {
-		return nil, fmt.Errorf("engine: trigger type: %s: %s", fkMatchTriggerType, err)
+		return nil, err
 	}
-	return &fkMatchTrigger{
-		con: sql.QuotedID(fkm.Constraint),
-		fktn: sql.TableName{
-			Database: sql.QuotedID(fkm.FKeyTable.Database),
-			Schema:   sql.QuotedID(fkm.FKeyTable.Schema),
-			Table:    sql.QuotedID(fkm.FKeyTable.Table),
-		},
-		keyCols: decodeIntSlice(fkm.KeyColumns),
-		sqlStmt: fkm.SQLStmt,
-	}, nil
+	return &fkm, nil
 }
 
 func (fkm *fkMatchTrigger) AfterRows(ctx context.Context, tx sql.Transaction, tbl sql.Table,
@@ -264,57 +288,21 @@ func (fkm *fkMatchTrigger) AfterRows(ctx context.Context, tx sql.Transaction, tb
 }
 
 type fkRestrictTrigger struct {
-	con     sql.Identifier
-	fktn    sql.TableName
-	rtn     sql.TableName
-	keyCols []int
-	sqlStmt string
-	prep    *evaluate.PreparedRowsPlan
+	fkTrigger
+	prep *evaluate.PreparedRowsPlan
 }
 
 func (fkr *fkRestrictTrigger) Type() string {
 	return fkRestrictTriggerType
 }
 
-func (fkr *fkRestrictTrigger) Encode() ([]byte, error) {
-	return proto.Marshal(&FKRestrictTrigger{
-		Constraint: fkr.con.String(),
-		FKeyTable: &TableName{
-			Database: fkr.fktn.Database.String(),
-			Schema:   fkr.fktn.Schema.String(),
-			Table:    fkr.fktn.Table.String(),
-		},
-		RefTable: &TableName{
-			Database: fkr.rtn.Database.String(),
-			Schema:   fkr.rtn.Schema.String(),
-			Table:    fkr.rtn.Table.String(),
-		},
-		KeyColumns: encodeIntSlice(fkr.keyCols),
-		SQLStmt:    fkr.sqlStmt,
-	})
-}
-
 func decodeFKRestrictTrigger(buf []byte) (sql.Trigger, error) {
-	var fkr FKRestrictTrigger
-	err := proto.Unmarshal(buf, &fkr)
+	var fkr fkRestrictTrigger
+	err := decodeFKTrigger(buf, &fkr.fkTrigger)
 	if err != nil {
-		return nil, fmt.Errorf("engine: trigger type: %s: %s", fkRestrictTriggerType, err)
+		return nil, err
 	}
-	return &fkRestrictTrigger{
-		con: sql.QuotedID(fkr.Constraint),
-		fktn: sql.TableName{
-			Database: sql.QuotedID(fkr.FKeyTable.Database),
-			Schema:   sql.QuotedID(fkr.FKeyTable.Schema),
-			Table:    sql.QuotedID(fkr.FKeyTable.Table),
-		},
-		rtn: sql.TableName{
-			Database: sql.QuotedID(fkr.RefTable.Database),
-			Schema:   sql.QuotedID(fkr.RefTable.Schema),
-			Table:    sql.QuotedID(fkr.RefTable.Table),
-		},
-		keyCols: decodeIntSlice(fkr.KeyColumns),
-		sqlStmt: fkr.SQLStmt,
-	}, nil
+	return &fkr, nil
 }
 
 func (fkr *fkRestrictTrigger) AfterRows(ctx context.Context, tx sql.Transaction, tbl sql.Table,
