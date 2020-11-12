@@ -25,6 +25,8 @@ To Do:
 
 - storage/service might no longer be necessary?
 
+- add protobuf column type
+
 - select: ORDER BY: column(s) can have [table '.']
 
 - tests with 1000s to 100000s of rows

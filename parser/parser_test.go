@@ -1518,6 +1518,17 @@ func TestUpdate(t *testing.T) {
 			},
 		},
 		{
+			sql: "update t set c = default where c > 1",
+			stmt: query.Update{
+				Table: sql.TableName{Table: sql.ID("t")},
+				ColumnUpdates: []query.ColumnUpdate{
+					{Column: sql.ID("c"), Expr: nil},
+				},
+				Where: &expr.Binary{Op: expr.GreaterThanOp, Left: expr.Ref{sql.ID("c")},
+					Right: expr.Int64Literal(1)},
+			},
+		},
+		{
 			sql: "update t set c1 = 1, c2 = 2, c3 = 3",
 			stmt: query.Update{
 				Table: sql.TableName{Table: sql.ID("t")},

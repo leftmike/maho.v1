@@ -215,22 +215,25 @@ func (jr *joinRows) onMatch(ctx context.Context, dest []sql.Value) (bool, error)
 	if err != nil {
 		return true, err
 	}
+	if v == nil {
+		return false, nil
+	}
 	b, ok := v.(sql.BoolValue)
 	if !ok {
 		return true, fmt.Errorf("engine: expected boolean result from ON condition: %s",
 			sql.Format(v))
 	}
-	if b {
-		jr.leftUsed = true
-		if jr.rightUsed != nil {
-			jr.rightUsed[jr.rightIndex-1] = true
-		}
-		copy(dest, jr.leftDest)
-		copy(dest[jr.leftLen:], jr.rightDest)
-		return true, nil
+	if !b {
+		return false, nil
 	}
 
-	return false, nil
+	jr.leftUsed = true
+	if jr.rightUsed != nil {
+		jr.rightUsed[jr.rightIndex-1] = true
+	}
+	copy(dest, jr.leftDest)
+	copy(dest[jr.leftLen:], jr.rightDest)
+	return true, nil
 }
 
 func (jr *joinRows) onUsing(dest []sql.Value) (bool, error) {

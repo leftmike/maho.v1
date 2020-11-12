@@ -1139,7 +1139,7 @@ func (p *parser) parseSubExpr() expr.Expr {
 func (p *parser) parseInsert() evaluate.Stmt {
 	/*
 		INSERT INTO [database '.'] table ['(' column [',' ...] ')']
-			VALUES '(' expr | DEFAULT [',' ...] ')' [',' ...]
+			VALUES '(' (expr | DEFAULT) [',' ...] ')' [',' ...]
 	*/
 
 	var s query.InsertValues
@@ -1462,7 +1462,7 @@ func (p *parser) parseFromStmt(s evaluate.Stmt) query.FromItem {
 }
 
 func (p *parser) parseUpdate() evaluate.Stmt {
-	// UPDATE [database '.'] table SET column '=' expr [',' ...] [WHERE expr]
+	// UPDATE [database '.'] table SET column '=' (expr | DEFAULT) [',' ...] [WHERE expr]
 	var s query.Update
 	s.Table = p.parseTableName()
 	p.expectReserved(sql.SET)
@@ -1471,7 +1471,13 @@ func (p *parser) parseUpdate() evaluate.Stmt {
 		var cu query.ColumnUpdate
 		cu.Column = p.expectIdentifier("expected a column name")
 		p.expectTokens(token.Equal)
-		cu.Expr = p.parseExpr()
+		r := p.scan()
+		if r == token.Reserved && p.sctx.Identifier == sql.DEFAULT {
+			cu.Expr = nil
+		} else {
+			p.unscan()
+			cu.Expr = p.parseExpr()
+		}
 		s.ColumnUpdates = append(s.ColumnUpdates, cu)
 		if !p.maybeToken(token.Comma) {
 			break

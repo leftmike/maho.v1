@@ -78,14 +78,21 @@ func (stmt *Update) Plan(ctx context.Context, pctx evaluate.PlanContext,
 		updates: make([]columnUpdate, 0, len(stmt.ColumnUpdates)),
 	}
 
+	colTypes := tt.ColumnTypes()
 	for _, cu := range stmt.ColumnUpdates {
-		ce, err := expr.Compile(ctx, pctx, tx, fctx, cu.Expr)
-		if err != nil {
-			return nil, err
-		}
 		col, err := fctx.colIndex(cu.Column, "update")
 		if err != nil {
 			return nil, err
+		}
+
+		var ce sql.CExpr
+		if cu.Expr != nil {
+			ce, err = expr.Compile(ctx, pctx, tx, fctx, cu.Expr)
+			if err != nil {
+				return nil, err
+			}
+		} else {
+			ce = colTypes[col].Default
 		}
 		plan.updates = append(plan.updates, columnUpdate{column: col, expr: ce})
 	}
@@ -122,9 +129,13 @@ func (up *updatePlan) Execute(ctx context.Context, tx sql.Transaction) (int64, e
 		updates = updates[:0]
 		for _, update := range up.updates {
 			col := update.column
-			val, err := update.expr.Eval(ctx, tx, up)
-			if err != nil {
-				return -1, err
+
+			var val sql.Value
+			if update.expr != nil {
+				val, err = update.expr.Eval(ctx, tx, up)
+				if err != nil {
+					return -1, err
+				}
 			}
 			if sql.Compare(val, up.dest[col]) != 0 {
 				updates = append(updates, sql.ColumnUpdate{Column: col, Value: val})

@@ -400,6 +400,9 @@ func (fr *filterRows) Next(ctx context.Context, dest []sql.Value) error {
 		if err != nil {
 			return err
 		}
+		if v == nil {
+			continue
+		}
 		b, ok := v.(sql.BoolValue)
 		if !ok {
 			return fmt.Errorf("engine: expected boolean result from WHERE condition: %s",

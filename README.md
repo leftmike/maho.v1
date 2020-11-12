@@ -144,7 +144,7 @@ EXPLAIN [VERBOSE] select
 
 ```
 INSERT INTO [[database '.'] schema '.'] table ['(' column [',' ...] ')']
-	VALUES '(' expr | DEFAULT [',' ...] ')' [',' ...]
+	VALUES '(' (expr | DEFAULT) [',' ...] ')' [',' ...]
 ```
 
 ```
@@ -206,7 +206,7 @@ START TRANSACTION
 ```
 
 ```
-UPDATE [[database '.'] schema '.'] table SET column '=' expr [',' ...] [WHERE expr]
+UPDATE [[database '.'] schema '.'] table SET column '=' (expr | DEFAULT) [',' ...] [WHERE expr]
 ```
 
 ```
