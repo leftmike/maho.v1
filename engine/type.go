@@ -206,6 +206,17 @@ func generateRestrictSQL(fktn sql.TableName, fkCols []int, fktt *TableType) stri
 	return s
 }
 
+func generateDeleteSQL(fktn sql.TableName, fkCols []int, fktt *TableType) string {
+	s := fmt.Sprintf("DELETE FROM %s WHERE", generateTableName(fktn))
+	for cdx, col := range fkCols {
+		if cdx > 0 {
+			s += " AND"
+		}
+		s += fmt.Sprintf(" %s = $%d", fktt.cols[col], cdx+1)
+	}
+	return s
+}
+
 func addForeignKey(con sql.Identifier, fktn sql.TableName, fkCols []int, fktt *TableType,
 	rtn sql.TableName, ridx sql.Identifier, rtt *TableType, onDel, onUpd sql.RefAction) {
 
@@ -270,9 +281,16 @@ func addForeignKey(con sql.Identifier, fktn sql.TableName, fkCols []int, fktt *T
 				},
 			})
 	case sql.Cascade:
-		// XXX: fkCascadeDeleteTrigger
-		// DELETE FROM fktn WHERE ...
-		panic("on delete cascade ref action not implemented")
+		rtt.addTrigger(sql.DeleteEvent,
+			&fkDeleteTrigger{
+				fkTrigger: fkTrigger{
+					con:     con,
+					fktn:    fktn,
+					rtn:     rtn,
+					keyCols: frCols,
+					sqlStmt: generateDeleteSQL(fktn, fkCols, fktt),
+				},
+			})
 	case sql.SetNull, sql.SetDefault:
 		// XXX: fkSetTrigger
 		// check if Null is allowed for the column

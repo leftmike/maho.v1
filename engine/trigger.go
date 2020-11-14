@@ -16,6 +16,7 @@ import (
 const (
 	fkMatchTriggerType    = "fkMatchTriggerType"
 	fkRestrictTriggerType = "fkRestrictTriggerType"
+	fkDeleteTriggerType   = "fkDeleteTriggerType"
 )
 
 type triggerDecoder func(buf []byte) (sql.Trigger, error)
@@ -24,6 +25,7 @@ var (
 	TriggerDecoders = map[string]triggerDecoder{
 		fkMatchTriggerType:    decodeFKMatchTrigger,
 		fkRestrictTriggerType: decodeFKRestrictTrigger,
+		fkDeleteTriggerType:   decodeFKDeleteTrigger,
 	}
 )
 
@@ -204,7 +206,7 @@ type fkMatchTrigger struct {
 	prep *evaluate.PreparedRowsPlan
 }
 
-func (fkm *fkMatchTrigger) Type() string {
+func (_ *fkMatchTrigger) Type() string {
 	return fkMatchTriggerType
 }
 
@@ -292,7 +294,7 @@ type fkRestrictTrigger struct {
 	prep *evaluate.PreparedRowsPlan
 }
 
-func (fkr *fkRestrictTrigger) Type() string {
+func (_ *fkRestrictTrigger) Type() string {
 	return fkRestrictTriggerType
 }
 
@@ -361,6 +363,73 @@ func (fkr *fkRestrictTrigger) AfterRows(ctx context.Context, tx sql.Transaction,
 			return fmt.Errorf(
 				"engine: table %s: delete or update violates foreign key constraint %s on table %s",
 				fkr.fktn, fkr.con, fkr.rtn)
+		}
+	}
+
+	return nil
+}
+
+type fkDeleteTrigger struct {
+	fkTrigger
+	prep *evaluate.PreparedStmtPlan
+}
+
+func (_ *fkDeleteTrigger) Type() string {
+	return fkDeleteTriggerType
+}
+
+func decodeFKDeleteTrigger(buf []byte) (sql.Trigger, error) {
+	var fkd fkDeleteTrigger
+	err := decodeFKTrigger(buf, &fkd.fkTrigger)
+	if err != nil {
+		return nil, err
+	}
+	return &fkd, nil
+}
+
+func (fkd *fkDeleteTrigger) AfterRows(ctx context.Context, tx sql.Transaction, tbl sql.Table,
+	oldRows, newRows sql.Rows) error {
+
+	if fkd.prep == nil {
+		p := parser.NewParser(strings.NewReader(fkd.sqlStmt), fkd.sqlStmt)
+		stmt, err := p.Parse()
+		if err != nil {
+			panic(fmt.Sprintf("engine: table %s: foreign key restrict: %s: %s", fkd.fktn, fkd.con,
+				err))
+		}
+		prep, err := evaluate.PreparePlan(ctx, stmt, planContext{tx.(*transaction).e}, tx)
+		if err != nil {
+			panic(fmt.Sprintf("engine: table %s: foreign key restrict: %s: %s", fkd.fktn, fkd.con,
+				err))
+		}
+		fkd.prep = prep.(*evaluate.PreparedStmtPlan)
+	}
+
+	params := make([]sql.Value, len(fkd.keyCols))
+	row := make([]sql.Value, oldRows.NumColumns())
+	for {
+		err := oldRows.Next(ctx, row)
+		if err == io.EOF {
+			break
+		} else if err != nil {
+			return err
+		}
+
+		for cdx, col := range fkd.keyCols {
+			params[cdx] = row[col]
+		}
+
+		err = fkd.prep.SetParameters(params)
+		if err != nil {
+			panic(fmt.Sprintf("engine: table %s: foreign key restrict: %s: %s", fkd.fktn, fkd.con,
+				err))
+		}
+
+		_, err = fkd.prep.Execute(ctx, tx)
+		if err != nil {
+			return fmt.Errorf(
+				"engine: table %s: delete violates foreign key constraint %s on table %s",
+				fkd.fktn, fkd.con, fkd.rtn)
 		}
 	}
 
