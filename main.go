@@ -60,7 +60,6 @@ To Do:
 
 - references from foreign keys (ForeignRef?)
 -- use index on foreign key table if available
--- CASCADE, SET NULL, SET DEFAULT
 
 - constraints
 -- DROP TABLE: CASCADE: to remove foreign key constraint of another table

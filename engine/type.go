@@ -235,6 +235,29 @@ func generateUpdateSQL(fktn sql.TableName, fkCols []int, fktt *TableType) string
 	return s
 }
 
+func generateSetSQL(fktn sql.TableName, fkCols []int, fktt *TableType, setNull bool) string {
+	s := fmt.Sprintf("UPDATE %s SET", generateTableName(fktn))
+	for cdx, col := range fkCols {
+		if cdx > 0 {
+			s += " ,"
+		}
+		s += fmt.Sprintf(" %s = ", fktt.cols[col])
+		if setNull {
+			s += "NULL"
+		} else {
+			s += "DEFAULT"
+		}
+	}
+	s += " WHERE"
+	for cdx, col := range fkCols {
+		if cdx > 0 {
+			s += " AND"
+		}
+		s += fmt.Sprintf(" %s = $%d", fktt.cols[col], cdx+1)
+	}
+	return s
+}
+
 func addForeignKey(con sql.Identifier, fktn sql.TableName, fkCols []int, fktt *TableType,
 	rtn sql.TableName, ridx sql.Identifier, rtt *TableType, onDel, onUpd sql.RefAction) {
 
@@ -307,10 +330,15 @@ func addForeignKey(con sql.Identifier, fktn sql.TableName, fkCols []int, fktt *T
 				sqlStmt: generateDeleteSQL(fktn, fkCols, fktt),
 			})
 	case sql.SetNull, sql.SetDefault:
-		// XXX: fkSetTrigger
-		// check if Null is allowed for the column
-		// UPDATE fktn SET fkCols[0] = NULL/DEFAULT, fkCols[1] = NULL/DEFAULT WHERE ...
-		panic("on delete set ref action not implemented")
+		rtt.addTrigger(sql.DeleteEvent,
+			&fkTrigger{
+				typ:     fkSetTrigger,
+				con:     con,
+				fktn:    fktn,
+				rtn:     rtn,
+				keyCols: frCols,
+				sqlStmt: generateSetSQL(fktn, fkCols, fktt, onDel == sql.SetNull),
+			})
 	default:
 		panic(fmt.Sprintf("unexpected delete ref action: %v", onDel))
 	}
@@ -338,10 +366,15 @@ func addForeignKey(con sql.Identifier, fktn sql.TableName, fkCols []int, fktt *T
 				sqlStmt: generateUpdateSQL(fktn, fkCols, fktt),
 			})
 	case sql.SetNull, sql.SetDefault:
-		// XXX: fkSetTrigger
-		// check if Null is allowed for the column
-		// UPDATE fktn SET fkCols[0] = NULL/DEFAULT, fkCols[1] = NULL/DEFAULT WHERE ...
-		panic("on update set ref action not implemented")
+		rtt.addTrigger(sql.UpdateEvent,
+			&fkTrigger{
+				typ:     fkSetTrigger,
+				con:     con,
+				fktn:    fktn,
+				rtn:     rtn,
+				keyCols: frCols,
+				sqlStmt: generateSetSQL(fktn, fkCols, fktt, onUpd == sql.SetNull),
+			})
 	default:
 		panic(fmt.Sprintf("unexpected update ref action: %v", onUpd))
 	}

@@ -244,8 +244,8 @@ func (fkt *fkTrigger) AfterRows(ctx context.Context, tx sql.Transaction, tbl sql
 		return fkt.afterRowsDelete(ctx, tx, tbl, oldRows, newRows)
 	case fkUpdateTrigger:
 		return fkt.afterRowsUpdate(ctx, tx, tbl, oldRows, newRows)
-	//case fkSetTrigger:
-	//	return fkt.afterRowsSet(ctx, tx, tbl, oldRows, newRows)
+	case fkSetTrigger:
+		return fkt.afterRowsSet(ctx, tx, tbl, oldRows, newRows)
 	default:
 		panic(fmt.Sprintf("engine: table %s: foreign key: %s: unknown trigger type: %s",
 			fkt.fktn, fkt.con, fkt.typ))
@@ -457,6 +457,65 @@ func (fkt *fkTrigger) afterRowsUpdate(ctx context.Context, tx sql.Transaction, t
 			return fmt.Errorf(
 				"engine: table %s: update violates foreign key constraint %s on table %s",
 				fkt.fktn, fkt.con, fkt.rtn)
+		}
+	}
+
+	return nil
+}
+
+func (fkt *fkTrigger) afterRowsSet(ctx context.Context, tx sql.Transaction, tbl sql.Table,
+	oldRows, newRows sql.Rows) error {
+
+	prep := fkt.prep.(*evaluate.PreparedStmtPlan)
+	params := make([]sql.Value, len(fkt.keyCols))
+	oldRow := make([]sql.Value, oldRows.NumColumns())
+
+	var newRow []sql.Value
+	if newRows != nil {
+		newRow = make([]sql.Value, newRows.NumColumns())
+	}
+
+	for {
+		err := oldRows.Next(ctx, oldRow)
+		if err == io.EOF {
+			break
+		} else if err != nil {
+			return err
+		}
+
+		if newRows != nil {
+			err = newRows.Next(ctx, newRow)
+			if err != nil {
+				return err
+			}
+
+			var updated bool
+			for _, col := range fkt.keyCols {
+				if sql.Compare(oldRow[col], newRow[col]) != 0 {
+					updated = true
+					break
+				}
+			}
+			if !updated {
+				continue
+			}
+		}
+
+		for cdx, col := range fkt.keyCols {
+			params[cdx] = oldRow[col]
+		}
+
+		err = prep.SetParameters(params)
+		if err != nil {
+			panic(fmt.Sprintf("engine: table %s: foreign key set: %s: %s", fkt.fktn, fkt.con,
+				err))
+		}
+
+		_, err = prep.Execute(ctx, tx)
+		if err != nil {
+			return fmt.Errorf(
+				"engine: table %s: delete or update violates foreign key constraint %s on table %s",
+				fkt.rtn, fkt.con, fkt.fktn)
 		}
 	}
 
