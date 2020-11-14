@@ -96,9 +96,10 @@ message TriggerMetadata {
 }
 
 message FKTrigger {
-    string Constraint = 1;
-    TableName FKeyTable = 2;
-    TableName RefTable = 3;
-    repeated int32 KeyColumns = 4;
-    string SQLStmt = 5;
+    string Type = 1;
+    string Constraint = 2;
+    TableName FKeyTable = 3;
+    TableName RefTable = 4;
+    repeated int32 KeyColumns = 5;
+    string SQLStmt = 6;
 }

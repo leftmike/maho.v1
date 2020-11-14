@@ -217,6 +217,24 @@ func generateDeleteSQL(fktn sql.TableName, fkCols []int, fktt *TableType) string
 	return s
 }
 
+func generateUpdateSQL(fktn sql.TableName, fkCols []int, fktt *TableType) string {
+	s := fmt.Sprintf("UPDATE %s SET", generateTableName(fktn))
+	for cdx, col := range fkCols {
+		if cdx > 0 {
+			s += " ,"
+		}
+		s += fmt.Sprintf(" %s = $%d", fktt.cols[col], cdx+len(fkCols)+1)
+	}
+	s += " WHERE"
+	for cdx, col := range fkCols {
+		if cdx > 0 {
+			s += " AND"
+		}
+		s += fmt.Sprintf(" %s = $%d", fktt.cols[col], cdx+1)
+	}
+	return s
+}
+
 func addForeignKey(con sql.Identifier, fktn sql.TableName, fkCols []int, fktt *TableType,
 	rtn sql.TableName, ridx sql.Identifier, rtt *TableType, onDel, onUpd sql.RefAction) {
 
@@ -252,14 +270,13 @@ func addForeignKey(con sql.Identifier, fktn sql.TableName, fkCols []int, fktt *T
 	}
 
 	fktt.addTrigger(sql.InsertEvent|sql.UpdateEvent,
-		&fkMatchTrigger{
-			fkTrigger: fkTrigger{
-				con:     con,
-				fktn:    fktn,
-				rtn:     rtn,
-				keyCols: fkCols,
-				sqlStmt: generateMatchSQL(rtt, rtn, ridx, rkey, fkCols),
-			},
+		&fkTrigger{
+			typ:     fkMatchTrigger,
+			con:     con,
+			fktn:    fktn,
+			rtn:     rtn,
+			keyCols: fkCols,
+			sqlStmt: generateMatchSQL(rtt, rtn, ridx, rkey, fkCols),
 		})
 
 	frCols := make([]int, 0, len(rkey))
@@ -271,25 +288,23 @@ func addForeignKey(con sql.Identifier, fktn sql.TableName, fkCols []int, fktt *T
 	case sql.NoAction, sql.Restrict:
 		// Since constraints can't be deferred (yet), NoAction is the same as Restrict.
 		rtt.addTrigger(sql.DeleteEvent,
-			&fkRestrictTrigger{
-				fkTrigger: fkTrigger{
-					con:     con,
-					fktn:    fktn,
-					rtn:     rtn,
-					keyCols: frCols,
-					sqlStmt: generateRestrictSQL(fktn, fkCols, fktt),
-				},
+			&fkTrigger{
+				typ:     fkRestrictTrigger,
+				con:     con,
+				fktn:    fktn,
+				rtn:     rtn,
+				keyCols: frCols,
+				sqlStmt: generateRestrictSQL(fktn, fkCols, fktt),
 			})
 	case sql.Cascade:
 		rtt.addTrigger(sql.DeleteEvent,
-			&fkDeleteTrigger{
-				fkTrigger: fkTrigger{
-					con:     con,
-					fktn:    fktn,
-					rtn:     rtn,
-					keyCols: frCols,
-					sqlStmt: generateDeleteSQL(fktn, fkCols, fktt),
-				},
+			&fkTrigger{
+				typ:     fkDeleteTrigger,
+				con:     con,
+				fktn:    fktn,
+				rtn:     rtn,
+				keyCols: frCols,
+				sqlStmt: generateDeleteSQL(fktn, fkCols, fktt),
 			})
 	case sql.SetNull, sql.SetDefault:
 		// XXX: fkSetTrigger
@@ -305,19 +320,24 @@ func addForeignKey(con sql.Identifier, fktn sql.TableName, fkCols []int, fktt *T
 	case sql.NoAction, sql.Restrict:
 		// Since constraints can't be deferred (yet), NoAction is the same as Restrict.
 		rtt.addTrigger(sql.UpdateEvent,
-			&fkRestrictTrigger{
-				fkTrigger: fkTrigger{
-					con:     con,
-					fktn:    fktn,
-					rtn:     rtn,
-					keyCols: frCols,
-					sqlStmt: generateRestrictSQL(fktn, fkCols, fktt),
-				},
+			&fkTrigger{
+				typ:     fkRestrictTrigger,
+				con:     con,
+				fktn:    fktn,
+				rtn:     rtn,
+				keyCols: frCols,
+				sqlStmt: generateRestrictSQL(fktn, fkCols, fktt),
 			})
 	case sql.Cascade:
-		// XXX: fkCascadeUpdateTrigger
-		// UPDATE fktn SET fkCols[0] = $4, fkCols[1] = $5 ... WHERE ...
-		panic("on update cascade ref action not implemented")
+		rtt.addTrigger(sql.UpdateEvent,
+			&fkTrigger{
+				typ:     fkUpdateTrigger,
+				con:     con,
+				fktn:    fktn,
+				rtn:     rtn,
+				keyCols: frCols,
+				sqlStmt: generateUpdateSQL(fktn, fkCols, fktt),
+			})
 
 	case sql.SetNull, sql.SetDefault:
 		// XXX: fkSetTrigger
