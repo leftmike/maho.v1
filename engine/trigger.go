@@ -89,6 +89,8 @@ func (tx *transaction) stmtTriggers(ctx context.Context) error {
 		numCols := len(tbl.tt.Columns())
 		for _, trig := range tbl.tt.triggers {
 			if trig.events&sql.DeleteEvent != 0 && deletedRows != nil {
+				tx.tx.NextStmt()
+
 				oldRows := &triggerRows{
 					numCols: numCols,
 					vals:    deletedRows,
@@ -100,6 +102,8 @@ func (tx *transaction) stmtTriggers(ctx context.Context) error {
 			}
 
 			if trig.events&sql.InsertEvent != 0 && insertedRows != nil {
+				tx.tx.NextStmt()
+
 				newRows := &triggerRows{
 					numCols: numCols,
 					vals:    insertedRows,
@@ -111,6 +115,8 @@ func (tx *transaction) stmtTriggers(ctx context.Context) error {
 			}
 
 			if trig.events&sql.UpdateEvent != 0 && updatedOldRows != nil {
+				tx.tx.NextStmt()
+
 				oldRows := &triggerRows{
 					numCols: numCols,
 					vals:    updatedOldRows,
@@ -307,17 +313,41 @@ func (fkt *fkTrigger) afterRowsRestrict(ctx context.Context, tx sql.Transaction,
 
 	prep := fkt.prep.(*evaluate.PreparedRowsPlan)
 	params := make([]sql.Value, len(fkt.keyCols))
-	row := make([]sql.Value, oldRows.NumColumns())
+	oldRow := make([]sql.Value, oldRows.NumColumns())
+
+	var newRow []sql.Value
+	if newRows != nil {
+		newRow = make([]sql.Value, newRows.NumColumns())
+	}
+
 	for {
-		err := oldRows.Next(ctx, row)
+		err := oldRows.Next(ctx, oldRow)
 		if err == io.EOF {
 			break
 		} else if err != nil {
 			return err
 		}
 
+		if newRows != nil {
+			err = newRows.Next(ctx, newRow)
+			if err != nil {
+				return err
+			}
+
+			var updated bool
+			for _, col := range fkt.keyCols {
+				if sql.Compare(oldRow[col], newRow[col]) != 0 {
+					updated = true
+					break
+				}
+			}
+			if !updated {
+				continue
+			}
+		}
+
 		for cdx, col := range fkt.keyCols {
-			params[cdx] = row[col]
+			params[cdx] = oldRow[col]
 		}
 
 		err = prep.SetParameters(params)
@@ -390,26 +420,30 @@ func (fkt *fkTrigger) afterRowsUpdate(ctx context.Context, tx sql.Transaction, t
 
 	prep := fkt.prep.(*evaluate.PreparedStmtPlan)
 	params := make([]sql.Value, len(fkt.keyCols)*2)
-	row := make([]sql.Value, oldRows.NumColumns())
+	oldRow := make([]sql.Value, oldRows.NumColumns())
+	newRow := make([]sql.Value, newRows.NumColumns())
 	for {
-		err := oldRows.Next(ctx, row)
+		err := oldRows.Next(ctx, oldRow)
 		if err == io.EOF {
 			break
 		} else if err != nil {
 			return err
 		}
-
-		for cdx, col := range fkt.keyCols {
-			params[cdx] = row[col]
-		}
-
-		err = newRows.Next(ctx, row)
+		err = newRows.Next(ctx, newRow)
 		if err != nil {
 			return err
 		}
 
+		var updated bool
 		for cdx, col := range fkt.keyCols {
-			params[cdx+len(fkt.keyCols)] = row[col]
+			params[cdx] = oldRow[col]
+			params[cdx+len(fkt.keyCols)] = newRow[col]
+			if sql.Compare(oldRow[col], newRow[col]) != 0 {
+				updated = true
+			}
+		}
+		if !updated {
+			continue
 		}
 
 		err = prep.SetParameters(params)

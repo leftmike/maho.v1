@@ -311,7 +311,6 @@ func addForeignKey(con sql.Identifier, fktn sql.TableName, fkCols []int, fktt *T
 		// check if Null is allowed for the column
 		// UPDATE fktn SET fkCols[0] = NULL/DEFAULT, fkCols[1] = NULL/DEFAULT WHERE ...
 		panic("on delete set ref action not implemented")
-
 	default:
 		panic(fmt.Sprintf("unexpected delete ref action: %v", onDel))
 	}
@@ -338,13 +337,11 @@ func addForeignKey(con sql.Identifier, fktn sql.TableName, fkCols []int, fktt *T
 				keyCols: frCols,
 				sqlStmt: generateUpdateSQL(fktn, fkCols, fktt),
 			})
-
 	case sql.SetNull, sql.SetDefault:
 		// XXX: fkSetTrigger
 		// check if Null is allowed for the column
 		// UPDATE fktn SET fkCols[0] = NULL/DEFAULT, fkCols[1] = NULL/DEFAULT WHERE ...
 		panic("on update set ref action not implemented")
-
 	default:
 		panic(fmt.Sprintf("unexpected update ref action: %v", onUpd))
 	}
