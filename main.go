@@ -17,7 +17,7 @@ To Do:
 
 - use spf13/cobra for command argument handling
 
-- use jackc/pgx or cockroach/pkg/sql/pgwire for client sql interface
+- use etcd-io/etcd/raft
 
 - make sure all Rows get properly closed
 
@@ -43,6 +43,8 @@ To Do:
 -- usda.sql: causes corrupt WAL
 
 - proto3 (postgres protocol)
+-- use binary format for oid.T_bool, T_bytea, T_float4, T_float8, T_int2, T_int4, T_int8
+-- BEGIN needs to run as a no-op command
 
 - test subquery expressions: '(' select | values | show ')'
 
@@ -103,19 +105,22 @@ var (
 	store    = cfg.Var(new(string), "store").Usage("`store` (basic)").String("basic")
 	dataDir  = cfg.Var(new(string), "data").
 			Usage("`directory` containing databases (testdata)").String("testdata")
+	proto3Server = cfg.Var(new(bool), "proto3").
+			Usage("`flag` to control serving PostgreSQL wire protocol v3 (true)").Bool(true)
+	proto3Port = cfg.Var(new(string), "port").
+			Usage("`port` used to serve PostgreSQL wire protocol v3 (localhost:5432)").
+			String("localhost:5432")
 	sshServer = cfg.Var(new(bool), "ssh").
-			Usage("`flag` to control serving ssh (false)").Bool(false)
+			Usage("`flag` to control serving SSH (false)").Bool(false)
 	sshPort = cfg.Var(new(string), "ssh-port").
-		Usage("`port` used to serve ssh (localhost:8241)").String("localhost:8241")
+		Usage("`port` used to serve SSH (localhost:8241)").String("localhost:8241")
 	logFile = cfg.Var(new(string), "log-file").Usage("`file` to use for logging (maho.log)").
 		String("maho.log")
 	logLevel = cfg.Var(new(string), "log-level").
 			Usage("log level: debug, info, warn, error, fatal, or panic (info)").String("info")
 	authorizedKeys = cfg.Var(new(string), "ssh-authorized-keys").
 			Usage("`file` containing authorized ssh keys").String("")
-
-	accounts = cfg.Var(new(config.Array), "accounts").Hide().Array()
-
+	accounts   = cfg.Var(new(config.Array), "accounts").Hide().Array()
 	configFile = flag.String("config-file", "", "`file` to load config from (maho.hcl)")
 	noConfig   = flag.Bool("no-config", false, "don't load config file")
 	listConfig = flag.Bool("list-config", false, "list config and exit")
@@ -362,9 +367,19 @@ func main() {
 		}()
 	}
 
-	if *replFlag || (!*sshServer && len(args) == 0 && len(sqlArgs) == 0) {
+	if *proto3Server {
+		p3Cfg := server.Proto3Config{
+			Address: *proto3Port,
+		}
+
+		go func() {
+			fmt.Fprintf(os.Stderr, "maho: %s\n", svr.ListenAndServeProto3(p3Cfg))
+		}()
+	}
+
+	if *replFlag || (!*sshServer && !*proto3Server && len(args) == 0 && len(sqlArgs) == 0) {
 		svr.HandleSession(repl.Interact(), "startup", "console", "")
-	} else if *sshServer {
+	} else if *sshServer || *proto3Server {
 		ch := make(chan os.Signal, 1)
 		signal.Notify(ch, os.Interrupt)
 
@@ -376,7 +391,7 @@ func main() {
 		}()
 	}
 
-	if *sshServer {
+	if *sshServer || *proto3Server {
 		fmt.Println("maho: shutting down")
 		svr.Shutdown(context.Background())
 	}

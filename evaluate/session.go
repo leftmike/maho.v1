@@ -43,6 +43,10 @@ func (ses *Session) String() string {
 	return fmt.Sprintf("session-%d", ses.sesid)
 }
 
+func (ses *Session) ActiveTx() bool {
+	return ses.tx != nil
+}
+
 func (ses *Session) Begin() error {
 	if ses.tx != nil {
 		return fmt.Errorf("execute: session already has active transaction")

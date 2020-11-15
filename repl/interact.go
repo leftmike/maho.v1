@@ -35,6 +35,7 @@ func (lr *lineReader) ReadRune() (r rune, size int, err error) {
 		r, sz, err := lr.r.ReadRune()
 		if err == io.EOF {
 			lr.r = nil
+			return '\n', 1, nil
 		} else if err != nil {
 			return 0, 0, err
 		} else {
@@ -45,7 +46,6 @@ func (lr *lineReader) ReadRune() (r rune, size int, err error) {
 
 func Interact() evaluate.SessionHandler {
 	line := liner.NewLiner()
-	defer line.Close()
 
 	if f, err := os.Open(mahoHistory); err == nil {
 		line.ReadHistory(f)
@@ -53,6 +53,8 @@ func Interact() evaluate.SessionHandler {
 	}
 
 	return func(ses *evaluate.Session) {
+		defer line.Close()
+
 		ReplSQL(ses, parser.NewParser(&lineReader{line: line}, "console"), os.Stdout)
 
 		if f, err := os.Create(mahoHistory); err != nil {

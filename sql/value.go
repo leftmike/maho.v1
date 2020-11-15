@@ -133,6 +133,16 @@ func (b BytesValue) String() string {
 	return buf.String()
 }
 
+func (b BytesValue) HexBytes() []byte {
+	var buf bytes.Buffer
+	buf.WriteString("\\x")
+	for _, v := range b {
+		buf.WriteRune(hexDigits[v>>4])
+		buf.WriteRune(hexDigits[v&0xF])
+	}
+	return buf.Bytes()
+}
+
 func (b1 BytesValue) Compare(v2 Value) (int, error) {
 	if b2, ok := v2.(BytesValue); ok {
 		return bytes.Compare([]byte(b1), []byte(b2)), nil

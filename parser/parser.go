@@ -245,6 +245,10 @@ func (p *parser) expectEndOfStatement() {
 }
 
 func (p *parser) parseStmt() evaluate.Stmt {
+	if p.maybeToken(token.EndOfStatement) {
+		return nil
+	}
+
 	switch p.expectReserved(
 		sql.BEGIN,
 		sql.COMMIT,

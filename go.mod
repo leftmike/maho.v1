@@ -10,8 +10,9 @@ require (
 	github.com/golang/protobuf v1.4.2
 	github.com/google/btree v1.0.0
 	github.com/hashicorp/hcl v1.0.0
+	github.com/jackc/pgproto3/v2 v2.0.6
 	github.com/leftmike/sqltest v0.0.0-20201124155025-358c633be717
-	github.com/lib/pq v1.8.0 // indirect
+	github.com/lib/pq v1.8.0
 	github.com/peterh/liner v1.2.0
 	github.com/sirupsen/logrus v1.6.0
 	go.etcd.io/bbolt v1.3.5
