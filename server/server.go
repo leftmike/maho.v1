@@ -3,8 +3,12 @@ package server
 import (
 	"context"
 	"errors"
+	"fmt"
 	"io"
+	"net"
 	"sync"
+	"sync/atomic"
+	"time"
 
 	"github.com/leftmike/maho/engine"
 	"github.com/leftmike/maho/evaluate"
@@ -21,24 +25,24 @@ type Server struct {
 	DefaultDatabase sql.Identifier
 
 	mutex         sync.Mutex
-	servers       map[server]struct{}
+	listeners     map[net.Listener]struct{}
+	activeConn    map[io.Closer]struct{}
+	connCount     int32
+	shutdown      bool
+	closed        bool
 	sessions      map[*evaluate.Session]struct{}
 	lastSessionID uint64
 }
 
-type server interface {
-	Close() error
-	Shutdown(ctx context.Context) error
-}
-
-func (svr *Server) addServer(s server) {
+func (svr *Server) addListener(l net.Listener) {
 	svr.mutex.Lock()
 	defer svr.mutex.Unlock()
 
-	if svr.servers == nil {
-		svr.servers = map[server]struct{}{}
+	if svr.listeners == nil {
+		svr.listeners = map[net.Listener]struct{}{}
+		svr.activeConn = map[io.Closer]struct{}{}
 	}
-	svr.servers[s] = struct{}{}
+	svr.listeners[l] = struct{}{}
 }
 
 func (svr *Server) addSession(ses *evaluate.Session) {
@@ -72,43 +76,87 @@ func (svr *Server) Handle(rr io.RuneReader, w io.Writer, user, typ, addr string)
 	svr.removeSession(ses)
 }
 
-func (svr *Server) closeShutdown(cs func(s server) error) error {
+func (svr *Server) trackConn(conn io.Closer, add bool) bool {
 	svr.mutex.Lock()
-	cnt := len(svr.servers)
-	errors := make(chan error, cnt)
+	defer svr.mutex.Unlock()
 
-	for s := range svr.servers {
-		go func(s server) {
-			errors <- cs(s)
-		}(s)
-		delete(svr.servers, s)
+	if svr.closed {
+		return false
 	}
-	svr.mutex.Unlock()
-
-	var err error
-	for cnt > 0 {
-		var e error = <-errors
-		if e != nil && err == nil {
-			err = e
-		}
-		cnt -= 1
+	if add {
+		svr.activeConn[conn] = struct{}{}
+	} else {
+		delete(svr.activeConn, conn)
 	}
-
-	return err
+	return true
 }
 
 func (svr *Server) Close() error {
-	return svr.closeShutdown(
-		func(s server) error {
-			return s.Close()
-		})
+	svr.mutex.Lock()
+	defer svr.mutex.Unlock()
+
+	if svr.closed {
+		return nil
+	}
+	svr.closed = true
+
+	var err error
+	if !svr.shutdown {
+		for l := range svr.listeners {
+			e := l.Close()
+			if e != nil && err == nil {
+				err = e
+			}
+		}
+		svr.shutdown = true
+	}
+
+	for conn := range svr.activeConn {
+		e := conn.Close()
+		if e != nil && err == nil {
+			err = e
+		}
+		delete(svr.activeConn, conn)
+	}
+	return err
 }
 
 func (svr *Server) Shutdown(ctx context.Context) error {
-	return svr.closeShutdown(
-		func(s server) error {
-			return s.Shutdown(ctx)
-		})
+	svr.mutex.Lock()
+	if svr.closed {
+		svr.mutex.Unlock()
+		return nil
+	}
+
+	var err error
+	if !svr.shutdown {
+		for l := range svr.listeners {
+			e := l.Close()
+			if e != nil && err == nil {
+				err = e
+			}
+		}
+		svr.shutdown = true
+	}
+	svr.mutex.Unlock()
+
+	last := int32(-1)
+	for {
+		cc := atomic.LoadInt32(&svr.connCount)
+		if cc == 0 {
+			break
+		}
+		if cc != last {
+			p := ""
+			if cc > 1 {
+				p = "s"
+			}
+			fmt.Printf("%d active connection%s\n", cc, p)
+			last = cc
+		}
+		time.Sleep(500 * time.Millisecond)
+	}
+	return nil
 }
 
 func (svr *Server) makeSessionsVirtual(ctx context.Context, tx sql.Transaction,

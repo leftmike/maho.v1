@@ -2,12 +2,9 @@ package server
 
 import (
 	"bufio"
-	"context"
 	"fmt"
 	"net"
-	"sync"
 	"sync/atomic"
-	"time"
 
 	log "github.com/sirupsen/logrus"
 	"golang.org/x/crypto/ssh"
@@ -21,18 +18,7 @@ type SSHConfig struct {
 	CheckPassword   func(user, password string) error
 }
 
-type sshServer struct {
-	mutex      sync.Mutex
-	cfg        *ssh.ServerConfig
-	address    string
-	listener   net.Listener
-	activeConn map[*ssh.ServerConn]struct{}
-	connCount  int32
-	shutdown   bool
-	closed     bool
-}
-
-func newSSHServer(sshCfg SSHConfig) (*sshServer, error) {
+func sshServerConfig(sshCfg SSHConfig) (*ssh.ServerConfig, error) {
 	cfg := ssh.ServerConfig{
 		AuthLogCallback: func(md ssh.ConnMetadata, method string, err error) {
 			if method != "none" {
@@ -110,37 +96,33 @@ func newSSHServer(sshCfg SSHConfig) (*sshServer, error) {
 		log.Info("ssh client auth: public key")
 	}
 
-	return &sshServer{
-		cfg:        &cfg,
-		address:    sshCfg.Address,
-		activeConn: map[*ssh.ServerConn]struct{}{},
-	}, nil
+	return &cfg, nil
 }
 
 func (svr *Server) ListenAndServeSSH(sshCfg SSHConfig) error {
-	ss, err := newSSHServer(sshCfg)
+	cfg, err := sshServerConfig(sshCfg)
 	if err != nil {
 		return err
 	}
 
-	ss.listener, err = net.Listen("tcp", ss.address)
+	l, err := net.Listen("tcp", sshCfg.Address)
 	if err != nil {
 		return err
 	}
-	svr.addServer(ss)
+	svr.addListener(l)
 
 	for {
-		tcp, err := ss.listener.Accept()
+		tcp, err := l.Accept()
 		if err != nil {
-			ss.mutex.Lock()
-			if ss.shutdown {
+			svr.mutex.Lock()
+			if svr.shutdown {
 				err = ErrServerClosed
 			}
-			ss.mutex.Unlock()
+			svr.mutex.Unlock()
 			log.WithField("error", err.Error()).Error("ssh accept")
 			return err
 		}
-		conn, chans, reqs, err := ssh.NewServerConn(tcp, ss.cfg)
+		conn, chans, reqs, err := ssh.NewServerConn(tcp, cfg)
 		if err != nil {
 			log.WithField("error", err.Error()).Error("ssh new server connection")
 			continue
@@ -152,36 +134,21 @@ func (svr *Server) ListenAndServeSSH(sshCfg SSHConfig) error {
 		entry.Info("ssh connected")
 
 		go ssh.DiscardRequests(reqs)
-		go ss.handleConn(conn, chans, svr, entry)
+		go svr.handleSSHConn(conn, chans, entry)
 	}
 }
 
-func (ss *sshServer) trackConn(conn *ssh.ServerConn, add bool) bool {
-	ss.mutex.Lock()
-	defer ss.mutex.Unlock()
+func (svr *Server) handleSSHConn(conn *ssh.ServerConn, chans <-chan ssh.NewChannel,
+	entry *log.Entry) {
 
-	if ss.closed {
-		return false
-	}
-	if add {
-		ss.activeConn[conn] = struct{}{}
-	} else {
-		delete(ss.activeConn, conn)
-	}
-	return true
-}
+	atomic.AddInt32(&svr.connCount, 1)
+	defer atomic.AddInt32(&svr.connCount, -1)
 
-func (ss *sshServer) handleConn(conn *ssh.ServerConn, chans <-chan ssh.NewChannel,
-	svr *Server, entry *log.Entry) {
-
-	atomic.AddInt32(&ss.connCount, 1)
-	defer atomic.AddInt32(&ss.connCount, -1)
-
-	if ss.trackConn(conn, true) {
+	if svr.trackConn(conn, true) {
 		for ch := range chans {
-			go ss.handleChannel(conn, ch, svr, entry)
+			go svr.handleSSHChannel(conn, ch, entry)
 		}
-		if ss.trackConn(conn, false) {
+		if svr.trackConn(conn, false) {
 			conn.Close()
 		}
 	} else {
@@ -214,9 +181,7 @@ func (tr *termReader) Read(d []byte) (int, error) {
 	return n, nil
 }
 
-func (ss *sshServer) handleChannel(conn *ssh.ServerConn, nch ssh.NewChannel, svr *Server,
-	entry *log.Entry) {
-
+func (svr *Server) handleSSHChannel(conn *ssh.ServerConn, nch ssh.NewChannel, entry *log.Entry) {
 	typ := nch.ChannelType()
 	if typ != "session" {
 		nch.Reject(ssh.UnknownChannelType, typ)
@@ -251,59 +216,4 @@ func (ss *sshServer) handleChannel(conn *ssh.ServerConn, nch ssh.NewChannel, svr
 		term: t,
 	}
 	svr.Handle(bufio.NewReader(&tr), t, conn.User(), "ssh", conn.RemoteAddr().String())
-}
-
-func (ss *sshServer) Close() error {
-	ss.mutex.Lock()
-	defer ss.mutex.Unlock()
-
-	if ss.closed {
-		return nil
-	}
-	ss.closed = true
-
-	var err error
-	if !ss.shutdown {
-		err = ss.listener.Close()
-		ss.shutdown = true
-	}
-
-	for conn := range ss.activeConn {
-		conn.Close()
-		delete(ss.activeConn, conn)
-	}
-	return err
-}
-
-func (ss *sshServer) Shutdown(ctx context.Context) error {
-	var err error
-
-	ss.mutex.Lock()
-	if ss.closed {
-		ss.mutex.Unlock()
-		return nil
-	}
-	if !ss.shutdown {
-		err = ss.listener.Close()
-		ss.shutdown = true
-	}
-	ss.mutex.Unlock()
-
-	last := int32(-1)
-	for {
-		cc := atomic.LoadInt32(&ss.connCount)
-		if cc == 0 {
-			break
-		}
-		if cc != last {
-			p := ""
-			if cc > 1 {
-				p = "s"
-			}
-			fmt.Printf("%d active connection%s\n", cc, p)
-			last = cc
-		}
-		time.Sleep(500 * time.Millisecond)
-	}
-	return err
 }
