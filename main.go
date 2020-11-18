@@ -75,7 +75,6 @@ import (
 	"context"
 	"flag"
 	"fmt"
-	"io"
 	"io/ioutil"
 	"os"
 	"os/signal"
@@ -85,9 +84,8 @@ import (
 
 	"github.com/leftmike/maho/config"
 	"github.com/leftmike/maho/engine"
-	"github.com/leftmike/maho/evaluate"
 	"github.com/leftmike/maho/flags"
-	"github.com/leftmike/maho/parser"
+	"github.com/leftmike/maho/repl"
 	"github.com/leftmike/maho/server"
 	"github.com/leftmike/maho/sql"
 	"github.com/leftmike/maho/storage"
@@ -119,7 +117,7 @@ var (
 	configFile = flag.String("config-file", "", "`file` to load config from (maho.hcl)")
 	noConfig   = flag.Bool("no-config", false, "don't load config file")
 	listConfig = flag.Bool("list-config", false, "list config and exit")
-	repl       = flag.Bool("repl", false, "`flag` to control the console repl (false)")
+	replFlag   = flag.Bool("repl", false, "`flag` to control the console repl (false)")
 )
 
 type stringSlice []string
@@ -277,14 +275,6 @@ func main() {
 		})
 
 	svr := server.Server{
-		Handler: func(ses *evaluate.Session, rr io.RuneReader, w io.Writer) {
-			src := fmt.Sprintf("%s@%s", ses.User, ses.Type)
-			if ses.Addr != "" {
-				src = fmt.Sprintf("%s:%s", src, ses.Addr)
-			}
-			replSQL(ses,
-				parser.NewParser(rr, src), w)
-		},
 		Engine:          e,
 		DefaultDatabase: sql.ID(*database),
 	}
@@ -311,7 +301,8 @@ func main() {
 	}
 
 	for idx, arg := range sqlArgs {
-		svr.Handle(strings.NewReader(arg), os.Stdout, "startup", "sql-arg", fmt.Sprintf("%d", idx))
+		svr.HandleSession(repl.Handler(strings.NewReader(arg), os.Stdout), "startup", "sql-arg",
+			fmt.Sprintf("%d", idx))
 	}
 
 	args := flag.Args()
@@ -321,7 +312,8 @@ func main() {
 			fmt.Fprintf(os.Stderr, "maho: sql file: %s\n", err)
 			return
 		}
-		svr.Handle(bufio.NewReader(f), os.Stderr, "startup", "sql-file", args[idx])
+		svr.HandleSession(repl.Handler(bufio.NewReader(f), os.Stderr), "startup", "sql-file",
+			args[idx])
 	}
 
 	if *sshServer {
@@ -368,8 +360,8 @@ func main() {
 		}()
 	}
 
-	if *repl || (!*sshServer && len(args) == 0 && len(sqlArgs) == 0) {
-		interact(&svr)
+	if *replFlag || (!*sshServer && len(args) == 0 && len(sqlArgs) == 0) {
+		svr.HandleSession(repl.Interact(), "startup", "console", "")
 	} else if *sshServer {
 		ch := make(chan os.Signal, 1)
 		signal.Notify(ch, os.Interrupt)

@@ -10,6 +10,7 @@ import (
 	"github.com/leftmike/maho/evaluate"
 	"github.com/leftmike/maho/flags"
 	"github.com/leftmike/maho/parser"
+	"github.com/leftmike/maho/repl"
 	"github.com/leftmike/maho/sql"
 	"github.com/leftmike/maho/storage"
 	"github.com/leftmike/maho/storage/basic"
@@ -116,7 +117,8 @@ func testStore(t *testing.T, st *storage.Store, cases []testCase) {
 		ses := evaluate.NewSession(e, sql.SYSTEM, sql.INFO)
 
 		var b bytes.Buffer
-		replSQL(ses, parser.NewParser(strings.NewReader(c.s), fmt.Sprintf("cases[%d]", i)), &b)
+		repl.ReplSQL(ses, parser.NewParser(strings.NewReader(c.s), fmt.Sprintf("cases[%d]", i)),
+			&b)
 		if b.String() != c.r {
 			t.Errorf("parse(%q) got\n%s\nwant\n%s", c.s, b.String(), c.r)
 		}

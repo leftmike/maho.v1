@@ -9,6 +9,8 @@ import (
 	log "github.com/sirupsen/logrus"
 	"golang.org/x/crypto/ssh"
 	"golang.org/x/crypto/ssh/terminal"
+
+	"github.com/leftmike/maho/repl"
 )
 
 type SSHConfig struct {
@@ -181,6 +183,11 @@ func (tr *termReader) Read(d []byte) (int, error) {
 	return n, nil
 }
 
+var (
+	// Set by ssh_test.go
+	sshHandler = repl.Handler
+)
+
 func (svr *Server) handleSSHChannel(conn *ssh.ServerConn, nch ssh.NewChannel, entry *log.Entry) {
 	typ := nch.ChannelType()
 	if typ != "session" {
@@ -215,5 +222,6 @@ func (svr *Server) handleSSHChannel(conn *ssh.ServerConn, nch ssh.NewChannel, en
 	tr := termReader{
 		term: t,
 	}
-	svr.Handle(bufio.NewReader(&tr), t, conn.User(), "ssh", conn.RemoteAddr().String())
+	svr.HandleSession(sshHandler(bufio.NewReader(&tr), t), conn.User(), "ssh",
+		conn.RemoteAddr().String())
 }

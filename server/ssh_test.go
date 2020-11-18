@@ -1,4 +1,4 @@
-package server_test
+package server
 
 import (
 	"fmt"
@@ -11,7 +11,6 @@ import (
 	"github.com/leftmike/maho/engine"
 	"github.com/leftmike/maho/evaluate"
 	"github.com/leftmike/maho/flags"
-	"github.com/leftmike/maho/server"
 	"github.com/leftmike/maho/storage/basic"
 )
 
@@ -91,22 +90,24 @@ func testSSHServer(t *testing.T, fail bool, cfg *ssh.ClientConfig, port int, aut
 		t.Fatal(err)
 	}
 
-	s := server.Server{
-		Handler: func(ses *evaluate.Session, rr io.RuneReader, w io.Writer) {
+	sshHandler = func(rr io.RuneReader, w io.Writer) evaluate.SessionHandler {
+		return func(ses *evaluate.Session) {
 			served <- struct{}{}
-		},
+		}
+	}
+	s := Server{
 		Engine: engine.NewEngine(st, flags.Default()),
 	}
 
 	go func() {
 		err := s.ListenAndServeSSH(
-			server.SSHConfig{
+			SSHConfig{
 				Address:         addr,
 				HostKeysBytes:   hostKeysBytes,
 				AuthorizedBytes: authorizedBytes,
 				CheckPassword:   checkPassword,
 			})
-		if err != server.ErrServerClosed {
+		if err != ErrServerClosed {
 			t.Fatalf("ListenAndServe() returned with %s", err)
 		}
 	}()

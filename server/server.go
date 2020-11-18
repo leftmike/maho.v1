@@ -17,10 +17,7 @@ import (
 
 var ErrServerClosed = errors.New("server: closed")
 
-type Handler func(ses *evaluate.Session, rr io.RuneReader, w io.Writer)
-
 type Server struct {
-	Handler         Handler
 	Engine          sql.Engine
 	DefaultDatabase sql.Identifier
 
@@ -65,15 +62,16 @@ func (svr *Server) removeSession(ses *evaluate.Session) {
 	delete(svr.sessions, ses)
 }
 
-func (svr *Server) Handle(rr io.RuneReader, w io.Writer, user, typ, addr string) {
+func (svr *Server) HandleSession(shfn evaluate.SessionHandler, user, typ, addr string) {
 	ses := evaluate.NewSession(svr.Engine, svr.DefaultDatabase, sql.PUBLIC)
 	ses.User = user
 	ses.Type = typ
 	ses.Addr = addr
 
 	svr.addSession(ses)
-	svr.Handler(ses, rr, w)
-	svr.removeSession(ses)
+	defer svr.removeSession(ses)
+
+	shfn(ses)
 }
 
 func (svr *Server) trackConn(conn io.Closer, add bool) bool {

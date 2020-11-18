@@ -1,4 +1,4 @@
-package main
+package repl
 
 import (
 	"context"
@@ -12,7 +12,7 @@ import (
 	"github.com/leftmike/maho/sql"
 )
 
-func replSQL(ses *evaluate.Session, p parser.Parser, w io.Writer) {
+func ReplSQL(ses *evaluate.Session, p parser.Parser, w io.Writer) {
 	for {
 		stmt, err := p.Parse()
 		if err == io.EOF {
@@ -101,5 +101,15 @@ func replSQL(ses *evaluate.Session, p parser.Parser, w io.Writer) {
 		if err != nil {
 			fmt.Fprintln(w, err)
 		}
+	}
+}
+
+func Handler(rr io.RuneReader, w io.Writer) evaluate.SessionHandler {
+	return func(ses *evaluate.Session) {
+		src := fmt.Sprintf("%s@%s", ses.User, ses.Type)
+		if ses.Addr != "" {
+			src = fmt.Sprintf("%s:%s", src, ses.Addr)
+		}
+		ReplSQL(ses, parser.NewParser(rr, src), w)
 	}
 }

@@ -24,6 +24,8 @@ type Session struct {
 	flgs            map[flags.Flag]bool
 }
 
+type SessionHandler func(ses *Session)
+
 func NewSession(e sql.Engine, defaultDatabase, defaultSchema sql.Identifier) *Session {
 	return &Session{
 		ctx:             context.Background(),

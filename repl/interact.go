@@ -1,4 +1,4 @@
-package main
+package repl
 
 import (
 	"fmt"
@@ -8,7 +8,8 @@ import (
 
 	"github.com/peterh/liner"
 
-	"github.com/leftmike/maho/server"
+	"github.com/leftmike/maho/evaluate"
+	"github.com/leftmike/maho/parser"
 )
 
 const (
@@ -42,7 +43,7 @@ func (lr *lineReader) ReadRune() (r rune, size int, err error) {
 	}
 }
 
-func interact(svr *server.Server) {
+func Interact() evaluate.SessionHandler {
 	line := liner.NewLiner()
 	defer line.Close()
 
@@ -51,12 +52,14 @@ func interact(svr *server.Server) {
 		f.Close()
 	}
 
-	svr.Handle(&lineReader{line: line}, os.Stdout, "startup", "console", "")
+	return func(ses *evaluate.Session) {
+		ReplSQL(ses, parser.NewParser(&lineReader{line: line}, "console"), os.Stdout)
 
-	if f, err := os.Create(mahoHistory); err != nil {
-		fmt.Fprintf(os.Stderr, "maho: error writing history file, %s: %s", mahoHistory, err)
-	} else {
-		line.WriteHistory(f)
-		f.Close()
+		if f, err := os.Create(mahoHistory); err != nil {
+			fmt.Fprintf(os.Stderr, "maho: error writing history file, %s: %s", mahoHistory, err)
+		} else {
+			line.WriteHistory(f)
+			f.Close()
+		}
 	}
 }
