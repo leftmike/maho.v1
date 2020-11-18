@@ -109,7 +109,9 @@ type explainRows struct {
 	rows [][]sql.Value
 }
 
-func (_ *explainRows) Planned() {}
+func (_ *explainRows) Tag() string {
+	return "EXPLAIN"
+}
 
 func (er *explainRows) Columns() []sql.Identifier {
 	return er.cols

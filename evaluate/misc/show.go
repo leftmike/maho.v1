@@ -29,7 +29,9 @@ func (stmt *Show) Plan(ctx context.Context, pctx evaluate.PlanContext,
 	return stmt, nil
 }
 
-func (_ *Show) Planned() {}
+func (_ *Show) Tag() string {
+	return "SHOW"
+}
 
 func (stmt *Show) Columns() []sql.Identifier {
 	return stmt.ses.Columns(stmt.Variable)

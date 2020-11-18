@@ -99,7 +99,9 @@ func (stmt *Update) Plan(ctx context.Context, pctx evaluate.PlanContext,
 	return &plan, nil
 }
 
-func (_ *updatePlan) Planned() {}
+func (_ *updatePlan) Tag() string {
+	return "UPDATE"
+}
 
 func (up *updatePlan) Execute(ctx context.Context, tx sql.Transaction) (int64, error) {
 	tbl, err := tx.LookupTable(ctx, up.tn, up.ttVer)

@@ -22,7 +22,7 @@ type PlanContext interface {
 }
 
 type Plan interface {
-	Planned()
+	Tag() string
 }
 
 type StmtPlan interface {

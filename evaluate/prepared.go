@@ -108,7 +108,9 @@ func setParameters(prepParams []*sql.Value, params []sql.Value) error {
 	return nil
 }
 
-func (psp *PreparedStmtPlan) Planned() {}
+func (psp *PreparedStmtPlan) Tag() string {
+	return psp.plan.Tag()
+}
 
 func (psp *PreparedStmtPlan) SetParameters(params []sql.Value) error {
 	return setParameters(psp.params, params)
@@ -118,7 +120,9 @@ func (psp *PreparedStmtPlan) Execute(ctx context.Context, tx sql.Transaction) (i
 	return psp.plan.Execute(ctx, tx)
 }
 
-func (prp *PreparedRowsPlan) Planned() {}
+func (prp *PreparedRowsPlan) Tag() string {
+	return prp.plan.Tag()
+}
 
 func (prp *PreparedRowsPlan) SetParameters(params []sql.Value) error {
 	return setParameters(prp.params, params)

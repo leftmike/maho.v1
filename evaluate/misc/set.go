@@ -30,7 +30,9 @@ func (stmt *Set) Plan(ctx context.Context, pctx evaluate.PlanContext,
 	return stmt, nil
 }
 
-func (_ *Set) Planned() {}
+func (_ *Set) Tag() string {
+	return "SET"
+}
 
 func (stmt *Set) Execute(ctx context.Context, tx sql.Transaction) (int64, error) {
 	return -1, stmt.ses.Set(stmt.Variable, stmt.Value)

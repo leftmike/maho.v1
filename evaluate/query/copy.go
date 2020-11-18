@@ -97,7 +97,9 @@ type copyPlan struct {
 	delimiter  rune
 }
 
-func (_ *copyPlan) Planned() {}
+func (_ *copyPlan) Tag() string {
+	return "COPY"
+}
 
 func (plan *copyPlan) Execute(ctx context.Context, tx sql.Transaction) (int64, error) {
 	tbl, err := tx.LookupTable(ctx, plan.tn, plan.ttVer)

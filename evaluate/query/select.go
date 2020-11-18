@@ -160,7 +160,9 @@ type rowsOpPlan struct {
 	cols []sql.Identifier
 }
 
-func (_ rowsOpPlan) Planned() {}
+func (_ rowsOpPlan) Tag() string {
+	return "SELECT"
+}
 
 func (rp rowsOpPlan) Columns() []sql.Identifier {
 	return rp.cols

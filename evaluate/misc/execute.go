@@ -68,7 +68,9 @@ type executeStmtPlan struct {
 	prepStmt *evaluate.PreparedStmtPlan
 }
 
-func (_ executeStmtPlan) Planned() {}
+func (_ executeStmtPlan) Tag() string {
+	return "EXECUTE"
+}
 
 func (esp executeStmtPlan) Execute(ctx context.Context, tx sql.Transaction) (int64, error) {
 	err := setParameters(ctx, tx, esp.prepStmt, esp.params)
@@ -83,7 +85,9 @@ type executeRowsPlan struct {
 	prepRows *evaluate.PreparedRowsPlan
 }
 
-func (_ executeRowsPlan) Planned() {}
+func (_ executeRowsPlan) Tag() string {
+	return "EXECUTE"
+}
 
 func (erp executeRowsPlan) Columns() []sql.Identifier {
 	return erp.prepRows.Columns()

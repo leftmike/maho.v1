@@ -36,7 +36,9 @@ func (stmt *DropTable) Plan(ctx context.Context, pctx evaluate.PlanContext,
 	return stmt, nil
 }
 
-func (_ *DropTable) Planned() {}
+func (_ *DropTable) Tag() string {
+	return "DROP TABLE"
+}
 
 func (stmt *DropTable) Execute(ctx context.Context, tx sql.Transaction) (int64, error) {
 	for _, tn := range stmt.Tables {
@@ -70,7 +72,9 @@ func (stmt *DropIndex) Plan(ctx context.Context, pctx evaluate.PlanContext,
 	return stmt, nil
 }
 
-func (_ *DropIndex) Planned() {}
+func (_ *DropIndex) Tag() string {
+	return "DROP INDEX"
+}
 
 func (stmt *DropIndex) Execute(ctx context.Context, tx sql.Transaction) (int64, error) {
 	return -1, tx.DropIndex(ctx, stmt.Index, stmt.Table, stmt.IfExists)
@@ -103,7 +107,9 @@ func (stmt *DropDatabase) Plan(ctx context.Context, pctx evaluate.PlanContext,
 	return stmt, nil
 }
 
-func (_ *DropDatabase) Planned() {}
+func (_ *DropDatabase) Tag() string {
+	return "DROP DATABASE"
+}
 
 func (stmt *DropDatabase) Command(ctx context.Context, ses *evaluate.Session, e sql.Engine) (int64,
 	error) {
@@ -131,7 +137,9 @@ func (stmt *DropSchema) Plan(ctx context.Context, pctx evaluate.PlanContext,
 	return stmt, nil
 }
 
-func (_ *DropSchema) Planned() {}
+func (_ *DropSchema) Tag() string {
+	return "DROP SCHEMA"
+}
 
 func (stmt *DropSchema) Execute(ctx context.Context, tx sql.Transaction) (int64, error) {
 	return -1, tx.DropSchema(ctx, stmt.Schema, stmt.IfExists)

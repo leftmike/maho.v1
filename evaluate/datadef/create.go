@@ -246,7 +246,9 @@ func (stmt *CreateTable) Plan(ctx context.Context, pctx evaluate.PlanContext,
 	return stmt, nil
 }
 
-func (_ *CreateTable) Planned() {}
+func (_ *CreateTable) Tag() string {
+	return "CREATE TABLE"
+}
 
 func (stmt *CreateTable) Execute(ctx context.Context, tx sql.Transaction) (int64, error) {
 	err := tx.CreateTable(ctx, stmt.Table, stmt.Columns, stmt.columnTypes, stmt.constraints,
@@ -297,7 +299,9 @@ func (stmt *CreateIndex) Plan(ctx context.Context, pctx evaluate.PlanContext,
 	return stmt, nil
 }
 
-func (_ *CreateIndex) Planned() {}
+func (_ *CreateIndex) Tag() string {
+	return "CREATE INDEX"
+}
 
 func (stmt *CreateIndex) Execute(ctx context.Context, tx sql.Transaction) (int64, error) {
 	tt, err := tx.LookupTableType(ctx, stmt.Table)
@@ -336,7 +340,9 @@ func (stmt *CreateDatabase) Plan(ctx context.Context, pctx evaluate.PlanContext,
 	return stmt, nil
 }
 
-func (_ *CreateDatabase) Planned() {}
+func (_ *CreateDatabase) Tag() string {
+	return "CREATE DATABASE"
+}
 
 func (stmt *CreateDatabase) Command(ctx context.Context, pctx evaluate.PlanContext,
 	e sql.Engine) (int64, error) {
@@ -359,7 +365,9 @@ func (stmt *CreateSchema) Plan(ctx context.Context, pctx evaluate.PlanContext,
 	return stmt, nil
 }
 
-func (_ *CreateSchema) Planned() {}
+func (_ *CreateSchema) Tag() string {
+	return "CREATE SCHEMA"
+}
 
 func (stmt *CreateSchema) Execute(ctx context.Context, tx sql.Transaction) (int64, error) {
 	return -1, tx.CreateSchema(ctx, stmt.Schema)

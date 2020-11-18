@@ -68,7 +68,9 @@ type valuesPlan struct {
 	rows [][]sql.CExpr
 }
 
-func (_ valuesPlan) Planned() {}
+func (_ valuesPlan) Tag() string {
+	return "VALUES"
+}
 
 func (vp valuesPlan) Columns() []sql.Identifier {
 	return vp.cols

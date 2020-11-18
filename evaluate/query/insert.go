@@ -128,7 +128,9 @@ type insertValuesPlan struct {
 	rows  [][]sql.CExpr
 }
 
-func (_ *insertValuesPlan) Planned() {}
+func (_ *insertValuesPlan) Tag() string {
+	return "INSERT"
+}
 
 func (plan *insertValuesPlan) Execute(ctx context.Context, tx sql.Transaction) (int64, error) {
 	tbl, err := tx.LookupTable(ctx, plan.tn, plan.ttVer)

@@ -30,7 +30,9 @@ func (stmt *Prepare) Plan(ctx context.Context, pctx evaluate.PlanContext,
 	return stmt, nil
 }
 
-func (stmt *Prepare) Planned() {}
+func (stmt *Prepare) Tag() string {
+	return "PREPARE"
+}
 
 func (stmt *Prepare) Command(ctx context.Context, ses *evaluate.Session, e sql.Engine) error {
 	return ses.SetPreparedPlan(stmt.Name, stmt.prep)

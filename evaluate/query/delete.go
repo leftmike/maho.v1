@@ -49,7 +49,9 @@ func (stmt *Delete) Plan(ctx context.Context, pctx evaluate.PlanContext,
 	return &deletePlan{tn, tt.Version(), where}, nil
 }
 
-func (_ *deletePlan) Planned() {}
+func (_ *deletePlan) Tag() string {
+	return "DELETE"
+}
 
 func (dp *deletePlan) Execute(ctx context.Context, tx sql.Transaction) (int64, error) {
 	tbl, err := tx.LookupTable(ctx, dp.tn, dp.ttVer)

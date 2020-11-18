@@ -19,7 +19,9 @@ func (stmt *Commit) Plan(ctx context.Context, pctx evaluate.PlanContext,
 	return stmt, nil
 }
 
-func (_ *Commit) Planned() {}
+func (_ *Commit) Tag() string {
+	return "COMMIT"
+}
 
 func (stmt *Commit) Command(ctx context.Context, ses *evaluate.Session, e sql.Engine) error {
 	return ses.Commit()
