@@ -129,7 +129,8 @@ func (tx *transaction) LookupTable(ctx context.Context, tn sql.TableName, ttVer 
 }
 
 func (tx *transaction) CreateTable(ctx context.Context, tn sql.TableName, cols []sql.Identifier,
-	colTypes []sql.ColumnType, cons []sql.Constraint, ifNotExists bool) error {
+	colTypes []sql.ColumnType, colDefaults []sql.ColumnDefault, cons []sql.Constraint,
+	ifNotExists bool) error {
 
 	if tn.Database == sql.SYSTEM {
 		return fmt.Errorf("engine: database %s may not be modified", tn.Database)
@@ -171,11 +172,11 @@ func (tx *transaction) CreateTable(ctx context.Context, tn sql.TableName, cols [
 			Type:    sql.IntegerType,
 			Size:    8,
 			NotNull: true,
-			Default: dflt,
 		})
+		colDefaults = append(colDefaults, sql.ColumnDefault{Default: dflt})
 	}
 
-	tt := MakeTableType(cols, colTypes, primary)
+	tt := MakeTableType(cols, colTypes, colDefaults, primary)
 	for _, con := range cons {
 		if con.Type == sql.CheckConstraint {
 			tt.checks = append(tt.checks,

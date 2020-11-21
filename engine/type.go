@@ -41,6 +41,7 @@ type TableType struct {
 	ver         int64
 	cols        []sql.Identifier
 	colTypes    []sql.ColumnType
+	colDefaults []sql.ColumnDefault
 	primary     []sql.ColumnKey
 	indexes     []sql.IndexType
 	constraints []constraint
@@ -52,13 +53,14 @@ type TableType struct {
 }
 
 func MakeTableType(cols []sql.Identifier, colTypes []sql.ColumnType,
-	primary []sql.ColumnKey) *TableType {
+	colDefaults []sql.ColumnDefault, primary []sql.ColumnKey) *TableType {
 
 	return &TableType{
-		ver:      1,
-		cols:     cols,
-		colTypes: colTypes,
-		primary:  primary,
+		ver:         1,
+		cols:        cols,
+		colTypes:    colTypes,
+		colDefaults: colDefaults,
+		primary:     primary,
 	}
 }
 
@@ -72,6 +74,10 @@ func (tt *TableType) Columns() []sql.Identifier {
 
 func (tt *TableType) ColumnTypes() []sql.ColumnType {
 	return tt.colTypes
+}
+
+func (tt *TableType) ColumnDefaults() []sql.ColumnDefault {
+	return tt.colDefaults
 }
 
 func (tt *TableType) PrimaryKey() []sql.ColumnKey {
@@ -408,6 +414,7 @@ func encodeIntSlice(is []int) []int32 {
 func (tt *TableType) Encode() ([]byte, error) {
 	cols := tt.Columns()
 	colTypes := tt.ColumnTypes()
+	colDefaults := tt.ColumnDefaults()
 
 	var md TableTypeMetadata
 	md.Version = tt.ver
@@ -420,8 +427,8 @@ func (tt *TableType) Encode() ([]byte, error) {
 				Size:        colTypes[cdx].Size,
 				Fixed:       colTypes[cdx].Fixed,
 				NotNull:     colTypes[cdx].NotNull,
-				Default:     expr.Encode(colTypes[cdx].Default),
-				DefaultExpr: colTypes[cdx].DefaultExpr,
+				Default:     expr.Encode(colDefaults[cdx].Default),
+				DefaultExpr: colDefaults[cdx].DefaultExpr,
 			})
 	}
 
@@ -534,18 +541,22 @@ func DecodeTableType(tn sql.TableName, buf []byte) (*TableType, error) {
 
 	cols := make([]sql.Identifier, 0, len(md.Columns))
 	colTypes := make([]sql.ColumnType, 0, len(md.Columns))
+	colDefaults := make([]sql.ColumnDefault, 0, len(md.Columns))
 	for cdx := range md.Columns {
 		cols = append(cols, sql.QuotedID(md.Columns[cdx].Name))
+		colTypes = append(colTypes,
+			sql.ColumnType{
+				Type:    sql.DataType(md.Columns[cdx].Type),
+				Size:    md.Columns[cdx].Size,
+				Fixed:   md.Columns[cdx].Fixed,
+				NotNull: md.Columns[cdx].NotNull,
+			})
 		dflt, err := expr.Decode(md.Columns[cdx].Default)
 		if err != nil {
 			return nil, fmt.Errorf("engine: table %s: %s", tn, err)
 		}
-		colTypes = append(colTypes,
-			sql.ColumnType{
-				Type:        sql.DataType(md.Columns[cdx].Type),
-				Size:        md.Columns[cdx].Size,
-				Fixed:       md.Columns[cdx].Fixed,
-				NotNull:     md.Columns[cdx].NotNull,
+		colDefaults = append(colDefaults,
+			sql.ColumnDefault{
 				Default:     dflt,
 				DefaultExpr: md.Columns[cdx].DefaultExpr,
 			})
@@ -642,6 +653,7 @@ func DecodeTableType(tn sql.TableName, buf []byte) (*TableType, error) {
 		ver:         md.Version,
 		cols:        cols,
 		colTypes:    colTypes,
+		colDefaults: colDefaults,
 		primary:     primary,
 		indexes:     indexes,
 		constraints: constraints,

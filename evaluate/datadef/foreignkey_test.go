@@ -32,6 +32,10 @@ func (tt tableType) ColumnTypes() []sql.ColumnType {
 	return tt.colTypes
 }
 
+func (tt tableType) ColumnDefaults() []sql.ColumnDefault {
+	return make([]sql.ColumnDefault, len(tt.colTypes))
+}
+
 func (tt tableType) PrimaryKey() []sql.ColumnKey {
 	return tt.primary
 }

@@ -29,12 +29,6 @@ func TestEncodeDecode(t *testing.T) {
 			{
 				Type: sql.IntegerType,
 				Size: 4,
-				Default: mustCompile(t, &expr.Binary{
-					Op:    expr.AddOp,
-					Left:  expr.Int64Literal(123),
-					Right: expr.Int64Literal(456),
-				}),
-				DefaultExpr: "123 + 456",
 			},
 			{
 				Type:    sql.StringType,
@@ -46,6 +40,19 @@ func TestEncodeDecode(t *testing.T) {
 				Size:  128,
 				Fixed: true,
 			},
+		},
+		colDefaults: []sql.ColumnDefault{
+			{},
+			{
+				Default: mustCompile(t, &expr.Binary{
+					Op:    expr.AddOp,
+					Left:  expr.Int64Literal(123),
+					Right: expr.Int64Literal(456),
+				}),
+				DefaultExpr: "123 + 456",
+			},
+			{},
+			{},
 		},
 		primary: []sql.ColumnKey{sql.MakeColumnKey(1, true), sql.MakeColumnKey(0, false)},
 		indexes: []sql.IndexType{

@@ -64,7 +64,7 @@ func (stmt *InsertValues) Plan(ctx context.Context, pctx evaluate.PlanContext,
 	}
 
 	cols := tt.Columns()
-	colTypes := tt.ColumnTypes()
+	colDefaults := tt.ColumnDefaults()
 	mv := len(cols)
 	c2v := make([]int, mv) // column number to value number
 	if stmt.Columns == nil {
@@ -97,7 +97,7 @@ func (stmt *InsertValues) Plan(ctx context.Context, pctx evaluate.PlanContext,
 			return nil, fmt.Errorf("engine: %s: too many values", tn)
 		}
 		row := make([]sql.CExpr, len(cols))
-		for i, ct := range colTypes {
+		for i, cd := range colDefaults {
 			var e expr.Expr
 			if c2v[i] < len(r) {
 				e = r[c2v[i]]
@@ -110,7 +110,7 @@ func (stmt *InsertValues) Plan(ctx context.Context, pctx evaluate.PlanContext,
 					return nil, err
 				}
 			} else {
-				ce = ct.Default
+				ce = cd.Default
 			}
 			row[i] = ce
 		}

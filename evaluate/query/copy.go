@@ -46,13 +46,13 @@ func (stmt *Copy) Plan(ctx context.Context, pctx evaluate.PlanContext,
 	}
 
 	cols := tt.Columns()
-	colTypes := tt.ColumnTypes()
+	colDefaults := tt.ColumnDefaults()
 
 	defaultRow := make([]sql.CExpr, len(cols))
 	cmap := map[sql.Identifier]int{}
 	for cdx, cn := range cols {
 		cmap[cn] = cdx
-		defaultRow[cdx] = colTypes[cdx].Default
+		defaultRow[cdx] = colDefaults[cdx].Default
 	}
 
 	fromToRow := make([]int, len(stmt.Columns))

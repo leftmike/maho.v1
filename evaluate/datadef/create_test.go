@@ -6,6 +6,7 @@ import (
 	"testing"
 
 	"github.com/leftmike/maho/evaluate/datadef"
+	"github.com/leftmike/maho/evaluate/expr"
 	"github.com/leftmike/maho/evaluate/test"
 	"github.com/leftmike/maho/parser"
 	"github.com/leftmike/maho/sql"
@@ -30,12 +31,13 @@ func TestCreateTableString(t *testing.T) {
 			stmt: datadef.CreateTable{
 				Table:   sql.TableName{Table: sql.ID("t")},
 				Columns: []sql.Identifier{sql.ID("c1"), sql.ID("c2"), sql.ID("c3"), sql.ID("c4")},
-				ColumnTypes: []datadef.ColumnType{
+				ColumnTypes: []sql.ColumnType{
 					{Type: sql.IntegerType, Size: 4},
 					{Type: sql.IntegerType, Size: 4},
 					{Type: sql.IntegerType, Size: 4},
 					{Type: sql.IntegerType, Size: 4, NotNull: true},
 				},
+				ColumnDefaults: make([]expr.Expr, 4),
 				Constraints: []datadef.Constraint{
 					{
 						Type:   sql.NotNullConstraint,

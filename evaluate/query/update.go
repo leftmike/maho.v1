@@ -78,7 +78,7 @@ func (stmt *Update) Plan(ctx context.Context, pctx evaluate.PlanContext,
 		updates: make([]columnUpdate, 0, len(stmt.ColumnUpdates)),
 	}
 
-	colTypes := tt.ColumnTypes()
+	colDefaults := tt.ColumnDefaults()
 	for _, cu := range stmt.ColumnUpdates {
 		col, err := fctx.colIndex(cu.Column, "update")
 		if err != nil {
@@ -92,7 +92,7 @@ func (stmt *Update) Plan(ctx context.Context, pctx evaluate.PlanContext,
 				return nil, err
 			}
 		} else {
-			ce = colTypes[col].Default
+			ce = colDefaults[col].Default
 		}
 		plan.updates = append(plan.updates, columnUpdate{column: col, expr: ce})
 	}

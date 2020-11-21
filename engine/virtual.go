@@ -11,7 +11,7 @@ import (
 func MakeVirtualTable(tn sql.TableName, cols []sql.Identifier, colTypes []sql.ColumnType,
 	values [][]sql.Value) (sql.Table, sql.TableType, error) {
 
-	tt := MakeTableType(cols, colTypes, nil)
+	tt := MakeTableType(cols, colTypes, make([]sql.ColumnDefault, len(colTypes)), nil)
 	return &virtualTable{
 		tn:     tn,
 		tt:     tt,
@@ -219,12 +219,13 @@ var (
 )
 
 func appendColumns(values [][]sql.Value, tn sql.TableName, cols []sql.Identifier,
-	colTypes []sql.ColumnType) [][]sql.Value {
+	colTypes []sql.ColumnType, colDefaults []sql.ColumnDefault) [][]sql.Value {
 
 	for i, ct := range colTypes {
 		var def sql.Value
-		if ct.DefaultExpr != "" {
-			def = sql.StringValue(ct.DefaultExpr)
+		de := colDefaults[i].DefaultExpr
+		if de != "" {
+			def = sql.StringValue(de)
 		}
 		isNullable := "yes"
 		if ct.NotNull {
@@ -267,15 +268,18 @@ func (e *Engine) makeColumnsTable(ctx context.Context, tx sql.Transaction,
 		for _, tblname := range tblnames {
 			ttn := sql.TableName{tn.Database, scname, tblname}
 			if scname == sql.METADATA && tblname == sql.COLUMNS {
-				values = appendColumns(values, ttn, columnsColumns, columnsColumnTypes)
+				values = appendColumns(values, ttn, columnsColumns, columnsColumnTypes,
+					make([]sql.ColumnDefault, len(columnsColumnTypes)))
 			} else if scname == sql.METADATA && tblname == sql.CONSTRAINTS {
-				values = appendColumns(values, ttn, constraintsColumns, constraintsColumnTypes)
+				values = appendColumns(values, ttn, constraintsColumns, constraintsColumnTypes,
+					make([]sql.ColumnDefault, len(constraintsColumnTypes)))
 			} else {
 				tt, err := tx.LookupTableType(ctx, ttn)
 				if err != nil {
 					return nil, nil, err
 				}
-				values = appendColumns(values, ttn, tt.Columns(), tt.ColumnTypes())
+				values = appendColumns(values, ttn, tt.Columns(), tt.ColumnTypes(),
+					tt.ColumnDefaults())
 			}
 		}
 	}
@@ -319,7 +323,8 @@ func columnKey(tt *TableType, key []sql.ColumnKey) string {
 
 func appendConstraints(values [][]sql.Value, tn sql.TableName, tt *TableType) [][]sql.Value {
 	for i, ct := range tt.colTypes {
-		if ct.DefaultExpr != "" {
+		de := tt.colDefaults[i].DefaultExpr
+		if de != "" {
 			values = append(values,
 				[]sql.Value{
 					sql.StringValue(tn.Database.String()),
@@ -327,7 +332,7 @@ func appendConstraints(values [][]sql.Value, tn sql.TableName, tt *TableType) []
 					sql.StringValue(tn.Table.String()),
 					columnConstraintName(i, tt, sql.DefaultConstraint),
 					sql.StringValue("DEFAULT"),
-					sql.StringValue("column " + tt.cols[i].String() + ": " + ct.DefaultExpr),
+					sql.StringValue("column " + tt.cols[i].String() + ": " + de),
 				})
 		}
 		if ct.NotNull {
@@ -407,10 +412,12 @@ func (e *Engine) makeConstraintsTable(ctx context.Context, tx sql.Transaction,
 			ttn := sql.TableName{tn.Database, scname, tblname}
 			if scname == sql.METADATA && tblname == sql.COLUMNS {
 				values = appendConstraints(values, ttn,
-					MakeTableType(columnsColumns, columnsColumnTypes, nil))
+					MakeTableType(columnsColumns, columnsColumnTypes,
+						make([]sql.ColumnDefault, len(columnsColumnTypes)), nil))
 			} else if scname == sql.METADATA && tblname == sql.CONSTRAINTS {
 				values = appendConstraints(values, ttn,
-					MakeTableType(constraintsColumns, constraintsColumnTypes, nil))
+					MakeTableType(constraintsColumns, constraintsColumnTypes,
+						make([]sql.ColumnDefault, len(constraintsColumnTypes)), nil))
 			} else {
 				tt, err := tx.LookupTableType(ctx, ttn)
 				if err != nil {

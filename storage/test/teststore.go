@@ -309,9 +309,11 @@ func testDatabase(t *testing.T, st *storage.Store, dbname sql.Identifier, cmds [
 		case cmdCreateTable:
 			var tt *engine.TableType
 			if cmd.cols == nil {
-				tt = engine.MakeTableType(columns, columnTypes, primary)
+				tt = engine.MakeTableType(columns, columnTypes,
+					make([]sql.ColumnDefault, len(columnTypes)), primary)
 			} else {
-				tt = engine.MakeTableType(cmd.cols, cmd.colTypes, cmd.key)
+				tt = engine.MakeTableType(cmd.cols, cmd.colTypes,
+					make([]sql.ColumnDefault, len(cmd.colTypes)), cmd.key)
 			}
 			err := st.CreateTable(ctx, state.tx, sql.TableName{dbname, scname, cmd.name}, tt,
 				false)

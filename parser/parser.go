@@ -600,7 +600,7 @@ func (p *parser) parseCreateDetails(s *datadef.CreateTable) {
 	}
 }
 
-var types = map[sql.Identifier]datadef.ColumnType{
+var types = map[sql.Identifier]sql.ColumnType{
 	sql.BINARY:    {Type: sql.BytesType, Fixed: true, Size: 1},
 	sql.VARBINARY: {Type: sql.BytesType, Fixed: false},
 	sql.BLOB:      {Type: sql.BytesType, Fixed: false, Size: sql.MaxColumnSize},
@@ -623,7 +623,7 @@ var types = map[sql.Identifier]datadef.ColumnType{
 	sql.BIGINT:    {Type: sql.IntegerType, Size: 8},
 }
 
-func (p *parser) parseColumnType() datadef.ColumnType {
+func (p *parser) parseColumnType() sql.ColumnType {
 	/*
 		data_type =
 			  BINARY ['(' length ')']
@@ -787,6 +787,7 @@ func (p *parser) parseColumn(s *datadef.CreateTable) {
 
 	ct := p.parseColumnType()
 
+	var dflt expr.Expr
 	for {
 		var cn sql.Identifier
 		if p.optionalReserved(sql.CONSTRAINT) {
@@ -794,13 +795,13 @@ func (p *parser) parseColumn(s *datadef.CreateTable) {
 		}
 
 		if p.optionalReserved(sql.DEFAULT) {
-			if ct.Default != nil {
+			if dflt != nil {
 				p.error("DEFAULT specified more than once per column")
 			}
 			if cn != 0 {
 				p.addColumnConstraint(s, sql.DefaultConstraint, cn, len(s.Columns)-1)
 			}
-			ct.Default = p.parseExpr()
+			dflt = p.parseExpr()
 		} else if p.optionalReserved(sql.NOT) {
 			p.expectReserved(sql.NULL)
 
@@ -867,6 +868,7 @@ func (p *parser) parseColumn(s *datadef.CreateTable) {
 	}
 
 	s.ColumnTypes = append(s.ColumnTypes, ct)
+	s.ColumnDefaults = append(s.ColumnDefaults, dflt)
 }
 
 func (p *parser) parseCreateIndex(unique bool) evaluate.Stmt {

@@ -40,6 +40,7 @@ func createTable(t *testing.T, tx sql.Transaction, tn sql.TableName) {
 			{Type: sql.IntegerType, Size: 8},
 			{Type: sql.IntegerType, Size: 8},
 		},
+		make([]sql.ColumnDefault, 4),
 		[]sql.Constraint{
 			{
 				Type: sql.PrimaryConstraint,

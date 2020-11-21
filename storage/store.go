@@ -77,16 +77,19 @@ func NewStore(name string, ps PersistentStore, init bool) (*Store, error) {
 		sequences: engine.MakeTableType(
 			[]sql.Identifier{sql.ID("sequence"), sql.ID("current")},
 			[]sql.ColumnType{sql.IdColType, sql.Int64ColType},
+			make([]sql.ColumnDefault, 2),
 			[]sql.ColumnKey{sql.MakeColumnKey(0, false)}),
 
 		databases: engine.MakeTableType(
 			[]sql.Identifier{sql.ID("database")},
 			[]sql.ColumnType{sql.IdColType},
+			make([]sql.ColumnDefault, 1),
 			[]sql.ColumnKey{sql.MakeColumnKey(0, false)}),
 
 		schemas: engine.MakeTableType(
 			[]sql.Identifier{sql.ID("database"), sql.ID("schema"), sql.ID("tables")},
 			[]sql.ColumnType{sql.IdColType, sql.IdColType, sql.Int64ColType},
+			make([]sql.ColumnDefault, 3),
 			[]sql.ColumnKey{sql.MakeColumnKey(0, false), sql.MakeColumnKey(1, false)}),
 
 		tables: engine.MakeTableType(
@@ -95,6 +98,7 @@ func NewStore(name string, ps PersistentStore, init bool) (*Store, error) {
 			[]sql.ColumnType{sql.IdColType, sql.IdColType, sql.IdColType, sql.Int64ColType,
 				{Type: sql.BytesType, Fixed: false, Size: sql.MaxColumnSize}, sql.Int64ColType,
 				{Type: sql.BytesType, Fixed: false, Size: sql.MaxColumnSize}},
+			make([]sql.ColumnDefault, 7),
 			[]sql.ColumnKey{sql.MakeColumnKey(0, false), sql.MakeColumnKey(1, false),
 				sql.MakeColumnKey(2, false)}),
 	}

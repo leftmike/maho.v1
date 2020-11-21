@@ -21,7 +21,10 @@ type ColumnType struct {
 	Size  uint32
 	Fixed bool // fixed sized character column
 
-	NotNull     bool // not allowed to be NULL
+	NotNull bool // not allowed to be NULL
+}
+
+type ColumnDefault struct {
 	Default     CExpr
 	DefaultExpr string
 }

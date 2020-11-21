@@ -27,7 +27,7 @@ type Transaction interface {
 	LookupTableType(ctx context.Context, tn TableName) (TableType, error)
 	LookupTable(ctx context.Context, tn TableName, ttVer int64) (Table, error)
 	CreateTable(ctx context.Context, tn TableName, cols []Identifier, colTypes []ColumnType,
-		cons []Constraint, ifNotExists bool) error
+		colDefaults []ColumnDefault, cons []Constraint, ifNotExists bool) error
 	DropTable(ctx context.Context, tn TableName, ifExists bool) error
 	AddForeignKey(ctx context.Context, con Identifier, fktn TableName, fkCols []int, rtn TableName,
 		ridx Identifier, onDel, onUpd RefAction) error
@@ -51,6 +51,7 @@ type TableType interface {
 	Version() int64
 	Columns() []Identifier
 	ColumnTypes() []ColumnType
+	ColumnDefaults() []ColumnDefault
 	PrimaryKey() []ColumnKey
 	Indexes() []IndexType
 }

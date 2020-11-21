@@ -72,8 +72,9 @@ func TestTypedTable(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	err = st.CreateTable(ctx, tx, tn, engine.MakeTableType(columns, columnTypes, primaryKey),
-		false)
+	tt := engine.MakeTableType(columns, columnTypes, make([]sql.ColumnDefault, len(columnTypes)),
+		primaryKey)
+	err = st.CreateTable(ctx, tx, tn, tt, false)
 	if err != nil {
 		t.Fatal(err)
 	}

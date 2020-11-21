@@ -92,23 +92,16 @@ func (c Constraint) String() string {
 	return ""
 }
 
-type ColumnType struct {
-	Type    sql.DataType
-	Size    uint32
-	Fixed   bool
-	NotNull bool
-	Default expr.Expr
-}
-
 type CreateTable struct {
-	Table       sql.TableName
-	Columns     []sql.Identifier
-	ColumnTypes []ColumnType
-	columnTypes []sql.ColumnType
-	IfNotExists bool
-	Constraints []Constraint
-	constraints []sql.Constraint
-	ForeignKeys []*ForeignKey
+	Table          sql.TableName
+	Columns        []sql.Identifier
+	ColumnTypes    []sql.ColumnType
+	ColumnDefaults []expr.Expr
+	columnDefaults []sql.ColumnDefault
+	IfNotExists    bool
+	Constraints    []Constraint
+	constraints    []sql.Constraint
+	ForeignKeys    []*ForeignKey
 }
 
 func (stmt *CreateTable) String() string {
@@ -126,8 +119,9 @@ func (stmt *CreateTable) String() string {
 		if ct.NotNull {
 			s += " NOT NULL"
 		}
-		if ct.Default != nil {
-			s += fmt.Sprintf(" DEFAULT %s", ct.Default)
+		cd := stmt.ColumnDefaults[i]
+		if cd != nil {
+			s += fmt.Sprintf(" DEFAULT %s", cd)
 		}
 	}
 	for _, c := range stmt.Constraints {
@@ -221,23 +215,19 @@ func (stmt *CreateTable) Plan(ctx context.Context, pctx evaluate.PlanContext,
 			})
 	}
 
-	for _, ct := range stmt.ColumnTypes {
+	for _, cd := range stmt.ColumnDefaults {
 		var dflt sql.CExpr
 		var dfltExpr string
-		if ct.Default != nil {
+		if cd != nil {
 			var err error
-			dflt, err = expr.Compile(ctx, pctx, tx, nil, ct.Default)
+			dflt, err = expr.Compile(ctx, pctx, tx, nil, cd)
 			if err != nil {
 				return nil, err
 			}
-			dfltExpr = ct.Default.String()
+			dfltExpr = cd.String()
 		}
-		stmt.columnTypes = append(stmt.columnTypes,
-			sql.ColumnType{
-				Type:        ct.Type,
-				Size:        ct.Size,
-				Fixed:       ct.Fixed,
-				NotNull:     ct.NotNull,
+		stmt.columnDefaults = append(stmt.columnDefaults,
+			sql.ColumnDefault{
 				Default:     dflt,
 				DefaultExpr: dfltExpr,
 			})
@@ -251,8 +241,8 @@ func (_ *CreateTable) Tag() string {
 }
 
 func (stmt *CreateTable) Execute(ctx context.Context, tx sql.Transaction) (int64, error) {
-	err := tx.CreateTable(ctx, stmt.Table, stmt.Columns, stmt.columnTypes, stmt.constraints,
-		stmt.IfNotExists)
+	err := tx.CreateTable(ctx, stmt.Table, stmt.Columns, stmt.ColumnTypes, stmt.columnDefaults,
+		stmt.constraints, stmt.IfNotExists)
 	if err != nil {
 		return -1, err
 	}

@@ -120,7 +120,7 @@ func TestCreateTable(t *testing.T) {
 				Table: sql.TableName{Table: sql.ID("t")},
 				Columns: []sql.Identifier{sql.ID("c1"), sql.ID("c2"), sql.ID("c3"), sql.ID("c4"),
 					sql.ID("c5"), sql.ID("c6")},
-				ColumnTypes: []datadef.ColumnType{
+				ColumnTypes: []sql.ColumnType{
 					{Type: sql.IntegerType, Size: 2},
 					{Type: sql.IntegerType, Size: 2},
 					{Type: sql.IntegerType, Size: 4},
@@ -128,15 +128,17 @@ func TestCreateTable(t *testing.T) {
 					{Type: sql.IntegerType, Size: 8},
 					{Type: sql.IntegerType, Size: 8},
 				},
+				ColumnDefaults: []expr.Expr{nil, nil, nil, nil, nil, nil},
 			},
 		},
 		{
 			sql: "create table if not exists t (c int)",
 			stmt: datadef.CreateTable{
-				Table:       sql.TableName{Table: sql.ID("t")},
-				Columns:     []sql.Identifier{sql.ID("c")},
-				ColumnTypes: []datadef.ColumnType{{Type: sql.IntegerType, Size: 4}},
-				IfNotExists: true,
+				Table:          sql.TableName{Table: sql.ID("t")},
+				Columns:        []sql.Identifier{sql.ID("c")},
+				ColumnTypes:    []sql.ColumnType{{Type: sql.IntegerType, Size: 4}},
+				ColumnDefaults: []expr.Expr{nil},
+				IfNotExists:    true,
 			},
 		},
 		{
@@ -144,12 +146,13 @@ func TestCreateTable(t *testing.T) {
 			stmt: datadef.CreateTable{
 				Table:   sql.TableName{Table: sql.ID("t")},
 				Columns: []sql.Identifier{sql.ID("b1"), sql.ID("b2"), sql.ID("d1"), sql.ID("d2")},
-				ColumnTypes: []datadef.ColumnType{
+				ColumnTypes: []sql.ColumnType{
 					{Type: sql.BooleanType, Size: 1},
 					{Type: sql.BooleanType, Size: 1},
 					{Type: sql.FloatType, Size: 8},
 					{Type: sql.FloatType, Size: 8},
 				},
+				ColumnDefaults: []expr.Expr{nil, nil, nil, nil},
 			},
 		},
 		{
@@ -158,13 +161,14 @@ func TestCreateTable(t *testing.T) {
 				Table: sql.TableName{Table: sql.ID("t")},
 				Columns: []sql.Identifier{sql.ID("b1"), sql.ID("b2"), sql.ID("b3"), sql.ID("b4"),
 					sql.ID("b5")},
-				ColumnTypes: []datadef.ColumnType{
+				ColumnTypes: []sql.ColumnType{
 					{Type: sql.BytesType, Fixed: true, Size: 1},
 					{Type: sql.BytesType, Fixed: false, Size: 123},
 					{Type: sql.BytesType, Fixed: false, Size: sql.MaxColumnSize},
 					{Type: sql.BytesType, Fixed: false, Size: sql.MaxColumnSize},
 					{Type: sql.BytesType, Fixed: false, Size: sql.MaxColumnSize},
 				},
+				ColumnDefaults: []expr.Expr{nil, nil, nil, nil, nil},
 			},
 		},
 		{
@@ -172,11 +176,12 @@ func TestCreateTable(t *testing.T) {
 			stmt: datadef.CreateTable{
 				Table:   sql.TableName{Table: sql.ID("t")},
 				Columns: []sql.Identifier{sql.ID("b1"), sql.ID("b2"), sql.ID("b3")},
-				ColumnTypes: []datadef.ColumnType{
+				ColumnTypes: []sql.ColumnType{
 					{Type: sql.BytesType, Fixed: true, Size: 123},
 					{Type: sql.BytesType, Fixed: false, Size: 456},
 					{Type: sql.BytesType, Fixed: false, Size: 789},
 				},
+				ColumnDefaults: []expr.Expr{nil, nil, nil},
 			},
 		},
 		{
@@ -184,10 +189,11 @@ func TestCreateTable(t *testing.T) {
 			stmt: datadef.CreateTable{
 				Table:   sql.TableName{Table: sql.ID("t")},
 				Columns: []sql.Identifier{sql.ID("b1"), sql.ID("b2")},
-				ColumnTypes: []datadef.ColumnType{
+				ColumnTypes: []sql.ColumnType{
 					{Type: sql.BytesType, Fixed: false, Size: 456},
 					{Type: sql.BytesType, Fixed: false, Size: 789},
 				},
+				ColumnDefaults: []expr.Expr{nil, nil},
 			},
 		},
 		{
@@ -195,11 +201,12 @@ func TestCreateTable(t *testing.T) {
 			stmt: datadef.CreateTable{
 				Table:   sql.TableName{Table: sql.ID("t")},
 				Columns: []sql.Identifier{sql.ID("c1"), sql.ID("c2"), sql.ID("c3")},
-				ColumnTypes: []datadef.ColumnType{
+				ColumnTypes: []sql.ColumnType{
 					{Type: sql.StringType, Fixed: true, Size: 1},
 					{Type: sql.StringType, Fixed: false, Size: 123},
 					{Type: sql.StringType, Fixed: false, Size: sql.MaxColumnSize},
 				},
+				ColumnDefaults: []expr.Expr{nil, nil, nil},
 			},
 		},
 		{
@@ -207,11 +214,12 @@ func TestCreateTable(t *testing.T) {
 			stmt: datadef.CreateTable{
 				Table:   sql.TableName{Table: sql.ID("t")},
 				Columns: []sql.Identifier{sql.ID("c1"), sql.ID("c2"), sql.ID("c3")},
-				ColumnTypes: []datadef.ColumnType{
+				ColumnTypes: []sql.ColumnType{
 					{Type: sql.StringType, Fixed: true, Size: 123},
 					{Type: sql.StringType, Fixed: false, Size: 456},
 					{Type: sql.StringType, Fixed: false, Size: 789},
 				},
+				ColumnDefaults: []expr.Expr{nil, nil, nil},
 			},
 		},
 		{
@@ -219,11 +227,11 @@ func TestCreateTable(t *testing.T) {
 			stmt: datadef.CreateTable{
 				Table:   sql.TableName{Table: sql.ID("t")},
 				Columns: []sql.Identifier{sql.ID("c1"), sql.ID("c2")},
-				ColumnTypes: []datadef.ColumnType{
-					{Type: sql.StringType, Fixed: false, Size: 64,
-						Default: expr.StringLiteral("abcd")},
-					{Type: sql.IntegerType, Size: 4, Default: expr.Int64Literal(123)},
+				ColumnTypes: []sql.ColumnType{
+					{Type: sql.StringType, Fixed: false, Size: 64},
+					{Type: sql.IntegerType, Size: 4},
 				},
+				ColumnDefaults: []expr.Expr{expr.StringLiteral("abcd"), expr.Int64Literal(123)},
 			},
 		},
 		{
@@ -231,10 +239,11 @@ func TestCreateTable(t *testing.T) {
 			stmt: datadef.CreateTable{
 				Table:   sql.TableName{Table: sql.ID("t")},
 				Columns: []sql.Identifier{sql.ID("c1"), sql.ID("c2")},
-				ColumnTypes: []datadef.ColumnType{
-					{Type: sql.BooleanType, Size: 1, Default: expr.True()},
+				ColumnTypes: []sql.ColumnType{
+					{Type: sql.BooleanType, Size: 1},
 					{Type: sql.BooleanType, Size: 1, NotNull: true},
 				},
+				ColumnDefaults: []expr.Expr{expr.True(), nil},
 			},
 		},
 		{
@@ -243,10 +252,11 @@ c2 boolean not null default true)`,
 			stmt: datadef.CreateTable{
 				Table:   sql.TableName{Table: sql.ID("t")},
 				Columns: []sql.Identifier{sql.ID("c1"), sql.ID("c2")},
-				ColumnTypes: []datadef.ColumnType{
-					{Type: sql.BooleanType, Size: 1, Default: expr.True(), NotNull: true},
-					{Type: sql.BooleanType, Size: 1, NotNull: true, Default: expr.True()},
+				ColumnTypes: []sql.ColumnType{
+					{Type: sql.BooleanType, Size: 1, NotNull: true},
+					{Type: sql.BooleanType, Size: 1, NotNull: true},
 				},
+				ColumnDefaults: []expr.Expr{expr.True(), expr.True()},
 			},
 		},
 		{sql: "create table t (c1 int primary, c2 bool)", fail: true},
@@ -261,10 +271,11 @@ c2 boolean not null default true)`,
 			stmt: datadef.CreateTable{
 				Table:   sql.TableName{Table: sql.ID("t")},
 				Columns: []sql.Identifier{sql.ID("c1"), sql.ID("c2")},
-				ColumnTypes: []datadef.ColumnType{
+				ColumnTypes: []sql.ColumnType{
 					{Type: sql.IntegerType, Size: 4},
 					{Type: sql.BooleanType, Size: 1},
 				},
+				ColumnDefaults: []expr.Expr{nil, nil},
 				Constraints: []datadef.Constraint{
 					{
 						Type:   sql.PrimaryConstraint,
@@ -284,10 +295,11 @@ c2 boolean not null default true)`,
 			stmt: datadef.CreateTable{
 				Table:   sql.TableName{Table: sql.ID("t")},
 				Columns: []sql.Identifier{sql.ID("c1"), sql.ID("c2")},
-				ColumnTypes: []datadef.ColumnType{
+				ColumnTypes: []sql.ColumnType{
 					{Type: sql.IntegerType, Size: 4},
 					{Type: sql.BooleanType, Size: 1},
 				},
+				ColumnDefaults: []expr.Expr{nil, nil},
 				Constraints: []datadef.Constraint{
 					{
 						Type:   sql.UniqueConstraint,
@@ -307,10 +319,11 @@ c2 boolean not null default true)`,
 			stmt: datadef.CreateTable{
 				Table:   sql.TableName{Table: sql.ID("t")},
 				Columns: []sql.Identifier{sql.ID("c1"), sql.ID("c2")},
-				ColumnTypes: []datadef.ColumnType{
+				ColumnTypes: []sql.ColumnType{
 					{Type: sql.IntegerType, Size: 4},
 					{Type: sql.BooleanType, Size: 1},
 				},
+				ColumnDefaults: []expr.Expr{nil, nil},
 				Constraints: []datadef.Constraint{
 					{
 						Type:   sql.PrimaryConstraint,
@@ -330,10 +343,11 @@ c2 boolean not null default true)`,
 			stmt: datadef.CreateTable{
 				Table:   sql.TableName{Table: sql.ID("t")},
 				Columns: []sql.Identifier{sql.ID("c1"), sql.ID("c2")},
-				ColumnTypes: []datadef.ColumnType{
+				ColumnTypes: []sql.ColumnType{
 					{Type: sql.IntegerType, Size: 4},
 					{Type: sql.BooleanType, Size: 1},
 				},
+				ColumnDefaults: []expr.Expr{nil, nil},
 				Constraints: []datadef.Constraint{
 					{
 						Type:   sql.PrimaryConstraint,
@@ -353,10 +367,11 @@ c2 boolean not null default true)`,
 			stmt: datadef.CreateTable{
 				Table:   sql.TableName{Table: sql.ID("t")},
 				Columns: []sql.Identifier{sql.ID("c1"), sql.ID("c2")},
-				ColumnTypes: []datadef.ColumnType{
+				ColumnTypes: []sql.ColumnType{
 					{Type: sql.IntegerType, Size: 4},
 					{Type: sql.BooleanType, Size: 1},
 				},
+				ColumnDefaults: []expr.Expr{nil, nil},
 				Constraints: []datadef.Constraint{
 					{
 						Type:   sql.UniqueConstraint,
@@ -396,10 +411,11 @@ c2 boolean not null default true)`,
 			stmt: datadef.CreateTable{
 				Table:   sql.TableName{Table: sql.ID("t")},
 				Columns: []sql.Identifier{sql.ID("c1"), sql.ID("c2")},
-				ColumnTypes: []datadef.ColumnType{
+				ColumnTypes: []sql.ColumnType{
 					{Type: sql.IntegerType, Size: 4},
 					{Type: sql.BooleanType, Size: 1},
 				},
+				ColumnDefaults: []expr.Expr{nil, nil},
 				Constraints: []datadef.Constraint{
 					{
 						Type:   sql.PrimaryConstraint,
@@ -430,10 +446,11 @@ constraint con2 unique (c2, c1))`,
 			stmt: datadef.CreateTable{
 				Table:   sql.TableName{Table: sql.ID("t")},
 				Columns: []sql.Identifier{sql.ID("c1"), sql.ID("c2")},
-				ColumnTypes: []datadef.ColumnType{
+				ColumnTypes: []sql.ColumnType{
 					{Type: sql.IntegerType, Size: 4},
 					{Type: sql.BooleanType, Size: 1},
 				},
+				ColumnDefaults: []expr.Expr{nil, nil},
 				Constraints: []datadef.Constraint{
 					{
 						Type:   sql.PrimaryConstraint,
@@ -464,10 +481,11 @@ c2 bool constraint dflt default true)`,
 			stmt: datadef.CreateTable{
 				Table:   sql.TableName{Table: sql.ID("t")},
 				Columns: []sql.Identifier{sql.ID("c1"), sql.ID("c2")},
-				ColumnTypes: []datadef.ColumnType{
+				ColumnTypes: []sql.ColumnType{
 					{Type: sql.IntegerType, Size: 4, NotNull: true},
-					{Type: sql.BooleanType, Size: 1, Default: expr.True()},
+					{Type: sql.BooleanType, Size: 1},
 				},
+				ColumnDefaults: []expr.Expr{nil, expr.True()},
 				Constraints: []datadef.Constraint{
 					{Type: sql.NotNullConstraint, Name: sql.ID("not_null"), ColNum: 0},
 					{Type: sql.DefaultConstraint, Name: sql.ID("dflt"), ColNum: 1},
@@ -505,10 +523,11 @@ constraint c1_primary unique (c2, c1))`,
 			stmt: datadef.CreateTable{
 				Table:   sql.TableName{Table: sql.ID("t")},
 				Columns: []sql.Identifier{sql.ID("c1"), sql.ID("c2")},
-				ColumnTypes: []datadef.ColumnType{
+				ColumnTypes: []sql.ColumnType{
 					{Type: sql.IntegerType, Size: 4},
 					{Type: sql.IntegerType, Size: 4},
 				},
+				ColumnDefaults: []expr.Expr{nil, nil},
 				Constraints: []datadef.Constraint{
 					{
 						Type:   sql.CheckConstraint,
@@ -549,10 +568,11 @@ c2 int check(true))`,
 			stmt: datadef.CreateTable{
 				Table:   sql.TableName{Table: sql.ID("t")},
 				Columns: []sql.Identifier{sql.ID("c1"), sql.ID("c2")},
-				ColumnTypes: []datadef.ColumnType{
-					{Type: sql.IntegerType, Size: 4, NotNull: true, Default: expr.Int64Literal(1)},
+				ColumnTypes: []sql.ColumnType{
+					{Type: sql.IntegerType, Size: 4, NotNull: true},
 					{Type: sql.IntegerType, Size: 4},
 				},
+				ColumnDefaults: []expr.Expr{expr.Int64Literal(1), nil},
 				Constraints: []datadef.Constraint{
 					{
 						Type:   sql.NotNullConstraint,
@@ -584,10 +604,11 @@ c2 int references t3 (p1) on update set default on delete set null)`,
 			stmt: datadef.CreateTable{
 				Table:   sql.TableName{Table: sql.ID("t")},
 				Columns: []sql.Identifier{sql.ID("c1"), sql.ID("c2")},
-				ColumnTypes: []datadef.ColumnType{
+				ColumnTypes: []sql.ColumnType{
 					{Type: sql.IntegerType, Size: 4},
 					{Type: sql.IntegerType, Size: 4},
 				},
+				ColumnDefaults: []expr.Expr{nil, nil},
 				ForeignKeys: []*datadef.ForeignKey{
 					&datadef.ForeignKey{
 						Name:     sql.ID("foreign_1"),
@@ -613,12 +634,13 @@ constraint fkey foreign key (c3, c4, c2) references t3 (p1, p2, p3) on update no
 			stmt: datadef.CreateTable{
 				Table:   sql.TableName{Table: sql.ID("t")},
 				Columns: []sql.Identifier{sql.ID("c1"), sql.ID("c2"), sql.ID("c3"), sql.ID("c4")},
-				ColumnTypes: []datadef.ColumnType{
+				ColumnTypes: []sql.ColumnType{
 					{Type: sql.IntegerType, Size: 4},
 					{Type: sql.IntegerType, Size: 4},
 					{Type: sql.IntegerType, Size: 4},
 					{Type: sql.IntegerType, Size: 4, NotNull: true},
 				},
+				ColumnDefaults: []expr.Expr{nil, nil, nil, nil},
 				Constraints: []datadef.Constraint{
 					{
 						Type:   sql.NotNullConstraint,

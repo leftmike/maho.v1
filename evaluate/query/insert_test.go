@@ -154,10 +154,14 @@ var (
 
 	insertColumns3     = []sql.Identifier{sql.ID("c1"), sql.ID("c2"), sql.ID("c3")}
 	insertColumnTypes3 = []sql.ColumnType{
-		{Type: sql.IntegerType, Size: 4, Default: expr.Int64Literal(1)},
+		{Type: sql.IntegerType, Size: 4},
 		{Type: sql.IntegerType, Size: 4, NotNull: true},
-		{Type: sql.IntegerType, Size: 4, Default: expr.Int64Literal(3),
-			NotNull: true},
+		{Type: sql.IntegerType, Size: 4, NotNull: true},
+	}
+	insertColumnDefaults3 = []sql.ColumnDefault{
+		{Default: expr.Int64Literal(1)},
+		{},
+		{Default: expr.Int64Literal(3)},
 	}
 	insertCases3 = []insertCase{
 		{
@@ -194,11 +198,11 @@ func TestInsert(t *testing.T) {
 
 	e, ses := test.StartSession(t)
 	testInsert(t, e, ses, sql.TableName{sql.ID("test"), sql.PUBLIC, sql.ID("t")}, insertColumns1,
-		insertColumnTypes1, insertCases1)
+		insertColumnTypes1, nil, insertCases1)
 	testInsert(t, e, ses, sql.TableName{sql.ID("test"), sql.PUBLIC, sql.ID("t2")}, insertColumns2,
-		insertColumnTypes2, insertCases2)
+		insertColumnTypes2, nil, insertCases2)
 	testInsert(t, e, ses, sql.TableName{sql.ID("test"), sql.PUBLIC, sql.ID("t3")}, insertColumns3,
-		insertColumnTypes3, insertCases3)
+		insertColumnTypes3, insertColumnDefaults3, insertCases3)
 }
 
 func statement(ctx context.Context, ses *evaluate.Session, tx sql.Transaction, s string) error {
@@ -234,12 +238,17 @@ func allRows(ctx context.Context, rows sql.Rows, numCols int) ([][]sql.Value, er
 }
 
 func testInsert(t *testing.T, e sql.Engine, ses *evaluate.Session, tn sql.TableName,
-	cols []sql.Identifier, colTypes []sql.ColumnType, cases []insertCase) {
+	cols []sql.Identifier, colTypes []sql.ColumnType, colDefaults []sql.ColumnDefault,
+	cases []insertCase) {
+
+	if colDefaults == nil {
+		colDefaults = make([]sql.ColumnDefault, len(colTypes))
+	}
 
 	ctx := context.Background()
 	for _, c := range cases {
 		tx := e.Begin(0)
-		err := tx.CreateTable(ctx, tn, cols, colTypes, nil, false)
+		err := tx.CreateTable(ctx, tn, cols, colTypes, colDefaults, nil, false)
 		if err != nil {
 			t.Error(err)
 			return
