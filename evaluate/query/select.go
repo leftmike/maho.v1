@@ -522,8 +522,9 @@ func (_ *oneEmptyRow) Update(ctx context.Context, updates []sql.ColumnUpdate) er
 }
 
 type allResultsOp struct {
-	rop  rowsOp
-	cols []sql.Identifier
+	rop      rowsOp
+	cols     []sql.Identifier
+	colTypes []sql.ColumnType
 }
 
 func (_ *allResultsOp) Name() string {
@@ -559,6 +560,10 @@ func (aro *allResultsOp) columns() []sql.Identifier {
 	return aro.cols
 }
 
+func (aro *allResultsOp) columnTypes() []sql.ColumnType {
+	return aro.colTypes
+}
+
 type allResultRows struct {
 	rows    sql.Rows
 	numCols int
@@ -587,6 +592,7 @@ func (_ *allResultRows) Update(ctx context.Context, updates []sql.ColumnUpdate) 
 type resultsOp struct {
 	rop       rowsOp
 	cols      []sql.Identifier
+	colTypes  []sql.ColumnType
 	destCols  []src2dest
 	destExprs []expr2dest
 }
@@ -636,6 +642,10 @@ func (ro *resultsOp) rows(ctx context.Context, tx sql.Transaction) (sql.Rows, er
 
 func (ro *resultsOp) columns() []sql.Identifier {
 	return ro.cols
+}
+
+func (ro *resultsOp) columnTypes() []sql.ColumnType {
+	return ro.colTypes
 }
 
 type src2dest struct {
@@ -702,11 +712,14 @@ func results(ctx context.Context, pctx evaluate.PlanContext, tx sql.Transaction,
 	fctx *fromContext, results []SelectResult) (resultRowsOp, error) {
 
 	if results == nil {
+		// XXX: colTypes: fctx.columnTypes(),
 		return &allResultsOp{rop: rop, cols: fctx.columns()}, nil
 	}
 
 	var destExprs []expr2dest
 	var cols []sql.Identifier
+	var colTypes []sql.ColumnType
+
 	ddx := 0
 	for _, sr := range results {
 		switch sr := sr.(type) {
@@ -718,6 +731,8 @@ func results(ctx context.Context, pctx evaluate.PlanContext, tx sql.Transaction,
 				}
 				destExprs = append(destExprs, expr2dest{destColIndex: ddx, expr: ce})
 				cols = append(cols, col)
+				// XXX: append(colTypes, ce.Type())
+				colTypes = append(colTypes, sql.ColumnType{})
 				ddx += 1
 			}
 		case ExprResult:
@@ -727,16 +742,20 @@ func results(ctx context.Context, pctx evaluate.PlanContext, tx sql.Transaction,
 			}
 			destExprs = append(destExprs, expr2dest{destColIndex: ddx, expr: ce})
 			cols = append(cols, sr.Column(len(cols)))
+			// XXX: append(colTypes, ce.Type())
+			colTypes = append(colTypes, sql.ColumnType{})
 			ddx += 1
 		default:
 			panic(fmt.Sprintf("unexpected type for query.SelectResult: %T: %v", sr, sr))
 		}
 	}
-	return makeResultsOp(rop, cols, destExprs), nil
+	return makeResultsOp(rop, cols, colTypes, destExprs), nil
 }
 
-func makeResultsOp(rop rowsOp, cols []sql.Identifier, destExprs []expr2dest) resultRowsOp {
-	ro := resultsOp{rop: rop, cols: cols}
+func makeResultsOp(rop rowsOp, cols []sql.Identifier, colTypes []sql.ColumnType,
+	destExprs []expr2dest) resultRowsOp {
+
+	ro := resultsOp{rop: rop, cols: cols, colTypes: colTypes}
 	for _, de := range destExprs {
 		if ci, ok := expr.ColumnIndex(de.expr); ok {
 			ro.destCols = append(ro.destCols,

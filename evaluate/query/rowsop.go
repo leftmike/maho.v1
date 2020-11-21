@@ -15,4 +15,5 @@ type rowsOp interface {
 type resultRowsOp interface {
 	rowsOp
 	columns() []sql.Identifier
+	columnTypes() []sql.ColumnType
 }

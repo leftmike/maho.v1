@@ -72,7 +72,7 @@ func (fta FromTableAlias) plan(ctx context.Context, pctx evaluate.PlanContext,
 	if fta.Alias != 0 {
 		nam = fta.Alias
 	}
-	fctx := makeFromContext(nam, tt.Columns())
+	fctx := makeFromContext(nam, tt.Columns(), tt.ColumnTypes())
 
 	if cond != nil && pctx.GetFlag(flags.PushdownWhere) {
 		if colExpr := equalKeyExpr(fctx, cond, tt.PrimaryKey(), nil); colExpr != nil {
@@ -211,16 +211,19 @@ func (fia FromIndexAlias) plan(ctx context.Context, pctx evaluate.PlanContext,
 
 	it := tt.Indexes()[iidx]
 	ttCols := tt.Columns()
+	ttColTypes := tt.ColumnTypes()
 	var cols []sql.Identifier
+	var colTypes []sql.ColumnType
 	for _, col := range it.Columns {
 		cols = append(cols, ttCols[col])
+		colTypes = append(colTypes, ttColTypes[col])
 	}
 
 	nam := fia.Index
 	if fia.Alias != 0 {
 		nam = fia.Alias
 	}
-	fctx := makeFromContext(nam, cols)
+	fctx := makeFromContext(nam, cols, colTypes)
 	sio := scanIndexOp{
 		tn:    tn,
 		index: fia.Index,
@@ -351,7 +354,9 @@ func (fs FromStmt) plan(ctx context.Context, pctx evaluate.PlanContext,
 		}
 		cols = fs.ColumnAliases
 	}
-	fctx := makeFromContext(fs.Alias, cols)
+	colTypes := make([]sql.ColumnType, len(cols))
+	// XXX: colTypes := rowsPlan.ColumnTypes()
+	fctx := makeFromContext(fs.Alias, cols, colTypes)
 
 	if rp, ok := rowsPlan.(rowsOpPlan); ok {
 		return rp.rop, fctx, nil
@@ -414,7 +419,10 @@ type fromContext struct {
 	cols      []colRef
 }
 
-func makeFromContext(nam sql.Identifier, cols []sql.Identifier) *fromContext {
+func makeFromContext(nam sql.Identifier, cols []sql.Identifier,
+	colTypes []sql.ColumnType) *fromContext {
+
+	// XXX: colTypes
 	fctx := &fromContext{colMap: map[sql.Identifier]int{}, colRefMap: map[colRef]int{}}
 	for idx, col := range cols {
 		fctx.colMap[col] = idx

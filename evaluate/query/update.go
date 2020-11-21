@@ -61,7 +61,7 @@ func (stmt *Update) Plan(ctx context.Context, pctx evaluate.PlanContext,
 		return nil, err
 	}
 
-	fctx := makeFromContext(tn.Table, tt.Columns())
+	fctx := makeFromContext(tn.Table, tt.Columns(), tt.ColumnTypes())
 	var where sql.CExpr
 	if stmt.Where != nil {
 		where, err = expr.Compile(ctx, pctx, tx, fctx, stmt.Where)

@@ -301,6 +301,7 @@ func group(ctx context.Context, pctx evaluate.PlanContext, tx sql.Transaction, r
 
 	var destExprs []expr2dest
 	var resultCols []sql.Identifier
+	var resultColTypes []sql.ColumnType
 	for ddx, sr := range results {
 		er, ok := sr.(ExprResult)
 		if !ok {
@@ -313,6 +314,8 @@ func group(ctx context.Context, pctx evaluate.PlanContext, tx sql.Transaction, r
 		}
 		destExprs = append(destExprs, expr2dest{destColIndex: ddx, expr: ce})
 		resultCols = append(resultCols, er.Column(len(resultCols)))
+		// XXX: append(resultColTypes, ce.Type())
+		resultColTypes = append(resultColTypes, sql.ColumnType{})
 	}
 
 	var hce sql.CExpr
@@ -332,12 +335,12 @@ func group(ctx context.Context, pctx evaluate.PlanContext, tx sql.Transaction, r
 		rop = &filterOp{rop: rop, cond: hce}
 	}
 
-	rrop := makeResultsOp(rop, resultCols, destExprs)
+	rrop := makeResultsOp(rop, resultCols, resultColTypes, destExprs)
 	if orderBy == nil {
 		return rowsOpPlan{rop: rrop, cols: resultCols}, nil
 	}
 
-	rop, err = order(rrop, makeFromContext(0, rrop.columns()), orderBy)
+	rop, err = order(rrop, makeFromContext(0, rrop.columns(), rrop.columnTypes()), orderBy)
 	if err != nil {
 		return nil, err
 	}

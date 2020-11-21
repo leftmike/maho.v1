@@ -38,6 +38,7 @@ type CmdPlan interface {
 type RowsPlan interface {
 	Plan
 	Columns() []sql.Identifier
+	// XXX: ColumnTypes() []sql.ColumnType
 	Rows(ctx context.Context, tx sql.Transaction) (sql.Rows, error)
 }
 
