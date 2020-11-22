@@ -138,14 +138,14 @@ func (stmt *Select) Plan(ctx context.Context, pctx evaluate.PlanContext,
 		rrop, err := results(ctx, pctx, tx, rop, fctx, stmt.Results)
 		if err == nil {
 			if stmt.OrderBy == nil {
-				return rowsOpPlan{rop: rrop, cols: rrop.columns()}, nil
+				return makeRowsOpPlan(rrop, rrop.columns(), rrop.columnTypes()), nil
 			}
 
 			rop, err = order(rrop, fctx, stmt.OrderBy)
 			if err != nil {
 				return nil, err
 			}
-			return rowsOpPlan{rop: rop, cols: rrop.columns()}, nil
+			return makeRowsOpPlan(rop, rrop.columns(), rrop.columnTypes()), nil
 		} else if _, ok := err.(*expr.ContextError); !ok {
 			return nil, err
 		}
@@ -156,8 +156,20 @@ func (stmt *Select) Plan(ctx context.Context, pctx evaluate.PlanContext,
 }
 
 type rowsOpPlan struct {
-	rop  rowsOp
-	cols []sql.Identifier
+	rop      rowsOp
+	cols     []sql.Identifier
+	colTypes []sql.ColumnType
+}
+
+func makeRowsOpPlan(rop rowsOp, cols []sql.Identifier, colTypes []sql.ColumnType) rowsOpPlan {
+	if len(cols) != len(colTypes) {
+		panic(fmt.Sprintf("len(cols): %d != len(colTypes): %d", len(cols), len(colTypes)))
+	}
+	return rowsOpPlan{
+		rop:      rop,
+		cols:     cols,
+		colTypes: colTypes,
+	}
 }
 
 func (_ rowsOpPlan) Tag() string {
@@ -168,7 +180,14 @@ func (rp rowsOpPlan) Columns() []sql.Identifier {
 	return rp.cols
 }
 
+func (rp rowsOpPlan) ColumnTypes() []sql.ColumnType {
+	return rp.colTypes
+}
+
 func (rp rowsOpPlan) Rows(ctx context.Context, tx sql.Transaction) (sql.Rows, error) {
+	if len(rp.cols) != len(rp.colTypes) {
+		panic(fmt.Sprintf("len(cols): %d != len(colTypes): %d", len(rp.cols), len(rp.colTypes)))
+	}
 	return rp.rop.rows(ctx, tx)
 }
 
@@ -715,8 +734,12 @@ func results(ctx context.Context, pctx evaluate.PlanContext, tx sql.Transaction,
 	fctx *fromContext, results []SelectResult) (resultRowsOp, error) {
 
 	if results == nil {
-		// XXX: colTypes: fctx.columnTypes(),
-		return &allResultsOp{rop: rop, cols: fctx.columns()}, nil
+		cols := fctx.columns()
+		colTypes := fctx.columnTypes()
+		if len(cols) != len(colTypes) {
+			panic(fmt.Sprintf("len(cols): %d != len(colTypes): %d", len(cols), len(colTypes)))
+		}
+		return &allResultsOp{rop: rop, cols: cols, colTypes: colTypes}, nil
 	}
 
 	var destExprs []expr2dest
@@ -756,6 +779,9 @@ func results(ctx context.Context, pctx evaluate.PlanContext, tx sql.Transaction,
 func makeResultsOp(rop rowsOp, cols []sql.Identifier, colTypes []sql.ColumnType,
 	destExprs []expr2dest) resultRowsOp {
 
+	if len(cols) != len(colTypes) {
+		panic(fmt.Sprintf("len(cols): %d != len(colTypes): %d", len(cols), len(colTypes)))
+	}
 	ro := resultsOp{rop: rop, cols: cols, colTypes: colTypes}
 	for _, de := range destExprs {
 		if ci, ok := expr.ColumnIndex(de.expr); ok {

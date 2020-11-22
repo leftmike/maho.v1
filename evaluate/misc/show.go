@@ -37,6 +37,10 @@ func (stmt *Show) Columns() []sql.Identifier {
 	return stmt.ses.Columns(stmt.Variable)
 }
 
+func (stmt *Show) ColumnTypes() []sql.ColumnType {
+	return stmt.ses.ColumnTypes(stmt.Variable)
+}
+
 func (stmt *Show) Rows(ctx context.Context, tx sql.Transaction) (sql.Rows, error) {
 	return stmt.ses.Show(stmt.Variable)
 }

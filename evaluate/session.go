@@ -162,6 +162,19 @@ func (ses *Session) Columns(v sql.Identifier) []sql.Identifier {
 	return nil
 }
 
+func (ses *Session) ColumnTypes(v sql.Identifier) []sql.ColumnType {
+	if v == sql.DATABASE {
+		return []sql.ColumnType{sql.IdColType}
+	} else if v == sql.SCHEMA {
+		return []sql.ColumnType{sql.IdColType}
+	} else if v == sql.FLAGS {
+		return []sql.ColumnType{sql.IdColType, sql.BoolColType}
+	} else if _, ok := flags.LookupFlag(v.String()); ok {
+		return []sql.ColumnType{sql.BoolColType}
+	}
+	return nil
+}
+
 func (ses *Session) Show(v sql.Identifier) (sql.Rows, error) {
 	if v == sql.DATABASE {
 		return &values{

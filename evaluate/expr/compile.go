@@ -15,7 +15,7 @@ type CompileContext interface {
 }
 
 type AggregatorContext interface {
-	MaybeRefExpr(e Expr) (int, bool)
+	MaybeRefExpr(e Expr) (int, sql.ColumnType, bool)
 	CompileAggregator(c *Call, maker MakeAggregator) int
 }
 
@@ -43,15 +43,13 @@ func CompileAggregator(ctx context.Context, pctx evaluate.PlanContext, tx sql.Tr
 	return compile(ctx, pctx, tx, cctx, e, true)
 }
 
-// ZZZ: test ColumnType result from Compile
 func compile(ctx context.Context, pctx evaluate.PlanContext, tx sql.Transaction,
 	cctx CompileContext, e Expr, agg bool) (sql.CExpr, sql.ColumnType, error) {
 
 	var ct sql.ColumnType
 
 	if agg {
-		// ZZZ
-		idx, ok := cctx.(AggregatorContext).MaybeRefExpr(e)
+		idx, ct, ok := cctx.(AggregatorContext).MaybeRefExpr(e)
 		if ok {
 			return colIndex(idx), ct, nil
 		}
@@ -133,9 +131,8 @@ func compile(ctx context.Context, pctx evaluate.PlanContext, tx sql.Transaction,
 		}
 		if cf.makeAggregator != nil {
 			if agg {
-				// ZZZ
 				return colIndex(cctx.(AggregatorContext).CompileAggregator(e, cf.makeAggregator)),
-					ct, nil
+					cf.typ, nil
 			} else {
 				return nil, ct, &ContextError{e.Name}
 			}
@@ -170,7 +167,10 @@ func compile(ctx context.Context, pctx evaluate.PlanContext, tx sql.Transaction,
 		if !ok {
 			return nil, ct, fmt.Errorf("engine: expected rows: %s", e.Stmt)
 		}
-		// ZZZ: rowsPlan.ColumnTypes()
+		colTypes := rowsPlan.ColumnTypes()
+		if len(colTypes) > 0 {
+			ct = colTypes[0]
+		}
 		return &rowsExpr{rowsPlan: rowsPlan}, ct, nil
 	case Param:
 		if pctx == nil {
@@ -199,9 +199,11 @@ type callFunc struct {
 
 var (
 	intType    = sql.ColumnType{Type: sql.IntegerType, Size: 8}
+	floatType  = sql.ColumnType{Type: sql.FloatType, Size: 8}
 	boolType   = sql.ColumnType{Type: sql.BooleanType}
 	stringType = sql.ColumnType{Type: sql.StringType}
-	opFuncs    = map[Op]*callFunc{
+
+	opFuncs = map[Op]*callFunc{
 		AddOp:       {fn: addCall, tfn: numType, minArgs: 2, maxArgs: 2},
 		AndOp:       {fn: andCall, typ: boolType, minArgs: 2, maxArgs: 2},
 		BinaryAndOp: {fn: binaryAndCall, typ: intType, minArgs: 2, maxArgs: 2},
@@ -233,12 +235,17 @@ var (
 		sql.ID("unique_rowid"): {fn: uniqueRowIDCall, typ: intType, minArgs: 0, maxArgs: 0},
 
 		// Aggregate functions
-		sql.ID("avg"):       {minArgs: 1, maxArgs: 1, makeAggregator: makeAvgAggregator},
-		sql.ID("count"):     {minArgs: 1, maxArgs: 1, makeAggregator: makeCountAggregator},
-		sql.ID("count_all"): {minArgs: 0, maxArgs: 0, makeAggregator: makeCountAllAggregator},
-		sql.ID("max"):       {minArgs: 1, maxArgs: 1, makeAggregator: makeMaxAggregator},
-		sql.ID("min"):       {minArgs: 1, maxArgs: 1, makeAggregator: makeMinAggregator},
-		sql.ID("sum"):       {minArgs: 1, maxArgs: 1, makeAggregator: makeSumAggregator},
+		sql.ID("avg"): {typ: floatType, minArgs: 1, maxArgs: 1,
+			makeAggregator: makeAvgAggregator},
+		sql.ID("count"): {typ: intType, minArgs: 1, maxArgs: 1,
+			makeAggregator: makeCountAggregator},
+		sql.ID("count_all"): {typ: intType,
+			minArgs: 0, maxArgs: 0, makeAggregator: makeCountAllAggregator},
+		sql.ID("max"): {typ: floatType,
+			minArgs: 1, maxArgs: 1, makeAggregator: makeMaxAggregator},
+		sql.ID("min"): {typ: floatType,
+			minArgs: 1, maxArgs: 1, makeAggregator: makeMinAggregator},
+		sql.ID("sum"): {typ: floatType, minArgs: 1, maxArgs: 1, makeAggregator: makeSumAggregator},
 	}
 
 	funcs = map[string]*callFunc{}

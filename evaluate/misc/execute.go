@@ -93,6 +93,10 @@ func (erp executeRowsPlan) Columns() []sql.Identifier {
 	return erp.prepRows.Columns()
 }
 
+func (erp executeRowsPlan) ColumnTypes() []sql.ColumnType {
+	return erp.prepRows.ColumnTypes()
+}
+
 func (erp executeRowsPlan) Rows(ctx context.Context, tx sql.Transaction) (sql.Rows, error) {
 	err := setParameters(ctx, tx, erp.prepRows, erp.params)
 	if err != nil {

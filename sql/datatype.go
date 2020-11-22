@@ -1,5 +1,7 @@
 package sql
 
+import "fmt"
+
 type DataType int
 
 const (
@@ -25,8 +27,7 @@ func (dt DataType) String() string {
 		return "DOUBLE"
 	case IntegerType:
 		return "INT"
-		// XXX: default: panic
+	default:
+		panic(fmt.Sprintf("unexpected datatype; got %#v", dt))
 	}
-
-	return ""
 }

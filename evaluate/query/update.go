@@ -70,8 +70,7 @@ func (stmt *Update) Plan(ctx context.Context, pctx evaluate.PlanContext,
 			return nil, err
 		}
 		if ct.Type != sql.BooleanType {
-			return nil, fmt.Errorf("engine: WHERE must be boolean expression: %s",
-				stmt.Where)
+			return nil, fmt.Errorf("engine: WHERE must be boolean expression: %s", stmt.Where)
 		}
 	}
 
@@ -92,7 +91,7 @@ func (stmt *Update) Plan(ctx context.Context, pctx evaluate.PlanContext,
 
 		var ce sql.CExpr
 		if cu.Expr != nil {
-			// ZZZ: check that ct is compatible with the column
+			// XXX: check that ct is compatible with the column
 			ce, _, err = expr.Compile(ctx, pctx, tx, fctx, cu.Expr)
 			if err != nil {
 				return nil, err

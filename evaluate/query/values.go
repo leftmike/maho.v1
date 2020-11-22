@@ -46,26 +46,32 @@ func (stmt *Values) Plan(ctx context.Context, pctx evaluate.PlanContext,
 	}
 
 	var rows [][]sql.CExpr
+	colTypes := make([]sql.ColumnType, len(stmt.Expressions[0]))
 	for _, r := range stmt.Expressions {
 		row := make([]sql.CExpr, len(r))
 		for j := range r {
 			var err error
-			row[j], _, err = expr.Compile(ctx, pctx, tx, nil, r[j])
+			var ct sql.ColumnType
+			row[j], ct, err = expr.Compile(ctx, pctx, tx, nil, r[j])
 			if err != nil {
 				return nil, err
 			}
+			// XXX: check types
+			colTypes[j] = ct
 		}
 		rows = append(rows, row)
 	}
 	return valuesPlan{
-		cols: cols,
-		rows: rows,
+		cols:     cols,
+		colTypes: colTypes,
+		rows:     rows,
 	}, nil
 }
 
 type valuesPlan struct {
-	cols []sql.Identifier
-	rows [][]sql.CExpr
+	cols     []sql.Identifier
+	colTypes []sql.ColumnType
+	rows     [][]sql.CExpr
 }
 
 func (_ valuesPlan) Tag() string {
@@ -74,6 +80,10 @@ func (_ valuesPlan) Tag() string {
 
 func (vp valuesPlan) Columns() []sql.Identifier {
 	return vp.cols
+}
+
+func (vp valuesPlan) ColumnTypes() []sql.ColumnType {
+	return vp.colTypes
 }
 
 func (vp valuesPlan) Rows(ctx context.Context, tx sql.Transaction) (sql.Rows, error) {

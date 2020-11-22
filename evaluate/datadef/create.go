@@ -236,7 +236,7 @@ func (stmt *CreateTable) Plan(ctx context.Context, pctx evaluate.PlanContext,
 		var dfltExpr string
 		if cd != nil {
 			var err error
-			// ZZZ: check that ct is compatible with the column
+			// XXX: check that ct is compatible with the column
 			dflt, _, err = expr.Compile(ctx, pctx, tx, nil, cd)
 			if err != nil {
 				return nil, err

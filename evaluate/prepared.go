@@ -132,6 +132,10 @@ func (prp *PreparedRowsPlan) Columns() []sql.Identifier {
 	return prp.plan.Columns()
 }
 
+func (prp *PreparedRowsPlan) ColumnTypes() []sql.ColumnType {
+	return prp.plan.ColumnTypes()
+}
+
 func (prp *PreparedRowsPlan) Rows(ctx context.Context, tx sql.Transaction) (sql.Rows, error) {
 	return prp.plan.Rows(ctx, tx)
 }

@@ -217,6 +217,7 @@ type groupContext struct {
 	group       []expr.Expr
 	groupExprs  []expr2dest
 	groupCols   []sql.Identifier
+	groupTypes  []sql.ColumnType
 	groupRefs   []bool
 	aggregators []*expr.Call
 	makers      []expr.MakeAggregator
@@ -228,13 +229,13 @@ func (_ *groupContext) CompileRef(r expr.Ref) (int, sql.ColumnType, error) {
 			"aggregate function", r)
 }
 
-func (gctx *groupContext) MaybeRefExpr(e expr.Expr) (int, bool) {
+func (gctx *groupContext) MaybeRefExpr(e expr.Expr) (int, sql.ColumnType, bool) {
 	for gdx, ge := range gctx.group {
 		if gctx.groupRefs[gdx] && e.Equal(ge) {
-			return gdx, true
+			return gdx, gctx.groupTypes[gdx], true
 		}
 	}
-	return 0, false
+	return 0, sql.ColumnType{}, false
 }
 
 func (gctx *groupContext) CompileAggregator(c *expr.Call, maker expr.MakeAggregator) int {
@@ -255,6 +256,7 @@ func (gctx *groupContext) makeGroupByOp(ctx context.Context, pctx evaluate.PlanC
 	for idx := range gctx.aggregators {
 		agg := aggregator{maker: gctx.makers[idx]}
 		for _, a := range gctx.aggregators[idx].Args {
+			// XXX: track type of aggregator
 			ce, _, err := expr.Compile(ctx, pctx, tx, fctx, a)
 			if err != nil {
 				return nil, err
@@ -272,10 +274,11 @@ func makeGroupContext(ctx context.Context, pctx evaluate.PlanContext, tx sql.Tra
 
 	var groupExprs []expr2dest
 	var groupCols []sql.Identifier
+	var groupTypes []sql.ColumnType
 	var groupRefs []bool
 	ddx := 0
 	for _, e := range group {
-		ce, _, err := expr.Compile(ctx, pctx, tx, fctx, e)
+		ce, ct, err := expr.Compile(ctx, pctx, tx, fctx, e)
 		if err != nil {
 			return nil, err
 		}
@@ -285,12 +288,18 @@ func makeGroupContext(ctx context.Context, pctx evaluate.PlanContext, tx sql.Tra
 		} else {
 			groupCols = append(groupCols, sql.ID(fmt.Sprintf("expr%d", len(groupCols)+1)))
 		}
+		groupTypes = append(groupTypes, ct)
 		groupRefs = append(groupRefs, e.HasRef())
 		ddx += 1
 	}
 
-	return &groupContext{group: group, groupExprs: groupExprs, groupCols: groupCols,
-		groupRefs: groupRefs}, nil
+	return &groupContext{
+		group:      group,
+		groupExprs: groupExprs,
+		groupCols:  groupCols,
+		groupTypes: groupTypes,
+		groupRefs:  groupRefs,
+	}, nil
 
 }
 
@@ -308,22 +317,24 @@ func group(ctx context.Context, pctx evaluate.PlanContext, tx sql.Transaction, r
 		if !ok {
 			panic(fmt.Sprintf("unexpected type for query.SelectResult: %T: %v", sr, sr))
 		}
-		var ce sql.CExpr
-		ce, _, err = expr.CompileAggregator(ctx, pctx, tx, gctx, er.Expr)
+		ce, ct, err := expr.CompileAggregator(ctx, pctx, tx, gctx, er.Expr)
 		if err != nil {
 			return nil, err
 		}
 		destExprs = append(destExprs, expr2dest{destColIndex: ddx, expr: ce})
 		resultCols = append(resultCols, er.Column(len(resultCols)))
-		// XXX: append(resultColTypes, ce.Type())
-		resultColTypes = append(resultColTypes, sql.ColumnType{})
+		resultColTypes = append(resultColTypes, ct)
 	}
 
 	var hce sql.CExpr
 	if having != nil {
-		hce, _, err = expr.CompileAggregator(ctx, pctx, tx, gctx, having)
+		var ct sql.ColumnType
+		hce, ct, err = expr.CompileAggregator(ctx, pctx, tx, gctx, having)
 		if err != nil {
 			return nil, err
+		}
+		if ct.Type != sql.BooleanType {
+			return nil, fmt.Errorf("engine: HAVING must be boolean expression: %s", having)
 		}
 	}
 
@@ -338,12 +349,12 @@ func group(ctx context.Context, pctx evaluate.PlanContext, tx sql.Transaction, r
 
 	rrop := makeResultsOp(rop, resultCols, resultColTypes, destExprs)
 	if orderBy == nil {
-		return rowsOpPlan{rop: rrop, cols: resultCols}, nil
+		return makeRowsOpPlan(rrop, resultCols, resultColTypes), nil
 	}
 
 	rop, err = order(rrop, makeFromContext(0, rrop.columns(), rrop.columnTypes()), orderBy)
 	if err != nil {
 		return nil, err
 	}
-	return rowsOpPlan{rop: rop, cols: resultCols}, nil
+	return makeRowsOpPlan(rop, resultCols, resultColTypes), nil
 }

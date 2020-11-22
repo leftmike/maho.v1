@@ -105,7 +105,7 @@ func (stmt *InsertValues) Plan(ctx context.Context, pctx evaluate.PlanContext,
 
 			var ce sql.CExpr
 			if e != nil {
-				// ZZZ: check that ct is compatible with the column
+				// XXX: check that ct is compatible with the column
 				ce, _, err = expr.Compile(ctx, pctx, tx, nil, e)
 				if err != nil {
 					return nil, err

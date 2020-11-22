@@ -40,11 +40,14 @@ func (stmt *Delete) Plan(ctx context.Context, pctx evaluate.PlanContext,
 
 	var where sql.CExpr
 	if stmt.Where != nil {
-		// ZZZ: check the ct is boolean
-		where, _, err = expr.Compile(ctx, pctx, tx,
+		var ct sql.ColumnType
+		where, ct, err = expr.Compile(ctx, pctx, tx,
 			makeFromContext(tn.Table, tt.Columns(), tt.ColumnTypes()), stmt.Where)
 		if err != nil {
 			return nil, err
+		}
+		if ct.Type != sql.BooleanType {
+			return nil, fmt.Errorf("engine: WHERE must be boolean expression: %s", stmt.Where)
 		}
 	}
 	return &deletePlan{tn, tt.Version(), where}, nil

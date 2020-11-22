@@ -93,20 +93,26 @@ func (stmt Explain) Plan(ctx context.Context, pctx evaluate.PlanContext,
 	}
 
 	var cols []sql.Identifier
+	var colTypes []sql.ColumnType
 	if stmt.Verbose {
 		cols = []sql.Identifier{sql.TREE, sql.FIELD, sql.DESCRIPTION, sql.COLUMNS}
+		colTypes = []sql.ColumnType{sql.StringColType, sql.StringColType, sql.StringColType,
+			sql.StringColType}
 	} else {
 		cols = []sql.Identifier{sql.TREE, sql.FIELD, sql.DESCRIPTION}
+		colTypes = []sql.ColumnType{sql.StringColType, sql.StringColType, sql.StringColType}
 	}
 	return &explainRows{
-		cols: cols,
-		rows: explain(expl.Explain(), nil, 0, stmt.Verbose),
+		cols:     cols,
+		colTypes: colTypes,
+		rows:     explain(expl.Explain(), nil, 0, stmt.Verbose),
 	}, nil
 }
 
 type explainRows struct {
-	cols []sql.Identifier
-	rows [][]sql.Value
+	cols     []sql.Identifier
+	colTypes []sql.ColumnType
+	rows     [][]sql.Value
 }
 
 func (_ *explainRows) Tag() string {
@@ -115,6 +121,10 @@ func (_ *explainRows) Tag() string {
 
 func (er *explainRows) Columns() []sql.Identifier {
 	return er.cols
+}
+
+func (er *explainRows) ColumnTypes() []sql.ColumnType {
+	return er.colTypes
 }
 
 func (er *explainRows) NumColumns() int {

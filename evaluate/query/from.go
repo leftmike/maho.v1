@@ -354,14 +354,11 @@ func (fs FromStmt) plan(ctx context.Context, pctx evaluate.PlanContext,
 		}
 		cols = fs.ColumnAliases
 	}
-	colTypes := make([]sql.ColumnType, len(cols))
-	// XXX: colTypes := rowsPlan.ColumnTypes()
-	fctx := makeFromContext(fs.Alias, cols, colTypes)
+	fctx := makeFromContext(fs.Alias, cols, rowsPlan.ColumnTypes())
 
 	if rp, ok := rowsPlan.(rowsOpPlan); ok {
 		return rp.rop, fctx, nil
 	}
-
 	rop, err := where(ctx, pctx, tx, fromPlanOp{rowsPlan, fs.Stmt.String(), cols}, fctx, cond)
 	if err != nil {
 		return nil, nil, err
@@ -413,54 +410,64 @@ func (cr colRef) String() string {
 	return fmt.Sprintf("%s.%s", cr.table, cr.column)
 }
 
+type fromCol struct {
+	colNum    int
+	ct        sql.ColumnType
+	ambiguous bool
+}
+
 type fromContext struct {
-	colMap    map[sql.Identifier]int // less than 0 means the column ambiguous
-	colRefMap map[colRef]int
+	colMap    map[sql.Identifier]fromCol
+	colRefMap map[colRef]fromCol
 	cols      []colRef
+	colTypes  []sql.ColumnType
 }
 
 func makeFromContext(nam sql.Identifier, cols []sql.Identifier,
 	colTypes []sql.ColumnType) *fromContext {
 
-	// XXX: colTypes
-	fctx := &fromContext{colMap: map[sql.Identifier]int{}, colRefMap: map[colRef]int{}}
+	fctx := &fromContext{colMap: map[sql.Identifier]fromCol{}, colRefMap: map[colRef]fromCol{}}
 	for idx, col := range cols {
-		fctx.colMap[col] = idx
+		fctx.colMap[col] = fromCol{colNum: idx, ct: colTypes[idx]}
 		if nam != 0 {
-			fctx.colRefMap[colRef{table: nam, column: col}] = idx
+			fctx.colRefMap[colRef{table: nam, column: col}] =
+				fromCol{colNum: idx, ct: colTypes[idx]}
 		}
 		fctx.cols = append(fctx.cols, colRef{table: nam, column: col})
+		fctx.colTypes = append(fctx.colTypes, colTypes[idx])
 	}
 	return fctx
 }
 
 func (fctx *fromContext) copy() *fromContext {
 	nctx := fromContext{
-		colMap:    map[sql.Identifier]int{},
-		colRefMap: map[colRef]int{},
+		colMap:    map[sql.Identifier]fromCol{},
+		colRefMap: map[colRef]fromCol{},
 		cols:      fctx.cols,
+		colTypes:  fctx.colTypes,
 	}
-	for col, idx := range fctx.colMap {
-		nctx.colMap[col] = idx
+	for col, fc := range fctx.colMap {
+		nctx.colMap[col] = fc
 	}
-	for cr, idx := range fctx.colRefMap {
-		nctx.colRefMap[cr] = idx
+	for cr, fc := range fctx.colRefMap {
+		nctx.colRefMap[cr] = fc
 	}
 	return &nctx
 }
 
-func (fctx *fromContext) addColumn(cr colRef) {
+func (fctx *fromContext) addColumn(cr colRef, ct sql.ColumnType) {
 	idx := len(fctx.cols)
 	fctx.cols = append(fctx.cols, cr)
+	fctx.colTypes = append(fctx.colTypes, ct)
 	if _, ok := fctx.colMap[cr.column]; ok {
-		fctx.colMap[cr.column] = -1
+		fctx.colMap[cr.column] = fromCol{ambiguous: true}
 	} else {
-		fctx.colMap[cr.column] = idx
+		fctx.colMap[cr.column] = fromCol{colNum: idx, ct: ct}
 	}
 	if _, ok := fctx.colRefMap[cr]; ok {
-		fctx.colRefMap[cr] = -1
+		fctx.colRefMap[cr] = fromCol{ambiguous: true}
 	} else {
-		fctx.colRefMap[cr] = idx
+		fctx.colRefMap[cr] = fromCol{colNum: idx, ct: ct}
 	}
 }
 
@@ -469,21 +476,21 @@ func joinContextsOn(lctx, rctx *fromContext) *fromContext {
 	fctx := lctx.copy()
 
 	// Merge in the right context.
-	for _, cr := range rctx.cols {
-		fctx.addColumn(cr)
+	for rdx, cr := range rctx.cols {
+		fctx.addColumn(cr, rctx.colTypes[rdx])
 	}
 	return fctx
 }
 
 func (fctx *fromContext) usingIndex(col sql.Identifier, side string) (int, error) {
-	idx, ok := fctx.colMap[col]
+	fc, ok := fctx.colMap[col]
 	if !ok {
 		return -1, fmt.Errorf("engine: %s not found on %s side of join", col, side)
 	}
-	if idx < 0 {
+	if fc.ambiguous {
 		return -1, fmt.Errorf("engine: %s is ambigous on %s side of join", col, side)
 	}
-	return idx, nil
+	return fc.colNum, nil
 }
 
 func joinContextsUsing(lctx, rctx *fromContext, useSet map[sql.Identifier]struct{}) (*fromContext,
@@ -498,7 +505,7 @@ func joinContextsUsing(lctx, rctx *fromContext, useSet map[sql.Identifier]struct
 		if _, ok := useSet[cr.column]; ok {
 			continue
 		}
-		fctx.addColumn(cr)
+		fctx.addColumn(cr, rctx.colTypes[idx])
 		src2dest = append(src2dest, idx)
 	}
 	return fctx, src2dest
@@ -514,14 +521,14 @@ func (fctx *fromContext) CompileRef(r expr.Ref) (int, sql.ColumnType, error) {
 }
 
 func (fctx *fromContext) colIndex(col sql.Identifier, what string) (int, sql.ColumnType, error) {
-	idx, ok := fctx.colMap[col]
+	fc, ok := fctx.colMap[col]
 	if !ok {
 		return -1, sql.ColumnType{}, fmt.Errorf("engine: %s %s not found", what, col)
 	}
-	if idx < 0 {
+	if fc.ambiguous {
 		return -1, sql.ColumnType{}, fmt.Errorf("engine: %s %s is ambiguous", what, col)
 	}
-	return idx, sql.ColumnType{}, nil // ZZZ
+	return fc.colNum, fc.ct, nil
 }
 
 func (fctx *fromContext) tblColIndex(tbl, col sql.Identifier, what string) (int, sql.ColumnType,
@@ -531,14 +538,14 @@ func (fctx *fromContext) tblColIndex(tbl, col sql.Identifier, what string) (int,
 		return fctx.colIndex(col, what)
 	}
 	cr := colRef{table: tbl, column: col}
-	idx, ok := fctx.colRefMap[cr]
+	fc, ok := fctx.colRefMap[cr]
 	if !ok {
 		return -1, sql.ColumnType{}, fmt.Errorf("engine: %s %s not found", what, cr.String())
 	}
-	if idx < 0 {
+	if fc.ambiguous {
 		return -1, sql.ColumnType{}, fmt.Errorf("engine: %s %s is ambiguous", what, cr.String())
 	}
-	return idx, sql.ColumnType{}, nil // ZZZ
+	return fc.colNum, fc.ct, nil
 }
 
 func (fctx *fromContext) tableColumns(tbl sql.Identifier) []sql.Identifier {
@@ -557,4 +564,8 @@ func (fctx *fromContext) columns() []sql.Identifier {
 		cols = append(cols, cr.column)
 	}
 	return cols
+}
+
+func (fctx *fromContext) columnTypes() []sql.ColumnType {
+	return fctx.colTypes
 }
