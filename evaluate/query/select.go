@@ -335,7 +335,7 @@ func orderByInput(order []OrderBy, fctx *fromContext) []orderBy {
 		if !ok || len(r) != 1 {
 			return nil
 		}
-		cdx, err := fctx.colIndex(r[0], "")
+		cdx, _, err := fctx.colIndex(r[0], "")
 		if err != nil {
 			return nil
 		}
@@ -431,9 +431,12 @@ func where(ctx context.Context, pctx evaluate.PlanContext, tx sql.Transaction, r
 	if cond == nil {
 		return rop, nil
 	}
-	ce, err := expr.Compile(ctx, pctx, tx, fctx, cond)
+	ce, ct, err := expr.Compile(ctx, pctx, tx, fctx, cond)
 	if err != nil {
 		return nil, err
+	}
+	if ct.Type != sql.BooleanType {
+		return nil, fmt.Errorf("engine: WHERE must be boolean expression: %s", cond)
 	}
 	return &filterOp{rop, ce}, nil
 }
@@ -725,25 +728,23 @@ func results(ctx context.Context, pctx evaluate.PlanContext, tx sql.Transaction,
 		switch sr := sr.(type) {
 		case TableResult:
 			for _, col := range fctx.tableColumns(sr.Table) {
-				ce, err := expr.Compile(ctx, pctx, tx, fctx, expr.Ref{sr.Table, col})
+				ce, ct, err := expr.Compile(ctx, pctx, tx, fctx, expr.Ref{sr.Table, col})
 				if err != nil {
 					panic(err)
 				}
 				destExprs = append(destExprs, expr2dest{destColIndex: ddx, expr: ce})
 				cols = append(cols, col)
-				// XXX: append(colTypes, ce.Type())
-				colTypes = append(colTypes, sql.ColumnType{})
+				colTypes = append(colTypes, ct)
 				ddx += 1
 			}
 		case ExprResult:
-			ce, err := expr.Compile(ctx, pctx, tx, fctx, sr.Expr)
+			ce, ct, err := expr.Compile(ctx, pctx, tx, fctx, sr.Expr)
 			if err != nil {
 				return nil, err
 			}
 			destExprs = append(destExprs, expr2dest{destColIndex: ddx, expr: ce})
 			cols = append(cols, sr.Column(len(cols)))
-			// XXX: append(colTypes, ce.Type())
-			colTypes = append(colTypes, sql.ColumnType{})
+			colTypes = append(colTypes, ct)
 			ddx += 1
 		default:
 			panic(fmt.Sprintf("unexpected type for query.SelectResult: %T: %v", sr, sr))

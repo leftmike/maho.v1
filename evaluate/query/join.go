@@ -396,9 +396,14 @@ func (fj FromJoin) plan(ctx context.Context, pctx evaluate.PlanContext,
 		fctx = joinContextsOn(leftCtx, rightCtx)
 		jop.rightLen = len(rightCtx.cols)
 		if fj.On != nil {
-			jop.on, err = expr.Compile(ctx, pctx, tx, fctx, fj.On)
+			var ct sql.ColumnType
+			jop.on, ct, err = expr.Compile(ctx, pctx, tx, fctx, fj.On)
 			if err != nil {
 				return nil, nil, err
+			}
+			if ct.Type != sql.BooleanType {
+				return nil, nil,
+					fmt.Errorf("engine: expected boolean expression for ON condition: %s", fj.On)
 			}
 		}
 	}

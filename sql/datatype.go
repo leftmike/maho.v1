@@ -3,7 +3,8 @@ package sql
 type DataType int
 
 const (
-	BooleanType DataType = iota + 1
+	UnknownType DataType = iota
+	BooleanType
 	StringType
 	BytesType
 	FloatType
@@ -12,6 +13,8 @@ const (
 
 func (dt DataType) String() string {
 	switch dt {
+	case UnknownType:
+		return "UNKNOWN"
 	case BooleanType:
 		return "BOOL"
 	case StringType:
@@ -22,6 +25,7 @@ func (dt DataType) String() string {
 		return "DOUBLE"
 	case IntegerType:
 		return "INT"
+		// XXX: default: panic
 	}
 
 	return ""

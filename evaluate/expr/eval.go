@@ -346,6 +346,15 @@ func numFunc(a0 sql.Value, a1 sql.Value, ifn func(i0, i1 sql.Int64Value) sql.Val
 	return nil, fmt.Errorf("engine: want number got %v", a1)
 }
 
+func numType(args []sql.ColumnType) sql.ColumnType {
+	for adx := range args {
+		if args[adx].Type == sql.FloatType {
+			return sql.ColumnType{Type: sql.FloatType, Size: 8}
+		}
+	}
+	return sql.ColumnType{Type: sql.IntegerType, Size: 8}
+}
+
 func intFunc(a0 sql.Value, a1 sql.Value, ifn func(i0, i1 sql.Int64Value) sql.Value) (sql.Value,
 	error) {
 
@@ -510,7 +519,6 @@ func multiplyCall(ctx sql.EvalContext, args []sql.Value) (sql.Value, error) {
 }
 
 func negateCall(ctx sql.EvalContext, args []sql.Value) (sql.Value, error) {
-
 	switch a0 := args[0].(type) {
 	case sql.Float64Value:
 		return -a0, nil
@@ -529,7 +537,6 @@ func notEqualCall(ctx sql.EvalContext, args []sql.Value) (sql.Value, error) {
 }
 
 func notCall(ctx sql.EvalContext, args []sql.Value) (sql.Value, error) {
-
 	if a0, ok := args[0].(sql.BoolValue); ok {
 		return sql.BoolValue(a0 == false), nil
 	}
@@ -537,7 +544,6 @@ func notCall(ctx sql.EvalContext, args []sql.Value) (sql.Value, error) {
 }
 
 func orCall(ctx sql.EvalContext, args []sql.Value) (sql.Value, error) {
-
 	if a0, ok := args[0].(sql.BoolValue); ok {
 		if a1, ok := args[1].(sql.BoolValue); ok {
 			return a0 || a1, nil

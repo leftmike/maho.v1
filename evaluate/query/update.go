@@ -64,9 +64,14 @@ func (stmt *Update) Plan(ctx context.Context, pctx evaluate.PlanContext,
 	fctx := makeFromContext(tn.Table, tt.Columns(), tt.ColumnTypes())
 	var where sql.CExpr
 	if stmt.Where != nil {
-		where, err = expr.Compile(ctx, pctx, tx, fctx, stmt.Where)
+		var ct sql.ColumnType
+		where, ct, err = expr.Compile(ctx, pctx, tx, fctx, stmt.Where)
 		if err != nil {
 			return nil, err
+		}
+		if ct.Type != sql.BooleanType {
+			return nil, fmt.Errorf("engine: WHERE must be boolean expression: %s",
+				stmt.Where)
 		}
 	}
 
@@ -80,14 +85,15 @@ func (stmt *Update) Plan(ctx context.Context, pctx evaluate.PlanContext,
 
 	colDefaults := tt.ColumnDefaults()
 	for _, cu := range stmt.ColumnUpdates {
-		col, err := fctx.colIndex(cu.Column, "update")
+		col, _, err := fctx.colIndex(cu.Column, "update")
 		if err != nil {
 			return nil, err
 		}
 
 		var ce sql.CExpr
 		if cu.Expr != nil {
-			ce, err = expr.Compile(ctx, pctx, tx, fctx, cu.Expr)
+			// ZZZ: check that ct is compatible with the column
+			ce, _, err = expr.Compile(ctx, pctx, tx, fctx, cu.Expr)
 			if err != nil {
 				return nil, err
 			}

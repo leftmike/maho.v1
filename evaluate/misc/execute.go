@@ -28,7 +28,7 @@ func (stmt *Execute) Plan(ctx context.Context, pctx evaluate.PlanContext,
 
 	params := make([]sql.CExpr, 0, len(stmt.Params))
 	for _, param := range stmt.Params {
-		ce, err := expr.Compile(ctx, pctx, tx, nil, param)
+		ce, _, err := expr.Compile(ctx, pctx, tx, nil, param)
 		if err != nil {
 			return nil, err
 		}

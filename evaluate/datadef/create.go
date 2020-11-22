@@ -135,31 +135,35 @@ func (stmt *CreateTable) String() string {
 	return s
 }
 
-type tableCheck []sql.Identifier
+type tableCheck struct {
+	cols     []sql.Identifier
+	colTypes []sql.ColumnType
+}
 
-func (tc tableCheck) CompileRef(r expr.Ref) (int, error) {
+func (tc tableCheck) CompileRef(r expr.Ref) (int, sql.ColumnType, error) {
 	if len(r) == 1 {
-		for idx, col := range tc {
+		for idx, col := range tc.cols {
 			if col == r[0] {
-				return idx, nil
+				return idx, tc.colTypes[idx], nil
 			}
 		}
 	}
-	return -1, fmt.Errorf("engine: reference %s not found", r)
+	return -1, sql.ColumnType{}, fmt.Errorf("engine: reference %s not found", r)
 }
 
 type columnCheck struct {
 	col    sql.Identifier
+	ct     sql.ColumnType
 	colNum int
 }
 
-func (cc columnCheck) CompileRef(r expr.Ref) (int, error) {
+func (cc columnCheck) CompileRef(r expr.Ref) (int, sql.ColumnType, error) {
 	if len(r) == 1 {
 		if cc.col == r[0] {
-			return cc.colNum, nil
+			return cc.colNum, cc.ct, nil
 		}
 	}
-	return -1, fmt.Errorf("engine: reference %s not found", r)
+	return -1, sql.ColumnType{}, fmt.Errorf("engine: reference %s not found", r)
 }
 
 func (stmt *CreateTable) Plan(ctx context.Context, pctx evaluate.PlanContext,
@@ -193,13 +197,25 @@ func (stmt *CreateTable) Plan(ctx context.Context, pctx evaluate.PlanContext,
 			var err error
 			var cctx expr.CompileContext
 			if con.ColNum >= 0 {
-				cctx = columnCheck{stmt.Columns[con.ColNum], con.ColNum}
+				cctx = columnCheck{
+					col:    stmt.Columns[con.ColNum],
+					ct:     stmt.ColumnTypes[con.ColNum],
+					colNum: con.ColNum,
+				}
 			} else {
-				cctx = tableCheck(stmt.Columns)
+				cctx = tableCheck{
+					cols:     stmt.Columns,
+					colTypes: stmt.ColumnTypes,
+				}
 			}
-			check, err = expr.Compile(ctx, pctx, tx, cctx, con.Check)
+
+			var ct sql.ColumnType
+			check, ct, err = expr.Compile(ctx, pctx, tx, cctx, con.Check)
 			if err != nil {
 				return nil, err
+			} else if ct.Type != sql.BooleanType {
+				return nil, fmt.Errorf("engine: check constraint must be boolean expression: %s",
+					con.Check)
 			}
 			checkExpr = con.Check.String()
 		}
@@ -220,7 +236,8 @@ func (stmt *CreateTable) Plan(ctx context.Context, pctx evaluate.PlanContext,
 		var dfltExpr string
 		if cd != nil {
 			var err error
-			dflt, err = expr.Compile(ctx, pctx, tx, nil, cd)
+			// ZZZ: check that ct is compatible with the column
+			dflt, _, err = expr.Compile(ctx, pctx, tx, nil, cd)
 			if err != nil {
 				return nil, err
 			}

@@ -159,7 +159,7 @@ func TestEval(t *testing.T) {
 			t.Errorf("ParseExpr(%q) failed with %s", c.s, err)
 			continue
 		}
-		r, err := expr.Compile(context.Background(), nil, nil, nil, e)
+		r, _, err := expr.Compile(context.Background(), nil, nil, nil, e)
 		if err != nil {
 			t.Errorf("Compile(%q) failed with %s", c.s, err)
 			continue
@@ -293,7 +293,7 @@ func TestEval(t *testing.T) {
 			t.Errorf("ParseExpr(%q) failed with %s", f, err)
 			continue
 		}
-		r, err := expr.Compile(context.Background(), nil, nil, nil, e)
+		r, _, err := expr.Compile(context.Background(), nil, nil, nil, e)
 		if err != nil {
 			t.Errorf("Compile(%q) failed with %s", f, err)
 			continue
@@ -323,7 +323,7 @@ func compareTest(t *testing.T, m, op, n string, b bool) {
 		t.Errorf("ParseExpr(%q) failed with %s", s, err)
 		return
 	}
-	r, err := expr.Compile(context.Background(), nil, nil, nil, e)
+	r, _, err := expr.Compile(context.Background(), nil, nil, nil, e)
 	if err != nil {
 		t.Errorf("Compile(%q) failed with %s", s, err)
 		return
@@ -348,9 +348,9 @@ type compileContext struct {
 	idx int
 }
 
-func (cc *compileContext) CompileRef(r expr.Ref) (int, error) {
+func (cc *compileContext) CompileRef(r expr.Ref) (int, sql.ColumnType, error) {
 	cc.idx += 1
-	return cc.idx, nil
+	return cc.idx, sql.ColumnType{}, nil
 }
 
 func TestEncode(t *testing.T) {
@@ -377,7 +377,7 @@ func TestEncode(t *testing.T) {
 		if err != nil {
 			t.Errorf("ParseExpr(%q) failed with %s", c, err)
 		}
-		ce, err := expr.Compile(nil, nil, nil, ctx, e)
+		ce, _, err := expr.Compile(nil, nil, nil, ctx, e)
 		if err != nil {
 			t.Errorf("Compile(%q) failed with %s", c, err)
 		}

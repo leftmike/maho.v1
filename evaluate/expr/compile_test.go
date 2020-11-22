@@ -12,8 +12,8 @@ import (
 
 type compileCtx struct{}
 
-func (_ compileCtx) CompileRef(r expr.Ref) (int, error) {
-	return -1, fmt.Errorf("reference %s not found", r)
+func (_ compileCtx) CompileRef(r expr.Ref) (int, sql.ColumnType, error) {
+	return -1, sql.ColumnType{}, fmt.Errorf("reference %s not found", r)
 }
 
 func TestCompile(t *testing.T) {
@@ -34,7 +34,7 @@ func TestCompile(t *testing.T) {
 		if err != nil {
 			t.Errorf("ParseExpr(%q) failed with %s", c.s, err)
 		}
-		r, err := expr.Compile(nil, nil, nil, compileCtx{}, e)
+		r, _, err := expr.Compile(nil, nil, nil, compileCtx{}, e)
 		if err != nil {
 			t.Errorf("expr.Compile(%q) failed with %s", c.s, err)
 		}
@@ -57,7 +57,7 @@ func TestCompile(t *testing.T) {
 		if err != nil {
 			t.Errorf("ParseExpr(%q) failed with %s", f, err)
 		}
-		r, err := expr.Compile(nil, nil, nil, compileCtx{}, e)
+		r, _, err := expr.Compile(nil, nil, nil, compileCtx{}, e)
 		if err == nil {
 			t.Errorf("expr.Compile(%q) did not fail, got %s", f, r)
 		}

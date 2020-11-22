@@ -504,39 +504,41 @@ func joinContextsUsing(lctx, rctx *fromContext, useSet map[sql.Identifier]struct
 	return fctx, src2dest
 }
 
-func (fctx *fromContext) CompileRef(r expr.Ref) (int, error) {
+func (fctx *fromContext) CompileRef(r expr.Ref) (int, sql.ColumnType, error) {
 	if len(r) == 1 {
 		return fctx.colIndex(r[0], "reference")
 	} else if len(r) == 2 {
 		return fctx.tblColIndex(r[0], r[1], "reference")
 	}
-	return -1, fmt.Errorf("engine: %s is not a valid reference", r)
+	return -1, sql.ColumnType{}, fmt.Errorf("engine: %s is not a valid reference", r)
 }
 
-func (fctx *fromContext) colIndex(col sql.Identifier, what string) (int, error) {
+func (fctx *fromContext) colIndex(col sql.Identifier, what string) (int, sql.ColumnType, error) {
 	idx, ok := fctx.colMap[col]
 	if !ok {
-		return -1, fmt.Errorf("engine: %s %s not found", what, col)
+		return -1, sql.ColumnType{}, fmt.Errorf("engine: %s %s not found", what, col)
 	}
 	if idx < 0 {
-		return -1, fmt.Errorf("engine: %s %s is ambiguous", what, col)
+		return -1, sql.ColumnType{}, fmt.Errorf("engine: %s %s is ambiguous", what, col)
 	}
-	return idx, nil
+	return idx, sql.ColumnType{}, nil // ZZZ
 }
 
-func (fctx *fromContext) tblColIndex(tbl, col sql.Identifier, what string) (int, error) {
+func (fctx *fromContext) tblColIndex(tbl, col sql.Identifier, what string) (int, sql.ColumnType,
+	error) {
+
 	if tbl == 0 {
 		return fctx.colIndex(col, what)
 	}
 	cr := colRef{table: tbl, column: col}
 	idx, ok := fctx.colRefMap[cr]
 	if !ok {
-		return -1, fmt.Errorf("engine: %s %s not found", what, cr.String())
+		return -1, sql.ColumnType{}, fmt.Errorf("engine: %s %s not found", what, cr.String())
 	}
 	if idx < 0 {
-		return -1, fmt.Errorf("engine: %s %s is ambiguous", what, cr.String())
+		return -1, sql.ColumnType{}, fmt.Errorf("engine: %s %s is ambiguous", what, cr.String())
 	}
-	return idx, nil
+	return idx, sql.ColumnType{}, nil // ZZZ
 }
 
 func (fctx *fromContext) tableColumns(tbl sql.Identifier) []sql.Identifier {

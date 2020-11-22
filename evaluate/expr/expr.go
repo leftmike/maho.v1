@@ -301,7 +301,7 @@ func EqualColExpr(cctx CompileContext, e Expr) []ColExpr {
 	} else if be.Op == EqualOp {
 		if l, ok := be.Left.(*Literal); ok {
 			if r, ok := be.Right.(Ref); ok {
-				col, err := cctx.CompileRef(r)
+				col, _, err := cctx.CompileRef(r)
 				if err != nil {
 					return nil
 				}
@@ -311,7 +311,7 @@ func EqualColExpr(cctx CompileContext, e Expr) []ColExpr {
 			}
 		} else if p, ok := be.Left.(Param); ok {
 			if r, ok := be.Right.(Ref); ok {
-				col, err := cctx.CompileRef(r)
+				col, _, err := cctx.CompileRef(r)
 				if err != nil {
 					return nil
 				}
@@ -320,7 +320,7 @@ func EqualColExpr(cctx CompileContext, e Expr) []ColExpr {
 				return nil
 			}
 		} else if r, ok := be.Left.(Ref); ok {
-			col, err := cctx.CompileRef(r)
+			col, _, err := cctx.CompileRef(r)
 			if err != nil {
 				return nil
 			}

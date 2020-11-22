@@ -51,27 +51,27 @@ func TestExpr(t *testing.T) {
 
 type andEqualRefContext struct{}
 
-func (_ andEqualRefContext) CompileRef(r Ref) (int, error) {
+func (_ andEqualRefContext) CompileRef(r Ref) (int, sql.ColumnType, error) {
 	var s string
 	if len(r) == 1 {
 		s = r[0].String()
 	} else if len(r) == 2 {
 		if r[0].String() != "tbl" {
-			return 0, errors.New("want tbl.c#")
+			return 0, sql.ColumnType{}, errors.New("want tbl.c#")
 		}
 		s = r[1].String()
 	} else {
-		return 0, errors.New("want tbl.c#")
+		return 0, sql.ColumnType{}, errors.New("want tbl.c#")
 	}
 
 	if s[0] != 'c' {
-		return 0, errors.New("want c#")
+		return 0, sql.ColumnType{}, errors.New("want c#")
 	}
 	i, err := strconv.Atoi(s[1:])
 	if err != nil {
-		return 0, err
+		return 0, sql.ColumnType{}, err
 	}
-	return i, nil
+	return i, sql.ColumnType{}, nil
 }
 
 func TestEqualColExpr(t *testing.T) {

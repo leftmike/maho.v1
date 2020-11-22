@@ -222,9 +222,10 @@ type groupContext struct {
 	makers      []expr.MakeAggregator
 }
 
-func (_ *groupContext) CompileRef(r expr.Ref) (int, error) {
-	return 0, fmt.Errorf("engine: column \"%s\" must appear in a GROUP BY clause or in an "+
-		"aggregate function", r)
+func (_ *groupContext) CompileRef(r expr.Ref) (int, sql.ColumnType, error) {
+	return 0, sql.ColumnType{},
+		fmt.Errorf("engine: column \"%s\" must appear in a GROUP BY clause or in an "+
+			"aggregate function", r)
 }
 
 func (gctx *groupContext) MaybeRefExpr(e expr.Expr) (int, bool) {
@@ -254,7 +255,7 @@ func (gctx *groupContext) makeGroupByOp(ctx context.Context, pctx evaluate.PlanC
 	for idx := range gctx.aggregators {
 		agg := aggregator{maker: gctx.makers[idx]}
 		for _, a := range gctx.aggregators[idx].Args {
-			ce, err := expr.Compile(ctx, pctx, tx, fctx, a)
+			ce, _, err := expr.Compile(ctx, pctx, tx, fctx, a)
 			if err != nil {
 				return nil, err
 			}
@@ -274,7 +275,7 @@ func makeGroupContext(ctx context.Context, pctx evaluate.PlanContext, tx sql.Tra
 	var groupRefs []bool
 	ddx := 0
 	for _, e := range group {
-		ce, err := expr.Compile(ctx, pctx, tx, fctx, e)
+		ce, _, err := expr.Compile(ctx, pctx, tx, fctx, e)
 		if err != nil {
 			return nil, err
 		}
@@ -308,7 +309,7 @@ func group(ctx context.Context, pctx evaluate.PlanContext, tx sql.Transaction, r
 			panic(fmt.Sprintf("unexpected type for query.SelectResult: %T: %v", sr, sr))
 		}
 		var ce sql.CExpr
-		ce, err = expr.CompileAggregator(ctx, pctx, tx, gctx, er.Expr)
+		ce, _, err = expr.CompileAggregator(ctx, pctx, tx, gctx, er.Expr)
 		if err != nil {
 			return nil, err
 		}
@@ -320,7 +321,7 @@ func group(ctx context.Context, pctx evaluate.PlanContext, tx sql.Transaction, r
 
 	var hce sql.CExpr
 	if having != nil {
-		hce, err = expr.CompileAggregator(ctx, pctx, tx, gctx, having)
+		hce, _, err = expr.CompileAggregator(ctx, pctx, tx, gctx, having)
 		if err != nil {
 			return nil, err
 		}

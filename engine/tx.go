@@ -164,9 +164,12 @@ func (tx *transaction) CreateTable(ctx context.Context, tn sql.TableName, cols [
 		}
 		cols = append(cols, rowID)
 
-		dflt, err := expr.Compile(ctx, nil, tx, nil, &expr.Call{Name: sql.ID("unique_rowid")})
+		dflt, ct, err := expr.Compile(ctx, nil, tx, nil, &expr.Call{Name: sql.ID("unique_rowid")})
 		if err != nil {
 			panic(fmt.Sprintf("unable to compile default for rowid: %s", err))
+		}
+		if ct.Type != sql.IntegerType {
+			panic(fmt.Sprintf("default for rowid should be integer expression; got: %s", ct.Type))
 		}
 		colTypes = append(colTypes, sql.ColumnType{
 			Type:    sql.IntegerType,

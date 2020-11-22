@@ -50,7 +50,7 @@ func (stmt *Values) Plan(ctx context.Context, pctx evaluate.PlanContext,
 		row := make([]sql.CExpr, len(r))
 		for j := range r {
 			var err error
-			row[j], err = expr.Compile(ctx, pctx, tx, nil, r[j])
+			row[j], _, err = expr.Compile(ctx, pctx, tx, nil, r[j])
 			if err != nil {
 				return nil, err
 			}
