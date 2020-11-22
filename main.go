@@ -43,7 +43,6 @@ To Do:
 -- usda.sql: causes corrupt WAL
 
 - proto3 (postgres protocol)
-- test type info from compile
 - test type info from rows sql statements
 - correctly handle type of aggregators
 - create, insert, update: check that expr type matches column type
