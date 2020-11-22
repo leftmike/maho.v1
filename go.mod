@@ -10,7 +10,7 @@ require (
 	github.com/golang/protobuf v1.4.2
 	github.com/google/btree v1.0.0
 	github.com/hashicorp/hcl v1.0.0
-	github.com/leftmike/sqltest v0.0.0-20201025165730-b7e3a45870b4
+	github.com/leftmike/sqltest v0.0.0-20201122191159-a6ca047afd4b
 	github.com/lib/pq v1.8.0 // indirect
 	github.com/peterh/liner v1.2.0
 	github.com/sirupsen/logrus v1.6.0

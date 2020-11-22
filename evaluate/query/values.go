@@ -56,8 +56,16 @@ func (stmt *Values) Plan(ctx context.Context, pctx evaluate.PlanContext,
 			if err != nil {
 				return nil, err
 			}
-			// XXX: check types
-			colTypes[j] = ct
+			if colTypes[j].Type == sql.UnknownType {
+				colTypes[j] = ct
+			} else if colTypes[j].Type != ct.Type && ct.Type != sql.UnknownType {
+				if colTypes[j].Type == sql.IntegerType && ct.Type == sql.FloatType {
+					colTypes[j] = ct
+				} else if colTypes[j].Type != sql.FloatType || ct.Type != sql.IntegerType {
+					return nil,
+						fmt.Errorf("engine: incompatible expression type in VALUES: %s", r[j])
+				}
+			}
 		}
 		rows = append(rows, row)
 	}
