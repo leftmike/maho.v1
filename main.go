@@ -44,7 +44,6 @@ To Do:
 
 - proto3 (postgres protocol)
 - test type info from rows sql statements
-- create, insert, update: check that expr type matches column type
 
 - test subquery expressions: '(' select | values | show ')'
 

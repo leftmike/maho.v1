@@ -16,8 +16,7 @@ type CompileContext interface {
 
 type AggregatorContext interface {
 	MaybeRefExpr(e Expr) (int, sql.ColumnType, bool)
-	ExistingAggregator(c *Call) (int, sql.ColumnType, bool)
-	CompileAggregator(c *Call, ct sql.ColumnType, maker MakeAggregator, args []sql.CExpr) int
+	CompileAggregator(maker MakeAggregator, args []sql.CExpr) int
 	ArgContext() CompileContext
 }
 
@@ -132,24 +131,21 @@ func compile(ctx context.Context, pctx evaluate.PlanContext, tx sql.Transaction,
 					cf.maxArgs, len(e.Args))
 		}
 
-		var actx AggregatorContext
+		var actx CompileContext
 		if cf.makeAggregator != nil {
 			if !agg {
 				return nil, ct, &ContextError{e.Name}
 			}
-			actx = cctx.(AggregatorContext)
-			idx, ct, found := actx.ExistingAggregator(e)
-			if found {
-				return colIndex(idx), ct, nil
-			}
-			cctx = actx.ArgContext()
+			actx = cctx.(AggregatorContext).ArgContext()
+		} else {
+			actx = cctx
 		}
 
 		args := make([]sql.CExpr, len(e.Args))
 		argTypes := make([]sql.ColumnType, len(e.Args))
 		for i, a := range e.Args {
 			var err error
-			args[i], argTypes[i], err = compile(ctx, pctx, tx, cctx, a, false)
+			args[i], argTypes[i], err = compile(ctx, pctx, tx, actx, a, false)
 			if err != nil {
 				return nil, ct, err
 			}
@@ -163,7 +159,8 @@ func compile(ctx context.Context, pctx evaluate.PlanContext, tx sql.Transaction,
 		if cf.makeAggregator == nil {
 			return &call{cf, args}, ct, nil
 		} else {
-			return colIndex(actx.CompileAggregator(e, ct, cf.makeAggregator, args)), ct, nil
+			idx := cctx.(AggregatorContext).CompileAggregator(cf.makeAggregator, args)
+			return colIndex(idx), ct, nil
 		}
 	case *Stmt:
 		if pctx == nil {

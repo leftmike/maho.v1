@@ -91,7 +91,6 @@ func (stmt *Update) Plan(ctx context.Context, pctx evaluate.PlanContext,
 
 		var ce sql.CExpr
 		if cu.Expr != nil {
-			// XXX: check that ct is compatible with the column
 			ce, _, err = expr.Compile(ctx, pctx, tx, fctx, cu.Expr)
 			if err != nil {
 				return nil, err

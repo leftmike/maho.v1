@@ -220,8 +220,6 @@ type groupContext struct {
 	groupCols   []sql.Identifier
 	groupTypes  []sql.ColumnType
 	groupRefs   []bool
-	aggCalls    []*expr.Call
-	aggTypes    []sql.ColumnType
 	aggregators []aggregator
 }
 
@@ -240,20 +238,7 @@ func (gctx *groupContext) MaybeRefExpr(e expr.Expr) (int, sql.ColumnType, bool) 
 	return 0, sql.ColumnType{}, false
 }
 
-func (gctx *groupContext) ExistingAggregator(c *expr.Call) (int, sql.ColumnType, bool) {
-	for adx, ac := range gctx.aggCalls {
-		if ac.Equal(c) {
-			return adx + len(gctx.group), gctx.aggTypes[adx], true
-		}
-	}
-	return -1, sql.ColumnType{}, false
-}
-
-func (gctx *groupContext) CompileAggregator(c *expr.Call, ct sql.ColumnType,
-	maker expr.MakeAggregator, args []sql.CExpr) int {
-
-	gctx.aggCalls = append(gctx.aggCalls, c)
-	gctx.aggTypes = append(gctx.aggTypes, ct)
+func (gctx *groupContext) CompileAggregator(maker expr.MakeAggregator, args []sql.CExpr) int {
 	gctx.aggregators = append(gctx.aggregators, aggregator{maker, args})
 	gctx.groupCols = append(gctx.groupCols, sql.ID(fmt.Sprintf("agg%d", len(gctx.groupCols)+1)))
 	return len(gctx.group) + len(gctx.aggregators) - 1
