@@ -16,7 +16,9 @@ type CompileContext interface {
 
 type AggregatorContext interface {
 	MaybeRefExpr(e Expr) (int, sql.ColumnType, bool)
-	CompileAggregator(c *Call, maker MakeAggregator) int
+	ExistingAggregator(c *Call) (int, sql.ColumnType, bool)
+	CompileAggregator(c *Call, ct sql.ColumnType, maker MakeAggregator, args []sql.CExpr) int
+	ArgContext() CompileContext
 }
 
 type ContextError struct {
@@ -129,20 +131,25 @@ func compile(ctx context.Context, pctx evaluate.PlanContext, tx sql.Transaction,
 				fmt.Errorf("engine: function \"%s\": maximum %d arguments got %d", e.Name,
 					cf.maxArgs, len(e.Args))
 		}
+
+		var actx AggregatorContext
 		if cf.makeAggregator != nil {
-			if agg {
-				return colIndex(cctx.(AggregatorContext).CompileAggregator(e, cf.makeAggregator)),
-					cf.typ, nil
-			} else {
+			if !agg {
 				return nil, ct, &ContextError{e.Name}
 			}
+			actx = cctx.(AggregatorContext)
+			idx, ct, found := actx.ExistingAggregator(e)
+			if found {
+				return colIndex(idx), ct, nil
+			}
+			cctx = actx.ArgContext()
 		}
 
 		args := make([]sql.CExpr, len(e.Args))
 		argTypes := make([]sql.ColumnType, len(e.Args))
 		for i, a := range e.Args {
 			var err error
-			args[i], argTypes[i], err = compile(ctx, pctx, tx, cctx, a, agg)
+			args[i], argTypes[i], err = compile(ctx, pctx, tx, cctx, a, false)
 			if err != nil {
 				return nil, ct, err
 			}
@@ -152,7 +159,12 @@ func compile(ctx context.Context, pctx evaluate.PlanContext, tx sql.Transaction,
 		} else {
 			ct = cf.typ
 		}
-		return &call{cf, args}, ct, nil
+
+		if cf.makeAggregator == nil {
+			return &call{cf, args}, ct, nil
+		} else {
+			return colIndex(actx.CompileAggregator(e, ct, cf.makeAggregator, args)), ct, nil
+		}
 	case *Stmt:
 		if pctx == nil {
 			return nil, ct, fmt.Errorf("engine: expression statements not allowed here: %s", e.Stmt)
@@ -199,7 +211,6 @@ type callFunc struct {
 
 var (
 	intType    = sql.ColumnType{Type: sql.IntegerType, Size: 8}
-	floatType  = sql.ColumnType{Type: sql.FloatType, Size: 8}
 	boolType   = sql.ColumnType{Type: sql.BooleanType}
 	stringType = sql.ColumnType{Type: sql.StringType}
 
@@ -235,17 +246,15 @@ var (
 		sql.ID("unique_rowid"): {fn: uniqueRowIDCall, typ: intType, minArgs: 0, maxArgs: 0},
 
 		// Aggregate functions
-		sql.ID("avg"): {typ: floatType, minArgs: 1, maxArgs: 1,
+		sql.ID("avg"): {tfn: numType, minArgs: 1, maxArgs: 1,
 			makeAggregator: makeAvgAggregator},
 		sql.ID("count"): {typ: intType, minArgs: 1, maxArgs: 1,
 			makeAggregator: makeCountAggregator},
 		sql.ID("count_all"): {typ: intType,
 			minArgs: 0, maxArgs: 0, makeAggregator: makeCountAllAggregator},
-		sql.ID("max"): {typ: floatType,
-			minArgs: 1, maxArgs: 1, makeAggregator: makeMaxAggregator},
-		sql.ID("min"): {typ: floatType,
-			minArgs: 1, maxArgs: 1, makeAggregator: makeMinAggregator},
-		sql.ID("sum"): {typ: floatType, minArgs: 1, maxArgs: 1, makeAggregator: makeSumAggregator},
+		sql.ID("max"): {tfn: numType, minArgs: 1, maxArgs: 1, makeAggregator: makeMaxAggregator},
+		sql.ID("min"): {tfn: numType, minArgs: 1, maxArgs: 1, makeAggregator: makeMinAggregator},
+		sql.ID("sum"): {tfn: numType, minArgs: 1, maxArgs: 1, makeAggregator: makeSumAggregator},
 	}
 
 	funcs = map[string]*callFunc{}

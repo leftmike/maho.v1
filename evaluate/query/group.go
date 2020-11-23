@@ -214,13 +214,15 @@ func (_ *groupRows) Update(ctx context.Context, updates []sql.ColumnUpdate) erro
 }
 
 type groupContext struct {
+	actx        expr.CompileContext
 	group       []expr.Expr
 	groupExprs  []expr2dest
 	groupCols   []sql.Identifier
 	groupTypes  []sql.ColumnType
 	groupRefs   []bool
-	aggregators []*expr.Call
-	makers      []expr.MakeAggregator
+	aggCalls    []*expr.Call
+	aggTypes    []sql.ColumnType
+	aggregators []aggregator
 }
 
 func (_ *groupContext) CompileRef(r expr.Ref) (int, sql.ColumnType, error) {
@@ -238,35 +240,27 @@ func (gctx *groupContext) MaybeRefExpr(e expr.Expr) (int, sql.ColumnType, bool) 
 	return 0, sql.ColumnType{}, false
 }
 
-func (gctx *groupContext) CompileAggregator(c *expr.Call, maker expr.MakeAggregator) int {
-	for adx, ae := range gctx.aggregators {
-		if ae.Equal(c) {
-			return adx + len(gctx.group)
+func (gctx *groupContext) ExistingAggregator(c *expr.Call) (int, sql.ColumnType, bool) {
+	for adx, ac := range gctx.aggCalls {
+		if ac.Equal(c) {
+			return adx + len(gctx.group), gctx.aggTypes[adx], true
 		}
 	}
-	gctx.aggregators = append(gctx.aggregators, c)
-	gctx.makers = append(gctx.makers, maker)
+	return -1, sql.ColumnType{}, false
+}
+
+func (gctx *groupContext) CompileAggregator(c *expr.Call, ct sql.ColumnType,
+	maker expr.MakeAggregator, args []sql.CExpr) int {
+
+	gctx.aggCalls = append(gctx.aggCalls, c)
+	gctx.aggTypes = append(gctx.aggTypes, ct)
+	gctx.aggregators = append(gctx.aggregators, aggregator{maker, args})
+	gctx.groupCols = append(gctx.groupCols, sql.ID(fmt.Sprintf("agg%d", len(gctx.groupCols)+1)))
 	return len(gctx.group) + len(gctx.aggregators) - 1
 }
 
-func (gctx *groupContext) makeGroupByOp(ctx context.Context, pctx evaluate.PlanContext,
-	tx sql.Transaction, rop rowsOp, fctx *fromContext) (rowsOp, error) {
-
-	gbo := &groupByOp{rop: rop, cols: gctx.groupCols, groupExprs: gctx.groupExprs}
-	for idx := range gctx.aggregators {
-		agg := aggregator{maker: gctx.makers[idx]}
-		for _, a := range gctx.aggregators[idx].Args {
-			// XXX: track type of aggregator
-			ce, _, err := expr.Compile(ctx, pctx, tx, fctx, a)
-			if err != nil {
-				return nil, err
-			}
-			agg.args = append(agg.args, ce)
-		}
-		gbo.aggregators = append(gbo.aggregators, agg)
-		gbo.cols = append(gbo.cols, sql.ID(fmt.Sprintf("agg%d", len(gbo.cols)+1)))
-	}
-	return gbo, nil
+func (gctx *groupContext) ArgContext() expr.CompileContext {
+	return gctx.actx
 }
 
 func makeGroupContext(ctx context.Context, pctx evaluate.PlanContext, tx sql.Transaction,
@@ -294,13 +288,13 @@ func makeGroupContext(ctx context.Context, pctx evaluate.PlanContext, tx sql.Tra
 	}
 
 	return &groupContext{
+		actx:       fctx,
 		group:      group,
 		groupExprs: groupExprs,
 		groupCols:  groupCols,
 		groupTypes: groupTypes,
 		groupRefs:  groupRefs,
 	}, nil
-
 }
 
 func group(ctx context.Context, pctx evaluate.PlanContext, tx sql.Transaction, rop rowsOp,
@@ -338,9 +332,11 @@ func group(ctx context.Context, pctx evaluate.PlanContext, tx sql.Transaction, r
 		}
 	}
 
-	rop, err = gctx.makeGroupByOp(ctx, pctx, tx, rop, fctx)
-	if err != nil {
-		return nil, err
+	rop = &groupByOp{
+		rop:         rop,
+		cols:        gctx.groupCols,
+		groupExprs:  gctx.groupExprs,
+		aggregators: gctx.aggregators,
 	}
 
 	if having != nil {
