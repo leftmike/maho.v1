@@ -62,18 +62,19 @@ func (run *Runner) RunExec(tst *sqltestdb.Test) (int64, error) {
 	return n, nil
 }
 
-func (run *Runner) RunQuery(tst *sqltestdb.Test) ([]string, [][]string, error) {
+func (run *Runner) RunQuery(tst *sqltestdb.Test) (sqltestdb.QueryResult, error) {
 	ses := ((*evaluate.Session)(run))
 
 	p := parser.NewParser(strings.NewReader(tst.Test),
 		fmt.Sprintf("%s:%d", tst.Filename, tst.LineNumber))
 	stmt, err := p.Parse()
 	if err != nil {
-		return nil, nil, err
+		return sqltestdb.QueryResult{}, err
 	}
 
 	var resultCols []string
 	var results [][]string
+	var resultTypes []string
 	err = ses.Run(stmt,
 		func(ctx context.Context, ses *evaluate.Session, e sql.Engine,
 			tx sql.Transaction) error {
@@ -94,8 +95,12 @@ func (run *Runner) RunQuery(tst *sqltestdb.Test) ([]string, [][]string, error) {
 			cols := rowsPlan.Columns()
 			lenCols := len(cols)
 			resultCols = make([]string, 0, lenCols)
-			for _, col := range cols {
-				resultCols = append(resultCols, col.String())
+			for cdx := range cols {
+				resultCols = append(resultCols, cols[cdx].String())
+			}
+
+			for _, ct := range rowsPlan.ColumnTypes() {
+				resultTypes = append(resultTypes, ct.Type.String())
 			}
 
 			dest := make([]sql.Value, lenCols)
@@ -123,7 +128,11 @@ func (run *Runner) RunQuery(tst *sqltestdb.Test) ([]string, [][]string, error) {
 		})
 
 	if err != nil {
-		return nil, nil, err
+		return sqltestdb.QueryResult{}, err
 	}
-	return resultCols, results, nil
+	return sqltestdb.QueryResult{
+		Columns:   resultCols,
+		TypeNames: resultTypes,
+		Rows:      results,
+	}, nil
 }
