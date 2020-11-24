@@ -49,7 +49,7 @@ func TestRowValues(t *testing.T) {
 		{
 			row: []sql.Value{sql.Int64Value(123), sql.StringValue(""),
 				sql.BytesValue{0xFF, 1, 2, 3}},
-			s: "123, '', x'ff010203'",
+			s: `123, '', '\xff010203'`,
 		},
 	}
 

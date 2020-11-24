@@ -62,6 +62,29 @@ func (run *Runner) RunExec(tst *sqltestdb.Test) (int64, error) {
 	return n, nil
 }
 
+func columnType(ct sql.ColumnType) string {
+	switch ct.Type {
+	case sql.UnknownType, sql.BooleanType:
+		return ct.Type.String()
+	case sql.BytesType:
+		return "BYTEA"
+	case sql.StringType:
+		if ct.Fixed {
+			return "BPCHAR"
+		} else if ct.Size < sql.MaxColumnSize {
+			return "VARCHAR"
+		} else {
+			return "TEXT"
+		}
+	case sql.FloatType:
+		return fmt.Sprintf("FLOAT%d", ct.Size)
+	case sql.IntegerType:
+		return fmt.Sprintf("INT%d", ct.Size)
+	default:
+		panic(fmt.Sprintf("unexpected column type; got %#v", ct.Type))
+	}
+}
+
 func (run *Runner) RunQuery(tst *sqltestdb.Test) (sqltestdb.QueryResult, error) {
 	ses := ((*evaluate.Session)(run))
 
@@ -100,7 +123,7 @@ func (run *Runner) RunQuery(tst *sqltestdb.Test) (sqltestdb.QueryResult, error) 
 			}
 
 			for _, ct := range rowsPlan.ColumnTypes() {
-				resultTypes = append(resultTypes, ct.Type.String())
+				resultTypes = append(resultTypes, columnType(ct))
 			}
 
 			dest := make([]sql.Value, lenCols)
@@ -117,6 +140,8 @@ func (run *Runner) RunQuery(tst *sqltestdb.Test) (sqltestdb.QueryResult, error) 
 						row = append(row, "")
 					} else if s, ok := v.(sql.StringValue); ok {
 						row = append(row, string(s))
+					} else if b, ok := v.(sql.BytesValue); ok {
+						row = append(row, string(b))
 					} else {
 						row = append(row, sql.Format(v))
 					}

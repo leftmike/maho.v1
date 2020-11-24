@@ -43,7 +43,6 @@ To Do:
 -- usda.sql: causes corrupt WAL
 
 - proto3 (postgres protocol)
-- test type info from rows sql statements
 
 - test subquery expressions: '(' select | values | show ')'
 

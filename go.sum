@@ -97,6 +97,8 @@ github.com/leftmike/sqltest v0.0.0-20201122191159-a6ca047afd4b h1:/gp3JsZJ+paxm7
 github.com/leftmike/sqltest v0.0.0-20201122191159-a6ca047afd4b/go.mod h1:Lsvg3MrwA13o5vmacfX3gLqLOIRNouPFTHdQKfvOPXY=
 github.com/leftmike/sqltest v0.0.0-20201124023720-43b9a944e8c5 h1:g2eFZ5o+oEnpGWpAxNXFbAPG1NXOfsDhxbGusan4DEI=
 github.com/leftmike/sqltest v0.0.0-20201124023720-43b9a944e8c5/go.mod h1:Lsvg3MrwA13o5vmacfX3gLqLOIRNouPFTHdQKfvOPXY=
+github.com/leftmike/sqltest v0.0.0-20201124155025-358c633be717 h1:X/GaTN42Tcgptzmr7Hp8qWZUCxkDLBimKkyPuryvEM0=
+github.com/leftmike/sqltest v0.0.0-20201124155025-358c633be717/go.mod h1:Lsvg3MrwA13o5vmacfX3gLqLOIRNouPFTHdQKfvOPXY=
 github.com/lib/pq v1.0.0 h1:X5PMW56eZitiTeO7tKzZxFCSpbFZJtkMMooicw2us9A=
 github.com/lib/pq v1.0.0/go.mod h1:5WUZQaWbwv1U+lTReE5YruASi9Al49XbQIvNi/34Woo=
 github.com/lib/pq v1.4.0 h1:TmtCFbH+Aw0AixwyttznSMQDgbR5Yed/Gg6S8Funrhc=

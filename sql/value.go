@@ -123,7 +123,7 @@ var (
 
 func (b BytesValue) String() string {
 	var buf bytes.Buffer
-	buf.WriteString("x'")
+	buf.WriteString("'\\x")
 	for _, v := range b {
 		buf.WriteRune(hexDigits[v>>4])
 		buf.WriteRune(hexDigits[v&0xF])
