@@ -217,7 +217,6 @@ func proto3Query(ses *evaluate.Session, conn net.Conn, msg *pgproto3.Query, entr
 				if err != nil {
 					return err
 				}
-				// XXX: BEGIN needs to go through here
 				proto3CommandComplete(conn, cmdPlan.Tag(), -1, entry)
 			} else if rowsPlan, ok := plan.(evaluate.RowsPlan); ok {
 				var fields []pgproto3.FieldDescription

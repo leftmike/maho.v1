@@ -9,7 +9,7 @@ import (
 
 type Commit struct{}
 
-func (stmt *Commit) String() string {
+func (_ *Commit) String() string {
 	return "COMMIT"
 }
 
@@ -23,6 +23,6 @@ func (_ *Commit) Tag() string {
 	return "COMMIT"
 }
 
-func (stmt *Commit) Command(ctx context.Context, ses *evaluate.Session, e sql.Engine) error {
+func (_ *Commit) Command(ctx context.Context, ses *evaluate.Session, e sql.Engine) error {
 	return ses.Commit()
 }

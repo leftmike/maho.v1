@@ -9,7 +9,7 @@ import (
 
 type Rollback struct{}
 
-func (stmt *Rollback) String() string {
+func (_ *Rollback) String() string {
 	return "ROLLBACK"
 }
 
@@ -23,6 +23,6 @@ func (_ *Rollback) Tag() string {
 	return "ROLLBACK"
 }
 
-func (stmt *Rollback) Command(ctx context.Context, ses *evaluate.Session, e sql.Engine) error {
+func (_ *Rollback) Command(ctx context.Context, ses *evaluate.Session, e sql.Engine) error {
 	return ses.Rollback()
 }

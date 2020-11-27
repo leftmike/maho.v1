@@ -83,9 +83,8 @@ func (ses *Session) Run(stmt Stmt, run runFunc) error {
 		}
 
 		return run(ses.ctx, ses, ses.e, ses.tx)
-	}
-	if _, ok := stmt.(*Begin); ok {
-		return ses.Begin()
+	} else if _, ok := stmt.(*Begin); ok {
+		return run(ses.ctx, ses, ses.e, nil)
 	}
 
 	tx := ses.e.Begin(ses.sesid)

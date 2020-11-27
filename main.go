@@ -44,7 +44,6 @@ To Do:
 
 - proto3 (postgres protocol)
 -- use binary format for oid.T_bool, T_bytea, T_float4, T_float8, T_int2, T_int4, T_int8
--- BEGIN needs to run as a no-op command
 
 - test subquery expressions: '(' select | values | show ')'
 

@@ -13,7 +13,13 @@ func (stmt *Begin) String() string {
 }
 
 func (stmt *Begin) Plan(ctx context.Context, pctx PlanContext, tx sql.Transaction) (Plan, error) {
+	return stmt, nil
+}
 
-	panic("do not call; begin handled by session")
-	return nil, nil
+func (_ *Begin) Tag() string {
+	return "BEGIN"
+}
+
+func (_ *Begin) Command(ctx context.Context, ses *Session, e sql.Engine) error {
+	return ses.Begin()
 }
