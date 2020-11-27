@@ -1,0 +1,62 @@
+package test_test
+
+import (
+	"context"
+	"os"
+	"path/filepath"
+	"testing"
+
+	_ "github.com/lib/pq"
+
+	"github.com/leftmike/sqltest/sqltestdb"
+
+	"github.com/leftmike/maho/engine"
+	"github.com/leftmike/maho/flags"
+	"github.com/leftmike/maho/server"
+	"github.com/leftmike/maho/sql"
+	"github.com/leftmike/maho/storage/rowcols"
+	"github.com/leftmike/maho/testutil"
+)
+
+func TestProto3(t *testing.T) {
+	if !cleaned {
+		err := testutil.CleanDir("testdata", []string{".gitignore", "expected", "output", "sql"})
+		if err != nil {
+			t.Fatal(err)
+		}
+		cleaned = true
+	}
+
+	dataDir := filepath.Join("testdata", "proto3")
+	os.MkdirAll(dataDir, 0755)
+
+	st, err := rowcols.NewStore(dataDir)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	e := engine.NewEngine(st, flags.Default())
+	e.CreateDatabase(sql.ID("test"), nil)
+
+	svr := server.Server{
+		Engine:          e,
+		DefaultDatabase: sql.ID("test"),
+	}
+
+	go func() {
+		svr.ListenAndServeProto3(server.Proto3Config{Address: "localhost:35432"})
+	}()
+
+	var run sqltestdb.DBRunner
+	err = run.Connect("postgres", "host=localhost port=35432 dbname=test sslmode=disable")
+	if err != nil {
+		t.Fatal(err)
+	}
+	testSQL(t, "proto3", &run, *sqltestData, false, false)
+	err = run.Close()
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	svr.Shutdown(context.Background())
+}

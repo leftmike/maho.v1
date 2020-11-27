@@ -7,7 +7,7 @@ Maho is a partial implementation of a basic SQL server.
 
 ## Features
 * Parse and execute SQL statements.
-* Authentication for remote access using SSH.
+* Somewhat PostgreSQL protocol compatible; use psql to interact with maho.
 
 ## Remote Access
 

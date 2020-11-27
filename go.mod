@@ -11,7 +11,7 @@ require (
 	github.com/google/btree v1.0.0
 	github.com/hashicorp/hcl v1.0.0
 	github.com/jackc/pgproto3/v2 v2.0.6
-	github.com/leftmike/sqltest v0.0.0-20201124155025-358c633be717
+	github.com/leftmike/sqltest v0.0.0-20201127184731-7de0c97521fa
 	github.com/lib/pq v1.8.0
 	github.com/peterh/liner v1.2.0
 	github.com/sirupsen/logrus v1.6.0

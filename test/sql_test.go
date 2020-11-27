@@ -59,18 +59,9 @@ func (md mahoDialect) DriverName() string {
 	return md.name
 }
 
-func testSQL(t *testing.T, typ string, e sql.Engine, testData string, psql bool) {
-	t.Helper()
-
-	dbname := sql.ID("test")
-	err := e.CreateDatabase(dbname, nil)
-	if err != nil {
-		// If the test is run multiple times, then the database will already exist.
-	}
-
-	run := ((*test.Runner)(evaluate.NewSession(e, dbname, sql.PUBLIC)))
+func testSQL(t *testing.T, typ string, run sqltestdb.Runner, testData string, update, psql bool) {
 	var rptr reporter
-	err = sqltestdb.RunTests(testData, run, &rptr, mahoDialect{name: "maho-" + typ}, *update,
+	err := sqltestdb.RunTests(testData, run, &rptr, mahoDialect{name: "maho-" + typ}, update,
 		psql)
 	if err != nil {
 		t.Errorf("RunTests(%q) failed with %s", testData, err)
@@ -82,6 +73,10 @@ func testSQL(t *testing.T, typ string, e sql.Engine, testData string, psql bool)
 		}
 	}
 }
+
+var (
+	cleaned bool
+)
 
 func TestSQL(t *testing.T) {
 	configs := []struct {
@@ -136,9 +131,12 @@ func TestSQL(t *testing.T) {
 		},
 	}
 
-	err := testutil.CleanDir("testdata", []string{".gitignore", "expected", "output", "sql"})
-	if err != nil {
-		t.Fatal(err)
+	if !cleaned {
+		err := testutil.CleanDir("testdata", []string{".gitignore", "expected", "output", "sql"})
+		if err != nil {
+			t.Fatal(err)
+		}
+		cleaned = true
 	}
 
 	for _, tst := range tests {
@@ -151,7 +149,12 @@ func TestSQL(t *testing.T) {
 				t.Fatal(err)
 			}
 
-			testSQL(t, cfg.name, engine.NewEngine(st, flags.Default()), tst.testData, tst.psql)
+			e := engine.NewEngine(st, flags.Default())
+			e.CreateDatabase(sql.ID("test"), nil)
+			// Ignore errors: the database might already exist.
+
+			run := ((*test.Runner)(evaluate.NewSession(e, sql.ID("test"), sql.PUBLIC)))
+			testSQL(t, cfg.name, run, tst.testData, *update, tst.psql)
 		}
 	}
 }
