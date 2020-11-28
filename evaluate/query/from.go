@@ -356,8 +356,10 @@ func (fs FromStmt) plan(ctx context.Context, pctx evaluate.PlanContext,
 	}
 	fctx := makeFromContext(fs.Alias, cols, rowsPlan.ColumnTypes())
 
-	if rp, ok := rowsPlan.(rowsOpPlan); ok {
-		return rp.rop, fctx, nil
+	if cond == nil {
+		if rp, ok := rowsPlan.(rowsOpPlan); ok {
+			return rp.rop, fctx, nil
+		}
 	}
 	rop, err := where(ctx, pctx, tx, fromPlanOp{rowsPlan, fs.Stmt.String(), cols}, fctx, cond)
 	if err != nil {
