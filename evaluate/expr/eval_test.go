@@ -3,6 +3,7 @@ package expr_test
 import (
 	"context"
 	"fmt"
+	"reflect"
 	"strings"
 	"testing"
 
@@ -352,7 +353,6 @@ func (cc *compileContext) CompileRef(r []sql.Identifier) (int, int, sql.ColumnTy
 	return cc.idx, 0, sql.ColumnType{}, nil
 }
 
-/*
 func TestEncode(t *testing.T) {
 	cases := []string{
 		"true",
@@ -403,4 +403,3 @@ func TestEncode(t *testing.T) {
 		}
 	}
 }
-*/

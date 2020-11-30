@@ -31,6 +31,13 @@ func Encode(ce sql.CExpr) []byte {
 	return encode(nil, ce)
 }
 
+func encodeString(s string, buf []byte) []byte {
+	b := []byte(s)
+	buf = util.EncodeVarint(buf, uint64(len(b)))
+	buf = append(buf, b...)
+	return buf
+}
+
 func encode(buf []byte, ce sql.CExpr) []byte {
 	switch ce := ce.(type) {
 	case *Literal:
@@ -65,15 +72,15 @@ func encode(buf []byte, ce sql.CExpr) []byte {
 		buf = append(buf, colRefTag)
 		buf = util.EncodeZigzag64(buf, int64(ce.idx))
 		buf = util.EncodeZigzag64(buf, int64(ce.nest))
+		buf = util.EncodeVarint(buf, uint64(len(ce.ref)))
+		for _, r := range ce.ref {
+			buf = encodeString(r.String(), buf)
+		}
 	case *rowsExpr:
 		panic("engine: statement expressions may not be encoded")
 	case *call:
 		buf = append(buf, callTag)
-
-		b := []byte(ce.call.name)
-		buf = util.EncodeVarint(buf, uint64(len(b)))
-		buf = append(buf, b...)
-
+		buf = encodeString(ce.call.name, buf)
 		buf = util.EncodeVarint(buf, uint64(len(ce.args)))
 		for _, a := range ce.args {
 			buf = encode(buf, a)
@@ -96,6 +103,23 @@ func Decode(buf []byte) (sql.CExpr, error) {
 		return nil, fmt.Errorf("engine: unable to decode compiled expression: %v", buf)
 	}
 	return ce, nil
+}
+
+func decodeString(buf []byte) ([]byte, string, bool) {
+	var ok bool
+	var u uint64
+
+	buf, u, ok = util.DecodeVarint(buf)
+	if !ok {
+		return nil, "", false
+	}
+	if len(buf) < int(u) {
+		return nil, "", false
+	}
+
+	s := string(buf[:u])
+	buf = buf[u:]
+	return buf, s, true
 }
 
 func decode(buf []byte) (sql.CExpr, []byte) {
@@ -162,29 +186,44 @@ func decode(buf []byte) (sql.CExpr, []byte) {
 		return &Literal{sql.Int64Value(n)}, buf
 	case colRefTag:
 		var idx, nest int64
+		var u uint64
 		var ok bool
+
 		buf, idx, ok = util.DecodeZigzag64(buf)
 		if !ok {
 			return nil, nil
 		}
 		buf, nest, ok = util.DecodeZigzag64(buf)
-		return &colRef{
-			idx:  int(idx),
-			nest: int(nest),
-		}, buf
-	case callTag:
-		var ok bool
-		var u uint64
+
 		buf, u, ok = util.DecodeVarint(buf)
 		if !ok {
 			return nil, nil
 		}
-		if len(buf) < int(u) {
+		cr := &colRef{
+			idx:  int(idx),
+			nest: int(nest),
+		}
+		for u > 0 {
+			u -= 1
+
+			var s string
+			buf, s, ok = decodeString(buf)
+			if !ok {
+				return nil, nil
+			}
+			cr.ref = append(cr.ref, sql.QuotedID(s))
+		}
+		return cr, buf
+	case callTag:
+		var ok bool
+		var u uint64
+		var nam string
+
+		buf, nam, ok = decodeString(buf)
+		if !ok {
 			return nil, nil
 		}
-		name := string(buf[:u])
-		buf = buf[u:]
-		cf, ok := funcs[name]
+		cf, ok := funcs[nam]
 		if !ok {
 			return nil, nil
 		}
