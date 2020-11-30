@@ -58,7 +58,7 @@ func TestValuesSimple(t *testing.T) {
 		}
 		tx := e.Begin(0)
 
-		plan, err := stmt.Plan(ctx, ses, tx)
+		plan, err := stmt.Plan(ctx, ses, tx, nil)
 		if c.fail {
 			if err == nil {
 				t.Errorf("Plan(%q) did not fail", c.sql)
@@ -74,7 +74,7 @@ func TestValuesSimple(t *testing.T) {
 			t.Errorf("(%v).Plan() did not return Rows", c.sql)
 			continue
 		}
-		rows, err := rowsPlan.Rows(ctx, tx)
+		rows, err := rowsPlan.Rows(ctx, tx, nil)
 		if err != nil {
 			t.Errorf("(%v).Rows() failed with %s", c.sql, err)
 			continue

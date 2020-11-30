@@ -19,7 +19,7 @@ func (stmt *Execute) String() string {
 }
 
 func (stmt *Execute) Plan(ctx context.Context, pctx evaluate.PlanContext,
-	tx sql.Transaction) (evaluate.Plan, error) {
+	tx sql.Transaction, cctx sql.CompileContext) (evaluate.Plan, error) {
 
 	prep := pctx.GetPreparedPlan(stmt.Name)
 	if prep == nil {
@@ -97,10 +97,12 @@ func (erp executeRowsPlan) ColumnTypes() []sql.ColumnType {
 	return erp.prepRows.ColumnTypes()
 }
 
-func (erp executeRowsPlan) Rows(ctx context.Context, tx sql.Transaction) (sql.Rows, error) {
+func (erp executeRowsPlan) Rows(ctx context.Context, tx sql.Transaction,
+	ectx sql.EvalContext) (sql.Rows, error) {
+
 	err := setParameters(ctx, tx, erp.prepRows, erp.params)
 	if err != nil {
 		return nil, err
 	}
-	return erp.prepRows.Rows(ctx, tx)
+	return erp.prepRows.Rows(ctx, tx, ectx)
 }

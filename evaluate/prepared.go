@@ -52,7 +52,7 @@ func PreparePlan(ctx context.Context, stmt Stmt, pctx PlanContext,
 	tx sql.Transaction) (PreparedPlan, error) {
 
 	prep := prepareContext{pctx: pctx}
-	plan, err := stmt.Plan(ctx, &prep, tx)
+	plan, err := stmt.Plan(ctx, &prep, tx, nil)
 	if err != nil {
 		return nil, err
 	}
@@ -136,6 +136,8 @@ func (prp *PreparedRowsPlan) ColumnTypes() []sql.ColumnType {
 	return prp.plan.ColumnTypes()
 }
 
-func (prp *PreparedRowsPlan) Rows(ctx context.Context, tx sql.Transaction) (sql.Rows, error) {
-	return prp.plan.Rows(ctx, tx)
+func (prp *PreparedRowsPlan) Rows(ctx context.Context, tx sql.Transaction,
+	ectx sql.EvalContext) (sql.Rows, error) {
+
+	return prp.plan.Rows(ctx, tx, ectx)
 }

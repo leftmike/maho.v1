@@ -13,7 +13,7 @@ import (
 type FromItem interface {
 	fmt.Stringer
 	plan(ctx context.Context, pctx evaluate.PlanContext, tx sql.Transaction,
-		cond expr.Expr) (rowsOp, *fromContext, error)
+		cctx sql.CompileContext, cond expr.Expr) (rowsOp, *fromContext, error)
 }
 
 type FromTableAlias struct {
@@ -29,8 +29,8 @@ func (fta FromTableAlias) String() string {
 	return s
 }
 
-func equalKeyExpr(fctx expr.CompileContext, cond expr.Expr,
-	key []sql.ColumnKey, cols []int) []expr.ColExpr {
+func equalKeyExpr(fctx sql.CompileContext, cond expr.Expr, key []sql.ColumnKey,
+	cols []int) []expr.ColExpr {
 
 	ce := expr.EqualColExpr(fctx, cond)
 	if len(key) != len(ce) {
@@ -60,7 +60,7 @@ func equalKeyExpr(fctx expr.CompileContext, cond expr.Expr,
 }
 
 func (fta FromTableAlias) plan(ctx context.Context, pctx evaluate.PlanContext,
-	tx sql.Transaction, cond expr.Expr) (rowsOp, *fromContext, error) {
+	tx sql.Transaction, cctx sql.CompileContext, cond expr.Expr) (rowsOp, *fromContext, error) {
 
 	tn := pctx.ResolveTableName(fta.TableName)
 	tt, err := tx.LookupTableType(ctx, tn)
@@ -72,7 +72,7 @@ func (fta FromTableAlias) plan(ctx context.Context, pctx evaluate.PlanContext,
 	if fta.Alias != 0 {
 		nam = fta.Alias
 	}
-	fctx := makeFromContext(nam, tt.Columns(), tt.ColumnTypes())
+	fctx := makeFromContext(nam, tt.Columns(), tt.ColumnTypes(), cctx)
 
 	if cond != nil && pctx.GetFlag(flags.PushdownWhere) {
 		if colExpr := equalKeyExpr(fctx, cond, tt.PrimaryKey(), nil); colExpr != nil {
@@ -156,7 +156,9 @@ func (_ scanTableOp) Children() []evaluate.ExplainTree {
 	return nil
 }
 
-func (sto scanTableOp) rows(ctx context.Context, tx sql.Transaction) (sql.Rows, error) {
+func (sto scanTableOp) rows(ctx context.Context, tx sql.Transaction,
+	ectx sql.EvalContext) (sql.Rows, error) {
+
 	tbl, err := tx.LookupTable(ctx, sto.tn, sto.ttVer)
 	if err != nil {
 		return nil, err
@@ -189,7 +191,7 @@ func (fia FromIndexAlias) String() string {
 }
 
 func (fia FromIndexAlias) plan(ctx context.Context, pctx evaluate.PlanContext,
-	tx sql.Transaction, cond expr.Expr) (rowsOp, *fromContext, error) {
+	tx sql.Transaction, cctx sql.CompileContext, cond expr.Expr) (rowsOp, *fromContext, error) {
 
 	tn := pctx.ResolveTableName(fia.TableName)
 	tt, err := tx.LookupTableType(ctx, tn)
@@ -223,7 +225,7 @@ func (fia FromIndexAlias) plan(ctx context.Context, pctx evaluate.PlanContext,
 	if fia.Alias != 0 {
 		nam = fia.Alias
 	}
-	fctx := makeFromContext(nam, cols, colTypes)
+	fctx := makeFromContext(nam, cols, colTypes, cctx)
 	sio := scanIndexOp{
 		tn:    tn,
 		index: fia.Index,
@@ -299,7 +301,9 @@ func (_ scanIndexOp) Children() []evaluate.ExplainTree {
 	return nil
 }
 
-func (sio scanIndexOp) rows(ctx context.Context, tx sql.Transaction) (sql.Rows, error) {
+func (sio scanIndexOp) rows(ctx context.Context, tx sql.Transaction,
+	ectx sql.EvalContext) (sql.Rows, error) {
+
 	tbl, err := tx.LookupTable(ctx, sio.tn, sio.ttVer)
 	if err != nil {
 		return nil, err
@@ -339,9 +343,9 @@ func (fs FromStmt) String() string {
 }
 
 func (fs FromStmt) plan(ctx context.Context, pctx evaluate.PlanContext,
-	tx sql.Transaction, cond expr.Expr) (rowsOp, *fromContext, error) {
+	tx sql.Transaction, cctx sql.CompileContext, cond expr.Expr) (rowsOp, *fromContext, error) {
 
-	plan, err := fs.Stmt.Plan(ctx, pctx, tx)
+	plan, err := fs.Stmt.Plan(ctx, pctx, tx, cctx)
 	if err != nil {
 		return nil, nil, err
 	}
@@ -354,7 +358,7 @@ func (fs FromStmt) plan(ctx context.Context, pctx evaluate.PlanContext,
 		}
 		cols = fs.ColumnAliases
 	}
-	fctx := makeFromContext(fs.Alias, cols, rowsPlan.ColumnTypes())
+	fctx := makeFromContext(fs.Alias, cols, rowsPlan.ColumnTypes(), cctx)
 
 	if cond == nil {
 		if rp, ok := rowsPlan.(rowsOpPlan); ok {
@@ -396,8 +400,10 @@ func (fpo fromPlanOp) Children() []evaluate.ExplainTree {
 	return nil
 }
 
-func (fpo fromPlanOp) rows(ctx context.Context, tx sql.Transaction) (sql.Rows, error) {
-	return fpo.rp.Rows(ctx, tx)
+func (fpo fromPlanOp) rows(ctx context.Context, tx sql.Transaction,
+	ectx sql.EvalContext) (sql.Rows, error) {
+
+	return fpo.rp.Rows(ctx, tx, ectx)
 }
 
 type colRef struct {
@@ -419,16 +425,22 @@ type fromCol struct {
 }
 
 type fromContext struct {
+	cctx      sql.CompileContext
 	colMap    map[sql.Identifier]fromCol
 	colRefMap map[colRef]fromCol
 	cols      []colRef
 	colTypes  []sql.ColumnType
 }
 
-func makeFromContext(nam sql.Identifier, cols []sql.Identifier,
-	colTypes []sql.ColumnType) *fromContext {
+func makeFromContext(nam sql.Identifier, cols []sql.Identifier, colTypes []sql.ColumnType,
+	cctx sql.CompileContext) *fromContext {
 
-	fctx := &fromContext{colMap: map[sql.Identifier]fromCol{}, colRefMap: map[colRef]fromCol{}}
+	fctx := &fromContext{
+		cctx:      cctx,
+		colMap:    map[sql.Identifier]fromCol{},
+		colRefMap: map[colRef]fromCol{},
+	}
+
 	for idx, col := range cols {
 		fctx.colMap[col] = fromCol{colNum: idx, ct: colTypes[idx]}
 		if nam != 0 {
@@ -490,7 +502,7 @@ func (fctx *fromContext) usingIndex(col sql.Identifier, side string) (int, error
 		return -1, fmt.Errorf("engine: %s not found on %s side of join", col, side)
 	}
 	if fc.ambiguous {
-		return -1, fmt.Errorf("engine: %s is ambigous on %s side of join", col, side)
+		return -1, fmt.Errorf("engine: %s is ambiguous on %s side of join", col, side)
 	}
 	return fc.colNum, nil
 }
@@ -513,41 +525,56 @@ func joinContextsUsing(lctx, rctx *fromContext, useSet map[sql.Identifier]struct
 	return fctx, src2dest
 }
 
-func (fctx *fromContext) CompileRef(r expr.Ref) (int, sql.ColumnType, error) {
+func (fctx *fromContext) CompileRef(r []sql.Identifier) (int, int, sql.ColumnType, error) {
+	var tbl, col sql.Identifier
 	if len(r) == 1 {
-		return fctx.colIndex(r[0], "reference")
+		col = r[0]
 	} else if len(r) == 2 {
-		return fctx.tblColIndex(r[0], r[1], "reference")
+		tbl = r[0]
+		col = r[1]
+	} else {
+		return -1, -1, sql.ColumnType{}, fmt.Errorf("engine: %s is not a valid reference", r)
 	}
-	return -1, sql.ColumnType{}, fmt.Errorf("engine: %s is not a valid reference", r)
-}
-
-func (fctx *fromContext) colIndex(col sql.Identifier, what string) (int, sql.ColumnType, error) {
-	fc, ok := fctx.colMap[col]
-	if !ok {
-		return -1, sql.ColumnType{}, fmt.Errorf("engine: %s %s not found", what, col)
-	}
-	if fc.ambiguous {
-		return -1, sql.ColumnType{}, fmt.Errorf("engine: %s %s is ambiguous", what, col)
-	}
-	return fc.colNum, fc.ct, nil
-}
-
-func (fctx *fromContext) tblColIndex(tbl, col sql.Identifier, what string) (int, sql.ColumnType,
-	error) {
 
 	if tbl == 0 {
-		return fctx.colIndex(col, what)
+		fc, ok := fctx.colMap[col]
+		if ok {
+			if fc.ambiguous {
+				return -1, -1, sql.ColumnType{}, fmt.Errorf("engine: reference %s is ambiguous",
+					col)
+			}
+			return fc.colNum, 0, fc.ct, nil
+		}
+	} else {
+		cr := colRef{table: tbl, column: col}
+		fc, ok := fctx.colRefMap[cr]
+		if ok {
+			if fc.ambiguous {
+				return -1, -1, sql.ColumnType{}, fmt.Errorf("engine: reference %s is ambiguous",
+					cr.String())
+			}
+			return fc.colNum, 0, fc.ct, nil
+		}
 	}
-	cr := colRef{table: tbl, column: col}
-	fc, ok := fctx.colRefMap[cr]
+
+	if fctx.cctx != nil {
+		idx, nest, ct, err := fctx.cctx.CompileRef(r)
+		if err == nil {
+			return idx, nest + 1, ct, nil
+		}
+	}
+	return -1, -1, sql.ColumnType{}, fmt.Errorf("engine: reference %s not found", col)
+}
+
+func (fctx *fromContext) lookupColumn(col sql.Identifier) (int, bool) {
+	fc, ok := fctx.colMap[col]
 	if !ok {
-		return -1, sql.ColumnType{}, fmt.Errorf("engine: %s %s not found", what, cr.String())
+		return -1, false
 	}
 	if fc.ambiguous {
-		return -1, sql.ColumnType{}, fmt.Errorf("engine: %s %s is ambiguous", what, cr.String())
+		return -1, false
 	}
-	return fc.colNum, fc.ct, nil
+	return fc.colNum, true
 }
 
 func (fctx *fromContext) tableColumns(tbl sql.Identifier) []sql.Identifier {

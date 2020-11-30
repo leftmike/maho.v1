@@ -58,8 +58,10 @@ func (gbo groupByOp) Children() []evaluate.ExplainTree {
 	return []evaluate.ExplainTree{gbo.rop}
 }
 
-func (gbo groupByOp) rows(ctx context.Context, tx sql.Transaction) (sql.Rows, error) {
-	r, err := gbo.rop.rows(ctx, tx)
+func (gbo groupByOp) rows(ctx context.Context, tx sql.Transaction, ectx sql.EvalContext) (sql.Rows,
+	error) {
+
+	r, err := gbo.rop.rows(ctx, tx, ectx)
 	if err != nil {
 		return nil, err
 	}
@@ -89,7 +91,10 @@ type groupRows struct {
 	index       int
 }
 
-func (gr *groupRows) EvalRef(idx int) sql.Value {
+func (gr *groupRows) EvalRef(idx, nest int) sql.Value {
+	if nest > 0 {
+		panic("nested reference in group by expression")
+	}
 	return gr.dest[idx]
 }
 
@@ -214,7 +219,7 @@ func (_ *groupRows) Update(ctx context.Context, updates []sql.ColumnUpdate) erro
 }
 
 type groupContext struct {
-	actx        expr.CompileContext
+	actx        sql.CompileContext
 	group       []expr.Expr
 	groupExprs  []expr2dest
 	groupCols   []sql.Identifier
@@ -223,8 +228,8 @@ type groupContext struct {
 	aggregators []aggregator
 }
 
-func (_ *groupContext) CompileRef(r expr.Ref) (int, sql.ColumnType, error) {
-	return 0, sql.ColumnType{},
+func (_ *groupContext) CompileRef(r []sql.Identifier) (int, int, sql.ColumnType, error) {
+	return -1, -1, sql.ColumnType{},
 		fmt.Errorf("engine: column \"%s\" must appear in a GROUP BY clause or in an "+
 			"aggregate function", r)
 }
@@ -244,7 +249,7 @@ func (gctx *groupContext) CompileAggregator(maker expr.MakeAggregator, args []sq
 	return len(gctx.group) + len(gctx.aggregators) - 1
 }
 
-func (gctx *groupContext) ArgContext() expr.CompileContext {
+func (gctx *groupContext) ArgContext() sql.CompileContext {
 	return gctx.actx
 }
 
@@ -333,7 +338,7 @@ func group(ctx context.Context, pctx evaluate.PlanContext, tx sql.Transaction, r
 		return makeRowsOpPlan(rrop, resultCols, resultColTypes), nil
 	}
 
-	rop, err = order(rrop, makeFromContext(0, rrop.columns(), rrop.columnTypes()), orderBy)
+	rop, err = order(rrop, makeFromContext(0, rrop.columns(), rrop.columnTypes(), nil), orderBy)
 	if err != nil {
 		return nil, err
 	}

@@ -316,7 +316,7 @@ func TestPreparePlan(t *testing.T) {
 			} else if err != nil {
 				t.Errorf("%v[%d]: SetParameters failed with %s", c.stmt, tdx, err)
 			}
-			rows, err := prepRows.Rows(ctx, tx)
+			rows, err := prepRows.Rows(ctx, tx, nil)
 			if err != nil {
 				t.Errorf("%v[%d]: Rows failed with %s", c.stmt, tdx, err)
 			}

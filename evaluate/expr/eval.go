@@ -20,7 +20,7 @@ const (
 	float64LiteralTag = 3
 	stringLiteralTag  = 4
 	bytesLiteralTag   = 5
-	colIndexTag       = 6
+	colRefTag         = 6
 	callTag           = 7
 )
 
@@ -61,9 +61,10 @@ func encode(buf []byte, ce sql.CExpr) []byte {
 		default:
 			panic(fmt.Sprintf("unexpected type for sql.Value: %T: %v", ce, ce))
 		}
-	case colIndex:
-		buf = append(buf, colIndexTag)
-		buf = util.EncodeZigzag64(buf, int64(ce))
+	case *colRef:
+		buf = append(buf, colRefTag)
+		buf = util.EncodeZigzag64(buf, int64(ce.idx))
+		buf = util.EncodeZigzag64(buf, int64(ce.nest))
 	case *rowsExpr:
 		panic("engine: statement expressions may not be encoded")
 	case *call:
@@ -159,14 +160,18 @@ func decode(buf []byte) (sql.CExpr, []byte) {
 			return nil, nil
 		}
 		return &Literal{sql.Int64Value(n)}, buf
-	case colIndexTag:
-		var n int64
+	case colRefTag:
+		var idx, nest int64
 		var ok bool
-		buf, n, ok = util.DecodeZigzag64(buf)
+		buf, idx, ok = util.DecodeZigzag64(buf)
 		if !ok {
 			return nil, nil
 		}
-		return colIndex(n), buf
+		buf, nest, ok = util.DecodeZigzag64(buf)
+		return &colRef{
+			idx:  int(idx),
+			nest: int(nest),
+		}, buf
 	case callTag:
 		var ok bool
 		var u uint64
@@ -210,38 +215,44 @@ func (l *Literal) Eval(ctx context.Context, tx sql.Transaction, ectx sql.EvalCon
 	return l.Value, nil
 }
 
-type colIndex int
-
-func (ci colIndex) String() string {
-	return fmt.Sprintf("[%d]", ci)
+type colRef struct {
+	idx  int
+	nest int
+	ref  Ref
 }
 
-func (ci colIndex) Eval(ctx context.Context, tx sql.Transaction, ectx sql.EvalContext) (sql.Value,
+func (cr *colRef) String() string {
+	if cr.ref == nil {
+		return fmt.Sprintf("[%d.%d]", cr.nest, cr.idx)
+	}
+	return cr.ref.String()
+}
+
+func (cr *colRef) Eval(ctx context.Context, tx sql.Transaction, ectx sql.EvalContext) (sql.Value,
 	error) {
 
-	return ectx.EvalRef(int(ci)), nil
+	return ectx.EvalRef(cr.idx, cr.nest), nil
 }
 
 func ColumnIndex(ce sql.CExpr) (int, bool) {
-	if ci, ok := ce.(colIndex); ok {
-		return int(ci), true
+	if cr, ok := ce.(*colRef); ok && cr.nest == 0 {
+		return cr.idx, true
 	}
 	return 0, false
 }
 
 type rowsExpr struct {
 	rowsPlan evaluate.RowsPlan
-	value    sql.Value
-	err      error
-	done     bool
 }
 
-func (re *rowsExpr) String() string {
+func (_ rowsExpr) String() string {
 	return "rows plan"
 }
 
-func (re *rowsExpr) eval(ctx context.Context, tx sql.Transaction) (sql.Value, error) {
-	rows, err := re.rowsPlan.Rows(ctx, tx)
+func (re rowsExpr) Eval(ctx context.Context, tx sql.Transaction, ectx sql.EvalContext) (sql.Value,
+	error) {
+
+	rows, err := re.rowsPlan.Rows(ctx, tx, ectx)
 	if err != nil {
 		return nil, err
 	}
@@ -252,9 +263,12 @@ func (re *rowsExpr) eval(ctx context.Context, tx sql.Transaction) (sql.Value, er
 	}
 	dest := []sql.Value{nil}
 	err = rows.Next(ctx, dest)
-	if err != nil {
+	if err == io.EOF {
+		return nil, nil
+	} else if err != nil {
 		return nil, err
 	}
+
 	err = rows.Next(ctx, []sql.Value{nil})
 	if err == nil {
 		return nil, errors.New("engine: expected one row for scalar subquery")
@@ -262,16 +276,6 @@ func (re *rowsExpr) eval(ctx context.Context, tx sql.Transaction) (sql.Value, er
 		return nil, err
 	}
 	return dest[0], nil
-}
-
-func (re *rowsExpr) Eval(ctx context.Context, tx sql.Transaction, ectx sql.EvalContext) (sql.Value,
-	error) {
-
-	if !re.done {
-		re.done = true
-		re.value, re.err = re.eval(ctx, tx)
-	}
-	return re.value, re.err
 }
 
 type call struct {

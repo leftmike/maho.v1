@@ -14,7 +14,7 @@ func (_ *Commit) String() string {
 }
 
 func (stmt *Commit) Plan(ctx context.Context, pctx evaluate.PlanContext,
-	tx sql.Transaction) (evaluate.Plan, error) {
+	tx sql.Transaction, cctx sql.CompileContext) (evaluate.Plan, error) {
 
 	return stmt, nil
 }

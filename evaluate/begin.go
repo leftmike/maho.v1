@@ -12,7 +12,9 @@ func (stmt *Begin) String() string {
 	return "BEGIN"
 }
 
-func (stmt *Begin) Plan(ctx context.Context, pctx PlanContext, tx sql.Transaction) (Plan, error) {
+func (stmt *Begin) Plan(ctx context.Context, pctx PlanContext, tx sql.Transaction,
+	cctx sql.CompileContext) (Plan, error) {
+
 	return stmt, nil
 }
 

@@ -27,7 +27,7 @@ func ReplSQL(ses *evaluate.Session, p parser.Parser, w io.Writer) {
 			func(ctx context.Context, ses *evaluate.Session, e sql.Engine,
 				tx sql.Transaction) error {
 
-				plan, err := stmt.Plan(ctx, ses, tx)
+				plan, err := stmt.Plan(ctx, ses, tx, nil)
 				if err != nil {
 					return err
 				}
@@ -49,7 +49,7 @@ func ReplSQL(ses *evaluate.Session, p parser.Parser, w io.Writer) {
 				} else if rowsPlan, ok := plan.(evaluate.RowsPlan); ok {
 					w := tabwriter.NewWriter(w, 0, 0, 1, ' ', 0)
 
-					rows, err := rowsPlan.Rows(ctx, tx)
+					rows, err := rowsPlan.Rows(ctx, tx, nil)
 					if err != nil {
 						return err
 					}

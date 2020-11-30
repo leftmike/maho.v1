@@ -5,8 +5,12 @@ import (
 	"fmt"
 )
 
+type CompileContext interface {
+	CompileRef(r []Identifier) (int, int, ColumnType, error)
+}
+
 type EvalContext interface {
-	EvalRef(idx int) Value
+	EvalRef(idx, nest int) Value
 }
 
 type CExpr interface {

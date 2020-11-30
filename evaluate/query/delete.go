@@ -30,7 +30,7 @@ type deletePlan struct {
 }
 
 func (stmt *Delete) Plan(ctx context.Context, pctx evaluate.PlanContext,
-	tx sql.Transaction) (evaluate.Plan, error) {
+	tx sql.Transaction, cctx sql.CompileContext) (evaluate.Plan, error) {
 
 	tn := pctx.ResolveTableName(stmt.Table)
 	tt, err := tx.LookupTableType(ctx, tn)
@@ -42,7 +42,7 @@ func (stmt *Delete) Plan(ctx context.Context, pctx evaluate.PlanContext,
 	if stmt.Where != nil {
 		var ct sql.ColumnType
 		where, ct, err = expr.Compile(ctx, pctx, tx,
-			makeFromContext(tn.Table, tt.Columns(), tt.ColumnTypes()), stmt.Where)
+			makeFromContext(tn.Table, tt.Columns(), tt.ColumnTypes(), nil), stmt.Where)
 		if err != nil {
 			return nil, err
 		}

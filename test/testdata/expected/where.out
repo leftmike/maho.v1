@@ -119,7 +119,7 @@ EXPLAIN SELECT * FROM tbl1@idx1 WHERE c2 = 50;
                    ---- -----      -----------
  1               select                       
  2           +-- filter                       
- 3                    |  expr    "=="([0], 50)
+ 3                    |  expr     "=="(c2, 50)
  4       +-- scan index                       
  5                    | table test.public.tbl1
  6                    | index             idx1
@@ -164,7 +164,7 @@ EXPLAIN SELECT * FROM tbl1 WHERE c1 = 5;
                    ---- -----      -----------
  1               select                       
  2           +-- filter                       
- 3                    |  expr     "=="([0], 5)
+ 3                    |  expr      "=="(c1, 5)
  4       +-- scan table                       
  5                    | table test.public.tbl1
 (5 rows)
@@ -178,7 +178,7 @@ EXPLAIN SELECT * FROM tbl1@idx1 WHERE c2 = 50;
                    ---- -----      -----------
  1               select                       
  2           +-- filter                       
- 3                    |  expr    "=="([0], 50)
+ 3                    |  expr     "=="(c2, 50)
  4       +-- scan index                       
  5                    | table test.public.tbl1
  6                    | index             idx1

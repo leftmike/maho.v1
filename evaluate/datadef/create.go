@@ -140,15 +140,15 @@ type tableCheck struct {
 	colTypes []sql.ColumnType
 }
 
-func (tc tableCheck) CompileRef(r expr.Ref) (int, sql.ColumnType, error) {
+func (tc tableCheck) CompileRef(r []sql.Identifier) (int, int, sql.ColumnType, error) {
 	if len(r) == 1 {
 		for idx, col := range tc.cols {
 			if col == r[0] {
-				return idx, tc.colTypes[idx], nil
+				return idx, 0, tc.colTypes[idx], nil
 			}
 		}
 	}
-	return -1, sql.ColumnType{}, fmt.Errorf("engine: reference %s not found", r)
+	return -1, -1, sql.ColumnType{}, fmt.Errorf("engine: reference %s not found", r)
 }
 
 type columnCheck struct {
@@ -157,17 +157,17 @@ type columnCheck struct {
 	colNum int
 }
 
-func (cc columnCheck) CompileRef(r expr.Ref) (int, sql.ColumnType, error) {
+func (cc columnCheck) CompileRef(r []sql.Identifier) (int, int, sql.ColumnType, error) {
 	if len(r) == 1 {
 		if cc.col == r[0] {
-			return cc.colNum, cc.ct, nil
+			return cc.colNum, 0, cc.ct, nil
 		}
 	}
-	return -1, sql.ColumnType{}, fmt.Errorf("engine: reference %s not found", r)
+	return -1, -1, sql.ColumnType{}, fmt.Errorf("engine: reference %s not found", r)
 }
 
 func (stmt *CreateTable) Plan(ctx context.Context, pctx evaluate.PlanContext,
-	tx sql.Transaction) (evaluate.Plan, error) {
+	tx sql.Transaction, cctx sql.CompileContext) (evaluate.Plan, error) {
 
 	stmt.Table = pctx.ResolveTableName(stmt.Table)
 
@@ -195,7 +195,7 @@ func (stmt *CreateTable) Plan(ctx context.Context, pctx evaluate.PlanContext,
 			}
 		case sql.CheckConstraint:
 			var err error
-			var cctx expr.CompileContext
+			var cctx sql.CompileContext
 			if con.ColNum >= 0 {
 				cctx = columnCheck{
 					col:    stmt.Columns[con.ColNum],
@@ -299,7 +299,7 @@ func (stmt *CreateIndex) String() string {
 }
 
 func (stmt *CreateIndex) Plan(ctx context.Context, pctx evaluate.PlanContext,
-	tx sql.Transaction) (evaluate.Plan, error) {
+	tx sql.Transaction, cctx sql.CompileContext) (evaluate.Plan, error) {
 
 	stmt.Table = pctx.ResolveTableName(stmt.Table)
 	return stmt, nil
@@ -341,7 +341,7 @@ func (stmt *CreateDatabase) String() string {
 }
 
 func (stmt *CreateDatabase) Plan(ctx context.Context, pctx evaluate.PlanContext,
-	tx sql.Transaction) (evaluate.Plan, error) {
+	tx sql.Transaction, cctx sql.CompileContext) (evaluate.Plan, error) {
 
 	return stmt, nil
 }
@@ -365,7 +365,7 @@ func (stmt *CreateSchema) String() string {
 }
 
 func (stmt *CreateSchema) Plan(ctx context.Context, pctx evaluate.PlanContext,
-	tx sql.Transaction) (evaluate.Plan, error) {
+	tx sql.Transaction, cctx sql.CompileContext) (evaluate.Plan, error) {
 
 	stmt.Schema = pctx.ResolveSchemaName(stmt.Schema)
 	return stmt, nil

@@ -38,7 +38,7 @@ func (stmt *Values) String() string {
 }
 
 func (stmt *Values) Plan(ctx context.Context, pctx evaluate.PlanContext,
-	tx sql.Transaction) (evaluate.Plan, error) {
+	tx sql.Transaction, cctx sql.CompileContext) (evaluate.Plan, error) {
 
 	cols := make([]sql.Identifier, len(stmt.Expressions[0]))
 	for i := 0; i < len(cols); i++ {
@@ -52,7 +52,7 @@ func (stmt *Values) Plan(ctx context.Context, pctx evaluate.PlanContext,
 		for j := range r {
 			var err error
 			var ct sql.ColumnType
-			row[j], ct, err = expr.Compile(ctx, pctx, tx, nil, r[j])
+			row[j], ct, err = expr.Compile(ctx, pctx, tx, cctx, r[j])
 			if err != nil {
 				return nil, err
 			}
@@ -94,9 +94,12 @@ func (vp valuesPlan) ColumnTypes() []sql.ColumnType {
 	return vp.colTypes
 }
 
-func (vp valuesPlan) Rows(ctx context.Context, tx sql.Transaction) (sql.Rows, error) {
+func (vp valuesPlan) Rows(ctx context.Context, tx sql.Transaction, ectx sql.EvalContext) (sql.Rows,
+	error) {
+
 	return &exprValues{
 		tx:      tx,
+		ectx:    ectx,
 		numCols: len(vp.cols),
 		rows:    vp.rows,
 	}, nil
@@ -104,6 +107,7 @@ func (vp valuesPlan) Rows(ctx context.Context, tx sql.Transaction) (sql.Rows, er
 
 type exprValues struct {
 	tx      sql.Transaction
+	ectx    sql.EvalContext
 	numCols int
 	rows    [][]sql.CExpr
 	index   int
@@ -129,7 +133,7 @@ func (ev *exprValues) Next(ctx context.Context, dest []sql.Value) error {
 	i := 0
 	for i < len(dest) && i < len(row) {
 		var err error
-		dest[i], err = row[i].Eval(ctx, ev.tx, nil)
+		dest[i], err = row[i].Eval(ctx, ev.tx, ev.ectx)
 		if err != nil {
 			return err
 		}

@@ -37,7 +37,7 @@ func (stmt *Copy) String() string {
 }
 
 func (stmt *Copy) Plan(ctx context.Context, pctx evaluate.PlanContext,
-	tx sql.Transaction) (evaluate.Plan, error) {
+	tx sql.Transaction, cctx sql.CompileContext) (evaluate.Plan, error) {
 
 	tn := pctx.ResolveTableName(stmt.Table)
 	tt, err := tx.LookupTableType(ctx, tn)

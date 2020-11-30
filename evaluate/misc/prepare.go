@@ -19,7 +19,7 @@ func (stmt *Prepare) String() string {
 }
 
 func (stmt *Prepare) Plan(ctx context.Context, pctx evaluate.PlanContext,
-	tx sql.Transaction) (evaluate.Plan, error) {
+	tx sql.Transaction, cctx sql.CompileContext) (evaluate.Plan, error) {
 
 	var err error
 	stmt.prep, err = evaluate.PreparePlan(ctx, stmt.Stmt, pctx, tx)

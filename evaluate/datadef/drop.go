@@ -28,7 +28,7 @@ func (stmt *DropTable) String() string {
 }
 
 func (stmt *DropTable) Plan(ctx context.Context, pctx evaluate.PlanContext,
-	tx sql.Transaction) (evaluate.Plan, error) {
+	tx sql.Transaction, cctx sql.CompileContext) (evaluate.Plan, error) {
 
 	for idx, tn := range stmt.Tables {
 		stmt.Tables[idx] = pctx.ResolveTableName(tn)
@@ -66,7 +66,7 @@ func (stmt *DropIndex) String() string {
 }
 
 func (stmt *DropIndex) Plan(ctx context.Context, pctx evaluate.PlanContext,
-	tx sql.Transaction) (evaluate.Plan, error) {
+	tx sql.Transaction, cctx sql.CompileContext) (evaluate.Plan, error) {
 
 	stmt.Table = pctx.ResolveTableName(stmt.Table)
 	return stmt, nil
@@ -102,7 +102,7 @@ func (stmt *DropDatabase) String() string {
 }
 
 func (stmt *DropDatabase) Plan(ctx context.Context, pctx evaluate.PlanContext,
-	tx sql.Transaction) (evaluate.Plan, error) {
+	tx sql.Transaction, cctx sql.CompileContext) (evaluate.Plan, error) {
 
 	return stmt, nil
 }
@@ -131,7 +131,7 @@ func (stmt *DropSchema) String() string {
 }
 
 func (stmt *DropSchema) Plan(ctx context.Context, pctx evaluate.PlanContext,
-	tx sql.Transaction) (evaluate.Plan, error) {
+	tx sql.Transaction, cctx sql.CompileContext) (evaluate.Plan, error) {
 
 	stmt.Schema = pctx.ResolveSchemaName(stmt.Schema)
 	return stmt, nil

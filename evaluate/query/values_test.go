@@ -60,7 +60,7 @@ func TestValues(t *testing.T) {
 			t.Errorf("(%v).String() got %q want %q", c.values, c.values.String(), c.s)
 			continue
 		}
-		plan, err := c.values.Plan(ctx, ses, tx)
+		plan, err := c.values.Plan(ctx, ses, tx, nil)
 		if err != nil {
 			t.Errorf("(%v).Plan() failed with %s", c.values, err)
 			continue
@@ -70,7 +70,7 @@ func TestValues(t *testing.T) {
 			t.Errorf("(%v).Plan() did not return Rows", c.values)
 			continue
 		}
-		rows, err := rowsPlan.Rows(ctx, tx)
+		rows, err := rowsPlan.Rows(ctx, tx, nil)
 		if err != nil {
 			t.Errorf("(%v).Rows() failed with %s", c.values, err)
 			continue

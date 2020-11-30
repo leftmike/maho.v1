@@ -19,7 +19,7 @@ func (stmt *Show) String() string {
 }
 
 func (stmt *Show) Plan(ctx context.Context, pctx evaluate.PlanContext,
-	tx sql.Transaction) (evaluate.Plan, error) {
+	tx sql.Transaction, cctx sql.CompileContext) (evaluate.Plan, error) {
 
 	ses, ok := pctx.(*evaluate.Session)
 	if !ok {
@@ -41,6 +41,8 @@ func (stmt *Show) ColumnTypes() []sql.ColumnType {
 	return stmt.ses.ColumnTypes(stmt.Variable)
 }
 
-func (stmt *Show) Rows(ctx context.Context, tx sql.Transaction) (sql.Rows, error) {
+func (stmt *Show) Rows(ctx context.Context, tx sql.Transaction, ectx sql.EvalContext) (sql.Rows,
+	error) {
+
 	return stmt.ses.Show(stmt.Variable)
 }

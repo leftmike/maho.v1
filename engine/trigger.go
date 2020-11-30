@@ -284,7 +284,7 @@ func (fkt *fkTrigger) afterRowsMatch(ctx context.Context, tx sql.Transaction, tb
 				err))
 		}
 
-		rows, err := prep.Rows(ctx, tx)
+		rows, err := prep.Rows(ctx, tx, nil)
 		if err != nil {
 			panic(fmt.Sprintf("engine: table %s: foreign key match: %s: %s", fkt.fktn, fkt.con,
 				err))
@@ -356,7 +356,7 @@ func (fkt *fkTrigger) afterRowsRestrict(ctx context.Context, tx sql.Transaction,
 				err))
 		}
 
-		rows, err := prep.Rows(ctx, tx)
+		rows, err := prep.Rows(ctx, tx, nil)
 		if err != nil {
 			panic(fmt.Sprintf("engine: table %s: foreign key restrict: %s: %s", fkt.fktn, fkt.con,
 				err))

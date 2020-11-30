@@ -82,7 +82,10 @@ func convertValue(ct sql.ColumnType, n sql.Identifier, v sql.Value) (sql.Value, 
 
 type rowContext []sql.Value
 
-func (rc rowContext) EvalRef(idx int) sql.Value {
+func (rc rowContext) EvalRef(idx, nest int) sql.Value {
+	if nest != 0 {
+		panic("nested reference in table check expression")
+	}
 	return rc[idx]
 }
 

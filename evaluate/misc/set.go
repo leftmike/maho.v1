@@ -20,7 +20,7 @@ func (stmt *Set) String() string {
 }
 
 func (stmt *Set) Plan(ctx context.Context, pctx evaluate.PlanContext,
-	tx sql.Transaction) (evaluate.Plan, error) {
+	tx sql.Transaction, cctx sql.CompileContext) (evaluate.Plan, error) {
 
 	ses, ok := pctx.(*evaluate.Session)
 	if !ok {

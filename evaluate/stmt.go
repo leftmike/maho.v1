@@ -10,7 +10,8 @@ import (
 
 type Stmt interface {
 	fmt.Stringer
-	Plan(ctx context.Context, pctx PlanContext, tx sql.Transaction) (Plan, error)
+	Plan(ctx context.Context, pctx PlanContext, tx sql.Transaction, cctx sql.CompileContext) (Plan,
+		error)
 }
 
 type PlanContext interface {
@@ -39,7 +40,7 @@ type RowsPlan interface {
 	Plan
 	Columns() []sql.Identifier
 	ColumnTypes() []sql.ColumnType
-	Rows(ctx context.Context, tx sql.Transaction) (sql.Rows, error)
+	Rows(ctx context.Context, tx sql.Transaction, ectx sql.EvalContext) (sql.Rows, error)
 }
 
 type FieldDescription struct {

@@ -115,20 +115,20 @@ func (stmt *Select) String() string {
 }
 
 func (stmt *Select) Plan(ctx context.Context, pctx evaluate.PlanContext,
-	tx sql.Transaction) (evaluate.Plan, error) {
+	tx sql.Transaction, cctx sql.CompileContext) (evaluate.Plan, error) {
 
 	var rop rowsOp
 	var fctx *fromContext
 	var err error
 
 	if stmt.From == nil {
-		fctx = &fromContext{}
+		fctx = &fromContext{cctx: cctx}
 		rop, err = where(ctx, pctx, tx, oneEmptyOp{}, fctx, stmt.Where)
 		if err != nil {
 			return nil, err
 		}
 	} else {
-		rop, fctx, err = stmt.From.plan(ctx, pctx, tx, stmt.Where)
+		rop, fctx, err = stmt.From.plan(ctx, pctx, tx, cctx, stmt.Where)
 		if err != nil {
 			return nil, err
 		}
@@ -184,11 +184,13 @@ func (rp rowsOpPlan) ColumnTypes() []sql.ColumnType {
 	return rp.colTypes
 }
 
-func (rp rowsOpPlan) Rows(ctx context.Context, tx sql.Transaction) (sql.Rows, error) {
+func (rp rowsOpPlan) Rows(ctx context.Context, tx sql.Transaction, ectx sql.EvalContext) (sql.Rows,
+	error) {
+
 	if len(rp.cols) != len(rp.colTypes) {
 		panic(fmt.Sprintf("len(cols): %d != len(colTypes): %d", len(rp.cols), len(rp.colTypes)))
 	}
-	return rp.rop.rows(ctx, tx)
+	return rp.rop.rows(ctx, tx, ectx)
 }
 
 func (rp rowsOpPlan) Explain() evaluate.ExplainTree {
@@ -232,8 +234,10 @@ func (so sortOp) Children() []evaluate.ExplainTree {
 	return []evaluate.ExplainTree{so.rop}
 }
 
-func (so sortOp) rows(ctx context.Context, tx sql.Transaction) (sql.Rows, error) {
-	r, err := so.rop.rows(ctx, tx)
+func (so sortOp) rows(ctx context.Context, tx sql.Transaction, ectx sql.EvalContext) (sql.Rows,
+	error) {
+
+	r, err := so.rop.rows(ctx, tx, ectx)
 	if err != nil {
 		return nil, err
 	}
@@ -354,8 +358,8 @@ func orderByInput(order []OrderBy, fctx *fromContext) []orderBy {
 		if !ok || len(r) != 1 {
 			return nil
 		}
-		cdx, _, err := fctx.colIndex(r[0], "")
-		if err != nil {
+		cdx, ok := fctx.lookupColumn(r[0])
+		if !ok {
 			return nil
 		}
 		byInput = append(byInput, orderBy{cdx, by.Reverse})
@@ -390,12 +394,16 @@ func order(rrop resultRowsOp, fctx *fromContext, order []OrderBy) (rowsOp, error
 
 type filterRows struct {
 	tx   sql.Transaction
+	ectx sql.EvalContext
 	rows sql.Rows
 	cond sql.CExpr
 	dest []sql.Value
 }
 
-func (fr *filterRows) EvalRef(idx int) sql.Value {
+func (fr *filterRows) EvalRef(idx, nest int) sql.Value {
+	if nest > 0 {
+		return fr.ectx.EvalRef(idx, nest-1)
+	}
 	return fr.dest[idx]
 }
 
@@ -483,13 +491,15 @@ func (fo filterOp) Children() []evaluate.ExplainTree {
 	return []evaluate.ExplainTree{fo.rop}
 }
 
-func (fo filterOp) rows(ctx context.Context, tx sql.Transaction) (sql.Rows, error) {
-	r, err := fo.rop.rows(ctx, tx)
+func (fo filterOp) rows(ctx context.Context, tx sql.Transaction, ectx sql.EvalContext) (sql.Rows,
+	error) {
+
+	r, err := fo.rop.rows(ctx, tx, ectx)
 	if err != nil {
 		return nil, err
 	}
 
-	return &filterRows{tx: tx, rows: r, cond: fo.cond}, nil
+	return &filterRows{tx: tx, ectx: ectx, rows: r, cond: fo.cond}, nil
 }
 
 type oneEmptyOp struct{}
@@ -510,7 +520,9 @@ func (_ oneEmptyOp) Children() []evaluate.ExplainTree {
 	return nil
 }
 
-func (_ oneEmptyOp) rows(ctx context.Context, tx sql.Transaction) (sql.Rows, error) {
+func (_ oneEmptyOp) rows(ctx context.Context, tx sql.Transaction, ectx sql.EvalContext) (sql.Rows,
+	error) {
+
 	return &oneEmptyRow{}, nil
 }
 
@@ -569,8 +581,10 @@ func (aro *allResultsOp) Children() []evaluate.ExplainTree {
 	return []evaluate.ExplainTree{aro.rop}
 }
 
-func (aro *allResultsOp) rows(ctx context.Context, tx sql.Transaction) (sql.Rows, error) {
-	r, err := aro.rop.rows(ctx, tx)
+func (aro *allResultsOp) rows(ctx context.Context, tx sql.Transaction,
+	ectx sql.EvalContext) (sql.Rows, error) {
+
+	r, err := aro.rop.rows(ctx, tx, ectx)
 	if err != nil {
 		return nil, err
 	}
@@ -647,14 +661,17 @@ func (ro *resultsOp) Children() []evaluate.ExplainTree {
 	return []evaluate.ExplainTree{ro.rop}
 }
 
-func (ro *resultsOp) rows(ctx context.Context, tx sql.Transaction) (sql.Rows, error) {
-	r, err := ro.rop.rows(ctx, tx)
+func (ro *resultsOp) rows(ctx context.Context, tx sql.Transaction, ectx sql.EvalContext) (sql.Rows,
+	error) {
+
+	r, err := ro.rop.rows(ctx, tx, ectx)
 	if err != nil {
 		return nil, err
 	}
 
 	return &resultRows{
 		tx:        tx,
+		ectx:      ectx,
 		rows:      r,
 		numCols:   len(ro.cols),
 		destCols:  ro.destCols,
@@ -682,6 +699,7 @@ type expr2dest struct {
 
 type resultRows struct {
 	tx        sql.Transaction
+	ectx      sql.EvalContext
 	rows      sql.Rows
 	dest      []sql.Value
 	numCols   int
@@ -689,7 +707,10 @@ type resultRows struct {
 	destExprs []expr2dest
 }
 
-func (rr *resultRows) EvalRef(idx int) sql.Value {
+func (rr *resultRows) EvalRef(idx, nest int) sql.Value {
+	if nest > 0 {
+		return rr.ectx.EvalRef(idx, nest-1)
+	}
 	return rr.dest[idx]
 }
 

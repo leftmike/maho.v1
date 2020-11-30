@@ -10,14 +10,10 @@ import (
 	"github.com/leftmike/maho/sql"
 )
 
-type CompileContext interface {
-	CompileRef(r Ref) (int, sql.ColumnType, error)
-}
-
-type AggregatorContext interface {
+type aggregatorContext interface {
 	MaybeRefExpr(e Expr) (int, sql.ColumnType, bool)
 	CompileAggregator(maker MakeAggregator, args []sql.CExpr) int
-	ArgContext() CompileContext
+	ArgContext() sql.CompileContext
 }
 
 type ContextError struct {
@@ -28,31 +24,27 @@ func (e *ContextError) Error() string {
 	return fmt.Sprintf("engine: aggregate function \"%s\" used in scalar context", e.name)
 }
 
-func CompileRef(idx int) sql.CExpr {
-	return colIndex(idx)
-}
-
 func Compile(ctx context.Context, pctx evaluate.PlanContext, tx sql.Transaction,
-	cctx CompileContext, e Expr) (sql.CExpr, sql.ColumnType, error) {
+	cctx sql.CompileContext, e Expr) (sql.CExpr, sql.ColumnType, error) {
 
 	return compile(ctx, pctx, tx, cctx, e, false)
 }
 
 func CompileAggregator(ctx context.Context, pctx evaluate.PlanContext, tx sql.Transaction,
-	cctx CompileContext, e Expr) (sql.CExpr, sql.ColumnType, error) {
+	cctx sql.CompileContext, e Expr) (sql.CExpr, sql.ColumnType, error) {
 
 	return compile(ctx, pctx, tx, cctx, e, true)
 }
 
 func compile(ctx context.Context, pctx evaluate.PlanContext, tx sql.Transaction,
-	cctx CompileContext, e Expr, agg bool) (sql.CExpr, sql.ColumnType, error) {
+	cctx sql.CompileContext, e Expr, agg bool) (sql.CExpr, sql.ColumnType, error) {
 
 	var ct sql.ColumnType
 
 	if agg {
-		idx, ct, ok := cctx.(AggregatorContext).MaybeRefExpr(e)
+		idx, ct, ok := cctx.(aggregatorContext).MaybeRefExpr(e)
 		if ok {
-			return colIndex(idx), ct, nil
+			return &colRef{idx: idx}, ct, nil
 		}
 	}
 	switch e := e.(type) {
@@ -110,11 +102,11 @@ func compile(ctx context.Context, pctx evaluate.PlanContext, tx sql.Transaction,
 		if cctx == nil {
 			return nil, ct, fmt.Errorf("engine: %s not found", e)
 		}
-		idx, ct, err := cctx.CompileRef(e)
+		idx, nest, ct, err := cctx.CompileRef(e)
 		if err != nil {
 			return nil, ct, err
 		}
-		return colIndex(idx), ct, nil
+		return &colRef{idx: idx, nest: nest, ref: e}, ct, nil
 	case *Call:
 		cf, ok := idFuncs[e.Name]
 		if !ok {
@@ -131,12 +123,12 @@ func compile(ctx context.Context, pctx evaluate.PlanContext, tx sql.Transaction,
 					cf.maxArgs, len(e.Args))
 		}
 
-		var actx CompileContext
+		var actx sql.CompileContext
 		if cf.makeAggregator != nil {
 			if !agg {
 				return nil, ct, &ContextError{e.Name}
 			}
-			actx = cctx.(AggregatorContext).ArgContext()
+			actx = cctx.(aggregatorContext).ArgContext()
 		} else {
 			actx = cctx
 		}
@@ -159,15 +151,15 @@ func compile(ctx context.Context, pctx evaluate.PlanContext, tx sql.Transaction,
 		if cf.makeAggregator == nil {
 			return &call{cf, args}, ct, nil
 		} else {
-			idx := cctx.(AggregatorContext).CompileAggregator(cf.makeAggregator, args)
-			return colIndex(idx), ct, nil
+			idx := cctx.(aggregatorContext).CompileAggregator(cf.makeAggregator, args)
+			return &colRef{idx: idx, ref: Ref{e.Name}}, ct, nil
 		}
 	case *Stmt:
 		if pctx == nil {
 			return nil, ct, fmt.Errorf("engine: expression statements not allowed here: %s", e.Stmt)
 		}
 
-		plan, err := e.Stmt.Plan(ctx, pctx, tx)
+		plan, err := e.Stmt.Plan(ctx, pctx, tx, cctx)
 		if err != nil {
 			return nil, ct, err
 		}
@@ -180,7 +172,7 @@ func compile(ctx context.Context, pctx evaluate.PlanContext, tx sql.Transaction,
 		if len(colTypes) > 0 {
 			ct = colTypes[0]
 		}
-		return &rowsExpr{rowsPlan: rowsPlan}, ct, nil
+		return rowsExpr{rowsPlan: rowsPlan}, ct, nil
 	case Param:
 		if pctx == nil {
 			return nil, ct, errors.New("engine: unexpected parameter, not preparing a statement")

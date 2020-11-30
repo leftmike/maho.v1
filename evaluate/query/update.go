@@ -48,12 +48,15 @@ type updatePlan struct {
 	updates []columnUpdate
 }
 
-func (up *updatePlan) EvalRef(idx int) sql.Value {
+func (up *updatePlan) EvalRef(idx, nest int) sql.Value {
+	if nest != 0 {
+		panic(fmt.Sprintf("table %s: nested reference in update plan", up.tn))
+	}
 	return up.dest[idx]
 }
 
 func (stmt *Update) Plan(ctx context.Context, pctx evaluate.PlanContext,
-	tx sql.Transaction) (evaluate.Plan, error) {
+	tx sql.Transaction, cctx sql.CompileContext) (evaluate.Plan, error) {
 
 	tn := pctx.ResolveTableName(stmt.Table)
 	tt, err := tx.LookupTableType(ctx, tn)
@@ -61,7 +64,7 @@ func (stmt *Update) Plan(ctx context.Context, pctx evaluate.PlanContext,
 		return nil, err
 	}
 
-	fctx := makeFromContext(tn.Table, tt.Columns(), tt.ColumnTypes())
+	fctx := makeFromContext(tn.Table, tt.Columns(), tt.ColumnTypes(), nil)
 	var where sql.CExpr
 	if stmt.Where != nil {
 		var ct sql.ColumnType
@@ -84,9 +87,9 @@ func (stmt *Update) Plan(ctx context.Context, pctx evaluate.PlanContext,
 
 	colDefaults := tt.ColumnDefaults()
 	for _, cu := range stmt.ColumnUpdates {
-		col, _, err := fctx.colIndex(cu.Column, "update")
-		if err != nil {
-			return nil, err
+		col, ok := fctx.lookupColumn(cu.Column)
+		if !ok {
+			return nil, fmt.Errorf("engine: table %s: column %s not found", tn, cu.Column)
 		}
 
 		var ce sql.CExpr

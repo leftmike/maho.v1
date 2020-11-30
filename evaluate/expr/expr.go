@@ -282,7 +282,7 @@ type ColExpr struct {
 	Val   sql.Value
 }
 
-func EqualColExpr(cctx CompileContext, e Expr) []ColExpr {
+func EqualColExpr(cctx sql.CompileContext, e Expr) []ColExpr {
 	be, ok := e.(*Binary)
 	if !ok {
 		return nil
@@ -301,8 +301,8 @@ func EqualColExpr(cctx CompileContext, e Expr) []ColExpr {
 	} else if be.Op == EqualOp {
 		if l, ok := be.Left.(*Literal); ok {
 			if r, ok := be.Right.(Ref); ok {
-				col, _, err := cctx.CompileRef(r)
-				if err != nil {
+				col, nest, _, err := cctx.CompileRef(r)
+				if nest > 0 || err != nil {
 					return nil
 				}
 				return []ColExpr{{col, -1, l.Value}}
@@ -311,8 +311,8 @@ func EqualColExpr(cctx CompileContext, e Expr) []ColExpr {
 			}
 		} else if p, ok := be.Left.(Param); ok {
 			if r, ok := be.Right.(Ref); ok {
-				col, _, err := cctx.CompileRef(r)
-				if err != nil {
+				col, nest, _, err := cctx.CompileRef(r)
+				if nest > 0 || err != nil {
 					return nil
 				}
 				return []ColExpr{{col, p.Num, nil}}
@@ -320,8 +320,8 @@ func EqualColExpr(cctx CompileContext, e Expr) []ColExpr {
 				return nil
 			}
 		} else if r, ok := be.Left.(Ref); ok {
-			col, _, err := cctx.CompileRef(r)
-			if err != nil {
+			col, nest, _, err := cctx.CompileRef(r)
+			if nest > 0 || err != nil {
 				return nil
 			}
 			if l, ok := be.Right.(*Literal); ok {

@@ -34,7 +34,7 @@ func (run *Runner) RunExec(tst *sqltestdb.Test) (int64, error) {
 			func(ctx context.Context, ses *evaluate.Session, e sql.Engine,
 				tx sql.Transaction) error {
 
-				plan, err := stmt.Plan(ctx, ses, tx)
+				plan, err := stmt.Plan(ctx, ses, tx, nil)
 				if err != nil {
 					return err
 				}
@@ -102,7 +102,7 @@ func (run *Runner) RunQuery(tst *sqltestdb.Test) (sqltestdb.QueryResult, error) 
 		func(ctx context.Context, ses *evaluate.Session, e sql.Engine,
 			tx sql.Transaction) error {
 
-			plan, err := stmt.Plan(ctx, ses, tx)
+			plan, err := stmt.Plan(ctx, ses, tx, nil)
 			if err != nil {
 				return err
 			}
@@ -110,7 +110,7 @@ func (run *Runner) RunQuery(tst *sqltestdb.Test) (sqltestdb.QueryResult, error) 
 			if !ok {
 				return fmt.Errorf("%s:%d: expected a query", tst.Filename, tst.LineNumber)
 			}
-			rows, err := rowsPlan.Rows(ctx, tx)
+			rows, err := rowsPlan.Rows(ctx, tx, nil)
 			if err != nil {
 				return err
 			}

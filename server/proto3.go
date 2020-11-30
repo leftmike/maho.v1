@@ -202,7 +202,7 @@ func proto3Query(ses *evaluate.Session, conn net.Conn, msg *pgproto3.Query, entr
 	err = ses.Run(stmt,
 		func(ctx context.Context, ses *evaluate.Session, e sql.Engine,
 			tx sql.Transaction) error {
-			plan, err := stmt.Plan(ctx, ses, tx)
+			plan, err := stmt.Plan(ctx, ses, tx, nil)
 			if err != nil {
 				return err
 			}
@@ -241,7 +241,7 @@ func proto3Query(ses *evaluate.Session, conn net.Conn, msg *pgproto3.Query, entr
 					return err
 				}
 
-				rows, err := rowsPlan.Rows(ctx, tx)
+				rows, err := rowsPlan.Rows(ctx, tx, nil)
 				if err != nil {
 					return err
 				}

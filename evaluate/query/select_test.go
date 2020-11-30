@@ -103,7 +103,7 @@ func TestSelect(t *testing.T) {
 			t.Errorf("(%v).String() got %q want %q", c.stmt, c.stmt.String(), c.s)
 			continue
 		}
-		plan, err := c.stmt.Plan(ctx, ses, tx)
+		plan, err := c.stmt.Plan(ctx, ses, tx, nil)
 		if err != nil {
 			t.Errorf("(%v).Plan() failed with %s", c.stmt, err)
 			continue
@@ -113,7 +113,7 @@ func TestSelect(t *testing.T) {
 			t.Errorf("(%v).Plan() did not return Rows", c.stmt)
 			continue
 		}
-		rows, err := rowsPlan.Rows(ctx, tx)
+		rows, err := rowsPlan.Rows(ctx, tx, nil)
 		if err != nil {
 			t.Errorf("(%v).Rows() failed with %s", c.stmt, err)
 			continue

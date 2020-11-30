@@ -12,13 +12,13 @@ import (
 
 type compileCtx struct{}
 
-func (_ compileCtx) CompileRef(r expr.Ref) (int, sql.ColumnType, error) {
+func (_ compileCtx) CompileRef(r []sql.Identifier) (int, int, sql.ColumnType, error) {
 	if len(r) == 1 && r[0] == sql.ID("f") {
-		return 0, sql.ColumnType{Type: sql.FloatType}, nil
+		return 0, 0, sql.ColumnType{Type: sql.FloatType}, nil
 	} else if len(r) == 1 && r[0] == sql.ID("i") {
-		return 1, sql.ColumnType{Type: sql.IntegerType}, nil
+		return 1, 0, sql.ColumnType{Type: sql.IntegerType}, nil
 	}
-	return -1, sql.ColumnType{}, fmt.Errorf("reference %s not found", r)
+	return -1, -1, sql.ColumnType{}, fmt.Errorf("reference %s not found", r)
 }
 
 func TestCompile(t *testing.T) {
@@ -35,9 +35,9 @@ func TestCompile(t *testing.T) {
 		{"concat('abc', 123, 45.6, true, null)",
 			"concat('abc', 123, 45.6, " + sql.TrueString + ", " + sql.NullString + ")",
 			sql.ColumnType{Type: sql.StringType}},
-		{"1 + f", `"+"(1, [0])`, sql.ColumnType{Type: sql.FloatType}},
-		{"1.2 + i", `"+"(1.2, [1])`, sql.ColumnType{Type: sql.FloatType}},
-		{"1 + i", `"+"(1, [1])`, sql.ColumnType{Type: sql.IntegerType}},
+		{"1 + f", `"+"(1, f)`, sql.ColumnType{Type: sql.FloatType}},
+		{"1.2 + i", `"+"(1.2, i)`, sql.ColumnType{Type: sql.FloatType}},
+		{"1 + i", `"+"(1, i)`, sql.ColumnType{Type: sql.IntegerType}},
 	}
 
 	for i, c := range cases {

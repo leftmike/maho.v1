@@ -81,9 +81,9 @@ func explain(tree evaluate.ExplainTree, rows [][]sql.Value, depth int,
 }
 
 func (stmt Explain) Plan(ctx context.Context, pctx evaluate.PlanContext,
-	tx sql.Transaction) (evaluate.Plan, error) {
+	tx sql.Transaction, cctx sql.CompileContext) (evaluate.Plan, error) {
 
-	plan, err := stmt.Stmt.Plan(ctx, pctx, tx)
+	plan, err := stmt.Stmt.Plan(ctx, pctx, tx, nil)
 	if err != nil {
 		return nil, err
 	}
@@ -154,6 +154,8 @@ func (er *explainRows) Update(ctx context.Context, updates []sql.ColumnUpdate) e
 	return errors.New("explain: rows may not be updated")
 }
 
-func (er *explainRows) Rows(ctx context.Context, tx sql.Transaction) (sql.Rows, error) {
+func (er *explainRows) Rows(ctx context.Context, tx sql.Transaction,
+	ectx sql.EvalContext) (sql.Rows, error) {
+
 	return er, nil
 }

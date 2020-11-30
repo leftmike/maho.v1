@@ -9,7 +9,7 @@ import (
 
 type rowsOp interface {
 	evaluate.ExplainTree
-	rows(ctx context.Context, tx sql.Transaction) (sql.Rows, error)
+	rows(ctx context.Context, tx sql.Transaction, ectx sql.EvalContext) (sql.Rows, error)
 }
 
 type resultRowsOp interface {

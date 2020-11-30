@@ -212,7 +212,7 @@ func statement(ctx context.Context, ses *evaluate.Session, tx sql.Transaction, s
 		return err
 	}
 
-	plan, err := stmt.Plan(ctx, ses, tx)
+	plan, err := stmt.Plan(ctx, ses, tx, nil)
 	if err != nil {
 		return err
 	}

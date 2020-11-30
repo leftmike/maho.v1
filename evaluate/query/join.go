@@ -120,13 +120,15 @@ func (jo joinOp) Children() []evaluate.ExplainTree {
 	return []evaluate.ExplainTree{jo.leftRowsOp, jo.rightRowsOp}
 }
 
-func (jo joinOp) rows(ctx context.Context, tx sql.Transaction) (sql.Rows, error) {
-	leftRows, err := jo.leftRowsOp.rows(ctx, tx)
+func (jo joinOp) rows(ctx context.Context, tx sql.Transaction, ectx sql.EvalContext) (sql.Rows,
+	error) {
+
+	leftRows, err := jo.leftRowsOp.rows(ctx, tx, ectx)
 	if err != nil {
 		return nil, err
 	}
 
-	rows, err := jo.rightRowsOp.rows(ctx, tx)
+	rows, err := jo.rightRowsOp.rows(ctx, tx, ectx)
 	if err != nil {
 		return nil, err
 	}
@@ -142,6 +144,7 @@ func (jo joinOp) rows(ctx context.Context, tx sql.Transaction) (sql.Rows, error)
 
 	return &joinRows{
 		tx:        tx,
+		ectx:      ectx,
 		leftRows:  leftRows,
 		leftDest:  make([]sql.Value, jo.leftLen),
 		leftLen:   jo.leftLen,
@@ -169,7 +172,8 @@ type usingMatch struct {
 }
 
 type joinRows struct {
-	tx sql.Transaction
+	tx   sql.Transaction
+	ectx sql.EvalContext
 
 	state joinState
 
@@ -203,7 +207,10 @@ func (jr *joinRows) Close() error {
 	return jr.leftRows.Close()
 }
 
-func (jr *joinRows) EvalRef(idx int) sql.Value {
+func (jr *joinRows) EvalRef(idx, nest int) sql.Value {
+	if nest > 0 {
+		return jr.ectx.EvalRef(idx, nest-1)
+	}
 	if idx < jr.leftLen {
 		return jr.leftDest[idx]
 	}
@@ -349,13 +356,13 @@ func (_ *joinRows) Update(ctx context.Context, updates []sql.ColumnUpdate) error
 }
 
 func (fj FromJoin) plan(ctx context.Context, pctx evaluate.PlanContext,
-	tx sql.Transaction, cond expr.Expr) (rowsOp, *fromContext, error) {
+	tx sql.Transaction, cctx sql.CompileContext, cond expr.Expr) (rowsOp, *fromContext, error) {
 
-	leftRowsOp, leftCtx, err := fj.Left.plan(ctx, pctx, tx, nil)
+	leftRowsOp, leftCtx, err := fj.Left.plan(ctx, pctx, tx, cctx, nil)
 	if err != nil {
 		return nil, nil, err
 	}
-	rightRowsOp, rightCtx, err := fj.Right.plan(ctx, pctx, tx, nil)
+	rightRowsOp, rightCtx, err := fj.Right.plan(ctx, pctx, tx, cctx, nil)
 	if err != nil {
 		return nil, nil, err
 	}
