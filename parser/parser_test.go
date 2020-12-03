@@ -1001,7 +1001,8 @@ func TestSelect(t *testing.T) {
 				Where: &expr.Binary{
 					Op:   expr.EqualOp,
 					Left: expr.Ref{sql.ID("x")},
-					Right: &expr.Stmt{
+					Right: &expr.Subquery{
+						Op: expr.Scalar,
 						Stmt: &misc.Show{
 							Variable: sql.SCHEMA,
 						},

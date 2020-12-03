@@ -76,8 +76,8 @@ func encode(buf []byte, ce sql.CExpr) []byte {
 		for _, r := range ce.ref {
 			buf = encodeString(r.String(), buf)
 		}
-	case *rowsExpr:
-		panic("engine: statement expressions may not be encoded")
+	case subqueryExpr:
+		panic("engine: subquery expressions may not be encoded")
 	case *call:
 		buf = append(buf, callTag)
 		buf = encodeString(ce.call.name, buf)
@@ -280,41 +280,58 @@ func ColumnIndex(ce sql.CExpr) (int, bool) {
 	return 0, false
 }
 
-type rowsExpr struct {
+type subqueryExpr struct {
+	op       SubqueryOp
 	rowsPlan evaluate.RowsPlan
 }
 
-func (_ rowsExpr) String() string {
-	return "rows plan"
+func (_ subqueryExpr) String() string {
+	return "query expression"
 }
 
-func (re rowsExpr) Eval(ctx context.Context, tx sql.Transaction, ectx sql.EvalContext) (sql.Value,
-	error) {
+func (se subqueryExpr) Eval(ctx context.Context, tx sql.Transaction,
+	ectx sql.EvalContext) (sql.Value, error) {
 
-	rows, err := re.rowsPlan.Rows(ctx, tx, ectx)
+	rows, err := se.rowsPlan.Rows(ctx, tx, ectx)
 	if err != nil {
 		return nil, err
 	}
 	defer rows.Close()
 
-	if rows.NumColumns() != 1 {
-		return nil, errors.New("engine: expected one column for scalar subquery")
-	}
-	dest := []sql.Value{nil}
-	err = rows.Next(ctx, dest)
-	if err == io.EOF {
-		return nil, nil
-	} else if err != nil {
-		return nil, err
-	}
+	switch se.op {
+	case Scalar:
+		if rows.NumColumns() != 1 {
+			return nil, errors.New("engine: expected one column for scalar subquery")
+		}
+		dest := []sql.Value{nil}
+		err = rows.Next(ctx, dest)
+		if err == io.EOF {
+			return nil, nil
+		} else if err != nil {
+			return nil, err
+		}
 
-	err = rows.Next(ctx, []sql.Value{nil})
-	if err == nil {
-		return nil, errors.New("engine: expected one row for scalar subquery")
-	} else if err != io.EOF {
-		return nil, err
+		err = rows.Next(ctx, []sql.Value{nil})
+		if err == nil {
+			return nil, errors.New("engine: expected one row for scalar subquery")
+		} else if err != io.EOF {
+			return nil, err
+		}
+		return dest[0], nil
+
+	case Exists:
+		dest := []sql.Value{nil}
+		err = rows.Next(ctx, dest)
+		if err == io.EOF {
+			return sql.BoolValue(false), nil
+		} else if err != nil {
+			return nil, err
+		}
+		return sql.BoolValue(true), nil
+
+	default:
+		panic(fmt.Sprintf("unexpected query expression op; got %v", se.op))
 	}
-	return dest[0], nil
 }
 
 type call struct {

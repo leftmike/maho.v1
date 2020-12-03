@@ -240,19 +240,27 @@ func (c *Call) HasRef() bool {
 	return false
 }
 
-type Stmt struct {
+type SubqueryOp int
+
+const (
+	Scalar SubqueryOp = iota
+	Exists
+)
+
+type Subquery struct {
+	Op   SubqueryOp
 	Stmt evaluate.Stmt
 }
 
-func (s Stmt) String() string {
+func (s Subquery) String() string {
 	return fmt.Sprintf("(%s)", s.Stmt)
 }
 
-func (_ Stmt) Equal(e Expr) bool {
+func (_ Subquery) Equal(e Expr) bool {
 	return false
 }
 
-func (_ Stmt) HasRef() bool {
+func (_ Subquery) HasRef() bool {
 	return false
 }
 

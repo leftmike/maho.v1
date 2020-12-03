@@ -1021,16 +1021,18 @@ func (p *parser) parseExpr() expr.Expr {
 expr = literal
     | '-' expr
     | NOT expr
-    | '(' expr | select | values | show ')'
+    | '(' expr | subquery ')'
     | expr op expr
     | ref ['.' ref ...]
     | param
     | func '(' [expr [',' ...]] ')'
+    | EXISTS '(' subquery ')'
     | 'count' '(' '*' ')'
 op = '+' '-' '*' '/' '%'
     | '=' '==' '!=' '<>' '<' '<=' '>' '>='
     | '<<' '>>' '&' '|'
     | AND | OR
+subquery = select | values | show
 */
 
 var binaryOps = map[rune]expr.Op{
@@ -1066,6 +1068,15 @@ func (p *parser) parseSubExpr() expr.Expr {
 			e = expr.Nil()
 		} else if p.sctx.Identifier == sql.NOT {
 			e = &expr.Unary{Op: expr.NotOp, Expr: p.parseSubExpr()}
+		} else if p.sctx.Identifier == sql.EXISTS {
+			p.expectTokens(token.LParen)
+			s, ok := p.optionalSubquery()
+			if !ok {
+				p.error("expected a subquery")
+			}
+			// EXISTS ( subquery )
+			e = &expr.Subquery{Op: expr.Exists, Stmt: s}
+			p.expectTokens(token.RParen)
 		} else {
 			p.error(fmt.Sprintf("unexpected identifier %s", p.sctx.Identifier))
 		}
@@ -1113,7 +1124,7 @@ func (p *parser) parseSubExpr() expr.Expr {
 	} else if r == token.LParen {
 		if s, ok := p.optionalSubquery(); ok {
 			// ( subquery )
-			e = &expr.Stmt{Stmt: s}
+			e = &expr.Subquery{Op: expr.Scalar, Stmt: s}
 		} else {
 			// ( expr )
 			e = &expr.Unary{Op: expr.NoOp, Expr: p.parseSubExpr()}
@@ -1533,7 +1544,7 @@ func (p *parser) parseShowFromTable() (sql.TableName, *expr.Binary) {
 		schemaTest = &expr.Binary{
 			Op:    expr.EqualOp,
 			Left:  expr.Ref{sql.ID("schema_name")},
-			Right: &expr.Stmt{Stmt: &misc.Show{Variable: sql.SCHEMA}},
+			Right: &expr.Subquery{Op: expr.Scalar, Stmt: &misc.Show{Variable: sql.SCHEMA}},
 		}
 	} else {
 		schemaTest = &expr.Binary{
@@ -1667,7 +1678,7 @@ func (p *parser) parseShow() evaluate.Stmt {
 			where = &expr.Binary{
 				Op:    expr.EqualOp,
 				Left:  expr.Ref{sql.ID("schema_name")},
-				Right: &expr.Stmt{Stmt: &misc.Show{Variable: sql.SCHEMA}},
+				Right: &expr.Subquery{Op: expr.Scalar, Stmt: &misc.Show{Variable: sql.SCHEMA}},
 			}
 		}
 		return &query.Select{
