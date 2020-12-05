@@ -154,7 +154,7 @@ func compile(ctx context.Context, pctx evaluate.PlanContext, tx sql.Transaction,
 			idx := cctx.(aggregatorContext).CompileAggregator(cf.makeAggregator, args)
 			return &colRef{idx: idx, ref: Ref{e.Name}}, ct, nil
 		}
-	case *Subquery:
+	case Subquery:
 		if pctx == nil {
 			return nil, ct, fmt.Errorf("engine: expression statements not allowed here: %s", e.Stmt)
 		}
@@ -169,6 +169,8 @@ func compile(ctx context.Context, pctx evaluate.PlanContext, tx sql.Transaction,
 			return nil, ct, fmt.Errorf("engine: expected rows: %s", e.Stmt)
 		}
 
+		var cf *callFunc
+		var ce sql.CExpr
 		switch e.Op {
 		case Scalar:
 			colTypes := rowsPlan.ColumnTypes()
@@ -177,11 +179,23 @@ func compile(ctx context.Context, pctx evaluate.PlanContext, tx sql.Transaction,
 			}
 		case Exists:
 			ct = sql.BoolColType
+		case Any, All:
+			ct = sql.BoolColType
+			cf = opFuncs[e.ExprOp]
+			ce, _, err = compile(ctx, pctx, tx, cctx, e.Expr, agg)
+			if err != nil {
+				return nil, ct, err
+			}
 		default:
 			panic(fmt.Sprintf("unexpected query expression op; got %v", e.Op))
 		}
 
-		return subqueryExpr{op: e.Op, rowsPlan: rowsPlan}, ct, nil
+		return subqueryExpr{
+			op:       e.Op,
+			call:     cf,
+			expr:     ce,
+			rowsPlan: rowsPlan,
+		}, ct, nil
 	case Param:
 		if pctx == nil {
 			return nil, ct, errors.New("engine: unexpected parameter, not preparing a statement")

@@ -1026,8 +1026,13 @@ expr = literal
     | ref ['.' ref ...]
     | param
     | func '(' [expr [',' ...]] ')'
+    | COUNT '(' '*' ')'
     | EXISTS '(' subquery ')'
-    | 'count' '(' '*' ')'
+    | expr IN '(' subquery ')'
+    | expr NOT IN '(' subquery ')'
+    | expr op ANY '(' subquery ')'
+    | expr op SOME '(' subquery ')'
+    | expr op ALL '(' subquery ')'
 op = '+' '-' '*' '/' '%'
     | '=' '==' '!=' '<>' '<' '<=' '>' '>='
     | '<<' '>>' '&' '|'
@@ -1035,25 +1040,45 @@ op = '+' '-' '*' '/' '%'
 subquery = select | values | show
 */
 
-var binaryOps = map[rune]expr.Op{
-	token.Ampersand:      expr.BinaryAndOp,
-	token.Bar:            expr.BinaryOrOp,
-	token.BarBar:         expr.ConcatOp,
-	token.Equal:          expr.EqualOp,
-	token.EqualEqual:     expr.EqualOp,
-	token.BangEqual:      expr.NotEqualOp,
-	token.Greater:        expr.GreaterThanOp,
-	token.GreaterEqual:   expr.GreaterEqualOp,
-	token.GreaterGreater: expr.RShiftOp,
-	token.Less:           expr.LessThanOp,
-	token.LessEqual:      expr.LessEqualOp,
-	token.LessGreater:    expr.NotEqualOp,
-	token.LessLess:       expr.LShiftOp,
-	token.Minus:          expr.SubtractOp,
-	token.Percent:        expr.ModuloOp,
-	token.Plus:           expr.AddOp,
-	token.Slash:          expr.DivideOp,
-	token.Star:           expr.MultiplyOp,
+var binaryOps = map[rune]struct {
+	op     expr.Op
+	isBool bool
+}{
+	token.Ampersand:      {expr.BinaryAndOp, false},
+	token.Bar:            {expr.BinaryOrOp, false},
+	token.BarBar:         {expr.ConcatOp, false},
+	token.Equal:          {expr.EqualOp, true},
+	token.EqualEqual:     {expr.EqualOp, true},
+	token.BangEqual:      {expr.NotEqualOp, true},
+	token.Greater:        {expr.GreaterThanOp, true},
+	token.GreaterEqual:   {expr.GreaterEqualOp, true},
+	token.GreaterGreater: {expr.RShiftOp, false},
+	token.Less:           {expr.LessThanOp, true},
+	token.LessEqual:      {expr.LessEqualOp, true},
+	token.LessGreater:    {expr.NotEqualOp, true},
+	token.LessLess:       {expr.LShiftOp, false},
+	token.Minus:          {expr.SubtractOp, false},
+	token.Percent:        {expr.ModuloOp, false},
+	token.Plus:           {expr.AddOp, false},
+	token.Slash:          {expr.DivideOp, false},
+	token.Star:           {expr.MultiplyOp, false},
+}
+
+func (p *parser) optionalBinaryOp() (expr.Op, bool, bool) {
+	r := p.scan()
+	if bop, ok := binaryOps[r]; ok {
+		return bop.op, true, bop.isBool
+	} else if r == token.Reserved {
+		switch p.sctx.Identifier {
+		case sql.AND:
+			return expr.AndOp, true, true
+		case sql.OR:
+			return expr.OrOp, true, true
+		}
+	}
+
+	p.unscan()
+	return 0, false, false
 }
 
 func (p *parser) parseSubExpr() expr.Expr {
@@ -1069,14 +1094,8 @@ func (p *parser) parseSubExpr() expr.Expr {
 		} else if p.sctx.Identifier == sql.NOT {
 			e = &expr.Unary{Op: expr.NotOp, Expr: p.parseSubExpr()}
 		} else if p.sctx.Identifier == sql.EXISTS {
-			p.expectTokens(token.LParen)
-			s, ok := p.optionalSubquery()
-			if !ok {
-				p.error("expected a subquery")
-			}
 			// EXISTS ( subquery )
-			e = &expr.Subquery{Op: expr.Exists, Stmt: s}
-			p.expectTokens(token.RParen)
+			e = expr.Subquery{Op: expr.Exists, Stmt: p.parseSubquery()}
 		} else {
 			p.error(fmt.Sprintf("unexpected identifier %s", p.sctx.Identifier))
 		}
@@ -1124,7 +1143,7 @@ func (p *parser) parseSubExpr() expr.Expr {
 	} else if r == token.LParen {
 		if s, ok := p.optionalSubquery(); ok {
 			// ( subquery )
-			e = &expr.Subquery{Op: expr.Scalar, Stmt: s}
+			e = expr.Subquery{Op: expr.Scalar, Stmt: s}
 		} else {
 			// ( expr )
 			e = &expr.Unary{Op: expr.NoOp, Expr: p.parseSubExpr()}
@@ -1136,21 +1155,49 @@ func (p *parser) parseSubExpr() expr.Expr {
 		p.error(fmt.Sprintf("expected an expression, got %s", p.got()))
 	}
 
-	var op expr.Op
-	r = p.scan()
-	op, ok := binaryOps[r]
+	op, ok, bop := p.optionalBinaryOp()
 	if !ok {
-		if r == token.Reserved && p.sctx.Identifier == sql.AND {
-			op = expr.AndOp
-		} else if r == token.Reserved && p.sctx.Identifier == sql.OR {
-			op = expr.OrOp
-		} else {
-			p.unscan()
-			return e
+		if p.optionalReserved(sql.IN, sql.NOT) {
+			switch p.sctx.Identifier {
+			case sql.IN:
+				return expr.Subquery{Op: expr.Any, ExprOp: expr.EqualOp, Expr: e,
+					Stmt: p.parseSubquery()}
+			case sql.NOT:
+				if p.optionalReserved(sql.IN) {
+					return expr.Subquery{Op: expr.All, ExprOp: expr.NotEqualOp, Expr: e,
+						Stmt: p.parseSubquery()}
+				}
+				p.unscan()
+			}
 		}
+
+		return e
+	}
+
+	if p.optionalReserved(sql.ANY, sql.SOME, sql.ALL) {
+		if !bop {
+			p.error("expected boolean binary operator")
+		}
+		var subqueryOp expr.SubqueryOp
+		if p.sctx.Identifier == sql.ALL {
+			subqueryOp = expr.All
+		} else {
+			subqueryOp = expr.Any
+		}
+		return expr.Subquery{Op: subqueryOp, ExprOp: op, Expr: e, Stmt: p.parseSubquery()}
 	}
 
 	return &expr.Binary{Op: op, Left: e, Right: p.parseSubExpr()}
+}
+
+func (p *parser) parseSubquery() evaluate.Stmt {
+	p.expectTokens(token.LParen)
+	s, ok := p.optionalSubquery()
+	if !ok {
+		p.error("expected a subquery")
+	}
+	p.expectTokens(token.RParen)
+	return s
 }
 
 func (p *parser) parseInsert() evaluate.Stmt {
@@ -1544,7 +1591,7 @@ func (p *parser) parseShowFromTable() (sql.TableName, *expr.Binary) {
 		schemaTest = &expr.Binary{
 			Op:    expr.EqualOp,
 			Left:  expr.Ref{sql.ID("schema_name")},
-			Right: &expr.Subquery{Op: expr.Scalar, Stmt: &misc.Show{Variable: sql.SCHEMA}},
+			Right: expr.Subquery{Op: expr.Scalar, Stmt: &misc.Show{Variable: sql.SCHEMA}},
 		}
 	} else {
 		schemaTest = &expr.Binary{
@@ -1678,7 +1725,7 @@ func (p *parser) parseShow() evaluate.Stmt {
 			where = &expr.Binary{
 				Op:    expr.EqualOp,
 				Left:  expr.Ref{sql.ID("schema_name")},
-				Right: &expr.Subquery{Op: expr.Scalar, Stmt: &misc.Show{Variable: sql.SCHEMA}},
+				Right: expr.Subquery{Op: expr.Scalar, Stmt: &misc.Show{Variable: sql.SCHEMA}},
 			}
 		}
 		return &query.Select{

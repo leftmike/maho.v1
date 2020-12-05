@@ -914,6 +914,11 @@ func TestParseExpr(t *testing.T) {
 		{"x * y / z", "((x * y) / z)"},
 		{"123 + (select * from t)", "(123 + (SELECT * FROM t))"},
 		{"(values (1)) + (show schema)", "((VALUES (1)) + (SHOW SCHEMA))"},
+		{"exists(show schema) and c1", "(EXISTS(SHOW SCHEMA) AND c1)"},
+		{"c1 in (select * from tbl1)", "c1 == ANY(SELECT * FROM tbl1)"},
+		{"(c1 + c2) not in (values (1), (2), (3))", "(c1 + c2) != ALL(VALUES (1), (2), (3))"},
+		{"c1 > some(select * from t1)", "c1 > ANY(SELECT * FROM t1)"},
+		{"c1 <= all(select c1 from t1)", "c1 <= ALL(SELECT c1 FROM t1)"},
 	}
 
 	for i, c := range cases {
@@ -934,6 +939,15 @@ func TestParseExpr(t *testing.T) {
 		"((1 + 2) * 3",
 		"abc(123,",
 		"abc(*)",
+		"exists()",
+		"exists(1 + 2)",
+		"exists(select * show schema)",
+		"c1 in (1, 2, 3)",
+		"c1 in (select * from tbl1, select * from tbl2)",
+		"c1 not in (1, 2, 3)",
+		"(c1 not (1, 2, 3))",
+		"(c1 all = (select * from t1))",
+		"(c1 + any(select c2 from t1)",
 	}
 
 	for i, f := range fails {
@@ -1001,7 +1015,7 @@ func TestSelect(t *testing.T) {
 				Where: &expr.Binary{
 					Op:   expr.EqualOp,
 					Left: expr.Ref{sql.ID("x")},
-					Right: &expr.Subquery{
+					Right: expr.Subquery{
 						Op: expr.Scalar,
 						Stmt: &misc.Show{
 							Variable: sql.SCHEMA,

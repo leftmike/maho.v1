@@ -282,6 +282,8 @@ func ColumnIndex(ce sql.CExpr) (int, bool) {
 
 type subqueryExpr struct {
 	op       SubqueryOp
+	call     *callFunc
+	expr     sql.CExpr
 	rowsPlan evaluate.RowsPlan
 }
 
@@ -298,11 +300,12 @@ func (se subqueryExpr) Eval(ctx context.Context, tx sql.Transaction,
 	}
 	defer rows.Close()
 
+	if se.op != Exists && rows.NumColumns() != 1 {
+		return nil, errors.New("engine: expected one column for subquery")
+	}
+
 	switch se.op {
 	case Scalar:
-		if rows.NumColumns() != 1 {
-			return nil, errors.New("engine: expected one column for scalar subquery")
-		}
 		dest := []sql.Value{nil}
 		err = rows.Next(ctx, dest)
 		if err == io.EOF {
@@ -318,7 +321,6 @@ func (se subqueryExpr) Eval(ctx context.Context, tx sql.Transaction,
 			return nil, err
 		}
 		return dest[0], nil
-
 	case Exists:
 		dest := []sql.Value{nil}
 		err = rows.Next(ctx, dest)
@@ -328,7 +330,72 @@ func (se subqueryExpr) Eval(ctx context.Context, tx sql.Transaction,
 			return nil, err
 		}
 		return sql.BoolValue(true), nil
+	case Any:
+		val, err := se.expr.Eval(ctx, tx, ectx)
+		if err != nil {
+			return nil, err
+		}
+		if val == nil {
+			return sql.BoolValue(false), nil
+		}
 
+		dest := []sql.Value{nil}
+		ret := sql.Value(sql.BoolValue(false))
+		for {
+			err = rows.Next(ctx, dest)
+			if err == io.EOF {
+				return ret, nil
+			} else if err != nil {
+				return nil, err
+			}
+
+			var cmp sql.Value
+			if dest[0] != nil {
+				cmp, err = se.call.fn(ectx, []sql.Value{val, dest[0]})
+				if err != nil {
+					return nil, err
+				}
+			}
+			if cmp == nil {
+				ret = nil
+			} else {
+				if b, ok := cmp.(sql.BoolValue); ok && bool(b) {
+					return sql.BoolValue(true), nil
+				}
+			}
+		}
+	case All:
+		val, err := se.expr.Eval(ctx, tx, ectx)
+		if err != nil {
+			return nil, err
+		}
+		if val == nil {
+			return nil, nil
+		}
+
+		dest := []sql.Value{nil}
+		ret := sql.Value(sql.BoolValue(true))
+		for {
+			err = rows.Next(ctx, dest)
+			if err == io.EOF {
+				return ret, nil
+			} else if err != nil {
+				return nil, err
+			}
+
+			var cmp sql.Value
+			if dest[0] != nil {
+				cmp, err = se.call.fn(ectx, []sql.Value{val, dest[0]})
+				if err != nil {
+					return nil, err
+				}
+			}
+			if cmp == nil {
+				ret = nil
+			} else if b, ok := cmp.(sql.BoolValue); ok && !bool(b) {
+				return sql.BoolValue(false), nil
+			}
+		}
 	default:
 		panic(fmt.Sprintf("unexpected query expression op; got %v", se.op))
 	}

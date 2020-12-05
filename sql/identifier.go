@@ -58,7 +58,9 @@ const (
 
 const (
 	ACTION Identifier = -(iota + 1)
+	ALL
 	AND
+	ANY
 	AS
 	ASC
 	BEGIN
@@ -87,6 +89,7 @@ const (
 	GROUP
 	HAVING
 	IF
+	IN
 	INDEX
 	INNER
 	INSERT
@@ -111,6 +114,7 @@ const (
 	SELECT
 	SET
 	SHOW
+	SOME
 	START
 	TABLE
 	TO
@@ -155,7 +159,9 @@ var knownKeywords = map[string]struct {
 	reserved bool
 }{
 	"ACTION":      {ACTION, true},
+	"ALL":         {ALL, true},
 	"AND":         {AND, true},
+	"ANY":         {ANY, true},
 	"AS":          {AS, true},
 	"ASC":         {ASC, true},
 	"BEGIN":       {BEGIN, true},
@@ -194,6 +200,7 @@ var knownKeywords = map[string]struct {
 	"GROUP":       {GROUP, true},
 	"HAVING":      {HAVING, true},
 	"IF":          {IF, true},
+	"IN":          {IN, true},
 	"INDEX":       {INDEX, true},
 	"INNER":       {INNER, true},
 	"INSERT":      {INSERT, true},
@@ -227,6 +234,7 @@ var knownKeywords = map[string]struct {
 	"SET":         {SET, true},
 	"SHOW":        {SHOW, true},
 	"SMALLINT":    {SMALLINT, false},
+	"SOME":        {SOME, true},
 	"STDIN":       {STDIN, false},
 	"START":       {START, true},
 	"TABLE":       {TABLE, true},

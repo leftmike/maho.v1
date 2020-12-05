@@ -245,15 +245,30 @@ type SubqueryOp int
 const (
 	Scalar SubqueryOp = iota
 	Exists
+	Any
+	All
 )
 
 type Subquery struct {
-	Op   SubqueryOp
-	Stmt evaluate.Stmt
+	Op     SubqueryOp
+	ExprOp Op
+	Expr   Expr
+	Stmt   evaluate.Stmt
 }
 
 func (s Subquery) String() string {
-	return fmt.Sprintf("(%s)", s.Stmt)
+	switch s.Op {
+	case Scalar:
+		return fmt.Sprintf("(%s)", s.Stmt)
+	case Exists:
+		return fmt.Sprintf("EXISTS(%s)", s.Stmt)
+	case Any:
+		return fmt.Sprintf("%s %s ANY(%s)", s.Expr, s.ExprOp, s.Stmt)
+	case All:
+		return fmt.Sprintf("%s %s ALL(%s)", s.Expr, s.ExprOp, s.Stmt)
+	default:
+		panic(fmt.Sprintf("unexpected query expression op; got %v", s.Op))
+	}
 }
 
 func (_ Subquery) Equal(e Expr) bool {

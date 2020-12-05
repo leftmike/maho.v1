@@ -222,16 +222,23 @@ expr =
       literal
     | '-' expr
     | NOT expr
-    | '(' expr | select | values | show ')'
+    | '(' expr | subquery ')'
     | expr op expr
     | ref ['.' ref ...]
     | param
     | func '(' [expr [',' ...]] ')'
+    | EXISTS '(' subquery ')'
+    | expr IN '(' subquery ')'
+    | expr NOT IN '(' subquery ')'
+    | expr op ANY '(' subquery ')'
+    | expr op SOME '(' subquery ')'
+    | expr op ALL '(' subquery ')'
 op =
       '+' '-' '*' '/' '%'
     | '=' '==' '!=' '<>' '<' '<=' '>' '>='
     | '<<' '>>' '&' '|'
     | AND | OR
+subquery = select | values | show
 ```
 
 Scalar Functions:
