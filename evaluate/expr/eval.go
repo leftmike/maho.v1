@@ -719,3 +719,7 @@ var (
 func uniqueRowIDCall(ctx sql.EvalContext, args []sql.Value) (sql.Value, error) {
 	return sql.Int64Value(atomic.AddUint64(&rowID, 1)), nil
 }
+
+func versionCall(ctx sql.EvalContext, args []sql.Value) (sql.Value, error) {
+	return sql.StringValue("Maho 0.1"), nil
+}
