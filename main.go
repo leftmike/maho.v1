@@ -45,7 +45,6 @@ To Do:
 - proto3 (postgres protocol)
 -- use binary format for oid.T_bool, T_bytea, T_float4, T_float8, T_int2, T_int4, T_int8
 
-- subquery expressions: EXISTS, IN, NOT IN, ANY/SOME, ALL
 - conditional expressions: CASE, COALESCE, NULLIF, GREATEST, LEAST
 
 - EXPLAIN

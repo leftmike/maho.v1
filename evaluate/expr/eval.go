@@ -7,6 +7,7 @@ import (
 	"fmt"
 	"io"
 	"math"
+	"runtime"
 	"sync/atomic"
 
 	"github.com/leftmike/maho/evaluate"
@@ -721,5 +722,8 @@ func uniqueRowIDCall(ctx sql.EvalContext, args []sql.Value) (sql.Value, error) {
 }
 
 func versionCall(ctx sql.EvalContext, args []sql.Value) (sql.Value, error) {
-	return sql.StringValue("Maho 0.1"), nil
+	// PostgreSQL 10.12 on x86_64-pc-linux-gnu, compiled by gcc (GCC) 4.9.3, 64-bit
+	return sql.StringValue(
+		fmt.Sprintf("Maho %d.%d on %s %s, compiled by %s", sql.MajorVersion, sql.MinorVersion,
+			runtime.GOARCH, runtime.GOOS, runtime.Version())), nil
 }
