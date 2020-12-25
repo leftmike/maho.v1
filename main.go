@@ -13,8 +13,6 @@ To Do:
 
 - use olekukonko/tablewriter for table output
 
-- use cockroachdb/pebble as a storage engine with kvrows
-
 - use spf13/cobra for command argument handling
 
 - use etcd-io/etcd/raft

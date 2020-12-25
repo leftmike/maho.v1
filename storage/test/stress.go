@@ -56,6 +56,10 @@ func incColumn(t *testing.T, st *storage.Store, tx engine.Transaction, tdx uint6
 }
 
 func RunStressTest(t *testing.T, st *storage.Store) {
+	if testing.Short() {
+		t.SkipNow()
+	}
+
 	t.Helper()
 
 	dbname := sql.ID("stress_test")

@@ -25,6 +25,10 @@ var (
 )
 
 func DurableTests(t *testing.T, helper string) {
+	if testing.Short() {
+		t.SkipNow()
+	}
+
 	for grp := range durableTests {
 		for num := range durableTests[grp].tests {
 			cmd := exec.Command(os.Args[0], fmt.Sprintf("-test.run=%s", helper))
@@ -43,6 +47,10 @@ func DurableTests(t *testing.T, helper string) {
 }
 
 func DurableHelper(t *testing.T, createStore func() (*storage.Store, error)) {
+	if testing.Short() {
+		t.SkipNow()
+	}
+
 	test := os.Getenv("MAHO_DURABLE_TEST")
 	if test == "" {
 		return

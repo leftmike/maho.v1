@@ -106,6 +106,20 @@ func NewBadgerStore(dataDir string) (*storage.Store, error) {
 	return storage.NewStore("kvrows", kvst, init)
 }
 
+func NewPebbleStore(dataDir string) (*storage.Store, error) {
+	kv, err := MakePebbleKV(dataDir)
+	if err != nil {
+		return nil, err
+	}
+
+	kvst, init, err := makeStore(kv)
+	if err != nil {
+		return nil, err
+	}
+
+	return storage.NewStore("kvrows", kvst, init)
+}
+
 func getUint64(kv KV, key []byte) (uint64, error) {
 	var u64 uint64
 	err := kv.Get(key,

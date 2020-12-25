@@ -6,6 +6,7 @@ require (
 	github.com/AndreasBriese/bbloom v0.0.0-20190825152654-46b345b51c96 // indirect
 	github.com/PuerkitoBio/goquery v1.5.1 // indirect
 	github.com/aws/aws-sdk-go v1.35.14 // indirect
+	github.com/cockroachdb/pebble v0.0.0-20201223210013-108cd0260986
 	github.com/dgraph-io/badger v1.6.1
 	github.com/golang/protobuf v1.4.2
 	github.com/google/btree v1.0.0

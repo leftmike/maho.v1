@@ -1,6 +1,7 @@
 package kvrows_test
 
 import (
+	"path/filepath"
 	"testing"
 
 	"github.com/leftmike/maho/storage"
@@ -50,6 +51,55 @@ func TestBadgerHelper(t *testing.T) {
 	test.DurableHelper(t,
 		func() (*storage.Store, error) {
 			st, err := kvrows.NewBadgerStore("testdata")
+			if err != nil {
+				return nil, err
+			}
+			return st, nil
+		})
+}
+
+func TestPebbleKVRows(t *testing.T) {
+	dataDir := filepath.Join("testdata", "pebble_kvrows")
+	err := testutil.CleanDir(dataDir, []string{".gitignore"})
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	st, err := kvrows.NewPebbleStore(dataDir)
+	if err != nil {
+		t.Fatal(err)
+	}
+	test.RunDatabaseTest(t, st)
+	test.RunTableTest(t, st)
+	test.RunSchemaTest(t, st)
+	test.RunTableLifecycleTest(t, st)
+	test.RunTableRowsTest(t, st)
+
+	test.RunIndexLifecycleTest(t, st)
+	test.RunIndexOneColUniqueTest(t, st)
+	test.RunIndexTwoColUniqueTest(t, st)
+	test.RunIndexOneColTest(t, st)
+	test.RunIndexTwoColTest(t, st)
+	test.RunPrimaryMinMaxTest(t, st)
+	test.RunIndexMinMaxTest(t, st)
+
+	test.RunStressTest(t, st)
+	test.RunParallelTest(t, st)
+}
+
+func TestPebbleDurability(t *testing.T) {
+	err := testutil.CleanDir(filepath.Join("testdata", "pebble_durable"), []string{".gitignore"})
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	test.DurableTests(t, "TestPebbleHelper")
+}
+
+func TestPebbleHelper(t *testing.T) {
+	test.DurableHelper(t,
+		func() (*storage.Store, error) {
+			st, err := kvrows.NewPebbleStore(filepath.Join("testdata", "pebble_durable"))
 			if err != nil {
 				return nil, err
 			}

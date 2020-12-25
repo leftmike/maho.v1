@@ -46,13 +46,6 @@ func (bkv *badgerKV) Iterate(key []byte) (Iterator, error) {
 	}, nil
 }
 
-func printKeyVal(who string, key, val []byte) {
-	if len(key) < 16 {
-		return
-	}
-	//fmt.Printf("%s: %v: %v\n", who, key, val)
-}
-
 func (bit badgerIterator) Item(fn func(key, val []byte) error) error {
 	if !bit.it.Valid() {
 		return io.EOF
@@ -61,7 +54,6 @@ func (bit badgerIterator) Item(fn func(key, val []byte) error) error {
 	item := bit.it.Item()
 	err := item.Value(
 		func(val []byte) error {
-			printKeyVal("iterate", item.Key(), val)
 			return fn(item.Key(), val)
 		})
 	if err != nil {
@@ -118,13 +110,11 @@ func get(tx *badger.Txn, key []byte, fn func(val []byte) error) error {
 	}
 	return item.Value(
 		func(val []byte) error {
-			printKeyVal("get", key, val)
 			return fn(val)
 		})
 }
 
 func (bu badgerUpdater) Set(key, val []byte) error {
-	printKeyVal("set", key, val)
 	return bu.tx.Set(key, val)
 }
 
