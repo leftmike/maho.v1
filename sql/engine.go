@@ -36,8 +36,6 @@ type Transaction interface {
 	CreateIndex(ctx context.Context, idxname Identifier, tn TableName, unique bool,
 		keys []ColumnKey, ifNotExists bool) error
 	DropIndex(ctx context.Context, idxname Identifier, tn TableName, ifExists bool) error
-
-	ListDatabases(ctx context.Context) ([]Identifier, error)
 }
 
 type IndexType struct {
@@ -82,6 +80,7 @@ type Engine interface {
 	CreateSystemInfoTable(tblname Identifier, maker MakeVirtual)
 	CreateMetadataTable(tblname Identifier, maker MakeVirtual)
 
+	ValidDatabase(dbname Identifier) (bool, error)
 	CreateDatabase(dbname Identifier, options map[Identifier]string) error
 	DropDatabase(dbname Identifier, ifExists bool, options map[Identifier]string) error
 

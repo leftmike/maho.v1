@@ -214,6 +214,13 @@ func (st *Store) createDatabase(ctx context.Context, tx engine.Transaction,
 	return st.CreateSchema(ctx, tx, sql.SchemaName{dbname, sql.PUBLIC})
 }
 
+func (st *Store) ValidDatabase(dbname sql.Identifier) (bool, error) {
+	tx := st.ps.Begin(0)
+	defer tx.Rollback()
+
+	return st.validDatabase(context.Background(), tx, dbname)
+}
+
 func (st *Store) CreateDatabase(dbname sql.Identifier, options map[sql.Identifier]string) error {
 	if len(options) != 0 {
 		return fmt.Errorf("%s: unexpected option to create database: %s", st.name, dbname)

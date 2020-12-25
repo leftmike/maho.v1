@@ -36,6 +36,7 @@ type IndexRows interface {
 }
 
 type store interface {
+	ValidDatabase(dbname sql.Identifier) (bool, error)
 	CreateDatabase(dbname sql.Identifier, options map[sql.Identifier]string) error
 	DropDatabase(dbname sql.Identifier, ifExists bool, options map[sql.Identifier]string) error
 

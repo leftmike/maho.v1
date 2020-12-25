@@ -60,6 +60,13 @@ func (e *Engine) CreateMetadataTable(tblname sql.Identifier, maker sql.MakeVirtu
 	e.metadataTables[tblname] = maker
 }
 
+func (e *Engine) ValidDatabase(dbname sql.Identifier) (bool, error) {
+	if dbname == sql.SYSTEM {
+		return true, nil
+	}
+	return e.st.ValidDatabase(dbname)
+}
+
 func (e *Engine) CreateDatabase(dbname sql.Identifier, options map[sql.Identifier]string) error {
 	if dbname == sql.SYSTEM {
 		return fmt.Errorf("engine: database %s already exists", dbname)

@@ -19,8 +19,6 @@ To Do:
 
 - make sure all Rows get properly closed
 
-- get rid of engine.ListDatabases: only used at startup in main.go
-
 - storage/service might no longer be necessary?
 
 - add protobuf column type
@@ -280,20 +278,13 @@ func main() {
 		DefaultDatabase: sql.ID(*database),
 	}
 
-	tx := e.Begin(0)
-	dbs, err := tx.ListDatabases(context.Background())
-	tx.Rollback()
-
 	defaultDB := sql.ID(*database)
-	var found bool
-	for _, db := range dbs {
-		if db == defaultDB {
-			found = true
-			break
-		}
+	valid, err := e.ValidDatabase(defaultDB)
+	if err != nil {
+		fmt.Fprintf(os.Stderr, "maho: valid database: %s", err)
+		return
 	}
-
-	if !found {
+	if !valid {
 		err = e.CreateDatabase(defaultDB, nil)
 		if err != nil {
 			fmt.Fprintf(os.Stderr, "maho: %s: %s\n", defaultDB, err)

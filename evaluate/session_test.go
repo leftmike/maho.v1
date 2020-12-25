@@ -24,6 +24,11 @@ type testTransaction struct {
 	nextStmtAllowed int
 }
 
+func (st *testStore) ValidDatabase(dbname sql.Identifier) (bool, error) {
+	st.t.Error("ValidDatabase should never be called")
+	return false, nil
+}
+
 func (st *testStore) CreateDatabase(dbname sql.Identifier,
 	options map[sql.Identifier]string) error {
 

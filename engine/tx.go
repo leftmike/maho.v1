@@ -379,7 +379,3 @@ func (tx *transaction) DropIndex(ctx context.Context, idxname sql.Identifier, tn
 	delete(tx.tableTypes, tn)
 	return nil
 }
-
-func (tx *transaction) ListDatabases(ctx context.Context) ([]sql.Identifier, error) {
-	return tx.e.st.ListDatabases(ctx, tx.tx)
-}
