@@ -14,6 +14,7 @@ require (
 	github.com/jackc/pgproto3/v2 v2.0.6
 	github.com/leftmike/sqltest v0.0.0-20201127184731-7de0c97521fa
 	github.com/lib/pq v1.8.0
+	github.com/olekukonko/tablewriter v0.0.4
 	github.com/peterh/liner v1.2.0
 	github.com/sirupsen/logrus v1.6.0
 	go.etcd.io/bbolt v1.3.5

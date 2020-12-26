@@ -29,84 +29,103 @@ select * from metadata.tables
     where table_name != 'locks' and table_name != 'transactions' and schema_name != 'private'
     order by table_name
 `,
-			`  database_name schema_name table_name  
-  ------------- ----------- ----------  
-1 system        metadata    columns     
-2 system        metadata    constraints 
-3 system        info        databases   
-4 system        info        identifiers 
-5 system        metadata    schemas     
-6 system        metadata    tables      
+			`+---------------+-------------+-------------+
+| database_name | schema_name | table_name  |
++---------------+-------------+-------------+
+| system        | metadata    | columns     |
+| system        | metadata    | constraints |
+| system        | info        | databases   |
+| system        | info        | identifiers |
+| system        | metadata    | schemas     |
+| system        | metadata    | tables      |
++---------------+-------------+-------------+
 (6 rows)
 `},
 		{"select schema_name, table_name, column_name from (show columns from identifiers) as c",
-			`  schema_name table_name  column_name 
-  ----------- ----------  ----------- 
-1 info        identifiers name        
-2 info        identifiers id          
-3 info        identifiers reserved    
+			`+-------------+-------------+-------------+
+| schema_name | table_name  | column_name |
++-------------+-------------+-------------+
+| info        | identifiers | name        |
+| info        | identifiers | id          |
+| info        | identifiers | reserved    |
++-------------+-------------+-------------+
 (3 rows)
 `},
 		{"show database",
-			`  DATABASE 
-  -------- 
-1 system   
+			`+----------+
+| DATABASE |
++----------+
+| system   |
++----------+
 (1 rows)
 `},
 		{"show databases",
-			`  database 
-  -------- 
-1 system   
+			`+----------+
+| database |
++----------+
+| system   |
++----------+
 (1 rows)
 `},
 		{"show schema",
-			`  SCHEMA 
-  ------ 
-1 info   
+			`+--------+
+| SCHEMA |
++--------+
+| info   |
++--------+
 (1 rows)
 `},
 		{"select * from (show tables from metadata) as c order by table_name",
-			`  database_name schema_name table_name  
-  ------------- ----------- ----------  
-1 system        metadata    columns     
-2 system        metadata    constraints 
-3 system        metadata    schemas     
-4 system        metadata    tables      
+			`+---------------+-------------+-------------+
+| database_name | schema_name | table_name  |
++---------------+-------------+-------------+
+| system        | metadata    | columns     |
+| system        | metadata    | constraints |
+| system        | metadata    | schemas     |
+| system        | metadata    | tables      |
++---------------+-------------+-------------+
 (4 rows)
 `},
 		{"show schemas",
-			`  database_name schema_name 
-  ------------- ----------- 
-1 system        private     
-2 system        metadata    
-3 system        info        
+			`+---------------+-------------+
+| database_name | schema_name |
++---------------+-------------+
+| system        | private     |
+| system        | metadata    |
+| system        | info        |
++---------------+-------------+
 (3 rows)
 `},
 		{"select * from metadata.tables order by table_name, schema_name",
-			`   database_name schema_name table_name  
-   ------------- ----------- ----------  
-1  system        metadata    columns     
-2  system        metadata    constraints 
-3  system        info        databases   
-4  system        private     databases   
-5  system        info        identifiers 
-6  system        metadata    schemas     
-7  system        private     schemas     
-8  system        private     sequences   
-9  system        metadata    tables      
-10 system        private     tables      
+			`+---------------+-------------+-------------+
+| database_name | schema_name | table_name  |
++---------------+-------------+-------------+
+| system        | metadata    | columns     |
+| system        | metadata    | constraints |
+| system        | info        | databases   |
+| system        | private     | databases   |
+| system        | info        | identifiers |
+| system        | metadata    | schemas     |
+| system        | private     | schemas     |
+| system        | private     | sequences   |
+| system        | metadata    | tables      |
+| system        | private     | tables      |
++---------------+-------------+-------------+
 (10 rows)
 `},
 		{`select * from metadata.constraints
 where table_name = 'tables' and schema_name = 'metadata'
 order by table_name, schema_name, constraint_name`,
-			`  database_name schema_name table_name constraint_name constraint_type details              
-  ------------- ----------- ---------- --------------- --------------- -------              
-1 system        metadata    tables     NULL            NOT NULL        column database_name 
-2 system        metadata    tables     NULL            NOT NULL        column schema_name   
-3 system        metadata    tables     NULL            NOT NULL        column table_name    
+			`+---------------+-------------+------------+-----------------+-----------------+----------------------+
+| database_name | schema_name | table_name | constraint_name | constraint_type |       details        |
++---------------+-------------+------------+-----------------+-----------------+----------------------+
+| system        | metadata    | tables     | NULL            | NOT NULL        | column database_name |
+| system        | metadata    | tables     | NULL            | NOT NULL        | column schema_name   |
+| system        | metadata    | tables     | NULL            | NOT NULL        | column table_name    |
++---------------+-------------+------------+-----------------+-----------------+----------------------+
 (3 rows)
-`},
+`,
+		},
 	}
 )
 

@@ -11,8 +11,6 @@ To Do:
 
 - specify a subset of columns to return: Table.Rows(cols []int, ...)
 
-- use olekukonko/tablewriter for table output
-
 - use spf13/cobra for command argument handling
 
 - use etcd-io/etcd/raft

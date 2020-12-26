@@ -4,8 +4,8 @@ import (
 	"context"
 	"fmt"
 	"io"
-	"strings"
-	"text/tabwriter"
+
+	"github.com/olekukonko/tablewriter"
 
 	"github.com/leftmike/maho/evaluate"
 	"github.com/leftmike/maho/parser"
@@ -47,7 +47,8 @@ func ReplSQL(ses *evaluate.Session, p parser.Parser, w io.Writer) {
 						return err
 					}
 				} else if rowsPlan, ok := plan.(evaluate.RowsPlan); ok {
-					w := tabwriter.NewWriter(w, 0, 0, 1, ' ', 0)
+					tw := tablewriter.NewWriter(w)
+					tw.SetAutoFormatHeaders(false)
 
 					rows, err := rowsPlan.Rows(ctx, tx, nil)
 					if err != nil {
@@ -55,39 +56,32 @@ func ReplSQL(ses *evaluate.Session, p parser.Parser, w io.Writer) {
 					}
 
 					cols := rowsPlan.Columns()
-					fmt.Fprint(w, "\t")
-					for _, col := range cols {
-						fmt.Fprintf(w, "%s\t", col)
+					row := make([]string, len(cols))
+					for cdx, col := range cols {
+						row[cdx] = col.String()
 					}
-					fmt.Fprint(w, "\n\t")
-					for _, col := range cols {
-						fmt.Fprintf(w, "%s\t", strings.Repeat("-", len(col.String())))
-
-					}
-					fmt.Fprintln(w)
+					tw.SetHeader(row)
 
 					dest := make([]sql.Value, len(cols))
-					i := 1
 					for {
 						err = rows.Next(ctx, dest)
 						if err != nil {
 							break
 						}
-						fmt.Fprintf(w, "%d\t", i)
-						for _, v := range dest {
+
+						for cdx, v := range dest {
 							if v != nil {
 								if s, ok := v.(sql.StringValue); ok {
-									fmt.Fprintf(w, "%s\t", string(s))
+									row[cdx] = string(s)
 									continue
 								}
 							}
-							fmt.Fprintf(w, "%s\t", sql.Format(v))
+							row[cdx] = sql.Format(v)
 						}
-						fmt.Fprintln(w)
-						i += 1
+						tw.Append(row)
 					}
-					fmt.Fprintf(w, "(%d rows)\n", i-1)
-					w.Flush()
+					tw.Render()
+					fmt.Fprintf(w, "(%d rows)\n", tw.NumLines())
 					if err != io.EOF {
 						return err
 					}
