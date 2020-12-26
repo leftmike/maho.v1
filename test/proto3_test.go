@@ -5,6 +5,7 @@ import (
 	"os"
 	"path/filepath"
 	"testing"
+	"time"
 
 	_ "github.com/lib/pq"
 
@@ -48,10 +49,19 @@ func TestProto3(t *testing.T) {
 	}()
 
 	var run sqltestdb.DBRunner
-	err = run.Connect("postgres", "host=localhost port=35432 dbname=test sslmode=disable")
-	if err != nil {
-		t.Fatal(err)
+	var retries int
+	for {
+		err = run.Connect("postgres", "host=localhost port=35432 dbname=test sslmode=disable")
+		if err == nil {
+			break
+		}
+		retries += 1
+		if retries > 3 {
+			t.Fatal(err)
+		}
+		time.Sleep(time.Second * time.Duration(retries))
 	}
+
 	testSQL(t, "proto3", &run, *sqltestData, false, false)
 	err = run.Close()
 	if err != nil {
