@@ -2,8 +2,6 @@ package flags
 
 import (
 	"strings"
-
-	"github.com/leftmike/maho/config"
 )
 
 type Flag int
@@ -38,15 +36,6 @@ type Flags []bool
 
 func (flgs Flags) GetFlag(f Flag) bool {
 	return flgs[f]
-}
-
-func Config(cfg *config.Config) Flags {
-	flgs := make([]bool, len(defaultFlags))
-	for nam, fd := range defaultFlags {
-		flgs[fd.flag] = fd.def
-		cfg.Var(&flgs[fd.flag], nam).Hide()
-	}
-	return flgs
 }
 
 func Default() Flags {
