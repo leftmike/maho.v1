@@ -11,6 +11,7 @@ import (
 	"sync"
 
 	"github.com/google/btree"
+	log "github.com/sirupsen/logrus"
 
 	"github.com/leftmike/maho/engine"
 	"github.com/leftmike/maho/sql"
@@ -89,8 +90,8 @@ type indexRows struct {
 	rowsIterator
 }
 
-func NewBadgerStore(dataDir string) (*storage.Store, error) {
-	kv, err := MakeBadgerKV(dataDir)
+func NewBadgerStore(dataDir string, logger *log.Logger) (*storage.Store, error) {
+	kv, err := MakeBadgerKV(dataDir, logger)
 	if err != nil {
 		return nil, err
 	}

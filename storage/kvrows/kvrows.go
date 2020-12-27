@@ -13,6 +13,7 @@ import (
 	"sync"
 
 	"github.com/golang/protobuf/proto"
+	log "github.com/sirupsen/logrus"
 
 	"github.com/leftmike/maho/engine"
 	"github.com/leftmike/maho/sql"
@@ -92,8 +93,8 @@ type indexRows struct {
 	rows [][]sql.Value
 }
 
-func NewBadgerStore(dataDir string) (*storage.Store, error) {
-	kv, err := MakeBadgerKV(dataDir)
+func NewBadgerStore(dataDir string, logger *log.Logger) (*storage.Store, error) {
+	kv, err := MakeBadgerKV(dataDir, logger)
 	if err != nil {
 		return nil, err
 	}
@@ -106,8 +107,8 @@ func NewBadgerStore(dataDir string) (*storage.Store, error) {
 	return storage.NewStore("kvrows", kvst, init)
 }
 
-func NewPebbleStore(dataDir string) (*storage.Store, error) {
-	kv, err := MakePebbleKV(dataDir)
+func NewPebbleStore(dataDir string, logger *log.Logger) (*storage.Store, error) {
+	kv, err := MakePebbleKV(dataDir, logger)
 	if err != nil {
 		return nil, err
 	}

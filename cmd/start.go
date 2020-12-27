@@ -10,6 +10,7 @@ import (
 	"strconv"
 	"strings"
 
+	log "github.com/sirupsen/logrus"
 	"github.com/spf13/cobra"
 	"github.com/spf13/pflag"
 
@@ -145,15 +146,18 @@ func newServer(args []string) (*server.Server, error) {
 	case "rowcols":
 		st, err = rowcols.NewStore(dataDir)
 	case "badger":
-		st, err = keyval.NewBadgerStore(dataDir)
+		st, err = keyval.NewBadgerStore(dataDir, log.StandardLogger())
 	case "bbolt":
 		st, err = keyval.NewBBoltStore(dataDir)
 	case "kvrows":
-		st, err = kvrows.NewBadgerStore(dataDir)
+		st, err = kvrows.NewBadgerStore(dataDir, log.StandardLogger())
+	case "pebble":
+		st, err = kvrows.NewPebbleStore(dataDir, log.StandardLogger())
 	default:
 		return nil,
 			fmt.Errorf(
-				"maho: got %s for store; want basic, rowcols, badger, bbolt, or kvrows", store)
+				"maho: got %s for store; want basic, rowcols, badger, bbolt, kvrows, or pebble",
+				store)
 	}
 	if err != nil {
 		return nil, fmt.Errorf("maho: %s", err)

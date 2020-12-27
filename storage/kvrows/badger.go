@@ -6,6 +6,7 @@ import (
 	"sync"
 
 	"github.com/dgraph-io/badger"
+	log "github.com/sirupsen/logrus"
 )
 
 type badgerKV struct {
@@ -23,10 +24,13 @@ type badgerUpdater struct {
 	tx *badger.Txn
 }
 
-func MakeBadgerKV(dataDir string) (KV, error) {
+func MakeBadgerKV(dataDir string, logger *log.Logger) (KV, error) {
 	os.MkdirAll(dataDir, 0755)
 
-	db, err := badger.Open(badger.DefaultOptions(dataDir).WithBypassLockGuard(true))
+	opts := badger.DefaultOptions(dataDir)
+	opts = opts.WithBypassLockGuard(true)
+	opts = opts.WithLogger(logger)
+	db, err := badger.Open(opts)
 	if err != nil {
 		return nil, err
 	}

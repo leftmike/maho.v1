@@ -48,11 +48,10 @@ func init() {
 	cfgVars["log-file"] = fs.Lookup("log-file")
 
 	fs.StringVar(&logLevel, "log-level", logLevel,
-		"log level: debug, info, warn, error, fatal, or panic")
+		"log level: trace, debug, info, warn, error, fatal, or panic")
 	cfgVars["log-level"] = fs.Lookup("log-level")
 
-	fs.BoolVarP(&logStderr, "log-stderr", "s", logStderr,
-		"`flag` to control logging to standard error")
+	fs.BoolVarP(&logStderr, "log-stderr", "s", logStderr, "log to standard error")
 
 	fs.StringVar(&configFile, "config-file", configFile, "`file` to load config from")
 	fs.BoolVar(&noConfig, "no-config", noConfig, "don't load config file")
@@ -85,18 +84,9 @@ func mahoPreRun(cmd *cobra.Command, args []string) error {
 		log.SetOutput(logWriter)
 	}
 
-	ll, ok := map[string]log.Level{
-		"panic": log.PanicLevel,
-		"fatal": log.FatalLevel,
-		"error": log.ErrorLevel,
-		"warn":  log.WarnLevel,
-		"info":  log.InfoLevel,
-		"debug": log.DebugLevel,
-	}[logLevel]
-	if !ok {
-		return fmt.Errorf(
-			"maho: got %s for log level; want debug, info, warn, error, fatal, or panic",
-			logLevel)
+	ll, err := log.ParseLevel(logLevel)
+	if err != nil {
+		return fmt.Errorf("maho: %s", err)
 	}
 	log.SetLevel(ll)
 

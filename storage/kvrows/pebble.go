@@ -6,6 +6,7 @@ import (
 	"sync"
 
 	"github.com/cockroachdb/pebble"
+	log "github.com/sirupsen/logrus"
 )
 
 type pebbleKV struct {
@@ -23,10 +24,10 @@ type pebbleUpdater struct {
 	batch *pebble.Batch
 }
 
-func MakePebbleKV(dataDir string) (KV, error) {
+func MakePebbleKV(dataDir string, logger *log.Logger) (KV, error) {
 	os.MkdirAll(dataDir, 0755)
 
-	db, err := pebble.Open(dataDir, &pebble.Options{})
+	db, err := pebble.Open(dataDir, &pebble.Options{Logger: logger})
 	if err != nil {
 		return nil, err
 	}

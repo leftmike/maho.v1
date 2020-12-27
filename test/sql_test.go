@@ -93,16 +93,29 @@ func TestSQL(t *testing.T) {
 			newStore: rowcols.NewStore,
 		},
 		{
-			name:     "badger",
-			newStore: keyval.NewBadgerStore,
+			name: "badger",
+			newStore: func(dataDir string) (*storage.Store, error) {
+				return keyval.NewBadgerStore(dataDir,
+					testutil.SetupLogger(filepath.Join(dataDir, "badger_test.log")))
+			},
 		},
 		{
 			name:     "bbolt",
 			newStore: keyval.NewBBoltStore,
 		},
 		{
-			name:     "kvrows",
-			newStore: kvrows.NewBadgerStore,
+			name: "kvrows",
+			newStore: func(dataDir string) (*storage.Store, error) {
+				return kvrows.NewBadgerStore(dataDir,
+					testutil.SetupLogger(filepath.Join(dataDir, "badger_test.log")))
+			},
+		},
+		{
+			name: "pebble",
+			newStore: func(dataDir string) (*storage.Store, error) {
+				return kvrows.NewPebbleStore(dataDir,
+					testutil.SetupLogger(filepath.Join(dataDir, "pebble_test.log")))
+			},
 		},
 	}
 

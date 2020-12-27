@@ -4,6 +4,7 @@ import (
 	"errors"
 	"fmt"
 	"io"
+	"path/filepath"
 	"testing"
 
 	"github.com/leftmike/maho/storage/kvrows"
@@ -221,7 +222,8 @@ func TestBadgerKV(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	kv, err := kvrows.MakeBadgerKV("testdata")
+	kv, err := kvrows.MakeBadgerKV("testdata",
+		testutil.SetupLogger(filepath.Join("testdata", "badger_kv.log")))
 	if err != nil {
 		t.Fatal(err)
 	}

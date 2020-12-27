@@ -13,8 +13,6 @@ To Do:
 
 - maho sql; use builtin client
 
-- badger, pebble: use logFile from main
-
 - use etcd-io/etcd/raft
 
 - make sure all Rows get properly closed

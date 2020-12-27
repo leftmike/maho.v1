@@ -1,6 +1,7 @@
 package keyval_test
 
 import (
+	"path/filepath"
 	"testing"
 
 	"github.com/leftmike/maho/storage/keyval"
@@ -13,7 +14,8 @@ func TestBadgerKV(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	kv, err := keyval.MakeBadgerKV("testdata")
+	kv, err := keyval.MakeBadgerKV("testdata",
+		testutil.SetupLogger(filepath.Join("testdata", "badger_kv.log")))
 	if err != nil {
 		t.Fatal(err)
 	}

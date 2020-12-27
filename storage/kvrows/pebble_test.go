@@ -15,7 +15,8 @@ func TestPebbleKV(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	kv, err := kvrows.MakePebbleKV(dataDir)
+	kv, err := kvrows.MakePebbleKV(dataDir,
+		testutil.SetupLogger(filepath.Join("testdata", "pebble_kv.log")))
 	if err != nil {
 		t.Fatal(err)
 	}

@@ -16,7 +16,8 @@ func TestBadgerKVRows(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	st, err := kvrows.NewBadgerStore("testdata")
+	st, err := kvrows.NewBadgerStore("testdata",
+		testutil.SetupLogger(filepath.Join("testdata", "badger_kvrows.log")))
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -50,7 +51,8 @@ func TestBadgerDurability(t *testing.T) {
 func TestBadgerHelper(t *testing.T) {
 	test.DurableHelper(t,
 		func() (*storage.Store, error) {
-			st, err := kvrows.NewBadgerStore("testdata")
+			st, err := kvrows.NewBadgerStore("testdata",
+				testutil.SetupLogger(filepath.Join("testdata", "badger_durable.log")))
 			if err != nil {
 				return nil, err
 			}
@@ -65,7 +67,8 @@ func TestPebbleKVRows(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	st, err := kvrows.NewPebbleStore(dataDir)
+	st, err := kvrows.NewPebbleStore(dataDir,
+		testutil.SetupLogger(filepath.Join("testdata", "pebble_kvrows.log")))
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -99,7 +102,8 @@ func TestPebbleDurability(t *testing.T) {
 func TestPebbleHelper(t *testing.T) {
 	test.DurableHelper(t,
 		func() (*storage.Store, error) {
-			st, err := kvrows.NewPebbleStore(filepath.Join("testdata", "pebble_durable"))
+			st, err := kvrows.NewPebbleStore(filepath.Join("testdata", "pebble_durable"),
+				testutil.SetupLogger(filepath.Join("testdata", "pebble_durable.log")))
 			if err != nil {
 				return nil, err
 			}

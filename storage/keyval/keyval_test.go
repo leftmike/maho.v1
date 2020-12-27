@@ -1,6 +1,7 @@
 package keyval_test
 
 import (
+	"path/filepath"
 	"testing"
 
 	"github.com/leftmike/maho/storage"
@@ -15,7 +16,8 @@ func TestBadgerKeyVal(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	st, err := keyval.NewBadgerStore("testdata")
+	st, err := keyval.NewBadgerStore("testdata",
+		testutil.SetupLogger(filepath.Join("testdata", "badger_keyval.log")))
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -50,7 +52,8 @@ func TestBadgerDurability(t *testing.T) {
 func TestBadgerHelper(t *testing.T) {
 	test.DurableHelper(t,
 		func() (*storage.Store, error) {
-			st, err := keyval.NewBadgerStore("testdata")
+			st, err := keyval.NewBadgerStore("testdata",
+				testutil.SetupLogger(filepath.Join("testdata", "badger_durable.log")))
 			if err != nil {
 				return nil, err
 			}
