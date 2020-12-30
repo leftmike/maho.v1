@@ -108,9 +108,9 @@ func (plan *copyPlan) Execute(ctx context.Context, tx sql.Transaction) (int64, e
 	}
 
 	var cnt int64
+	row := make([]sql.Value, len(plan.cols))
 	err = copy.CopyFromText(plan.from, len(plan.fromToRow), plan.delimiter,
 		func(vals []sql.Value) error {
-			row := make([]sql.Value, len(plan.cols))
 			for cdx, ce := range plan.defaultRow {
 				if ce == nil {
 					continue

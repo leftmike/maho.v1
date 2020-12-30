@@ -120,9 +120,10 @@ func TestSQL(t *testing.T) {
 	}
 
 	tests := []struct {
-		name     string
-		testData string
-		psql     bool
+		name      string
+		testData  string
+		psql      bool
+		skipShort bool
 	}{
 		{
 			name:     "maho",
@@ -138,9 +139,10 @@ func TestSQL(t *testing.T) {
 			psql:     true,
 		},
 		{
-			name:     "postgres",
-			testData: *postgresData,
-			psql:     true,
+			name:      "postgres",
+			testData:  *postgresData,
+			psql:      true,
+			skipShort: true,
 		},
 	}
 
@@ -153,21 +155,28 @@ func TestSQL(t *testing.T) {
 	}
 
 	for _, tst := range tests {
+		if testing.Short() && tst.skipShort {
+			continue
+		}
+
 		for _, cfg := range configs {
-			dataDir := filepath.Join("testdata", tst.name, cfg.name)
-			os.MkdirAll(dataDir, 0755)
+			t.Run(fmt.Sprintf("%s.%s", cfg.name, tst.name),
+				func(t *testing.T) {
+					dataDir := filepath.Join("testdata", tst.name, cfg.name)
+					os.MkdirAll(dataDir, 0755)
 
-			st, err := cfg.newStore(dataDir)
-			if err != nil {
-				t.Fatal(err)
-			}
+					st, err := cfg.newStore(dataDir)
+					if err != nil {
+						t.Fatal(err)
+					}
 
-			e := engine.NewEngine(st, flags.Default())
-			e.CreateDatabase(sql.ID("test"), nil)
-			// Ignore errors: the database might already exist.
+					e := engine.NewEngine(st, flags.Default())
+					e.CreateDatabase(sql.ID("test"), nil)
+					// Ignore errors: the database might already exist.
 
-			run := ((*test.Runner)(evaluate.NewSession(e, sql.ID("test"), sql.PUBLIC)))
-			testSQL(t, cfg.name, run, tst.testData, *update, tst.psql)
+					run := ((*test.Runner)(evaluate.NewSession(e, sql.ID("test"), sql.PUBLIC)))
+					testSQL(t, cfg.name, run, tst.testData, *update, tst.psql)
+				})
 		}
 	}
 }
