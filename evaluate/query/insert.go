@@ -138,6 +138,7 @@ func (plan *insertValuesPlan) Execute(ctx context.Context, tx sql.Transaction) (
 		return -1, err
 	}
 
+	rows := make([][]sql.Value, 0, len(plan.rows))
 	for _, r := range plan.rows {
 		row := make([]sql.Value, len(plan.cols))
 
@@ -155,11 +156,13 @@ func (plan *insertValuesPlan) Execute(ctx context.Context, tx sql.Transaction) (
 			row[i] = v
 		}
 
-		err := tbl.Insert(ctx, row)
-		if err != nil {
-			return -1, err
-		}
+		rows = append(rows, row)
 	}
 
-	return int64(len(plan.rows)), nil
+	err = tbl.Insert(ctx, rows)
+	if err != nil {
+		return -1, err
+	}
+
+	return int64(len(rows)), nil
 }

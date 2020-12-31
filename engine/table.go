@@ -89,37 +89,40 @@ func (rc rowContext) EvalRef(idx, nest int) sql.Value {
 	return rc[idx]
 }
 
-func (tbl *table) Insert(ctx context.Context, row []sql.Value) error {
+func (tbl *table) Insert(ctx context.Context, rows [][]sql.Value) error {
 	cols := tbl.tt.cols
-	for rdx, ct := range tbl.tt.colTypes {
-		var err error
-		row[rdx], err = convertValue(ct, cols[rdx], row[rdx])
-		if err != nil {
-			return fmt.Errorf("engine: table %s: %s", tbl.tn, err)
-		}
-	}
 
-	for _, chk := range tbl.tt.checks {
-		val, err := chk.check.Eval(ctx, tbl.tx, rowContext(row))
-		if err != nil {
-			return fmt.Errorf("engine: table %s: constraint: %s: %s", tbl.tn, chk.name, err)
+	for _, row := range rows {
+		for rdx, ct := range tbl.tt.colTypes {
+			var err error
+			row[rdx], err = convertValue(ct, cols[rdx], row[rdx])
+			if err != nil {
+				return fmt.Errorf("engine: table %s: %s", tbl.tn, err)
+			}
 		}
-		if val != nil {
-			if b, ok := val.(sql.BoolValue); ok && b == sql.BoolValue(false) {
-				return fmt.Errorf("engine: table %s: check: %s: failed", tbl.tn, chk.name)
+
+		for _, chk := range tbl.tt.checks {
+			val, err := chk.check.Eval(ctx, tbl.tx, rowContext(row))
+			if err != nil {
+				return fmt.Errorf("engine: table %s: constraint: %s: %s", tbl.tn, chk.name, err)
+			}
+			if val != nil {
+				if b, ok := val.(sql.BoolValue); ok && b == sql.BoolValue(false) {
+					return fmt.Errorf("engine: table %s: check: %s: failed", tbl.tn, chk.name)
+				}
+			}
+		}
+
+		if tbl.tt.events&sql.InsertEvent != 0 {
+			tbl.insertedRows = append(tbl.insertedRows, row)
+			if !tbl.modified {
+				tbl.modified = true
+				tbl.tx.modified = append(tbl.tx.modified, tbl)
 			}
 		}
 	}
 
-	if tbl.tt.events&sql.InsertEvent != 0 {
-		tbl.insertedRows = append(tbl.insertedRows, row)
-		if !tbl.modified {
-			tbl.modified = true
-			tbl.tx.modified = append(tbl.tx.modified, tbl)
-		}
-	}
-
-	return tbl.stbl.Insert(ctx, row)
+	return tbl.stbl.Insert(ctx, rows)
 }
 
 type updateRow func(ctx context.Context, updatedCols []int, updateRow []sql.Value) error

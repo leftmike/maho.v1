@@ -214,22 +214,24 @@ func (bt *table) IndexRows(ctx context.Context, iidx int,
 	return bir, nil
 }
 
-func (bt *table) Insert(ctx context.Context, row []sql.Value) error {
+func (bt *table) Insert(ctx context.Context, rows [][]sql.Value) error {
 	bt.tx.forWrite()
 
-	item := bt.toItem(row)
-	if bt.tx.tree.Has(item) {
-		return fmt.Errorf("basic: %s: primary index: existing row with duplicate key", bt.tn)
-	}
-	bt.tx.tree.ReplaceOrInsert(item)
-
-	for idx, il := range bt.tl.Indexes() {
-		item := bt.toIndexItem(row, il)
+	for _, row := range rows {
+		item := bt.toItem(row)
 		if bt.tx.tree.Has(item) {
-			return fmt.Errorf("basic: %s: %s index: existing row with duplicate key", bt.tn,
-				bt.tl.IndexName(idx))
+			return fmt.Errorf("basic: %s: primary index: existing row with duplicate key", bt.tn)
 		}
 		bt.tx.tree.ReplaceOrInsert(item)
+
+		for idx, il := range bt.tl.Indexes() {
+			item := bt.toIndexItem(row, il)
+			if bt.tx.tree.Has(item) {
+				return fmt.Errorf("basic: %s: %s index: existing row with duplicate key", bt.tn,
+					bt.tl.IndexName(idx))
+			}
+			bt.tx.tree.ReplaceOrInsert(item)
+		}
 	}
 
 	return nil
@@ -315,7 +317,7 @@ func (bt *table) updateRow(ctx context.Context, updatedCols []int,
 			return err
 		}
 
-		err = bt.Insert(ctx, updateRow)
+		err = bt.Insert(ctx, [][]sql.Value{updateRow})
 		if err != nil {
 			return err
 		}

@@ -713,24 +713,26 @@ func (kvt *table) proposeUpdate(upd Updater, updateKey []byte, row []sql.Value,
 	return upd.Set(makeKeyVersion(updateKey, ProposalVersion), val)
 }
 
-func (kvt *table) Insert(ctx context.Context, row []sql.Value) error {
+func (kvt *table) Insert(ctx context.Context, rows [][]sql.Value) error {
 	upd, err := kvt.st.kv.Update()
 	if err != nil {
 		return err
 	}
 
-	err = kvt.proposeUpdate(upd, kvt.makePrimaryKey(row), row, false)
-	if err != nil {
-		upd.Rollback()
-		return err
-	}
-
-	for _, il := range kvt.tl.Indexes() {
-		indexRow := il.RowToIndexRow(row)
-		err = kvt.proposeUpdate(upd, kvt.makeIndexKey(il, indexRow), indexRow, false)
+	for _, row := range rows {
+		err = kvt.proposeUpdate(upd, kvt.makePrimaryKey(row), row, false)
 		if err != nil {
 			upd.Rollback()
 			return err
+		}
+
+		for _, il := range kvt.tl.Indexes() {
+			indexRow := il.RowToIndexRow(row)
+			err = kvt.proposeUpdate(upd, kvt.makeIndexKey(il, indexRow), indexRow, false)
+			if err != nil {
+				upd.Rollback()
+				return err
+			}
 		}
 	}
 

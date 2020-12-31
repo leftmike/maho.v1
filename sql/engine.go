@@ -63,7 +63,7 @@ const (
 type Table interface {
 	Rows(ctx context.Context, minRow, maxRow []Value) (Rows, error)
 	IndexRows(ctx context.Context, iidx int, minRow, maxRow []Value) (IndexRows, error)
-	Insert(ctx context.Context, row []Value) error
+	Insert(ctx context.Context, rows [][]Value) error
 }
 
 type Trigger interface {

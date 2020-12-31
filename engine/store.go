@@ -15,7 +15,7 @@ type Transaction interface {
 type Table interface {
 	Rows(ctx context.Context, minRow, maxRow []sql.Value) (Rows, error)
 	IndexRows(ctx context.Context, iidx int, minRow, maxRow []sql.Value) (IndexRows, error)
-	Insert(ctx context.Context, row []sql.Value) error
+	Insert(ctx context.Context, rows [][]sql.Value) error
 }
 
 type Rows interface {

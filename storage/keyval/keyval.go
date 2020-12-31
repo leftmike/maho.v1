@@ -412,18 +412,20 @@ func (kvt *table) insert(ri rowItem, idxname sql.Identifier) error {
 	return nil
 }
 
-func (kvt *table) Insert(ctx context.Context, row []sql.Value) error {
+func (kvt *table) Insert(ctx context.Context, rows [][]sql.Value) error {
 	kvt.tx.forWrite()
 
-	err := kvt.insert(kvt.toItem(row, false), sql.PRIMARY)
-	if err != nil {
-		return err
-	}
-
-	for idx, il := range kvt.tl.Indexes() {
-		err = kvt.insert(kvt.toIndexItem(row, false, il), kvt.tl.IndexName(idx))
+	for _, row := range rows {
+		err := kvt.insert(kvt.toItem(row, false), sql.PRIMARY)
 		if err != nil {
 			return err
+		}
+
+		for idx, il := range kvt.tl.Indexes() {
+			err = kvt.insert(kvt.toIndexItem(row, false, il), kvt.tl.IndexName(idx))
+			if err != nil {
+				return err
+			}
 		}
 	}
 
@@ -571,7 +573,7 @@ func (kvt *table) updateRow(ctx context.Context, updatedCols []int,
 
 	if kvt.tl.PrimaryUpdated(updatedCols) {
 		kvt.deleteRow(ctx, row)
-		err := kvt.Insert(ctx, updateRow)
+		err := kvt.Insert(ctx, [][]sql.Value{updateRow})
 		if err != nil {
 			return err
 		}

@@ -93,22 +93,24 @@ func insertRows(t *testing.T, tx sql.Transaction, tn sql.TableName, min, max int
 	tbl := lookupTable(t, tx, tn)
 
 	cnt := 0
+	var rows [][]sql.Value
 	for min+cnt <= max {
-		err := tbl.Insert(ctx,
+		rows = append(rows,
 			[]sql.Value{
 				i64Val(cnt + min),
 				strVal(strconv.FormatInt(int64(max-cnt), 10)),
 				i64Val(cnt / 2),
 				i64Val(cnt),
 			})
-		if err != nil {
-			t.Fatal(err)
-		}
-
 		cnt += 1
 	}
 
-	err := tx.NextStmt(ctx)
+	err := tbl.Insert(ctx, rows)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	err = tx.NextStmt(ctx)
 	if err != nil {
 		t.Fatal(err)
 	}

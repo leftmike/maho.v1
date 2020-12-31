@@ -390,18 +390,20 @@ func (rct *table) insertItem(ri btree.Item, idxname sql.Identifier) error {
 	return nil
 }
 
-func (rct *table) Insert(ctx context.Context, row []sql.Value) error {
+func (rct *table) Insert(ctx context.Context, rows [][]sql.Value) error {
 	rct.tx.forWrite()
 
-	err := rct.insertItem(rct.toItem(row, false), sql.PRIMARY)
-	if err != nil {
-		return err
-	}
-
-	for idx, il := range rct.tl.Indexes() {
-		err = rct.insertItem(rct.toIndexItem(row, false, il), rct.tl.IndexName(idx))
+	for _, row := range rows {
+		err := rct.insertItem(rct.toItem(row, false), sql.PRIMARY)
 		if err != nil {
 			return err
+		}
+
+		for idx, il := range rct.tl.Indexes() {
+			err = rct.insertItem(rct.toIndexItem(row, false, il), rct.tl.IndexName(idx))
+			if err != nil {
+				return err
+			}
 		}
 	}
 
@@ -471,7 +473,7 @@ func (rct *table) updateRow(ctx context.Context, updatedCols []int,
 
 	if rct.tl.PrimaryUpdated(updatedCols) {
 		rct.deleteRow(ctx, row)
-		err := rct.Insert(ctx, updateRow)
+		err := rct.Insert(ctx, [][]sql.Value{updateRow})
 		if err != nil {
 			return err
 		}

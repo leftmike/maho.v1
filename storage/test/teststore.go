@@ -363,7 +363,7 @@ func testDatabase(t *testing.T, st *storage.Store, dbname sql.Identifier, cmds [
 				}
 			}
 		case cmdInsert:
-			err := state.tbl.Insert(ctx, cmd.row)
+			err := state.tbl.Insert(ctx, [][]sql.Value{cmd.row})
 			if cmd.fail {
 				if err == nil {
 					t.Errorf("%stable.Insert() did not fail", cmd.fln)

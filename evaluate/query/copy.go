@@ -108,9 +108,10 @@ func (plan *copyPlan) Execute(ctx context.Context, tx sql.Transaction) (int64, e
 	}
 
 	var cnt int64
-	row := make([]sql.Value, len(plan.cols))
+	rows := make([][]sql.Value, 0, 128)
 	err = copy.CopyFromText(plan.from, len(plan.fromToRow), plan.delimiter,
 		func(vals []sql.Value) error {
+			row := make([]sql.Value, len(plan.cols))
 			for cdx, ce := range plan.defaultRow {
 				if ce == nil {
 					continue
@@ -127,10 +128,31 @@ func (plan *copyPlan) Execute(ctx context.Context, tx sql.Transaction) (int64, e
 				row[plan.fromToRow[fdx]] = val
 			}
 			cnt += 1
-			return tbl.Insert(ctx, row)
+
+			if len(rows) == cap(rows) {
+				err := tbl.Insert(ctx, rows)
+				if err != nil {
+					return err
+				}
+				if len(rows) < 1024 {
+					rows = make([][]sql.Value, 0, 1024)
+				} else {
+					rows = rows[:0]
+				}
+			}
+
+			rows = append(rows, row)
+			return nil
 		})
 	if err != nil {
 		return -1, err
+	}
+
+	if len(rows) > 0 {
+		err := tbl.Insert(ctx, rows)
+		if err != nil {
+			return -1, err
+		}
 	}
 	return cnt, nil
 }

@@ -208,7 +208,7 @@ func (ttbl *typedTable) rowObjToRow(ctx context.Context, nam string,
 }
 
 func (ttbl *typedTable) Insert(ctx context.Context, rowObj interface{}) error {
-	return ttbl.tbl.Insert(ctx, ttbl.rowObjToRow(ctx, "rowObj", rowObj))
+	return ttbl.tbl.Insert(ctx, [][]sql.Value{ttbl.rowObjToRow(ctx, "rowObj", rowObj)})
 }
 
 func (r *TypedRows) NumColumns() int {

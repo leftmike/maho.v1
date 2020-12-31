@@ -57,7 +57,7 @@ func (vt *virtualTable) IndexRows(ctx context.Context, iidx int,
 	panic(fmt.Sprintf("virtual tables don't have indexes: %s", vt.tn))
 }
 
-func (vt *virtualTable) Insert(ctx context.Context, row []sql.Value) error {
+func (vt *virtualTable) Insert(ctx context.Context, rows [][]sql.Value) error {
 	panic(fmt.Sprintf("virtual: table %s can not be modified", vt.tn))
 }
 
