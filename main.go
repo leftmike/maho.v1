@@ -26,15 +26,14 @@ To Do:
 - tests with 1000s to 100000s of rows
 -- generate rows
 -- use sample databases
+-- usda.sql: indexes and foreign keys
 
 - kvrows
 -- cleanup proposals
 -- consider making Rows() incremental, maybe as blocks of rows
--- badger: usda.sql: can't load largest table; can't select from tables
 
 - rowcols
 -- snapshot store and truncate WAL
--- usda.sql: causes corrupt WAL
 
 - proto3 (postgres protocol)
 -- use binary format for oid.T_bool, T_bytea, T_float4, T_float8, T_int2, T_int4, T_int8

@@ -21,7 +21,7 @@ const (
 func encodeColNumValueTag(buf []byte, colNum int, tag byte) []byte {
 	if colNum == 0 {
 		buf = append(buf, tag)
-	} else if colNum < 16 {
+	} else if colNum < 0x0F {
 		buf = append(buf, byte(colNum<<4)|tag)
 	} else {
 		buf = append(buf, 0xF0|tag)
@@ -86,7 +86,7 @@ func DecodeRowValue(buf []byte) []sql.Value {
 		tag := buf[0] & 0x0F
 		num := int(buf[0] >> 4)
 		buf = buf[1:]
-		if num == 16 {
+		if num == 0x0F {
 			buf, u, ok = util.DecodeVarint(buf)
 			if !ok {
 				return nil

@@ -51,6 +51,28 @@ func TestRowValues(t *testing.T) {
 				sql.BytesValue{0xFF, 1, 2, 3}},
 			s: `123, '', '\xff010203'`,
 		},
+		{
+			row: []sql.Value{
+				sql.StringValue("19064"),
+				sql.StringValue("303"),
+				sql.Float64Value(0.8),
+				sql.Int64Value(1),
+				nil,
+				sql.Int64Value(1),
+				sql.StringValue("A"),
+				sql.StringValue("     "),
+				sql.StringValue(" "),
+				nil,
+				nil,
+				nil,
+				nil,
+				nil,
+				nil,
+				sql.StringValue(""),
+				sql.StringValue("D"),
+			},
+			s: `'19064', '303', 0.8, 1, NULL, 1, 'A', '     ', ' ', NULL, NULL, NULL, NULL, NULL, NULL, '', 'D'`,
+		},
 	}
 
 	for _, c := range cases {

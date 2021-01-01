@@ -410,7 +410,7 @@ func (kvt *table) decodeRow(key, val []byte) ([]sql.Value, error) {
 	row := encode.DecodeRowValue(val)
 	if row == nil {
 		return nil,
-			fmt.Errorf("kvrows: %s: unable to decode proposed row at %v: %v", kvt.tn, key, val)
+			fmt.Errorf("kvrows: %s: unable to decode row at %v: %v", kvt.tn, key, val)
 	}
 
 	return row, nil
