@@ -189,7 +189,7 @@ func (tx *transaction) CreateTable(ctx context.Context, tn sql.TableName, cols [
 					checkExpr: con.CheckExpr,
 				})
 		} else if con.Type == sql.UniqueConstraint {
-			tt.indexes = append(tt.indexes, tt.makeIndexType(con.Name, con.Key, true))
+			tt.indexes = append(tt.indexes, tt.makeIndexType(con.Name, con.Key, true, false))
 		} else if con.Type == sql.PrimaryConstraint {
 			// Used above; remove from constraints.
 		} else {
@@ -343,6 +343,16 @@ func (tx *transaction) CreateIndex(ctx context.Context, idxname sql.Identifier, 
 	if err != nil {
 		return err
 	}
+
+	// XXX: populate index
+
+	tx.tx.NextStmt()
+	tt = tt.ShowIndex(idxname)
+	err = tx.e.st.UpdateType(ctx, tx.tx, tn, tt)
+	if err != nil {
+		return err
+	}
+
 	delete(tx.tables, tn)
 	delete(tx.tableTypes, tn)
 	return nil

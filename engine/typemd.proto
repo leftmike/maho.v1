@@ -44,6 +44,7 @@ message IndexMetadata {
     repeated ColumnKey Key = 2;
     repeated int32 Columns = 3;
     bool Unique = 4;
+    bool Hidden = 5;
 }
 
 // These need to match the values in maho/sql/constraint.go

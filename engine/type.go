@@ -115,7 +115,7 @@ func addColumn(cols []int, num int) []int {
 }
 
 func (tt *TableType) makeIndexType(nam sql.Identifier, key []sql.ColumnKey,
-	unique bool) sql.IndexType {
+	unique, hidden bool) sql.IndexType {
 
 	if !unique {
 		for _, ck := range tt.PrimaryKey() {
@@ -139,6 +139,7 @@ func (tt *TableType) makeIndexType(nam sql.Identifier, key []sql.ColumnKey,
 		Key:     key,
 		Columns: cols,
 		Unique:  unique,
+		Hidden:  hidden,
 	}
 }
 
@@ -154,9 +155,21 @@ func (tt *TableType) AddIndex(idxname sql.Identifier, unique bool,
 	}
 
 	tt.ver += 1
-	it = tt.makeIndexType(idxname, key, unique)
+	it = tt.makeIndexType(idxname, key, unique, true)
 	tt.indexes = append(tt.indexes, it)
 	return tt, it, false
+}
+
+func (tt *TableType) ShowIndex(idxname sql.Identifier) *TableType {
+	for idx, it := range tt.indexes {
+		if it.Name == idxname && it.Hidden {
+			tt.indexes[idx].Hidden = false
+			tt.ver += 1
+			return tt
+		}
+	}
+
+	return nil
 }
 
 func (tt *TableType) RemoveIndex(idxname sql.Identifier) (*TableType, int) {
@@ -442,6 +455,7 @@ func (tt *TableType) Encode() ([]byte, error) {
 				Key:     encodeColumnKey(it.Key),
 				Columns: encodeIntSlice(it.Columns),
 				Unique:  it.Unique,
+				Hidden:  it.Hidden,
 			})
 	}
 
@@ -572,6 +586,7 @@ func DecodeTableType(tn sql.TableName, buf []byte) (*TableType, error) {
 				Key:     decodeColumnKey(it.Key),
 				Columns: decodeIntSlice(it.Columns),
 				Unique:  it.Unique,
+				Hidden:  it.Hidden,
 			})
 	}
 

@@ -201,7 +201,7 @@ func (fia FromIndexAlias) plan(ctx context.Context, pctx evaluate.PlanContext,
 
 	iidx := -1
 	for idx, it := range tt.Indexes() {
-		if it.Name == fia.Index {
+		if !it.Hidden && it.Name == fia.Index {
 			iidx = idx
 			break
 		}

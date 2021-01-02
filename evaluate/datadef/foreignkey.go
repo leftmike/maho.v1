@@ -72,7 +72,7 @@ func matchIndexKey(cols []sql.Identifier, key []sql.ColumnKey, refCols []sql.Ide
 
 func findIndex(rtt sql.TableType, refCols []sql.Identifier) (sql.IndexType, bool) {
 	for _, it := range rtt.Indexes() {
-		if !it.Unique || len(it.Key) != len(refCols) {
+		if it.Hidden || !it.Unique || len(it.Key) != len(refCols) {
 			continue
 		}
 

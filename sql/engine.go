@@ -43,6 +43,7 @@ type IndexType struct {
 	Key     []ColumnKey
 	Columns []int
 	Unique  bool
+	Hidden  bool
 }
 
 type TableType interface {

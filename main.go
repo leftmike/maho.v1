@@ -54,6 +54,9 @@ To Do:
 - references from foreign keys (ForeignRef?)
 -- use index on foreign key table if available
 
+- CREATE INDEX
+-- fill in index
+
 - constraints
 -- DROP TABLE: CASCADE: to remove foreign key constraint of another table
 -- drop CHECK constraint: use ALTER TABLE table DROP CONSTRAINT constraint
