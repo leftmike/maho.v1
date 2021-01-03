@@ -8,7 +8,7 @@ import (
 	"github.com/leftmike/maho/testutil"
 )
 
-func TestPebbleKV(t *testing.T) {
+func TestPebbleKVStore(t *testing.T) {
 	dataDir := filepath.Join("testdata", "pebble_kv")
 	err := testutil.CleanDir(dataDir, []string{".gitignore"})
 	if err != nil {

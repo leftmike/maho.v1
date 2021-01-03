@@ -216,7 +216,7 @@ func testKV(t *testing.T, kv kvrows.KV) {
 		})
 }
 
-func TestBadgerKV(t *testing.T) {
+func TestBadgerKVStore(t *testing.T) {
 	err := testutil.CleanDir("testdata", []string{".gitignore"})
 	if err != nil {
 		t.Fatal(err)

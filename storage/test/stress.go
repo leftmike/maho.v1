@@ -12,16 +12,17 @@ import (
 	"github.com/leftmike/maho/storage"
 )
 
-func incColumn(t *testing.T, st *storage.Store, tx engine.Transaction, tdx uint64, i int,
+func incColumn(t *testing.T, st *storage.Store, tx engine.Transaction, i int,
 	tn sql.TableName) bool {
 
-	var ctx context.Context
+	ctx := context.Background()
 
 	tbl, _, err := st.LookupTable(ctx, tx, tn)
 	if err != nil {
 		t.Fatalf("LookupTable(%s) failed with %s", tn, err)
 	}
-	rows, err := tbl.Rows(ctx, nil, nil)
+	keyRow := []sql.Value{sql.Int64Value(i), nil, nil}
+	rows, err := tbl.Rows(ctx, keyRow, keyRow)
 	if err != nil {
 		t.Fatalf("table.Rows() failed with %s", err)
 	}
@@ -45,14 +46,12 @@ func incColumn(t *testing.T, st *storage.Store, tx engine.Transaction, tdx uint6
 			err = rowUpdate(ctx, rows,
 				[]sql.ColumnUpdate{{Column: 1, Value: sql.Int64Value(v + 1)}}, dest)
 			if err == nil {
-				//fmt.Printf("%d: %d -> %d\n", tdx, i, v+1)
 				return true
+			} else {
+				return false
 			}
-			break
 		}
 	}
-
-	return false
 }
 
 func RunStressTest(t *testing.T, st *storage.Store) {
@@ -95,14 +94,14 @@ func RunStressTest(t *testing.T, st *storage.Store) {
 		go func(tdx uint64, r int) {
 			defer wg.Done()
 
-			var ctx context.Context
+			ctx := context.Background()
 			name := sql.ID("tbl")
 			i := 0
 			for i < r {
 				updated := false
 				for !updated {
 					tx := st.Begin(tdx)
-					updated = incColumn(t, st, tx, tdx, i, sql.TableName{dbname, sql.PUBLIC, name})
+					updated = incColumn(t, st, tx, i, sql.TableName{dbname, sql.PUBLIC, name})
 					if updated {
 						err := tx.Commit(ctx)
 						if err == nil {

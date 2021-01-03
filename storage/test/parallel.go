@@ -10,6 +10,10 @@ import (
 )
 
 func RunParallelTest(t *testing.T, st *storage.Store) {
+	if testing.Short() {
+		t.SkipNow()
+	}
+
 	t.Helper()
 
 	dbname := sql.ID("parallel_test")
@@ -43,11 +47,14 @@ func RunParallelTest(t *testing.T, st *storage.Store) {
 			}
 
 			for j := 0; j < r; j++ {
+				keyRow := []sql.Value{sql.Int64Value(i*r + j), nil, nil}
 				testDatabase(t, st, dbname,
 					[]storeCmd{
 						{fln: fln(), cmd: cmdBegin},
 						{fln: fln(), cmd: cmdLookupTable, name: sql.ID("tbl")},
 						{fln: fln(), cmd: cmdUpdate, rowID: i*r + j,
+							minRow: keyRow,
+							maxRow: keyRow,
 							updates: []sql.ColumnUpdate{
 								{Column: 1, Value: sql.Int64Value(j * j)},
 							},

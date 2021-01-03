@@ -21,6 +21,7 @@ func TestBadgerKVRows(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
+
 	test.RunDatabaseTest(t, st)
 	test.RunTableTest(t, st)
 	test.RunSchemaTest(t, st)

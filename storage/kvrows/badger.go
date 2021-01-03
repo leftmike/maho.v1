@@ -30,6 +30,7 @@ func MakeBadgerKV(dataDir string, logger *log.Logger) (KV, error) {
 	opts := badger.DefaultOptions(dataDir)
 	opts = opts.WithBypassLockGuard(true)
 	opts = opts.WithLogger(logger)
+	opts = opts.WithSyncWrites(false)
 	db, err := badger.Open(opts)
 	if err != nil {
 		return nil, err
