@@ -54,7 +54,9 @@ type store interface {
 	AddIndex(ctx context.Context, tx Transaction, tn sql.TableName, tt *TableType,
 		it sql.IndexType) error
 	RemoveIndex(ctx context.Context, tx Transaction, tn sql.TableName, tt *TableType,
-		rdx int) error
+		iidx int) error
+	FillIndex(ctx context.Context, tx Transaction, tn sql.TableName, tt *TableType,
+		iidx int) error
 
 	ListDatabases(ctx context.Context, tx Transaction) ([]sql.Identifier, error)
 	ListSchemas(ctx context.Context, tx Transaction, dbname sql.Identifier) ([]sql.Identifier,

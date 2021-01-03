@@ -89,7 +89,7 @@ func NewStore(dataDir string) (*storage.Store, error) {
 }
 
 func (rcst *rowColsStore) Table(ctx context.Context, tx engine.Transaction, tn sql.TableName,
-	tid int64, tt *engine.TableType, tl *storage.TableLayout) (engine.Table, error) {
+	tid int64, tt *engine.TableType, tl *storage.TableLayout) (storage.Table, error) {
 
 	if len(tt.PrimaryKey()) == 0 {
 		panic(fmt.Sprintf("rowcols: table %s: missing required primary key", tn))
@@ -404,6 +404,26 @@ func (rct *table) Insert(ctx context.Context, rows [][]sql.Value) error {
 			if err != nil {
 				return err
 			}
+		}
+	}
+
+	return nil
+}
+
+func (rct *table) FillIndex(ctx context.Context, iidx int) error {
+	indexes := rct.tl.Indexes()
+	if iidx >= len(indexes) {
+		panic(fmt.Sprintf("rowcols: table: %s: %d indexes: out of range: %d", rct.tn, len(indexes),
+			iidx))
+	}
+	il := indexes[iidx]
+	idxname := rct.tl.IndexName(iidx)
+
+	rows := rct.fetchRows(ctx, rct.toItem(nil, false), nil, (rct.tid<<16)|storage.PrimaryIID)
+	for _, row := range rows {
+		err := rct.insertItem(rct.toIndexItem(row, false, il), idxname)
+		if err != nil {
+			return err
 		}
 	}
 

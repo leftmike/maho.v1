@@ -107,9 +107,16 @@ func (st *testStore) AddIndex(ctx context.Context, tx engine.Transaction, tn sql
 }
 
 func (st *testStore) RemoveIndex(ctx context.Context, tx engine.Transaction, tn sql.TableName,
-	tt *engine.TableType, rdx int) error {
+	tt *engine.TableType, iidx int) error {
 
 	st.t.Error("RemoveIndex should never be called")
+	return nil
+}
+
+func (st *testStore) FillIndex(ctx context.Context, tx engine.Transaction, tn sql.TableName,
+	tt *engine.TableType, iidx int) error {
+
+	st.t.Error("FillIndex should never be called")
 	return nil
 }
 

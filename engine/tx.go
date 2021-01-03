@@ -331,20 +331,23 @@ func (tx *transaction) CreateIndex(ctx context.Context, idxname sql.Identifier, 
 		return err
 	}
 
-	tt, it, found := tt.AddIndex(idxname, unique, key)
+	tt, it, iidx, found := tt.AddIndex(idxname, unique, key)
 	if found {
 		if ifNotExists {
 			return nil
 		}
 		return fmt.Errorf("engine: table %s: index %s already exists", tn, idxname)
 	}
-
 	err = tx.e.st.AddIndex(ctx, tx.tx, tn, tt, it)
 	if err != nil {
 		return err
 	}
 
-	// XXX: populate index
+	tx.tx.NextStmt()
+	err = tx.e.st.FillIndex(ctx, tx.tx, tn, tt, iidx)
+	if err != nil {
+		return err
+	}
 
 	tx.tx.NextStmt()
 	tt = tt.ShowIndex(idxname)
@@ -373,7 +376,7 @@ func (tx *transaction) DropIndex(ctx context.Context, idxname sql.Identifier, tn
 		return err
 	}
 
-	tt, rdx := tt.RemoveIndex(idxname)
+	tt, iidx := tt.RemoveIndex(idxname)
 	if tt == nil {
 		if ifExists {
 			return nil
@@ -381,7 +384,7 @@ func (tx *transaction) DropIndex(ctx context.Context, idxname sql.Identifier, tn
 		return fmt.Errorf("engine: table %s: index %s not found", tn, idxname)
 	}
 
-	err = tx.e.st.RemoveIndex(ctx, tx.tx, tn, tt, rdx)
+	err = tx.e.st.RemoveIndex(ctx, tx.tx, tn, tt, iidx)
 	if err != nil {
 		return err
 	}

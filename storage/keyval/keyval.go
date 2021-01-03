@@ -136,7 +136,7 @@ func newStore(kv KV) (*storage.Store, error) {
 }
 
 func (kvst *keyValStore) Table(ctx context.Context, tx engine.Transaction, tn sql.TableName,
-	tid int64, tt *engine.TableType, tl *storage.TableLayout) (engine.Table, error) {
+	tid int64, tt *engine.TableType, tl *storage.TableLayout) (storage.Table, error) {
 
 	if len(tt.PrimaryKey()) == 0 {
 		panic(fmt.Sprintf("keyval: table %s: missing required primary key", tn))
@@ -426,6 +426,38 @@ func (kvt *table) Insert(ctx context.Context, rows [][]sql.Value) error {
 			if err != nil {
 				return err
 			}
+		}
+	}
+
+	return nil
+}
+
+func (kvt *table) FillIndex(ctx context.Context, iidx int) error {
+	indexes := kvt.tl.Indexes()
+	if iidx >= len(indexes) {
+		panic(fmt.Sprintf("keyval: table: %s: %d indexes: out of range: %d", kvt.tn, len(indexes),
+			iidx))
+	}
+	il := indexes[iidx]
+	idxname := kvt.tl.IndexName(iidx)
+
+	rows, err := kvt.Rows(ctx, nil, nil)
+	if err != nil {
+		return err
+	}
+	defer rows.Close()
+
+	for {
+		row, err := rows.Next(ctx)
+		if err == io.EOF {
+			break
+		} else if err != nil {
+			return err
+		}
+
+		err = kvt.insert(kvt.toIndexItem(row, false, il), idxname)
+		if err != nil {
+			return err
 		}
 	}
 

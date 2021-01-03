@@ -54,16 +54,12 @@ To Do:
 - references from foreign keys (ForeignRef?)
 -- use index on foreign key table if available
 
-- CREATE INDEX
--- fill in index
-
 - constraints
 -- DROP TABLE: CASCADE: to remove foreign key constraint of another table
 -- drop CHECK constraint: use ALTER TABLE table DROP CONSTRAINT constraint
 -- drop DEFAULT: use ALTER TABLE table ALTER COLUMN column DROP DEFAULT (or DROP CONSTRAINT)
 -- drop FOREIGN KEY: use ALTER TABLE table DROP CONSTRAINT constraint
 -- drop NOT NULL: use ALTER TABLE table ALTER COLUMN column DROP NOT NULL (or DROP CONSTRAINT)
--- drop UNIQUE: use DROP INDEX ...
 */
 
 import (

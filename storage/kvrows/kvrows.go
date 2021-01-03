@@ -251,7 +251,7 @@ func (kvst *kvStore) startupStore(upd Updater) error {
 }
 
 func (kvst *kvStore) Table(ctx context.Context, tx engine.Transaction, tn sql.TableName,
-	tid int64, tt *engine.TableType, tl *storage.TableLayout) (engine.Table, error) {
+	tid int64, tt *engine.TableType, tl *storage.TableLayout) (storage.Table, error) {
 
 	if len(tt.PrimaryKey()) == 0 {
 		panic(fmt.Sprintf("kvrows: table %s: missing required primary key", tn))
@@ -737,6 +737,58 @@ func (kvt *table) Insert(ctx context.Context, rows [][]sql.Value) error {
 	}
 
 	return upd.Commit()
+}
+
+func (kvt *table) fillIndex(ctx context.Context, il storage.IndexLayout,
+	rows [][]sql.Value) error {
+
+	upd, err := kvt.st.kv.Update()
+	if err != nil {
+		return err
+	}
+
+	for _, row := range rows {
+		indexRow := il.RowToIndexRow(row)
+		err = kvt.proposeUpdate(upd, kvt.makeIndexKey(il, indexRow), indexRow, false)
+		if err != nil {
+			upd.Rollback()
+			return err
+		}
+	}
+
+	return upd.Commit()
+}
+
+func (kvt *table) FillIndex(ctx context.Context, iidx int) error {
+	indexes := kvt.tl.Indexes()
+	if iidx >= len(indexes) {
+		panic(fmt.Sprintf("kvrows: table: %s: %d indexes: out of range: %d", kvt.tn, len(indexes),
+			iidx))
+	}
+	il := indexes[iidx]
+
+	rows, err := kvt.fetchRows(ctx, kvt.makePrimaryKey(nil), nil)
+	if err != nil {
+		return err
+	}
+
+	for len(rows) > 0 {
+		var rowsChunk [][]sql.Value
+		if len(rows) > 1024 {
+			rowsChunk = rows[:1024]
+			rows = rows[1024:]
+		} else {
+			rowsChunk = rows
+			rows = nil
+		}
+
+		err = kvt.fillIndex(ctx, il, rowsChunk)
+		if err != nil {
+			return err
+		}
+	}
+
+	return nil
 }
 
 func (kvr *rows) NumColumns() int {

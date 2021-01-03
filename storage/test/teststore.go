@@ -439,7 +439,7 @@ func testDatabase(t *testing.T, st *storage.Store, dbname sql.Identifier, cmds [
 			if err != nil {
 				t.Errorf("%sLookupTableType(%s) failed with %s", cmd.fln, cmd.name, err)
 			} else {
-				tt, it, found := tt.AddIndex(cmd.idxname, cmd.unique, cmd.key)
+				tt, it, _, found := tt.AddIndex(cmd.idxname, cmd.unique, cmd.key)
 				if cmd.fail {
 					if !found {
 						t.Errorf("%sAddIndex(%s) index %s did not fail", cmd.fln, cmd.name,
@@ -463,7 +463,7 @@ func testDatabase(t *testing.T, st *storage.Store, dbname sql.Identifier, cmds [
 			if err != nil {
 				t.Errorf("%sLookupTableType(%s) failed with %s", cmd.fln, cmd.name, err)
 			} else {
-				tt, rdx := tt.RemoveIndex(cmd.idxname)
+				tt, iidx := tt.RemoveIndex(cmd.idxname)
 				if cmd.fail {
 					if tt != nil {
 						t.Errorf("%sRemoveIndex(%s) index %s did not fail", cmd.fln, cmd.name,
@@ -473,7 +473,7 @@ func testDatabase(t *testing.T, st *storage.Store, dbname sql.Identifier, cmds [
 					t.Errorf("%sRemoveIndex(%s) index %s not found", cmd.fln, cmd.name,
 						cmd.idxname)
 				} else {
-					err = st.RemoveIndex(ctx, state.tx, tn, tt, rdx)
+					err = st.RemoveIndex(ctx, state.tx, tn, tt, iidx)
 					if err != nil {
 						t.Errorf("%sRemoveIndex(%s, %s) failed with %s", cmd.fln, cmd.name,
 							cmd.idxname, err)
@@ -481,19 +481,19 @@ func testDatabase(t *testing.T, st *storage.Store, dbname sql.Identifier, cmds [
 				}
 			}
 		case cmdIndexRows:
-			rdx := -1
+			iidx := -1
 			for idx, it := range state.tt.Indexes() {
 				if it.Name == cmd.idxname {
-					rdx = idx
+					iidx = idx
 					break
 				}
 			}
-			if rdx == -1 {
+			if iidx == -1 {
 				t.Errorf("%sIndexRows(%s): index %s not found", cmd.fln, cmd.name, cmd.idxname)
 				continue
 			}
 
-			idxRows, err := state.tbl.IndexRows(ctx, rdx, cmd.minRow, cmd.maxRow)
+			idxRows, err := state.tbl.IndexRows(ctx, iidx, cmd.minRow, cmd.maxRow)
 			if err != nil {
 				t.Errorf("%stable.IndexRows() failed with %s", cmd.fln, err)
 			} else {
@@ -515,19 +515,19 @@ func testDatabase(t *testing.T, st *storage.Store, dbname sql.Identifier, cmds [
 				}
 			}
 		case cmdIndexDelete:
-			rdx := -1
+			iidx := -1
 			for idx, it := range state.tt.Indexes() {
 				if it.Name == cmd.idxname {
-					rdx = idx
+					iidx = idx
 					break
 				}
 			}
-			if rdx == -1 {
+			if iidx == -1 {
 				t.Errorf("%sIndexRows(%s): index %s not found", cmd.fln, cmd.name, cmd.idxname)
 				continue
 			}
 
-			idxRows, err := state.tbl.IndexRows(ctx, rdx, cmd.minRow, cmd.maxRow)
+			idxRows, err := state.tbl.IndexRows(ctx, iidx, cmd.minRow, cmd.maxRow)
 			if err != nil {
 				t.Errorf("%stable.IndexRows() failed with %s", cmd.fln, err)
 				continue
@@ -564,19 +564,19 @@ func testDatabase(t *testing.T, st *storage.Store, dbname sql.Identifier, cmds [
 				t.Errorf("%sIndexRows.Close() failed with %s", cmd.fln, err)
 			}
 		case cmdIndexUpdate:
-			rdx := -1
+			iidx := -1
 			for idx, it := range state.tt.Indexes() {
 				if it.Name == cmd.idxname {
-					rdx = idx
+					iidx = idx
 					break
 				}
 			}
-			if rdx == -1 {
+			if iidx == -1 {
 				t.Errorf("%sIndexRows(%s): index %s not found", cmd.fln, cmd.name, cmd.idxname)
 				continue
 			}
 
-			idxRows, err := state.tbl.IndexRows(ctx, rdx, cmd.minRow, cmd.maxRow)
+			idxRows, err := state.tbl.IndexRows(ctx, iidx, cmd.minRow, cmd.maxRow)
 			if err != nil {
 				t.Errorf("%stable.IndexRows() failed with %s", cmd.fln, err)
 				continue

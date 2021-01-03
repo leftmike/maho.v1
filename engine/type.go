@@ -144,20 +144,20 @@ func (tt *TableType) makeIndexType(nam sql.Identifier, key []sql.ColumnKey,
 }
 
 func (tt *TableType) AddIndex(idxname sql.Identifier, unique bool,
-	key []sql.ColumnKey) (*TableType, sql.IndexType, bool) {
+	key []sql.ColumnKey) (*TableType, sql.IndexType, int, bool) {
 
 	var it sql.IndexType
 
-	for _, it := range tt.indexes {
+	for idx, it := range tt.indexes {
 		if it.Name == idxname {
-			return nil, it, true
+			return nil, it, idx, true
 		}
 	}
 
 	tt.ver += 1
 	it = tt.makeIndexType(idxname, key, unique, true)
 	tt.indexes = append(tt.indexes, it)
-	return tt, it, false
+	return tt, it, len(tt.indexes) - 1, false
 }
 
 func (tt *TableType) ShowIndex(idxname sql.Identifier) *TableType {

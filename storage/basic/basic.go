@@ -65,7 +65,7 @@ func NewStore(dataDir string) (*storage.Store, error) {
 }
 
 func (_ *basicStore) Table(ctx context.Context, tx engine.Transaction, tn sql.TableName, tid int64,
-	tt *engine.TableType, tl *storage.TableLayout) (engine.Table, error) {
+	tt *engine.TableType, tl *storage.TableLayout) (storage.Table, error) {
 
 	if len(tt.PrimaryKey()) == 0 {
 		panic(fmt.Sprintf("basic: table %s: missing required primary key", tn))
@@ -150,17 +150,13 @@ func (ri rowItem) Less(item btree.Item) bool {
 	return ri.rid == ri2.rid && bytes.Compare(ri.key, ri2.key) < 0
 }
 
-func (bt *table) Rows(ctx context.Context, minRow, maxRow []sql.Value) (engine.Rows, error) {
-	br := &rows{
-		tbl: bt,
-		idx: 0,
-	}
-
+func (bt *table) fetchRows(ctx context.Context, minRow, maxRow []sql.Value) [][]sql.Value {
 	var maxItem btree.Item
 	if maxRow != nil {
 		maxItem = bt.toItem(maxRow)
 	}
 
+	var rows [][]sql.Value
 	rid := (bt.tid << 16) | storage.PrimaryIID
 	bt.tx.tree.AscendGreaterOrEqual(bt.toItem(minRow),
 		func(item btree.Item) bool {
@@ -171,10 +167,19 @@ func (bt *table) Rows(ctx context.Context, minRow, maxRow []sql.Value) (engine.R
 			if ri.rid != rid {
 				return false
 			}
-			br.rows = append(br.rows, append(make([]sql.Value, 0, len(ri.row)), ri.row...))
+			rows = append(rows, append(make([]sql.Value, 0, len(ri.row)), ri.row...))
 			return true
 		})
-	return br, nil
+
+	return rows
+}
+
+func (bt *table) Rows(ctx context.Context, minRow, maxRow []sql.Value) (engine.Rows, error) {
+	return &rows{
+		tbl:  bt,
+		idx:  0,
+		rows: bt.fetchRows(ctx, minRow, maxRow),
+	}, nil
 }
 
 func (bt *table) IndexRows(ctx context.Context, iidx int,
@@ -232,6 +237,26 @@ func (bt *table) Insert(ctx context.Context, rows [][]sql.Value) error {
 			}
 			bt.tx.tree.ReplaceOrInsert(item)
 		}
+	}
+
+	return nil
+}
+
+func (bt *table) FillIndex(ctx context.Context, iidx int) error {
+	indexes := bt.tl.Indexes()
+	if iidx >= len(indexes) {
+		panic(fmt.Sprintf("basic: table: %s: %d indexes: out of range: %d", bt.tn, len(indexes),
+			iidx))
+	}
+	il := indexes[iidx]
+
+	for _, row := range bt.fetchRows(ctx, nil, nil) {
+		item := bt.toIndexItem(row, il)
+		if bt.tx.tree.Has(item) {
+			return fmt.Errorf("basic: %s: %s index: existing row with duplicate key", bt.tn,
+				bt.tl.IndexName(iidx))
+		}
+		bt.tx.tree.ReplaceOrInsert(item)
 	}
 
 	return nil

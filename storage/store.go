@@ -57,8 +57,13 @@ type tableRow struct {
 
 type PersistentStore interface {
 	Table(ctx context.Context, tx engine.Transaction, tn sql.TableName, tid int64,
-		tt *engine.TableType, tl *TableLayout) (engine.Table, error)
+		tt *engine.TableType, tl *TableLayout) (Table, error)
 	Begin(sesid uint64) engine.Transaction
+}
+
+type Table interface {
+	engine.Table
+	FillIndex(ctx context.Context, iidx int) error
 }
 
 type Store struct {
@@ -464,7 +469,7 @@ func (st *Store) validTable(ctx context.Context, tx engine.Transaction, tn sql.T
 }
 
 func (st *Store) lookupTable(ctx context.Context, tx engine.Transaction,
-	tn sql.TableName, wantTbl bool) (engine.Table, *engine.TableType, error) {
+	tn sql.TableName, wantTbl bool) (Table, *engine.TableType, error) {
 
 	rows, err := st.lookupTableRows(ctx, tx, tn)
 	if err != nil {
@@ -688,13 +693,13 @@ func (st *Store) AddIndex(ctx context.Context, tx engine.Transaction, tn sql.Tab
 }
 
 func (st *Store) RemoveIndex(ctx context.Context, tx engine.Transaction, tn sql.TableName,
-	tt *engine.TableType, rdx int) error {
+	tt *engine.TableType, iidx int) error {
 
 	return st.updateLayout(ctx, tx, tn, tt,
 		func(tl *TableLayout) error {
 			indexes := make([]IndexLayout, 0, len(tl.indexes)-1)
 			for idx, il := range tl.indexes {
-				if idx == rdx {
+				if idx == iidx {
 					continue
 				}
 				indexes = append(indexes, il)
@@ -703,6 +708,20 @@ func (st *Store) RemoveIndex(ctx context.Context, tx engine.Transaction, tn sql.
 
 			return nil
 		})
+}
+
+func (st *Store) FillIndex(ctx context.Context, tx engine.Transaction, tn sql.TableName,
+	tt *engine.TableType, iidx int) error {
+
+	tbl, ctt, err := st.lookupTable(ctx, tx, tn, true)
+	if err != nil {
+		return err
+	}
+	if tt.Version() != ctt.Version() {
+		return fmt.Errorf("%s: table %s: conflicting metadata for fill index", st.name, tn)
+	}
+
+	return tbl.FillIndex(ctx, iidx)
 }
 
 func (st *Store) Begin(sesid uint64) engine.Transaction {
