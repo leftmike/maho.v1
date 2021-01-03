@@ -26,7 +26,7 @@ To Do:
 - tests with 1000s to 100000s of rows
 -- generate rows
 -- use sample databases
--- usda.sql: indexes and foreign keys
+-- usda.sql: foreign keys
 
 - kvrows
 -- cleanup proposals

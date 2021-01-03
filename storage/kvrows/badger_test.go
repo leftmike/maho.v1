@@ -139,7 +139,7 @@ func runKVTest(t *testing.T, kv kvrows.KV, cmds []kvCmd) {
 			if updater == nil {
 				panic("commit: updater is nil")
 			}
-			err := updater.Commit()
+			err := updater.Commit(true)
 			if cmd.fail {
 				if err == nil {
 					t.Errorf("%sCommit() did not fail", cmd.fln)

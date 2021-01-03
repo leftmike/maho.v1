@@ -38,7 +38,7 @@ type Updater interface {
 	Iterate(key []byte) (Iterator, error)
 	Get(key []byte, fn func(val []byte) error) error
 	Set(key, val []byte) error
-	Commit() error
+	Commit(sync bool) error
 	Rollback()
 }
 
@@ -220,7 +220,7 @@ func makeStore(kv KV) (*kvStore, bool, error) {
 		upd.Rollback()
 		return nil, false, err
 	}
-	err = upd.Commit()
+	err = upd.Commit(true)
 	if err != nil {
 		return nil, false, err
 	}
@@ -277,7 +277,7 @@ func (kvst *kvStore) setTransactionData(txid uint64, td *TransactionData) error 
 		upd.Rollback()
 		return err
 	}
-	return upd.Commit()
+	return upd.Commit(false)
 }
 
 func (kvst *kvStore) Begin(sesid uint64) engine.Transaction {
@@ -334,7 +334,7 @@ func (kvst *kvStore) commit(ctx context.Context, txid uint64) error {
 	if err == nil {
 		err = upd.Set(versionKey, util.EncodeUint64(make([]byte, 0, 8), ver))
 		if err == nil {
-			err = upd.Commit()
+			err = upd.Commit(true)
 		}
 	}
 	if err != nil {
@@ -362,7 +362,7 @@ func (kvst *kvStore) rollback(txid uint64) error {
 		if err != nil {
 			upd.Rollback()
 		} else {
-			err = upd.Commit()
+			err = upd.Commit(false)
 		}
 	}
 
@@ -736,7 +736,7 @@ func (kvt *table) Insert(ctx context.Context, rows [][]sql.Value) error {
 		}
 	}
 
-	return upd.Commit()
+	return upd.Commit(false)
 }
 
 func (kvt *table) fillIndex(ctx context.Context, il storage.IndexLayout,
@@ -756,7 +756,7 @@ func (kvt *table) fillIndex(ctx context.Context, il storage.IndexLayout,
 		}
 	}
 
-	return upd.Commit()
+	return upd.Commit(false)
 }
 
 func (kvt *table) FillIndex(ctx context.Context, iidx int) error {
@@ -832,7 +832,7 @@ func (kvt *table) deleteRow(ctx context.Context, row []sql.Value) error {
 		}
 	}
 
-	return upd.Commit()
+	return upd.Commit(false)
 }
 
 func (kvr *rows) Delete(ctx context.Context) error {
@@ -909,7 +909,7 @@ func (kvt *table) updateRow(ctx context.Context, updatedCols []int,
 		return err
 	}
 
-	return upd.Commit()
+	return upd.Commit(false)
 }
 
 func (kvr *rows) Update(ctx context.Context, updatedCols []int, updateRow []sql.Value) error {

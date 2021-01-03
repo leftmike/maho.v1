@@ -116,8 +116,12 @@ func (pu pebbleUpdater) Set(key, val []byte) error {
 	return pu.batch.Set(key, val, nil)
 }
 
-func (pu pebbleUpdater) Commit() error {
-	err := pu.batch.Commit(nil)
+func (pu pebbleUpdater) Commit(sync bool) error {
+	opt := pebble.NoSync
+	if sync {
+		opt = pebble.Sync
+	}
+	err := pu.batch.Commit(opt)
 	pu.kv.mutex.Unlock()
 	return err
 }

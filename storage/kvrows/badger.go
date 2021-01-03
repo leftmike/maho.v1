@@ -123,7 +123,7 @@ func (bu badgerUpdater) Set(key, val []byte) error {
 	return bu.tx.Set(key, val)
 }
 
-func (bu badgerUpdater) Commit() error {
+func (bu badgerUpdater) Commit(sync bool) error {
 	err := bu.tx.Commit()
 	bu.kv.mutex.Unlock()
 	return err
