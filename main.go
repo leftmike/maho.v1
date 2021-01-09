@@ -46,7 +46,11 @@ To Do:
 -- SELECT: track where columns come from, maybe as part of Plan
 -- DELETE, INSERT, UPDATE, VALUES
 
-- ALTER TABLE ONLY table ADD CONSTRAINT constraint FOREIGN KEY ...
+- ALTER TABLE [IF EXISTS] [ONLY] table action [, ....]
+- action = ADD [CONSTRAINT constraint] FOREIGN KEY ...
+- action = DROP CONSTRAINT [IF EXISTS] constraint
+- action = ALTER [COLUMN] column DROP DEFAULT
+- action = ALTER [COLUMN] column DROP NOT NULL
 
 - foreign key references
 -- need read lock on referenced keys

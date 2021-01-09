@@ -269,7 +269,7 @@ func (stmt *CreateTable) Execute(ctx context.Context, tx sql.Transaction) (int64
 			return -1, err
 		}
 
-		_, err = fk.execute(ctx, tx)
+		err = fk.execute(ctx, tx)
 		if err != nil {
 			return -1, err
 		}

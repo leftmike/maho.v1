@@ -6,6 +6,7 @@ import (
 	"strings"
 	"testing"
 
+	"github.com/leftmike/maho/evaluate"
 	"github.com/leftmike/maho/evaluate/datadef"
 	"github.com/leftmike/maho/evaluate/expr"
 	"github.com/leftmike/maho/evaluate/misc"
@@ -531,7 +532,6 @@ constraint c1_primary unique (c2, c1))`,
 				Constraints: []datadef.Constraint{
 					{
 						Type:   sql.CheckConstraint,
-						Name:   sql.ID("check_1"),
 						ColNum: 0,
 						Check: &expr.Binary{
 							Op:    expr.GreaterThanOp,
@@ -541,7 +541,6 @@ constraint c1_primary unique (c2, c1))`,
 					},
 					{
 						Type:   sql.CheckConstraint,
-						Name:   sql.ID("check_2"),
 						ColNum: -1,
 						Check: &expr.Binary{
 							Op:    expr.LessThanOp,
@@ -551,7 +550,6 @@ constraint c1_primary unique (c2, c1))`,
 					},
 					{
 						Type:   sql.CheckConstraint,
-						Name:   sql.ID("check_3"),
 						ColNum: 1,
 						Check: &expr.Binary{
 							Op:    expr.GreaterThanOp,
@@ -586,17 +584,11 @@ c2 int check(true))`,
 					},
 					{
 						Type:   sql.CheckConstraint,
-						Name:   sql.ID("check_3"),
 						ColNum: 1,
 						Check:  expr.True(),
 					},
 				},
 			},
-		},
-		{
-			sql: `create table t (c1 int constraint check_1 not null constraint check_2 default 1,
-c2 int constraint check_1 check(true))`,
-			fail: true,
 		},
 		{
 			sql: `create table t (c1 int references t2 on update cascade,
@@ -611,13 +603,11 @@ c2 int references t3 (p1) on update set default on delete set null)`,
 				ColumnDefaults: []expr.Expr{nil, nil},
 				ForeignKeys: []*datadef.ForeignKey{
 					&datadef.ForeignKey{
-						Name:     sql.ID("foreign_1"),
 						FKCols:   []sql.Identifier{sql.ID("c1")},
 						RefTable: sql.TableName{Table: sql.ID("t2")},
 						OnUpdate: sql.Cascade,
 					},
 					&datadef.ForeignKey{
-						Name:     sql.ID("foreign_2"),
 						FKCols:   []sql.Identifier{sql.ID("c2")},
 						RefTable: sql.TableName{Table: sql.ID("t3")},
 						RefCols:  []sql.Identifier{sql.ID("p1")},
@@ -650,7 +640,6 @@ constraint fkey foreign key (c3, c4, c2) references t3 (p1, p2, p3) on update no
 				},
 				ForeignKeys: []*datadef.ForeignKey{
 					&datadef.ForeignKey{
-						Name:     sql.ID("foreign_2"),
 						FKCols:   []sql.Identifier{sql.ID("c1"), sql.ID("c2")},
 						RefTable: sql.TableName{Table: sql.ID("t2")},
 						OnDelete: sql.Cascade,
@@ -1598,13 +1587,13 @@ func TestUpdate(t *testing.T) {
 func TestCreateDatabase(t *testing.T) {
 	cases := []struct {
 		sql  string
-		stmt datadef.CreateDatabase
+		stmt evaluate.Stmt
 		fail bool
 	}{
 		{sql: "create database", fail: true},
 		{
 			sql: "create database test",
-			stmt: datadef.CreateDatabase{
+			stmt: &datadef.CreateDatabase{
 				Database: sql.ID("test"),
 			},
 		},
@@ -1616,7 +1605,7 @@ func TestCreateDatabase(t *testing.T) {
 		{sql: "create database test with path = 'string' engine", fail: true},
 		{
 			sql: "create database test with path = 'string' engine 'fast'",
-			stmt: datadef.CreateDatabase{
+			stmt: &datadef.CreateDatabase{
 				Database: sql.ID("test"),
 				Options: map[sql.Identifier]string{
 					sql.UnquotedID("path"):   "string",
@@ -1637,8 +1626,59 @@ func TestCreateDatabase(t *testing.T) {
 			if err != nil {
 				t.Errorf("Parse(%q) failed with %s", c.sql, err)
 			} else {
-				cd, ok := cd.(*datadef.CreateDatabase)
-				if !ok || !reflect.DeepEqual(&c.stmt, cd) {
+				if !reflect.DeepEqual(c.stmt, cd) {
+					t.Errorf("Parse(%q) got %s want %s", c.sql, cd.String(), c.stmt.String())
+				}
+			}
+		}
+	}
+}
+
+func TestAlterTable(t *testing.T) {
+	cases := []struct {
+		sql  string
+		stmt evaluate.Stmt
+		fail bool
+	}{
+		{sql: "alter table tbl", fail: true},
+		{sql: "alter table exists tbl", fail: true},
+		{
+			sql: "alter table tbl add foreign key (c1, c2) references rtbl",
+			stmt: &datadef.AddConstraint{
+				Table:    sql.TableName{Table: sql.ID("tbl")},
+				IfExists: false,
+				ForeignKey: &datadef.ForeignKey{
+					FKCols:   []sql.Identifier{sql.ID("c1"), sql.ID("c2")},
+					RefTable: sql.TableName{Table: sql.ID("rtbl")},
+				},
+			},
+		},
+		{
+			sql: "alter table tbl add constraint con foreign key (c1) references rtbl",
+			stmt: &datadef.AddConstraint{
+				Table:    sql.TableName{Table: sql.ID("tbl")},
+				IfExists: false,
+				ForeignKey: &datadef.ForeignKey{
+					Name:     sql.ID("con"),
+					FKCols:   []sql.Identifier{sql.ID("c1")},
+					RefTable: sql.TableName{Table: sql.ID("rtbl")},
+				},
+			},
+		},
+	}
+
+	for i, c := range cases {
+		p := NewParser(strings.NewReader(c.sql), fmt.Sprintf("tests[%d]", i))
+		cd, err := p.Parse()
+		if c.fail {
+			if err == nil {
+				t.Errorf("Parse(%q) did not fail", c.sql)
+			}
+		} else {
+			if err != nil {
+				t.Errorf("Parse(%q) failed with %s", c.sql, err)
+			} else {
+				if !reflect.DeepEqual(c.stmt, cd) {
 					t.Errorf("Parse(%q) got %s want %s", c.sql, cd.String(), c.stmt.String())
 				}
 			}

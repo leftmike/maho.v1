@@ -58,7 +58,9 @@ const (
 
 const (
 	ACTION Identifier = -(iota + 1)
+	ADD
 	ALL
+	ALTER
 	AND
 	ANY
 	AS
@@ -159,7 +161,9 @@ var knownKeywords = map[string]struct {
 	reserved bool
 }{
 	"ACTION":      {ACTION, true},
+	"ADD":         {ADD, true},
 	"ALL":         {ALL, true},
+	"ALTER":       {ALTER, true},
 	"AND":         {AND, true},
 	"ANY":         {ANY, true},
 	"AS":          {AS, true},

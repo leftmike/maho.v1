@@ -41,6 +41,19 @@ Run maho: `maho -ssh=1`. And then in another terminal, connect using ssh:
 
 ## Supported SQL
 ```
+ALTER TABLE [IF EXISTS] [ONLY] table action [',' ...]
+action =
+      ADD [CONSTRAINT constraint] table_constraint
+    | DROP CONSTRAINT [IF EXISTS] constraint
+    | ALTER [COLUMN] column DROP DEFAULT
+    | ALTER [COLUMN] column DROP NOT NULL
+table_constraint = FOREIGN KEY columns REFERENCES [[database '.'] schema '.'] table [columns]
+    [ON DELETE referential_action] [ON UPDATE referential_action]
+referential_action = NO ACTION | RESTRICT | CASCADE | SET NULL | SET DEFAULT
+columns = '(' column [',' ...] ')'
+```
+
+```
 BEGIN
 ```
 

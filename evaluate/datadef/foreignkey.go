@@ -154,21 +154,21 @@ func (fk *ForeignKey) Prepare(fktt, rtt sql.TableType) ([]int, sql.Identifier, e
 	return fkCols, ridx, nil
 }
 
-func (fk *ForeignKey) execute(ctx context.Context, tx sql.Transaction) (int64, error) {
+func (fk *ForeignKey) execute(ctx context.Context, tx sql.Transaction) error {
 	fktt, err := tx.LookupTableType(ctx, fk.FKTable)
 	if err != nil {
-		return -1, err
+		return err
 	}
 	rtt, err := tx.LookupTableType(ctx, fk.RefTable)
 	if err != nil {
-		return -1, err
+		return err
 	}
 
 	fkCols, ridx, err := fk.Prepare(fktt, rtt)
 	if err != nil {
-		return -1, err
+		return err
 	}
 
-	return -1, tx.AddForeignKey(ctx, fk.Name, fk.FKTable, fkCols, fk.RefTable, ridx,
-		fk.OnDelete, fk.OnUpdate)
+	return tx.AddForeignKey(ctx, fk.Name, fk.FKTable, fkCols, fk.RefTable, ridx, fk.OnDelete,
+		fk.OnUpdate)
 }

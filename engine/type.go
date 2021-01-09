@@ -192,6 +192,51 @@ func (tt *TableType) RemoveIndex(idxname sql.Identifier) (*TableType, int) {
 	return tt, rdx
 }
 
+func (tt *TableType) duplicateConstraint(cn sql.Identifier) bool {
+	if cn == sql.PRIMARY_QUOTED {
+		return true
+	}
+
+	for _, con := range tt.constraints {
+		if con.name == cn {
+			return true
+		}
+	}
+
+	for _, ck := range tt.checks {
+		if ck.name == cn {
+			return true
+		}
+	}
+
+	for _, fk := range tt.foreignKeys {
+		if fk.name == cn {
+			return true
+		}
+	}
+
+	return false
+}
+
+func (tt *TableType) constraintName(tn sql.TableName, con sql.Identifier,
+	base string) (sql.Identifier, error) {
+
+	if con == 0 {
+		cnt := 1
+		for {
+			con := sql.ID(fmt.Sprintf("%s%d", base, cnt))
+			if !tt.duplicateConstraint(con) {
+				return con, nil
+			}
+			cnt += 1
+		}
+	} else if tt.duplicateConstraint(con) {
+		return 0, fmt.Errorf("engine: table: %s: duplicate constraint name: %s", tn, con)
+	}
+
+	return con, nil
+}
+
 func generateTableName(tn sql.TableName) string {
 	return fmt.Sprintf(`"%s"."%s"."%s"`, tn.Database, tn.Schema, tn.Table)
 }
@@ -278,7 +323,12 @@ func generateSetSQL(fktn sql.TableName, fkCols []int, fktt *TableType, setNull b
 }
 
 func addForeignKey(con sql.Identifier, fktn sql.TableName, fkCols []int, fktt *TableType,
-	rtn sql.TableName, ridx sql.Identifier, rtt *TableType, onDel, onUpd sql.RefAction) {
+	rtn sql.TableName, ridx sql.Identifier, rtt *TableType, onDel, onUpd sql.RefAction) error {
+
+	con, err := fktt.constraintName(fktn, con, "foreign_")
+	if err != nil {
+		return err
+	}
 
 	fktt.foreignKeys = append(fktt.foreignKeys,
 		foreignKey{
@@ -402,6 +452,8 @@ func addForeignKey(con sql.Identifier, fktn sql.TableName, fkCols []int, fktt *T
 	if rtt != fktt {
 		rtt.ver += 1
 	}
+
+	return nil
 }
 
 func encodeColumnKey(key []sql.ColumnKey) []*ColumnKey {

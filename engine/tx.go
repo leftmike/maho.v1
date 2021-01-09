@@ -182,9 +182,14 @@ func (tx *transaction) CreateTable(ctx context.Context, tn sql.TableName, cols [
 	tt := MakeTableType(cols, colTypes, colDefaults, primary)
 	for _, con := range cons {
 		if con.Type == sql.CheckConstraint {
+			cn, err := tt.constraintName(tn, con.Name, "check_")
+			if err != nil {
+				return err
+			}
+
 			tt.checks = append(tt.checks,
 				checkConstraint{
-					name:      con.Name,
+					name:      cn,
 					check:     con.Check,
 					checkExpr: con.CheckExpr,
 				})
@@ -264,7 +269,10 @@ func (tx *transaction) AddForeignKey(ctx context.Context, con sql.Identifier, fk
 		return err
 	}
 
-	addForeignKey(con, fktn, fkCols, fktt, rtn, ridx, rtt, onDel, onUpd)
+	err = addForeignKey(con, fktn, fkCols, fktt, rtn, ridx, rtt, onDel, onUpd)
+	if err != nil {
+		return err
+	}
 
 	err = tx.e.st.UpdateType(ctx, tx.tx, fktn, fktt)
 	if err != nil {

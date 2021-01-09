@@ -250,6 +250,7 @@ func (p *parser) parseStmt() evaluate.Stmt {
 	}
 
 	switch p.expectReserved(
+		sql.ALTER,
 		sql.BEGIN,
 		sql.COMMIT,
 		sql.COPY,
@@ -270,6 +271,10 @@ func (p *parser) parseStmt() evaluate.Stmt {
 		sql.USE,
 		sql.VALUES,
 	) {
+	case sql.ALTER:
+		// ALTER TABLE ...
+		p.expectReserved(sql.TABLE)
+		return p.parseAlterTable()
 	case sql.BEGIN:
 		// BEGIN
 		return &evaluate.Begin{}
@@ -515,6 +520,40 @@ func (p *parser) parseOnActions(fk *datadef.ForeignKey) *datadef.ForeignKey {
 	return fk
 }
 
+func (p *parser) parseForeignKey(cn sql.Identifier) *datadef.ForeignKey {
+	var cols []sql.Identifier
+	p.expectTokens(token.LParen)
+	for {
+		cols = append(cols, p.expectIdentifier("expected a column name"))
+		if p.maybeToken(token.RParen) {
+			break
+		}
+		p.expectTokens(token.Comma)
+	}
+
+	p.expectReserved(sql.REFERENCES)
+
+	rtn := p.parseTableName()
+	var refCols []sql.Identifier
+	if p.maybeToken(token.LParen) {
+		for {
+			refCols = append(refCols, p.expectIdentifier("expected a column name"))
+			if p.maybeToken(token.RParen) {
+				break
+			}
+			p.expectTokens(token.Comma)
+		}
+	}
+
+	return p.parseOnActions(
+		&datadef.ForeignKey{
+			Name:     cn,
+			FKCols:   cols,
+			RefTable: rtn,
+			RefCols:  refCols,
+		})
+}
+
 func (p *parser) parseCreateDetails(s *datadef.CreateTable) {
 	/*
 		CREATE TABLE [[database '.'] schema '.'] table
@@ -551,46 +590,14 @@ func (p *parser) parseCreateDetails(s *datadef.CreateTable) {
 			s.Constraints = append(s.Constraints,
 				datadef.Constraint{
 					Type:   sql.CheckConstraint,
-					Name:   p.makeConstraintName(cn, s, "check_"),
+					Name:   cn,
 					ColNum: -1,
 					Check:  p.parseExpr(),
 				})
 			p.expectTokens(token.RParen)
 		} else if p.optionalReserved(sql.FOREIGN) {
 			p.expectReserved(sql.KEY)
-
-			var cols []sql.Identifier
-			p.expectTokens(token.LParen)
-			for {
-				cols = append(cols, p.expectIdentifier("expected a column name"))
-				if p.maybeToken(token.RParen) {
-					break
-				}
-				p.expectTokens(token.Comma)
-			}
-
-			p.expectReserved(sql.REFERENCES)
-
-			rtn := p.parseTableName()
-			var refCols []sql.Identifier
-			if p.maybeToken(token.LParen) {
-				for {
-					refCols = append(refCols, p.expectIdentifier("expected a column name"))
-					if p.maybeToken(token.RParen) {
-						break
-					}
-					p.expectTokens(token.Comma)
-				}
-			}
-
-			s.ForeignKeys = append(s.ForeignKeys,
-				p.parseOnActions(
-					&datadef.ForeignKey{
-						Name:     p.makeConstraintName(cn, s, "foreign_"),
-						FKCols:   cols,
-						RefTable: rtn,
-						RefCols:  refCols,
-					}))
+			s.ForeignKeys = append(s.ForeignKeys, p.parseForeignKey(cn))
 		} else if cn != 0 {
 			p.error("CONSTRAINT name specified without a constraint")
 		} else {
@@ -734,39 +741,6 @@ func (p *parser) addColumnConstraint(s *datadef.CreateTable, ct sql.ConstraintTy
 		})
 }
 
-func duplicateName(cn sql.Identifier, s *datadef.CreateTable) bool {
-	for _, c := range s.Constraints {
-		if c.Name == cn {
-			return true
-		}
-	}
-	for _, fk := range s.ForeignKeys {
-		if fk.Name == cn {
-			return true
-		}
-	}
-	return false
-}
-
-func (p *parser) makeConstraintName(cn sql.Identifier, s *datadef.CreateTable,
-	base string) sql.Identifier {
-
-	if cn == 0 {
-		cnt := 1
-		for {
-			cn = sql.ID(fmt.Sprintf("%s%d", base, cnt))
-			if !duplicateName(cn, s) {
-				break
-			}
-			cnt += 1
-		}
-	} else if duplicateName(cn, s) {
-		p.error(fmt.Sprintf("duplicate constraint name: %s", cn))
-	}
-
-	return cn
-}
-
 func (p *parser) parseColumn(s *datadef.CreateTable) {
 	/*
 		column data_type [[CONSTRAINT constraint] column_constraint]
@@ -843,7 +817,7 @@ func (p *parser) parseColumn(s *datadef.CreateTable) {
 			s.Constraints = append(s.Constraints,
 				datadef.Constraint{
 					Type:   sql.CheckConstraint,
-					Name:   p.makeConstraintName(cn, s, "check_"),
+					Name:   cn,
 					ColNum: len(s.Columns) - 1,
 					Check:  p.parseExpr(),
 				})
@@ -859,7 +833,7 @@ func (p *parser) parseColumn(s *datadef.CreateTable) {
 			s.ForeignKeys = append(s.ForeignKeys,
 				p.parseOnActions(
 					&datadef.ForeignKey{
-						Name:     p.makeConstraintName(cn, s, "foreign_"),
+						Name:     cn,
 						FKCols:   []sql.Identifier{nam},
 						RefTable: rtn,
 						RefCols:  refCols,
@@ -875,10 +849,54 @@ func (p *parser) parseColumn(s *datadef.CreateTable) {
 	s.ColumnDefaults = append(s.ColumnDefaults, dflt)
 }
 
+func (p *parser) parseAlterTable() evaluate.Stmt {
+	// ALTER TABLE [IF EXISTS] table action [',' ...]
+	// action =
+	//      ADD [CONSTRAINT constraint] table_constraint
+	//    | DROP CONSTRAINT [IF EXISTS] constraint
+	//    | ALTER [COLUMN] column DROP DEFAULT
+	//    | ALTER [COLUMN] column DROP NOT NULL
+	// table_constraint = FOREIGN KEY columns
+	//    REFERENCES [[database '.'] schema '.'] table [columns]
+	//    [ON DELETE referential_action] [ON UPDATE referential_action]
+	// referential_action = NO ACTION | RESTRICT | CASCADE | SET NULL | SET DEFAULT
+	// columns = '(' column [',' ...] ')'
+
+	var ifExists bool
+	if p.optionalReserved(sql.IF) {
+		p.expectReserved(sql.EXISTS)
+		ifExists = true
+	}
+	tn := p.parseTableName()
+
+	switch p.expectReserved(sql.ADD, sql.DROP, sql.ALTER) {
+	case sql.ADD:
+		var cn sql.Identifier
+		if p.optionalReserved(sql.CONSTRAINT) {
+			cn = p.expectIdentifier("expected a constraint name")
+		}
+
+		p.expectReserved(sql.FOREIGN)
+		p.expectReserved(sql.KEY)
+
+		return &datadef.AddConstraint{
+			Table:      tn,
+			IfExists:   ifExists,
+			ForeignKey: p.parseForeignKey(cn),
+		}
+	case sql.DROP:
+		// XXX
+	case sql.ALTER:
+		// XXX
+	}
+
+	return nil
+}
+
 func (p *parser) parseCreateIndex(unique bool) evaluate.Stmt {
 	// CREATE [UNIQUE] INDEX [IF NOT EXISTS] index ON table
 	//    [USING btree]
-	//     '(' column [ASC | DESC] [, ...] ')'
+	//    '(' column [ASC | DESC] [, ...] ')'
 	var s datadef.CreateIndex
 
 	if p.optionalReserved(sql.IF) {
