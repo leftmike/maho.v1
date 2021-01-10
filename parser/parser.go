@@ -930,7 +930,7 @@ func (p *parser) parseDelete() evaluate.Stmt {
 }
 
 func (p *parser) parseDropTable() evaluate.Stmt {
-	// DROP TABLE [IF EXISTS] [database '.' ] table [',' ...]
+	// DROP TABLE [IF EXISTS] [database '.' ] table [',' ...] [CASCADE | RESTRICT]
 	var s datadef.DropTable
 	if p.optionalReserved(sql.IF) {
 		p.expectReserved(sql.EXISTS)
@@ -941,6 +941,13 @@ func (p *parser) parseDropTable() evaluate.Stmt {
 	for p.maybeToken(token.Comma) {
 		s.Tables = append(s.Tables, p.parseTableName())
 	}
+
+	if p.optionalReserved(sql.CASCADE) {
+		s.Cascade = true
+	} else {
+		p.optionalReserved(sql.RESTRICT)
+	}
+
 	return &s
 }
 

@@ -47,10 +47,13 @@ To Do:
 -- DELETE, INSERT, UPDATE, VALUES
 
 - ALTER TABLE [IF EXISTS] [ONLY] table action [, ....]
-- action = ADD [CONSTRAINT constraint] FOREIGN KEY ...
-- action = DROP CONSTRAINT [IF EXISTS] constraint
-- action = ALTER [COLUMN] column DROP DEFAULT
-- action = ALTER [COLUMN] column DROP NOT NULL
+-- handle IF EXISTS
+-- test ADD FOREIGN KEY
+-- action = ADD [CONSTRAINT constraint] FOREIGN KEY ...
+-- validate constraint
+-- action = DROP CONSTRAINT [IF EXISTS] constraint
+-- action = ALTER [COLUMN] column DROP DEFAULT
+-- action = ALTER [COLUMN] column DROP NOT NULL
 
 - foreign key references
 -- need read lock on referenced keys
@@ -59,7 +62,6 @@ To Do:
 -- use index on foreign key table if available
 
 - constraints
--- DROP TABLE: CASCADE: to remove foreign key constraint of another table
 -- drop CHECK constraint: use ALTER TABLE table DROP CONSTRAINT constraint
 -- drop DEFAULT: use ALTER TABLE table ALTER COLUMN column DROP DEFAULT (or DROP CONSTRAINT)
 -- drop FOREIGN KEY: use ALTER TABLE table DROP CONSTRAINT constraint

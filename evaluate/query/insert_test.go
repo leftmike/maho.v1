@@ -293,7 +293,7 @@ func testInsert(t *testing.T, e sql.Engine, ses *evaluate.Session, tn sql.TableN
 			}
 		}
 
-		err = tx.DropTable(ctx, tn, false)
+		err = tx.DropTable(ctx, tn, false, false)
 		if err != nil {
 			t.Error(err)
 			return

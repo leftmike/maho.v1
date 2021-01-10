@@ -588,9 +588,7 @@ func (st *Store) CreateTable(ctx context.Context, tx engine.Transaction, tn sql.
 	return st.createTable(ctx, tx, tn, tid, tt)
 }
 
-func (st *Store) DropTable(ctx context.Context, tx engine.Transaction, tn sql.TableName,
-	ifExists bool) error {
-
+func (st *Store) DropTable(ctx context.Context, tx engine.Transaction, tn sql.TableName) error {
 	err := st.updateSchema(ctx, tx, tn.SchemaName(), -1)
 	if err != nil {
 		return err
@@ -605,9 +603,6 @@ func (st *Store) DropTable(ctx context.Context, tx engine.Transaction, tn sql.Ta
 	var tr tableRow
 	err = rows.Next(ctx, &tr)
 	if err == io.EOF {
-		if ifExists {
-			return nil
-		}
 		return fmt.Errorf("%s: table %s not found", st.name, tn)
 	} else if err != nil {
 		return err

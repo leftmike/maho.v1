@@ -10,6 +10,7 @@ import (
 
 type DropTable struct {
 	IfExists bool
+	Cascade  bool
 	Tables   []sql.TableName
 }
 
@@ -23,6 +24,9 @@ func (stmt *DropTable) String() string {
 			s += ", "
 		}
 		s += tbl.String()
+	}
+	if stmt.Cascade {
+		s += " CASCADE"
 	}
 	return s
 }
@@ -42,7 +46,7 @@ func (_ *DropTable) Tag() string {
 
 func (stmt *DropTable) Execute(ctx context.Context, tx sql.Transaction) (int64, error) {
 	for _, tn := range stmt.Tables {
-		err := tx.DropTable(ctx, tn, stmt.IfExists)
+		err := tx.DropTable(ctx, tn, stmt.IfExists, stmt.Cascade)
 		if err != nil {
 			return -1, err
 		}

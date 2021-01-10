@@ -225,7 +225,49 @@ func (tx *transaction) CreateTable(ctx context.Context, tn sql.TableName, cols [
 	return tx.e.st.CreateTable(ctx, tx.tx, tn, tt, ifNotExists)
 }
 
-func (tx *transaction) DropTable(ctx context.Context, tn sql.TableName, ifExists bool) error {
+func (tx *transaction) dropForeignRef(ctx context.Context, con sql.Identifier,
+	fktn, rtn sql.TableName) error {
+
+	rtt, err := tx.e.st.LookupTableType(ctx, tx.tx, rtn)
+	if err != nil {
+		return err
+	}
+
+	rtt = rtt.dropForeignRef(con, fktn)
+	err = tx.e.st.UpdateType(ctx, tx.tx, rtn, rtt)
+	if err != nil {
+		return err
+	}
+	delete(tx.tables, rtn)
+	delete(tx.tableTypes, rtn)
+
+	tx.tx.NextStmt()
+	return nil
+}
+
+func (tx *transaction) dropForeignKey(ctx context.Context, con sql.Identifier,
+	fktn, rtn sql.TableName) error {
+
+	fktt, err := tx.e.st.LookupTableType(ctx, tx.tx, fktn)
+	if err != nil {
+		return err
+	}
+
+	fktt = fktt.dropForeignKey(con, rtn)
+	err = tx.e.st.UpdateType(ctx, tx.tx, fktn, fktt)
+	if err != nil {
+		return err
+	}
+	delete(tx.tables, fktn)
+	delete(tx.tableTypes, fktn)
+
+	tx.tx.NextStmt()
+	return nil
+}
+
+func (tx *transaction) DropTable(ctx context.Context, tn sql.TableName, ifExists,
+	cascade bool) error {
+
 	if tn.Database == sql.SYSTEM {
 		return fmt.Errorf("engine: database %s may not be modified", tn.Database)
 	}
@@ -233,7 +275,35 @@ func (tx *transaction) DropTable(ctx context.Context, tn sql.TableName, ifExists
 		return fmt.Errorf("engine: schema %s may not be modified", tn.Schema)
 	}
 
-	err := tx.e.st.DropTable(ctx, tx.tx, tn, ifExists)
+	tt, err := tx.e.st.LookupTableType(ctx, tx.tx, tn)
+	if err != nil {
+		if ifExists {
+			return nil
+		}
+		return err
+	}
+
+	for _, fk := range tt.foreignKeys {
+		err = tx.dropForeignRef(ctx, fk.name, tn, fk.refTable)
+		if err != nil {
+			return err
+		}
+	}
+
+	if len(tt.foreignRefs) > 0 {
+		if !cascade {
+			return fmt.Errorf("engine: table %s: existing foreign references", tn)
+		}
+
+		for _, fr := range tt.foreignRefs {
+			err = tx.dropForeignKey(ctx, fr.name, fr.tn, tn)
+			if err != nil {
+				return err
+			}
+		}
+	}
+
+	err = tx.e.st.DropTable(ctx, tx.tx, tn)
 	if err != nil {
 		return err
 	}

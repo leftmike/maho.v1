@@ -112,7 +112,6 @@ var (
 		[]storeCmd{
 			{fln: fln(), cmd: cmdBegin},
 			{fln: fln(), cmd: cmdLookupTable, name: sql.ID("tbl2"), fail: true},
-			{fln: fln(), cmd: cmdDropTable, name: sql.ID("tbl2"), ifExists: true},
 			{fln: fln(), cmd: cmdLookupTable, name: sql.ID("tbl2"), fail: true},
 			{fln: fln(), cmd: cmdCommit},
 		},

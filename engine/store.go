@@ -48,7 +48,7 @@ type store interface {
 		error)
 	CreateTable(ctx context.Context, tx Transaction, tn sql.TableName, tt *TableType,
 		ifNotExists bool) error
-	DropTable(ctx context.Context, tx Transaction, tn sql.TableName, ifExists bool) error
+	DropTable(ctx context.Context, tx Transaction, tn sql.TableName) error
 	UpdateType(ctx context.Context, tx Transaction, tn sql.TableName, tt *TableType) error
 
 	AddIndex(ctx context.Context, tx Transaction, tn sql.TableName, tt *TableType,

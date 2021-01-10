@@ -78,8 +78,8 @@ func (st *testStore) CreateTable(ctx context.Context, tx engine.Transaction, tn 
 	return nil
 }
 
-func (st *testStore) DropTable(ctx context.Context, tx engine.Transaction, tn sql.TableName,
-	ifExists bool) error {
+func (st *testStore) DropTable(ctx context.Context, tx engine.Transaction,
+	tn sql.TableName) error {
 
 	st.t.Error("DropTable should never be called")
 	return nil

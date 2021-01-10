@@ -104,6 +104,20 @@ func (tt *TableType) addTrigger(events int64, trig sql.Trigger) {
 	tt.events |= events
 }
 
+func (tt *TableType) dropTrigger(dfn func(trig sql.Trigger) bool) int {
+	var triggers []trigger
+	dropped := 0
+	for _, trig := range tt.triggers {
+		if dfn(trig.trig) {
+			dropped += 1
+		} else {
+			triggers = append(triggers, trig)
+		}
+	}
+	tt.triggers = triggers
+	return dropped
+}
+
 func addColumn(cols []int, num int) []int {
 	for _, col := range cols {
 		if col == num {
@@ -454,6 +468,54 @@ func addForeignKey(con sql.Identifier, fktn sql.TableName, fkCols []int, fktt *T
 	}
 
 	return nil
+}
+
+func (tt *TableType) dropForeignRef(con sql.Identifier, fktn sql.TableName) *TableType {
+	var foreignRefs []foreignRef
+	for _, fr := range tt.foreignRefs {
+		if fr.tn == fktn && fr.name == con {
+			dropped := tt.dropTrigger(
+				func(trig sql.Trigger) bool {
+					if fkt, ok := trig.(*fkTrigger); ok && fkt.con == con && fkt.fktn == fktn {
+						return true
+					}
+					return false
+				})
+			if dropped == 0 {
+				panic(fmt.Sprintf("engine: no foreign refs to table %s dropped", fktn))
+			}
+		} else {
+			foreignRefs = append(foreignRefs, fr)
+		}
+	}
+	tt.foreignRefs = foreignRefs
+
+	tt.ver += 1
+	return tt
+}
+
+func (tt *TableType) dropForeignKey(con sql.Identifier, rtn sql.TableName) *TableType {
+	var foreignKeys []foreignKey
+	for _, fk := range tt.foreignKeys {
+		if fk.refTable == rtn && fk.name == con {
+			dropped := tt.dropTrigger(
+				func(trig sql.Trigger) bool {
+					if fkt, ok := trig.(*fkTrigger); ok && fkt.con == con && fkt.rtn == rtn {
+						return true
+					}
+					return false
+				})
+			if dropped == 0 {
+				panic(fmt.Sprintf("engine: no foreign keys to table %s dropped", rtn))
+			}
+		} else {
+			foreignKeys = append(foreignKeys, fk)
+		}
+	}
+	tt.foreignKeys = foreignKeys
+
+	tt.ver += 1
+	return tt
 }
 
 func encodeColumnKey(key []sql.ColumnKey) []*ColumnKey {

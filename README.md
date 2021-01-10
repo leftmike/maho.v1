@@ -144,7 +144,7 @@ DROP SCHEMA [IF EXISTS] [database '.'] schema
 ```
 
 ```
-DROP TABLE [IF EXISTS] [[database '.'] schema '.'] table [',' ...]
+DROP TABLE [IF EXISTS] [[database '.'] schema '.'] table [',' ...] [CASCADE | RESTRICT]
 ```
 
 ```

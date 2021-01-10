@@ -326,8 +326,7 @@ func testDatabase(t *testing.T, st *storage.Store, dbname sql.Identifier, cmds [
 			}
 			state.tx.NextStmt()
 		case cmdDropTable:
-			err := st.DropTable(ctx, state.tx, sql.TableName{dbname, scname, cmd.name},
-				cmd.ifExists)
+			err := st.DropTable(ctx, state.tx, sql.TableName{dbname, scname, cmd.name})
 			if cmd.fail {
 				if err == nil {
 					t.Errorf("%sDropTable(%s) did not fail", cmd.fln, cmd.name)
