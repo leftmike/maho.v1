@@ -247,7 +247,7 @@ func addForeignKey(t *testing.T, tx sql.Transaction, con sql.Identifier, fktn sq
 	fkCols []int, rtn sql.TableName, ridx sql.Identifier) {
 
 	ctx := context.Background()
-	err := tx.AddForeignKey(ctx, con, fktn, fkCols, rtn, ridx, sql.NoAction, sql.NoAction)
+	err := tx.AddForeignKey(ctx, con, fktn, fkCols, rtn, ridx, sql.NoAction, sql.NoAction, false)
 	if err != nil {
 		t.Fatal(err)
 	}

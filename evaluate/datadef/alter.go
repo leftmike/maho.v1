@@ -35,5 +35,5 @@ func (_ *AddConstraint) Tag() string {
 }
 
 func (stmt *AddConstraint) Execute(ctx context.Context, tx sql.Transaction) (int64, error) {
-	return -1, stmt.ForeignKey.execute(ctx, tx)
+	return -1, stmt.ForeignKey.execute(ctx, tx, true)
 }

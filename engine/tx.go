@@ -313,7 +313,8 @@ func (tx *transaction) DropTable(ctx context.Context, tn sql.TableName, ifExists
 }
 
 func (tx *transaction) AddForeignKey(ctx context.Context, con sql.Identifier, fktn sql.TableName,
-	fkCols []int, rtn sql.TableName, ridx sql.Identifier, onDel, onUpd sql.RefAction) error {
+	fkCols []int, rtn sql.TableName, ridx sql.Identifier, onDel, onUpd sql.RefAction,
+	check bool) error {
 
 	if fktn.Database == sql.SYSTEM {
 		return fmt.Errorf("engine: database %s may not be modified", fktn.Database)
@@ -362,6 +363,37 @@ func (tx *transaction) AddForeignKey(ctx context.Context, con sql.Identifier, fk
 	delete(tx.tables, fktn)
 	delete(tx.tableTypes, fktn)
 
+	/*
+		if !check {
+			return nil
+		}
+
+		sqlStmt := generateCheckSQL(fktn, fkCols, fktt, rtn, ridx, rtt)
+		fmt.Println(sqlStmt)
+
+		p := parser.NewParser(strings.NewReader(sqlStmt), sqlStmt)
+		stmt, err := p.Parse()
+		if err != nil {
+			panic(fmt.Sprintf("engine: table %s: check foreign key: %s", fktn, err))
+		}
+		plan, err := stmt.Plan(ctx, planContext{tx.e}, tx, nil)
+		if err != nil {
+			panic(fmt.Sprintf("engine: table %s: check foreign key: %s", fktn, err))
+		}
+		rowsPlan := plan.(evaluate.RowsPlan)
+		rows, err := rowsPlan.Rows(ctx, tx, nil)
+
+		cntRow := []sql.Value{nil}
+		err = rows.Next(ctx, cntRow)
+		if err != nil {
+			panic(fmt.Sprintf("engine: table %s: check foreign key match: %s", fktn, err))
+		}
+		rows.Close()
+		cnt := cntRow[0].(sql.Int64Value)
+		if cnt > 0 {
+			return fmt.Errorf("engine: table %s: check foreign key failed", fktn)
+		}
+	*/
 	return nil
 }
 

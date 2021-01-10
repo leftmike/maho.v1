@@ -30,7 +30,7 @@ type Transaction interface {
 		colDefaults []ColumnDefault, cons []Constraint, ifNotExists bool) error
 	DropTable(ctx context.Context, tn TableName, ifExists, cascade bool) error
 	AddForeignKey(ctx context.Context, con Identifier, fktn TableName, fkCols []int, rtn TableName,
-		ridx Identifier, onDel, onUpd RefAction) error
+		ridx Identifier, onDel, onUpd RefAction, check bool) error
 	AddTrigger(ctx context.Context, tn TableName, events int64, trig Trigger) error
 
 	CreateIndex(ctx context.Context, idxname Identifier, tn TableName, unique bool,

@@ -49,6 +49,8 @@ To Do:
 - ALTER TABLE table action [, ....]
 -- handle list of actions
 -- validate FOREIGN KEY constraint
+-- add table names to generateCheckSQL
+-- usda.sql: ALTER TABLE
 -- action = DROP CONSTRAINT [IF EXISTS] constraint
 -- action = ALTER [COLUMN] column DROP DEFAULT
 -- action = ALTER [COLUMN] column DROP NOT NULL

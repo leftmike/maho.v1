@@ -251,6 +251,37 @@ func (tt *TableType) constraintName(tn sql.TableName, con sql.Identifier,
 	return con, nil
 }
 
+func (tt *TableType) lookupForeignKey(con sql.Identifier) (foreignKey, bool) {
+	for _, fk := range tt.foreignKeys {
+		if fk.name == con {
+			return fk, true
+		}
+	}
+	return foreignKey{}, false
+}
+
+func generateCheckSQL(fktn sql.TableName, fkCols []int, fktt *TableType, rtn sql.TableName,
+	ridx sql.Identifier, rtt *TableType) string {
+
+	rkey := rtt.lookupIndex(rtn, ridx)
+	s := fmt.Sprintf("SELECT COUNT(*) FROM %s LEFT JOIN %s ON", generateTableName(fktn),
+		generateTableName(rtn))
+	for cdx, col := range fkCols {
+		if cdx > 0 {
+			s += " AND"
+		}
+		s += fmt.Sprintf(" %s = %s", fktt.cols[col], rtt.cols[rkey[cdx].Column()])
+	}
+	s += " WHERE"
+	for cdx, ck := range rkey {
+		if cdx > 0 {
+			s += " OR"
+		}
+		s += fmt.Sprintf(" %s IS NULL", rtt.cols[ck.Column()])
+	}
+	return s
+}
+
 func generateTableName(tn sql.TableName) string {
 	return fmt.Sprintf(`"%s"."%s"."%s"`, tn.Database, tn.Schema, tn.Table)
 }
@@ -336,6 +367,20 @@ func generateSetSQL(fktn sql.TableName, fkCols []int, fktt *TableType, setNull b
 	return s
 }
 
+func (tt *TableType) lookupIndex(tn sql.TableName, idx sql.Identifier) []sql.ColumnKey {
+	if idx == sql.PRIMARY_QUOTED {
+		return tt.primary
+	}
+
+	for _, it := range tt.indexes {
+		if it.Name == idx {
+			return it.Key
+		}
+	}
+
+	panic(fmt.Sprintf("table %s: can't find index %d", tn, idx))
+
+}
 func addForeignKey(con sql.Identifier, fktn sql.TableName, fkCols []int, fktt *TableType,
 	rtn sql.TableName, ridx sql.Identifier, rtt *TableType, onDel, onUpd sql.RefAction) error {
 
@@ -360,20 +405,7 @@ func addForeignKey(con sql.Identifier, fktn sql.TableName, fkCols []int, fktt *T
 			tn:   fktn,
 		})
 
-	var rkey []sql.ColumnKey
-	if ridx == sql.PRIMARY_QUOTED {
-		rkey = rtt.primary
-	} else {
-		for _, it := range rtt.indexes {
-			if it.Name == ridx {
-				rkey = it.Key
-				break
-			}
-		}
-		if rkey == nil {
-			panic(fmt.Sprintf("table %s: can't find index %d", rtn, ridx))
-		}
-	}
+	rkey := rtt.lookupIndex(rtn, ridx)
 
 	fktt.addTrigger(sql.InsertEvent|sql.UpdateEvent,
 		&fkTrigger{
