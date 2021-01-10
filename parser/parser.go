@@ -1042,6 +1042,8 @@ expr = literal
     | NOT expr
     | '(' expr | subquery ')'
     | expr op expr
+    | expr IS NULL
+    | expr IS NOT NULL
     | ref ['.' ref ...]
     | param
     | func '(' [expr [',' ...]] ')'
@@ -1176,7 +1178,7 @@ func (p *parser) parseSubExpr() expr.Expr {
 
 	op, ok, bop := p.optionalBinaryOp()
 	if !ok {
-		if p.optionalReserved(sql.IN, sql.NOT) {
+		if p.optionalReserved(sql.IN, sql.NOT, sql.IS) {
 			switch p.sctx.Identifier {
 			case sql.IN:
 				return expr.Subquery{Op: expr.Any, ExprOp: expr.EqualOp, Expr: e,
@@ -1187,6 +1189,18 @@ func (p *parser) parseSubExpr() expr.Expr {
 						Stmt: p.parseSubquery()}
 				}
 				p.unscan()
+			case sql.IS:
+				var not bool
+				if p.optionalReserved(sql.NOT) {
+					not = true
+				}
+				p.expectReserved(sql.NULL)
+
+				e = &expr.Call{Name: sql.ID("is_null"), Args: []expr.Expr{e}}
+				if not {
+					return &expr.Unary{Op: expr.NotOp, Expr: e}
+				}
+				return e
 			}
 		}
 

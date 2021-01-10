@@ -255,6 +255,8 @@ var (
 		sql.ID("abs"): {fn: absCall, tfn: numType, minArgs: 1, maxArgs: 1},
 		sql.ID("concat"): {fn: concatCall, typ: stringType, minArgs: 2, maxArgs: math.MaxInt16,
 			handleNull: true},
+		sql.ID("is_null"): {fn: isNull, typ: boolType, minArgs: 1, maxArgs: 1,
+			handleNull: true},
 		sql.ID("unique_rowid"): {fn: uniqueRowIDCall, typ: intType, minArgs: 0, maxArgs: 0},
 		sql.ID("version"):      {fn: versionCall, typ: stringType, minArgs: 0, maxArgs: 0},
 

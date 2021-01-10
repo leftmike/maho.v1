@@ -96,6 +96,7 @@ const (
 	INNER
 	INSERT
 	INTO
+	IS
 	JOIN
 	KEY
 	LEFT
@@ -214,6 +215,7 @@ var knownKeywords = map[string]struct {
 	"INT8":        {INT8, false},
 	"INTEGER":     {INTEGER, false},
 	"INTO":        {INTO, true},
+	"IS":          {IS, true},
 	"JOIN":        {JOIN, true},
 	"KEY":         {KEY, true},
 	"LEFT":        {LEFT, true},

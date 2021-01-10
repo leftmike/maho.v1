@@ -712,6 +712,13 @@ func absCall(ctx sql.EvalContext, args []sql.Value) (sql.Value, error) {
 	return nil, fmt.Errorf("engine: want number got %v", args[0])
 }
 
+func isNull(ctx sql.EvalContext, args []sql.Value) (sql.Value, error) {
+	if args[0] == nil {
+		return sql.BoolValue(true), nil
+	}
+	return sql.BoolValue(false), nil
+}
+
 var (
 	rowID = uint64(0)
 )

@@ -237,6 +237,8 @@ expr =
     | NOT expr
     | '(' expr | subquery ')'
     | expr op expr
+    | expr IS NULL
+    | expr IS NOT NULL
     | ref ['.' ref ...]
     | param
     | func '(' [expr [',' ...]] ')'

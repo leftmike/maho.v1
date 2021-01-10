@@ -115,8 +115,11 @@ func TestEval(t *testing.T) {
 		{"true == false", sql.FalseString},
 		{"true == true", sql.TrueString},
 		{"false == false", sql.TrueString},
+		{"true = false", sql.FalseString},
+		{"true = true", sql.TrueString},
+		{"false = false", sql.TrueString},
 		{"true == null", sql.NullString},
-		{"null == false", sql.NullString},
+		{"null = false", sql.NullString},
 		{"null == null", sql.NullString},
 		{"true != false", sql.TrueString},
 		{"true != true", sql.FalseString},
@@ -127,6 +130,8 @@ func TestEval(t *testing.T) {
 
 		{"null == 123", sql.NullString},
 		{"12.3 == null", sql.NullString},
+		{"null = 123", sql.NullString},
+		{"12.3 = null", sql.NullString},
 		{"null >= 123", sql.NullString},
 		{"12.3 >= null", sql.NullString},
 		{"null > 123", sql.NullString},
@@ -150,6 +155,12 @@ func TestEval(t *testing.T) {
 		{"'abcd' < null", sql.NullString},
 		{"null != 'abc'", sql.NullString},
 		{"'abcd' != null", sql.NullString},
+
+		{"123 is null", sql.FalseString},
+		{"123 is not null", sql.TrueString},
+		{"null is null", sql.TrueString},
+		{"null is not null", sql.FalseString},
+		{"not (123 is null)", sql.TrueString},
 	}
 
 	for i, c := range cases {
