@@ -850,7 +850,7 @@ func (p *parser) parseColumn(s *datadef.CreateTable) {
 }
 
 func (p *parser) parseAlterTable() evaluate.Stmt {
-	// ALTER TABLE [IF EXISTS] table action [',' ...]
+	// ALTER TABLE table action [',' ...]
 	// action =
 	//      ADD [CONSTRAINT constraint] table_constraint
 	//    | DROP CONSTRAINT [IF EXISTS] constraint
@@ -862,11 +862,6 @@ func (p *parser) parseAlterTable() evaluate.Stmt {
 	// referential_action = NO ACTION | RESTRICT | CASCADE | SET NULL | SET DEFAULT
 	// columns = '(' column [',' ...] ')'
 
-	var ifExists bool
-	if p.optionalReserved(sql.IF) {
-		p.expectReserved(sql.EXISTS)
-		ifExists = true
-	}
 	tn := p.parseTableName()
 
 	switch p.expectReserved(sql.ADD, sql.DROP, sql.ALTER) {
@@ -881,7 +876,6 @@ func (p *parser) parseAlterTable() evaluate.Stmt {
 
 		return &datadef.AddConstraint{
 			Table:      tn,
-			IfExists:   ifExists,
 			ForeignKey: p.parseForeignKey(cn),
 		}
 	case sql.DROP:

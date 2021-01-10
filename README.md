@@ -41,7 +41,7 @@ Run maho: `maho -ssh=1`. And then in another terminal, connect using ssh:
 
 ## Supported SQL
 ```
-ALTER TABLE [IF EXISTS] [ONLY] table action [',' ...]
+ALTER TABLE table action [',' ...]
 action =
       ADD [CONSTRAINT constraint] table_constraint
     | DROP CONSTRAINT [IF EXISTS] constraint

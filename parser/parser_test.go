@@ -1645,8 +1645,7 @@ func TestAlterTable(t *testing.T) {
 		{
 			sql: "alter table tbl add foreign key (c1, c2) references rtbl",
 			stmt: &datadef.AddConstraint{
-				Table:    sql.TableName{Table: sql.ID("tbl")},
-				IfExists: false,
+				Table: sql.TableName{Table: sql.ID("tbl")},
 				ForeignKey: &datadef.ForeignKey{
 					FKCols:   []sql.Identifier{sql.ID("c1"), sql.ID("c2")},
 					RefTable: sql.TableName{Table: sql.ID("rtbl")},
@@ -1656,8 +1655,7 @@ func TestAlterTable(t *testing.T) {
 		{
 			sql: "alter table tbl add constraint con foreign key (c1) references rtbl",
 			stmt: &datadef.AddConstraint{
-				Table:    sql.TableName{Table: sql.ID("tbl")},
-				IfExists: false,
+				Table: sql.TableName{Table: sql.ID("tbl")},
 				ForeignKey: &datadef.ForeignKey{
 					Name:     sql.ID("con"),
 					FKCols:   []sql.Identifier{sql.ID("c1")},

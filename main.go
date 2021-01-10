@@ -46,11 +46,9 @@ To Do:
 -- SELECT: track where columns come from, maybe as part of Plan
 -- DELETE, INSERT, UPDATE, VALUES
 
-- ALTER TABLE [IF EXISTS] [ONLY] table action [, ....]
--- handle IF EXISTS
--- test ADD FOREIGN KEY
--- action = ADD [CONSTRAINT constraint] FOREIGN KEY ...
--- validate constraint
+- ALTER TABLE table action [, ....]
+-- handle list of actions
+-- validate FOREIGN KEY constraint
 -- action = DROP CONSTRAINT [IF EXISTS] constraint
 -- action = ALTER [COLUMN] column DROP DEFAULT
 -- action = ALTER [COLUMN] column DROP NOT NULL

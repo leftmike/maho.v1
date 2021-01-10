@@ -10,17 +10,11 @@ import (
 
 type AddConstraint struct {
 	Table      sql.TableName
-	IfExists   bool
 	ForeignKey *ForeignKey
 }
 
 func (stmt *AddConstraint) String() string {
-	s := "ALTER TABLE "
-	if stmt.IfExists {
-		s += "IF EXISTS "
-	}
-	s += fmt.Sprintf("%s ADD %s", stmt.Table, stmt.ForeignKey)
-	return s
+	return fmt.Sprintf("ALTER TABLE %s ADD %s", stmt.Table, stmt.ForeignKey)
 }
 
 func (stmt *AddConstraint) Plan(ctx context.Context, pctx evaluate.PlanContext,
