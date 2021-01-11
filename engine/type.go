@@ -270,14 +270,15 @@ func generateCheckSQL(fktn sql.TableName, fkCols []int, fktt *TableType, rtn sql
 		if cdx > 0 {
 			s += " AND"
 		}
-		s += fmt.Sprintf(" %s = %s", fktt.cols[col], rtt.cols[rkey[cdx].Column()])
+		s += fmt.Sprintf(" (%s.%s = %s.%s)", fktn.Table, fktt.cols[col], rtn.Table,
+			rtt.cols[rkey[cdx].Column()])
 	}
 	s += " WHERE"
 	for cdx, ck := range rkey {
 		if cdx > 0 {
 			s += " OR"
 		}
-		s += fmt.Sprintf(" %s IS NULL", rtt.cols[ck.Column()])
+		s += fmt.Sprintf(" (%s.%s IS NULL)", rtn.Table, rtt.cols[ck.Column()])
 	}
 	return s
 }
