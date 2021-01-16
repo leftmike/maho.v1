@@ -1644,24 +1644,60 @@ func TestAlterTable(t *testing.T) {
 		{sql: "alter table exists tbl", fail: true},
 		{
 			sql: "alter table tbl add foreign key (c1, c2) references rtbl",
-			stmt: &datadef.AddConstraint{
+			stmt: &datadef.AlterTable{
 				Table: sql.TableName{Table: sql.ID("tbl")},
-				ForeignKey: &datadef.ForeignKey{
-					FKCols:   []sql.Identifier{sql.ID("c1"), sql.ID("c2")},
-					RefTable: sql.TableName{Table: sql.ID("rtbl")},
+				Actions: []datadef.AlterAction{
+					&datadef.AddForeignKey{
+						datadef.ForeignKey{
+							FKCols:   []sql.Identifier{sql.ID("c1"), sql.ID("c2")},
+							RefTable: sql.TableName{Table: sql.ID("rtbl")},
+						},
+					},
 				},
 			},
 		},
 		{
 			sql: "alter table tbl add constraint con foreign key (c1) references rtbl",
-			stmt: &datadef.AddConstraint{
+			stmt: &datadef.AlterTable{
 				Table: sql.TableName{Table: sql.ID("tbl")},
-				ForeignKey: &datadef.ForeignKey{
-					Name:     sql.ID("con"),
-					FKCols:   []sql.Identifier{sql.ID("c1")},
-					RefTable: sql.TableName{Table: sql.ID("rtbl")},
+				Actions: []datadef.AlterAction{
+					&datadef.AddForeignKey{
+						datadef.ForeignKey{
+							Name:     sql.ID("con"),
+							FKCols:   []sql.Identifier{sql.ID("c1")},
+							RefTable: sql.TableName{Table: sql.ID("rtbl")},
+						},
+					},
 				},
 			},
+		},
+		{
+			sql: `alter table tbl add constraint con1 foreign key (c1) references rtbl,
+add constraint con2 foreign key (c2) references tbl2`,
+			stmt: &datadef.AlterTable{
+				Table: sql.TableName{Table: sql.ID("tbl")},
+				Actions: []datadef.AlterAction{
+					&datadef.AddForeignKey{
+						datadef.ForeignKey{
+							Name:     sql.ID("con1"),
+							FKCols:   []sql.Identifier{sql.ID("c1")},
+							RefTable: sql.TableName{Table: sql.ID("rtbl")},
+						},
+					},
+					&datadef.AddForeignKey{
+						datadef.ForeignKey{
+							Name:     sql.ID("con2"),
+							FKCols:   []sql.Identifier{sql.ID("c2")},
+							RefTable: sql.TableName{Table: sql.ID("tbl2")},
+						},
+					},
+				},
+			},
+		},
+		{
+			sql: `alter table tbl add constraint con1 foreign key (c1) references rtbl,
+add constraint con2 foreign key (c2) references tbl2, fail`,
+			fail: true,
 		},
 	}
 

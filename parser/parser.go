@@ -861,30 +861,35 @@ func (p *parser) parseAlterTable() evaluate.Stmt {
 	//    [ON DELETE referential_action] [ON UPDATE referential_action]
 	// referential_action = NO ACTION | RESTRICT | CASCADE | SET NULL | SET DEFAULT
 	// columns = '(' column [',' ...] ')'
+	var s datadef.AlterTable
 
-	tn := p.parseTableName()
+	s.Table = p.parseTableName()
 
-	switch p.expectReserved(sql.ADD, sql.DROP, sql.ALTER) {
-	case sql.ADD:
-		var cn sql.Identifier
-		if p.optionalReserved(sql.CONSTRAINT) {
-			cn = p.expectIdentifier("expected a constraint name")
+	for {
+		switch p.expectReserved(sql.ADD, sql.DROP, sql.ALTER) {
+		case sql.ADD:
+			var cn sql.Identifier
+			if p.optionalReserved(sql.CONSTRAINT) {
+				cn = p.expectIdentifier("expected a constraint name")
+			}
+
+			p.expectReserved(sql.FOREIGN)
+			p.expectReserved(sql.KEY)
+
+			fk := p.parseForeignKey(cn)
+			s.Actions = append(s.Actions, &datadef.AddForeignKey{*fk})
+		case sql.DROP:
+			// XXX
+		case sql.ALTER:
+			// XXX
 		}
 
-		p.expectReserved(sql.FOREIGN)
-		p.expectReserved(sql.KEY)
-
-		return &datadef.AddConstraint{
-			Table:      tn,
-			ForeignKey: p.parseForeignKey(cn),
+		if !p.maybeToken(token.Comma) {
+			break
 		}
-	case sql.DROP:
-		// XXX
-	case sql.ALTER:
-		// XXX
 	}
 
-	return nil
+	return &s
 }
 
 func (p *parser) parseCreateIndex(unique bool) evaluate.Stmt {

@@ -47,7 +47,6 @@ To Do:
 -- DELETE, INSERT, UPDATE, VALUES
 
 - ALTER TABLE table action [, ....]
--- handle list of actions
 -- action = DROP CONSTRAINT [IF EXISTS] constraint
 -- action = ALTER [COLUMN] column DROP DEFAULT
 -- action = ALTER [COLUMN] column DROP NOT NULL

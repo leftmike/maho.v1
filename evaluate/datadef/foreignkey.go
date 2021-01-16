@@ -19,7 +19,12 @@ type ForeignKey struct {
 }
 
 func (fk ForeignKey) String() string {
-	s := fmt.Sprintf("CONSTRAINT %s FOREIGN KEY (", fk.Name)
+	var s string
+	if fk.Name == 0 {
+		s = "CONSTRAINT FOREIGN KEY ("
+	} else {
+		s = fmt.Sprintf("CONSTRAINT %s FOREIGN KEY (", fk.Name)
+	}
 	for i, c := range fk.FKCols {
 		if i > 0 {
 			s += ", "
@@ -41,8 +46,9 @@ func (fk ForeignKey) String() string {
 }
 
 func (fk *ForeignKey) plan(ctx context.Context, pctx evaluate.PlanContext,
-	tx sql.Transaction) error {
+	tx sql.Transaction, tn sql.TableName) error {
 
+	fk.FKTable = tn
 	fk.RefTable = pctx.ResolveTableName(fk.RefTable)
 	if fk.FKTable.Database != fk.RefTable.Database {
 		return fmt.Errorf("engine: table %s: foreign key reference not within same database: %s",

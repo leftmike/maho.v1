@@ -172,8 +172,7 @@ func (stmt *CreateTable) Plan(ctx context.Context, pctx evaluate.PlanContext,
 	stmt.Table = pctx.ResolveTableName(stmt.Table)
 
 	for _, fk := range stmt.ForeignKeys {
-		fk.FKTable = stmt.Table
-		err := fk.plan(ctx, pctx, tx)
+		err := fk.plan(ctx, pctx, tx, stmt.Table)
 		if err != nil {
 			return nil, err
 		}
