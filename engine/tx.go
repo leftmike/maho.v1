@@ -371,7 +371,6 @@ func (tx *transaction) AddForeignKey(ctx context.Context, con sql.Identifier, fk
 	}
 
 	sqlStmt := generateCheckSQL(fktn, fkCols, fktt, rtn, ridx, rtt)
-	fmt.Println(sqlStmt)
 
 	p := parser.NewParser(strings.NewReader(sqlStmt), sqlStmt)
 	stmt, err := p.Parse()
@@ -422,6 +421,40 @@ func (tx *transaction) AddTrigger(ctx context.Context, tn sql.TableName, events 
 	}
 	delete(tx.tables, tn)
 	delete(tx.tableTypes, tn)
+	return nil
+}
+
+func (tx *transaction) DropConstraint(ctx context.Context, tn sql.TableName, con sql.Identifier,
+	ifExists bool, col sql.Identifier, ct sql.ConstraintType) error {
+
+	if tn.Database == sql.SYSTEM {
+		return fmt.Errorf("engine: database %s may not be modified", tn.Database)
+	}
+	if tn.Schema == sql.METADATA {
+		return fmt.Errorf("engine: schema %s may not be modified", tn.Schema)
+	}
+
+	tt, err := tx.e.st.LookupTableType(ctx, tx.tx, tn)
+	if err != nil {
+		return err
+	}
+
+	found, err := tt.dropConstraint(tn, con, col, ct)
+	if err != nil {
+		if !found && ifExists && con != 0 {
+			return nil
+		}
+		return err
+	}
+
+	err = tx.e.st.UpdateType(ctx, tx.tx, tn, tt)
+	if err != nil {
+		return err
+	}
+
+	delete(tx.tables, tn)
+	delete(tx.tableTypes, tn)
+
 	return nil
 }
 

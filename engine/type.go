@@ -206,6 +206,131 @@ func (tt *TableType) RemoveIndex(idxname sql.Identifier) (*TableType, int) {
 	return tt, rdx
 }
 
+func (tt *TableType) primaryColumn(colNum int) bool {
+	for _, ck := range tt.primary {
+		if ck.Column() == colNum {
+			return true
+		}
+	}
+	return false
+}
+
+func (tt *TableType) dropColumnConstraint(tn sql.TableName, cn sql.Identifier) error {
+	var constraints []constraint
+	for _, con := range tt.constraints {
+		if con.name == cn {
+			switch con.typ {
+			case sql.DefaultConstraint:
+				if tt.colDefaults[con.colNum].Default == nil ||
+					tt.colDefaults[con.colNum].DefaultExpr == "" {
+					panic(fmt.Sprintf(
+						"table %s: mismatch between constraint and column default", tn))
+				}
+				tt.colDefaults[con.colNum].Default = nil
+				tt.colDefaults[con.colNum].DefaultExpr = ""
+			case sql.NotNullConstraint:
+				if !tt.colTypes[con.colNum].NotNull {
+					panic(fmt.Sprintf(
+						"table %s: mismatch between constraint and column not null", tn))
+				}
+				if tt.primaryColumn(con.colNum) {
+					return fmt.Errorf("engine: table %s: primary column %s must be not null", tn,
+						tt.cols[con.colNum])
+				}
+				tt.colTypes[con.colNum].NotNull = false
+			default:
+				panic(fmt.Sprintf("table %s: constraint %s: unexpected type: %v", tn, cn, con.typ))
+			}
+		} else {
+			constraints = append(constraints, con)
+		}
+	}
+
+	tt.constraints = constraints
+	tt.ver += 1
+	return nil
+}
+
+func (tt *TableType) dropCheckConstraint(tn sql.TableName, cn sql.Identifier) {
+	var checks []checkConstraint
+	for _, chk := range tt.checks {
+		if chk.name != cn {
+			checks = append(checks, chk)
+		}
+	}
+
+	tt.checks = checks
+	tt.ver += 1
+}
+
+func (tt *TableType) dropConstraint(tn sql.TableName, cn, col sql.Identifier,
+	ct sql.ConstraintType) (bool, error) {
+
+	if cn != 0 {
+		for _, con := range tt.constraints {
+			if con.name == cn {
+				return true, tt.dropColumnConstraint(tn, cn)
+			}
+		}
+
+		for _, chk := range tt.checks {
+			if chk.name == cn {
+				tt.dropCheckConstraint(tn, cn)
+				return true, nil
+			}
+		}
+
+		return false, fmt.Errorf("engine: table %s: constraint not found: %s", tn, cn)
+	} else if col == 0 {
+		panic(fmt.Sprintf("table %s: one of constraint or column required", tn))
+	}
+
+	colNum := -1
+	for cdx, nam := range tt.cols {
+		if col == nam {
+			colNum = cdx
+			break
+		}
+	}
+	if colNum < 0 {
+		return false, fmt.Errorf("engine: table %s: column not found: %s", tn, col)
+	}
+
+	switch ct {
+	case sql.DefaultConstraint:
+		if tt.colDefaults[colNum].Default == nil ||
+			tt.colDefaults[colNum].DefaultExpr == "" {
+			return true,
+				fmt.Errorf("engine: table %s: column %s: missing default constraint", tn, col)
+		}
+		tt.colDefaults[colNum].Default = nil
+		tt.colDefaults[colNum].DefaultExpr = ""
+	case sql.NotNullConstraint:
+		if !tt.colTypes[colNum].NotNull {
+			return true,
+				fmt.Errorf("engine: table %s: column %s: missing not null constraint", tn, col)
+		}
+		if tt.primaryColumn(colNum) {
+			return true,
+				fmt.Errorf("engine: table %s: primary column %s must be not null", tn, col)
+		}
+		tt.colTypes[colNum].NotNull = false
+	default:
+		panic(fmt.Sprintf("table %s: column %s: unexpected type: %v", tn, col, ct))
+	}
+
+	var constraints []constraint
+	for _, con := range tt.constraints {
+		if con.colNum != colNum || con.typ != ct {
+			constraints = append(constraints, con)
+		}
+	}
+
+	tt.constraints = constraints
+	tt.ver += 1
+	return true, nil
+}
+
 func (tt *TableType) duplicateConstraint(cn sql.Identifier) bool {
 	if cn == sql.PRIMARY_QUOTED {
 		return true

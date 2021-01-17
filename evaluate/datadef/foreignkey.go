@@ -160,7 +160,9 @@ func (fk *ForeignKey) Prepare(fktt, rtt sql.TableType) ([]int, sql.Identifier, e
 	return fkCols, ridx, nil
 }
 
-func (fk *ForeignKey) execute(ctx context.Context, tx sql.Transaction, check bool) error {
+func (fk *ForeignKey) execute(ctx context.Context, tx sql.Transaction, tn sql.TableName,
+	check bool) error {
+
 	fktt, err := tx.LookupTableType(ctx, fk.FKTable)
 	if err != nil {
 		return err

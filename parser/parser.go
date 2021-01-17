@@ -879,9 +879,38 @@ func (p *parser) parseAlterTable() evaluate.Stmt {
 			fk := p.parseForeignKey(cn)
 			s.Actions = append(s.Actions, &datadef.AddForeignKey{*fk})
 		case sql.DROP:
-			// XXX
+			p.expectReserved(sql.CONSTRAINT)
+
+			var ifExists bool
+			if p.optionalReserved(sql.IF) {
+				p.expectReserved(sql.EXISTS)
+				ifExists = true
+			}
+
+			s.Actions = append(s.Actions,
+				&datadef.DropConstraint{
+					Name:     p.expectIdentifier("expected a constraint name"),
+					IfExists: ifExists,
+				})
 		case sql.ALTER:
-			// XXX
+			p.optionalReserved(sql.COLUMN)
+			nam := p.expectIdentifier("expected a column name")
+			p.expectReserved(sql.DROP)
+
+			var ct sql.ConstraintType
+			switch p.expectReserved(sql.DEFAULT, sql.NOT) {
+			case sql.DEFAULT:
+				ct = sql.DefaultConstraint
+			case sql.NOT:
+				p.expectReserved(sql.NULL)
+				ct = sql.NotNullConstraint
+			}
+
+			s.Actions = append(s.Actions,
+				&datadef.DropConstraint{
+					Column: nam,
+					Type:   ct,
+				})
 		}
 
 		if !p.maybeToken(token.Comma) {

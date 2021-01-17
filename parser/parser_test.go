@@ -1699,6 +1699,69 @@ add constraint con2 foreign key (c2) references tbl2`,
 add constraint con2 foreign key (c2) references tbl2, fail`,
 			fail: true,
 		},
+		{
+			sql: "alter table tbl drop constraint if exists con",
+			stmt: &datadef.AlterTable{
+				Table: sql.TableName{Table: sql.ID("tbl")},
+				Actions: []datadef.AlterAction{
+					&datadef.DropConstraint{
+						Name:     sql.ID("con"),
+						IfExists: true,
+					},
+				},
+			},
+		},
+		{
+			sql: `alter table tbl add constraint con foreign key (c1) references rtbl,
+alter column c1 drop default, alter c2 drop not null, drop constraint con`,
+			stmt: &datadef.AlterTable{
+				Table: sql.TableName{Table: sql.ID("tbl")},
+				Actions: []datadef.AlterAction{
+					&datadef.AddForeignKey{
+						datadef.ForeignKey{
+							Name:     sql.ID("con"),
+							FKCols:   []sql.Identifier{sql.ID("c1")},
+							RefTable: sql.TableName{Table: sql.ID("rtbl")},
+						},
+					},
+					&datadef.DropConstraint{
+						Column: sql.ID("c1"),
+						Type:   sql.DefaultConstraint,
+					},
+					&datadef.DropConstraint{
+						Column: sql.ID("c2"),
+						Type:   sql.NotNullConstraint,
+					},
+					&datadef.DropConstraint{
+						Name: sql.ID("con"),
+					},
+				},
+			},
+		},
+		{
+			sql:  "alter table tbl drop con",
+			fail: true,
+		},
+		{
+			sql:  "alter table tbl constraint if exists con",
+			fail: true,
+		},
+		{
+			sql:  "alter table tbl drop constraint if con",
+			fail: true,
+		},
+		{
+			sql:  "alter table tbl alter column drop default",
+			fail: true,
+		},
+		{
+			sql:  "alter table tbl alter c1 default",
+			fail: true,
+		},
+		{
+			sql:  "alter table tbl alter c1 drop null",
+			fail: true,
+		},
 	}
 
 	for i, c := range cases {

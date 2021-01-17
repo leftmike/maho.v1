@@ -69,6 +69,7 @@ const (
 	BY
 	CASCADE
 	CHECK
+	COLUMN
 	COMMIT
 	CONSTRAINT
 	COPY
@@ -182,6 +183,7 @@ var knownKeywords = map[string]struct {
 	"CHAR":        {CHAR, false},
 	"CHARACTER":   {CHARACTER, false},
 	"CHECK":       {CHECK, true},
+	"COLUMN":      {COLUMN, true},
 	"COMMIT":      {COMMIT, true},
 	"CONSTRAINT":  {CONSTRAINT, true},
 	"COPY":        {COPY, true},

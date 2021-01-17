@@ -32,6 +32,8 @@ type Transaction interface {
 	AddForeignKey(ctx context.Context, con Identifier, fktn TableName, fkCols []int, rtn TableName,
 		ridx Identifier, onDel, onUpd RefAction, check bool) error
 	AddTrigger(ctx context.Context, tn TableName, events int64, trig Trigger) error
+	DropConstraint(ctx context.Context, tn TableName, con Identifier, ifExists bool,
+		col Identifier, ct ConstraintType) error
 
 	CreateIndex(ctx context.Context, idxname Identifier, tn TableName, unique bool,
 		keys []ColumnKey, ifNotExists bool) error
