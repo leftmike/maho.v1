@@ -439,6 +439,24 @@ func (tx *transaction) DropConstraint(ctx context.Context, tn sql.TableName, con
 		return err
 	}
 
+	if con != 0 {
+		for _, fk := range tt.foreignKeys {
+			if fk.name == con {
+				err = tx.dropForeignRef(ctx, con, tn, fk.refTable)
+				if err != nil {
+					return err
+				}
+
+				err = tx.dropForeignKey(ctx, con, tn, fk.refTable)
+				if err != nil {
+					return err
+				}
+
+				return nil
+			}
+		}
+	}
+
 	found, err := tt.dropConstraint(tn, con, col, ct)
 	if err != nil {
 		if !found && ifExists && con != 0 {

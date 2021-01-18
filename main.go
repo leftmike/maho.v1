@@ -46,18 +46,13 @@ To Do:
 -- SELECT: track where columns come from, maybe as part of Plan
 -- DELETE, INSERT, UPDATE, VALUES
 
-- ALTER TABLE table action [, ....]
--- drop foreign keys
--- sqltest/testdata/sql/alter_drop.sql: broken with kvrows (but not pebble)
+- kvrows(badger): fails on sqltest/testdata/sql/drop.sql
 
 - foreign key references
 -- need read lock on referenced keys
 
 - references from foreign keys (ForeignRef?)
 -- use index on foreign key table if available
-
-- constraints
--- drop FOREIGN KEY: use ALTER TABLE table DROP CONSTRAINT constraint
 */
 
 import (
