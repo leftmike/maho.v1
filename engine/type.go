@@ -430,8 +430,44 @@ func generateMatchSQL(rtt *TableType, rtn sql.TableName, ridx sql.Identifier, rk
 	return s
 }
 
+func hasColumn(colNum int, cols []int) bool {
+	for _, col := range cols {
+		if col == colNum {
+			return true
+		}
+	}
+	return false
+}
+
+func matchIndexKey(cols []int, key []sql.ColumnKey) bool {
+	for _, ck := range key {
+		if !hasColumn(ck.Column(), cols) {
+			return false
+		}
+	}
+	return true
+}
+
+func (tt *TableType) findIndex(cols []int) (sql.Identifier, bool) {
+	for _, it := range tt.indexes {
+		if it.Hidden || len(cols) != len(it.Key) {
+			continue
+		}
+
+		if matchIndexKey(cols, it.Key) {
+			return it.Name, true
+		}
+	}
+
+	return 0, false
+}
+
 func generateRestrictSQL(fktn sql.TableName, fkCols []int, fktt *TableType) string {
-	s := fmt.Sprintf("SELECT COUNT(*) FROM %s WHERE", generateTableName(fktn))
+	s := fmt.Sprintf("SELECT COUNT(*) FROM %s", generateTableName(fktn))
+	if idx, found := fktt.findIndex(fkCols); found {
+		s += fmt.Sprintf(`@"%s"`, idx)
+	}
+	s += " WHERE"
 	for cdx, col := range fkCols {
 		if cdx > 0 {
 			s += " AND"

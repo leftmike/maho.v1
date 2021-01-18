@@ -50,9 +50,6 @@ To Do:
 
 - foreign key references
 -- need read lock on referenced keys
-
-- references from foreign keys (ForeignRef?)
--- use index on foreign key table if available
 */
 
 import (
