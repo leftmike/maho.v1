@@ -48,7 +48,7 @@ To Do:
 
 - ALTER TABLE table action [, ....]
 -- drop foreign keys
--- postgres tests for dropping: check that the constraints are gone
+-- sqltest/testdata/sql/alter_drop.sql: broken with kvrows (but not pebble)
 
 - foreign key references
 -- need read lock on referenced keys

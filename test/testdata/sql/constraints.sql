@@ -1,5 +1,7 @@
 --
--- Test SHOW CONSTRAINTS FROM table
+-- Test
+--     SHOW CONSTRAINTS FROM table
+--     ALTER TABLE table ...
 --
 
 DROP TABLE IF EXISTS tbl1;
