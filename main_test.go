@@ -139,7 +139,7 @@ func testStore(t *testing.T, st *storage.Store, cases []testCase) {
 		repl.ReplSQL(ses, parser.NewParser(strings.NewReader(c.s), fmt.Sprintf("cases[%d]", i)),
 			&b)
 		if b.String() != c.r {
-			t.Errorf("parse(%q) got\n%s\nwant\n%s", c.s, b.String(), c.r)
+			t.Errorf("ReplSQL(%q) got\n%s\nwant\n%s", c.s, b.String(), c.r)
 		}
 	}
 }

@@ -50,6 +50,7 @@ To Do:
 
 - foreign key references
 -- need read lock on referenced keys
+-- SELECT ... [FOR SHARE]
 */
 
 import (

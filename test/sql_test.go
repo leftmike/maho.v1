@@ -75,13 +75,8 @@ func testSQL(t *testing.T, typ string, run sqltestdb.Runner, testData string, up
 }
 
 var (
-	cleaned bool
-)
-
-func TestSQL(t *testing.T) {
-	configs := []struct {
+	configs = []struct {
 		name     string
-		persist  bool
 		newStore func(dataDir string) (*storage.Store, error)
 	}{
 		{
@@ -119,6 +114,20 @@ func TestSQL(t *testing.T) {
 		},
 	}
 
+	cleaned bool
+)
+
+func cleanDir(t *testing.T) {
+	if !cleaned {
+		err := testutil.CleanDir("testdata", []string{".gitignore", "expected", "output", "sql"})
+		if err != nil {
+			t.Fatal(err)
+		}
+		cleaned = true
+	}
+}
+
+func TestSQL(t *testing.T) {
 	tests := []struct {
 		name      string
 		testData  string
@@ -146,13 +155,7 @@ func TestSQL(t *testing.T) {
 		},
 	}
 
-	if !cleaned {
-		err := testutil.CleanDir("testdata", []string{".gitignore", "expected", "output", "sql"})
-		if err != nil {
-			t.Fatal(err)
-		}
-		cleaned = true
-	}
+	cleanDir(t)
 
 	for _, tst := range tests {
 		if testing.Short() && tst.skipShort {

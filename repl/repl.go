@@ -12,6 +12,74 @@ import (
 	"github.com/leftmike/maho/sql"
 )
 
+func Evaluate(ctx context.Context, ses *evaluate.Session, e sql.Engine, tx sql.Transaction,
+	stmt evaluate.Stmt, w io.Writer) error {
+
+	plan, err := stmt.Plan(ctx, ses, tx, nil)
+	if err != nil {
+		return err
+	}
+
+	if stmtPlan, ok := plan.(evaluate.StmtPlan); ok {
+		var cnt int64
+		cnt, err = stmtPlan.Execute(ctx, tx)
+		if err != nil {
+			return err
+		}
+		if cnt >= 0 {
+			fmt.Fprintf(w, "%d rows updated\n", cnt)
+		}
+	} else if cmdPlan, ok := plan.(evaluate.CmdPlan); ok {
+		err = cmdPlan.Command(ctx, ses, e)
+		if err != nil {
+			return err
+		}
+	} else if rowsPlan, ok := plan.(evaluate.RowsPlan); ok {
+		tw := tablewriter.NewWriter(w)
+		tw.SetAutoFormatHeaders(false)
+
+		rows, err := rowsPlan.Rows(ctx, tx, nil)
+		if err != nil {
+			return err
+		}
+
+		cols := rowsPlan.Columns()
+		row := make([]string, len(cols))
+		for cdx, col := range cols {
+			row[cdx] = col.String()
+		}
+		tw.SetHeader(row)
+
+		dest := make([]sql.Value, len(cols))
+		for {
+			err = rows.Next(ctx, dest)
+			if err != nil {
+				break
+			}
+
+			for cdx, v := range dest {
+				if v != nil {
+					if s, ok := v.(sql.StringValue); ok {
+						row[cdx] = string(s)
+						continue
+					}
+				}
+				row[cdx] = sql.Format(v)
+			}
+			tw.Append(row)
+		}
+		tw.Render()
+		fmt.Fprintf(w, "(%d rows)\n", tw.NumLines())
+		if err != io.EOF {
+			return err
+		}
+	} else {
+		panic(fmt.Sprintf("expected StmtPlan, CmdPlan, or RowsPlan: %#v", plan))
+	}
+
+	return nil
+}
+
 func ReplSQL(ses *evaluate.Session, p parser.Parser, w io.Writer) {
 	for {
 		stmt, err := p.Parse()
@@ -27,71 +95,8 @@ func ReplSQL(ses *evaluate.Session, p parser.Parser, w io.Writer) {
 			func(ctx context.Context, ses *evaluate.Session, e sql.Engine,
 				tx sql.Transaction) error {
 
-				plan, err := stmt.Plan(ctx, ses, tx, nil)
-				if err != nil {
-					return err
-				}
-
-				if stmtPlan, ok := plan.(evaluate.StmtPlan); ok {
-					var cnt int64
-					cnt, err = stmtPlan.Execute(ctx, tx)
-					if err != nil {
-						return err
-					}
-					if cnt >= 0 {
-						fmt.Fprintf(w, "%d rows updated\n", cnt)
-					}
-				} else if cmdPlan, ok := plan.(evaluate.CmdPlan); ok {
-					err = cmdPlan.Command(ctx, ses, e)
-					if err != nil {
-						return err
-					}
-				} else if rowsPlan, ok := plan.(evaluate.RowsPlan); ok {
-					tw := tablewriter.NewWriter(w)
-					tw.SetAutoFormatHeaders(false)
-
-					rows, err := rowsPlan.Rows(ctx, tx, nil)
-					if err != nil {
-						return err
-					}
-
-					cols := rowsPlan.Columns()
-					row := make([]string, len(cols))
-					for cdx, col := range cols {
-						row[cdx] = col.String()
-					}
-					tw.SetHeader(row)
-
-					dest := make([]sql.Value, len(cols))
-					for {
-						err = rows.Next(ctx, dest)
-						if err != nil {
-							break
-						}
-
-						for cdx, v := range dest {
-							if v != nil {
-								if s, ok := v.(sql.StringValue); ok {
-									row[cdx] = string(s)
-									continue
-								}
-							}
-							row[cdx] = sql.Format(v)
-						}
-						tw.Append(row)
-					}
-					tw.Render()
-					fmt.Fprintf(w, "(%d rows)\n", tw.NumLines())
-					if err != io.EOF {
-						return err
-					}
-				} else {
-					panic(fmt.Sprintf("expected StmtPlan, CmdPlan, or RowsPlan: %#v", plan))
-				}
-
-				return nil
+				return Evaluate(ctx, ses, e, tx, stmt, w)
 			})
-
 		if err != nil {
 			fmt.Fprintln(w, err)
 		}
