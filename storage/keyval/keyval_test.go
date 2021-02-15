@@ -36,6 +36,7 @@ func TestBadgerKeyVal(t *testing.T) {
 	test.RunPrimaryMinMaxTest(t, st)
 	test.RunIndexMinMaxTest(t, st)
 
+	test.RunGuardTest(t, st)
 	test.RunStressTest(t, st)
 	test.RunParallelTest(t, st)
 }
@@ -86,6 +87,7 @@ func TestBBoltKeyVal(t *testing.T) {
 	test.RunPrimaryMinMaxTest(t, st)
 	test.RunIndexMinMaxTest(t, st)
 
+	test.RunGuardTest(t, st)
 	// Work, but are very slow without setting NoSync = true and NoFreelistSync = true
 	test.RunStressTest(t, st)
 	test.RunParallelTest(t, st)

@@ -36,6 +36,7 @@ func TestBadgerKVRows(t *testing.T) {
 	test.RunPrimaryMinMaxTest(t, st)
 	test.RunIndexMinMaxTest(t, st)
 
+	test.RunGuardTest(t, st)
 	test.RunStressTest(t, st)
 	test.RunParallelTest(t, st)
 }
@@ -73,6 +74,7 @@ func TestPebbleKVRows(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
+
 	test.RunDatabaseTest(t, st)
 	test.RunTableTest(t, st)
 	test.RunSchemaTest(t, st)
@@ -87,6 +89,7 @@ func TestPebbleKVRows(t *testing.T) {
 	test.RunPrimaryMinMaxTest(t, st)
 	test.RunIndexMinMaxTest(t, st)
 
+	test.RunGuardTest(t, st)
 	test.RunStressTest(t, st)
 	test.RunParallelTest(t, st)
 }

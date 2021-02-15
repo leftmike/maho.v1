@@ -41,7 +41,7 @@ var (
 		"createDatabase",
 
 		createMinMax,
-		insertRows(minMaxRows),
+		insertRows(sql.ID("tbl-b"), minMaxRows),
 		checkMinMaxRows,
 		[]storeCmd{
 			{fln: fln(), cmd: cmdBegin},
@@ -241,7 +241,7 @@ var (
 		"createDatabase",
 
 		createMinMax,
-		insertRows(minMaxRows),
+		insertRows(sql.ID("tbl-b"), minMaxRows),
 		checkMinMaxRows,
 		[]storeCmd{
 			{fln: fln(), cmd: cmdBegin},
@@ -468,7 +468,7 @@ var (
 		"createDatabase",
 
 		createMinMax,
-		insertRows(minMaxRows),
+		insertRows(sql.ID("tbl-b"), minMaxRows),
 		checkMinMaxRows,
 		[]storeCmd{
 			{fln: fln(), cmd: cmdBegin},
@@ -629,7 +629,7 @@ var (
 		"createDatabase",
 
 		createMinMax,
-		insertRows(minMaxRows),
+		insertRows(sql.ID("tbl-b"), minMaxRows),
 		checkMinMaxRows,
 		[]storeCmd{
 			{fln: fln(), cmd: cmdBegin},
@@ -820,10 +820,10 @@ func sortValues(key []sql.ColumnKey, vals [][]sql.Value) [][]sql.Value {
 	return vals
 }
 
-func insertRows(rows [][]sql.Value) []storeCmd {
+func insertRows(nam sql.Identifier, rows [][]sql.Value) []storeCmd {
 	var cmds []storeCmd
 	cmds = append(cmds, storeCmd{fln: fln(), cmd: cmdBegin})
-	cmds = append(cmds, storeCmd{fln: fln(), cmd: cmdLookupTable, name: sql.ID("tbl-b")})
+	cmds = append(cmds, storeCmd{fln: fln(), cmd: cmdLookupTable, name: nam})
 
 	for _, row := range rows {
 		cmds = append(cmds, storeCmd{fln: fln(), cmd: cmdInsert, row: row})

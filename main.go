@@ -50,7 +50,12 @@ To Do:
 
 - foreign key references
 -- need read lock on referenced keys
--- SELECT ... [FOR SHARE]
+-- use SELECT ... [FOR SHARE] ???
+-- engine.transaction: add guardCount; func EnterGuard(), func LeaveGuard()
+-- engine.Table interface: Rows, IndexRows: add guard flag to get current snapshot _and_
+   guard against concurrent updates (read lock referenced rows)
+-- storage/test: test Rows, IndexRows: guard = true
+-- write lock happens as proposal; can read lock be separate for kvrows?
 */
 
 import (

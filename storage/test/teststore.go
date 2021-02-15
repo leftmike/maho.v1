@@ -2,6 +2,7 @@ package test
 
 import (
 	"context"
+	"flag"
 	"fmt"
 	"io"
 	"reflect"
@@ -15,13 +16,17 @@ import (
 )
 
 var (
+	show = flag.Bool("show", false, "show commands executed")
+
 	int32ColType  = sql.ColumnType{Type: sql.IntegerType, Size: 4, NotNull: true}
 	int64ColType  = sql.ColumnType{Type: sql.IntegerType, Size: 8, NotNull: true}
 	stringColType = sql.ColumnType{Type: sql.StringType, Size: 4096, NotNull: true}
 )
 
+type command int
+
 const (
-	cmdBegin = iota
+	cmdBegin command = iota
 	cmdCommit
 	cmdRollback
 	cmdNextStmt
@@ -43,9 +48,40 @@ const (
 	cmdIndexRows
 	cmdIndexDelete
 	cmdIndexUpdate
+	cmdSync
 	cmdCreateDatabase
 	cmdDropDatabase
 )
+
+func (cmd command) String() string {
+	return []string{
+		"Begin",
+		"Commit",
+		"Rollback",
+		"NextStmt",
+		"CreateSchema",
+		"DropSchema",
+		"SetSchema",
+		"ListSchemas",
+		"LookupSchema",
+		"LookupTable",
+		"CreateTable",
+		"DropTable",
+		"ListTables",
+		"Rows",
+		"Insert",
+		"Update",
+		"Delete",
+		"AddIndex",
+		"RemoveIndex",
+		"IndexRows",
+		"IndexDelete",
+		"IndexUpdate",
+		"Sync",
+		"CreateDatabase",
+		"DropDatabase",
+	}[cmd]
+}
 
 func fln() testutil.FileLineNumber {
 	return testutil.MakeFileLineNumber()
@@ -53,7 +89,7 @@ func fln() testutil.FileLineNumber {
 
 type storeCmd struct {
 	fln       testutil.FileLineNumber
-	cmd       int
+	cmd       command
 	tdx       int                // Which transaction to use
 	fail      bool               // The command should fail
 	ifExists  bool               // Flag for DropTable or DropSchema
@@ -72,6 +108,9 @@ type storeCmd struct {
 	colTypes  []sql.ColumnType
 	minRow    []sql.Value
 	maxRow    []sql.Value
+	guard     bool
+	rowsCheck func(vals [][]sql.Value) bool
+	thrd      int
 }
 
 type transactionState struct {
@@ -178,12 +217,34 @@ func indexRowUpdate(ctx context.Context, idxRows engine.IndexRows, updates []sql
 }
 
 func testDatabase(t *testing.T, st *storage.Store, dbname sql.Identifier, cmds []storeCmd) {
+	testDatabaseCmds(t, st, dbname, nil,
+		func() (storeCmd, bool) {
+			if len(cmds) == 0 {
+				return storeCmd{}, false
+			}
+			cmd := cmds[0]
+			cmds = cmds[1:]
+			return cmd, true
+		})
+}
+
+func testDatabaseCmds(t *testing.T, st *storage.Store, dbname sql.Identifier, sync chan<- struct{},
+	nextCmd func() (storeCmd, bool)) {
+
 	var state transactionState
 	var ctx context.Context
 	scname := sql.PUBLIC
 
-	for _, cmd := range cmds {
-		//fmt.Printf("%s%d\n", cmd.fln, cmd.cmd)
+	for {
+		cmd, ok := nextCmd()
+		if !ok {
+			break
+		}
+
+		if *show {
+			fmt.Printf("%s%d %s\n", cmd.fln, cmd.thrd, cmd.cmd)
+		}
+
 		switch cmd.cmd {
 		case cmdNextStmt:
 		case cmdRows:
@@ -193,6 +254,7 @@ func testDatabase(t *testing.T, st *storage.Store, dbname sql.Identifier, cmds [
 		case cmdIndexRows:
 		case cmdIndexDelete:
 		case cmdIndexUpdate:
+		case cmdSync:
 		default:
 			state.tbl = nil
 			state.tt = nil
@@ -355,8 +417,20 @@ func testDatabase(t *testing.T, st *storage.Store, dbname sql.Identifier, cmds [
 				t.Errorf("%stable.Rows() failed with %s", cmd.fln, err)
 			} else {
 				vals := allRows(t, ctx, rows, cmd.fln)
-				if vals != nil {
-					if !reflect.DeepEqual(vals, cmd.values) {
+				if cmd.rowsCheck != nil {
+					if cmd.rowsCheck(vals) != cmd.fail {
+						if cmd.fail {
+							t.Errorf("%stable.Rows() rows check did not fail: %v", cmd.fln, vals)
+						} else {
+							t.Errorf("%stable.Rows() rows check failed: %v", cmd.fln, vals)
+						}
+					}
+				} else {
+					if vals != nil {
+						if !reflect.DeepEqual(vals, cmd.values) {
+							t.Errorf("%stable.Rows() got %v want %v", cmd.fln, vals, cmd.values)
+						}
+					} else if len(cmd.values) != 0 {
 						t.Errorf("%stable.Rows() got %v want %v", cmd.fln, vals, cmd.values)
 					}
 				}
@@ -612,6 +686,8 @@ func testDatabase(t *testing.T, st *storage.Store, dbname sql.Identifier, cmds [
 			if err != nil {
 				t.Errorf("%sIndexRows.Close() failed with %s", cmd.fln, err)
 			}
+		case cmdSync:
+			sync <- struct{}{}
 		default:
 			panic("unexpected command")
 		}
