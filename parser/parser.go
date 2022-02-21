@@ -44,18 +44,22 @@ func newParser(rr io.RuneReader, fn string) *parser {
 }
 
 func (p *parser) Parse() (stmt evaluate.Stmt, err error) {
-	if p.scan() == token.EOF {
+	t, err := p.scanRune()
+	if err != nil {
+		return nil, err
+	} else if t == token.EOF {
 		return nil, io.EOF
 	}
 	p.unscan()
 
 	if p.failed {
 		for {
-			t := p.scan()
-			if t == token.EOF {
+			t, err = p.scanRune()
+			if err != nil {
+				return nil, err
+			} else if t == token.EOF {
 				return nil, io.EOF
-			}
-			if t == token.EndOfStatement {
+			} else if t == token.EndOfStatement {
 				break
 			}
 		}
@@ -82,7 +86,7 @@ func (p *parser) error(msg string) {
 	panic(fmt.Errorf("parser: %s: %s", p.sctx.Position, msg))
 }
 
-func (p *parser) scan() rune {
+func (p *parser) scanRune() (rune, error) {
 	p.current = (p.current + 1) % lookBackAmount
 	p.sctx = &p.lookBack[p.current]
 
@@ -91,10 +95,18 @@ func (p *parser) scan() rune {
 	} else {
 		p.scanner.Scan(p.sctx)
 		if p.sctx.Token == token.Error {
-			p.error(p.sctx.Error.Error())
+			return 0, p.sctx.Error
 		}
 	}
-	return p.sctx.Token
+	return p.sctx.Token, nil
+}
+
+func (p *parser) scan() rune {
+	r, err := p.scanRune()
+	if err != nil {
+		p.error(err.Error())
+	}
+	return r
 }
 
 func (p *parser) unscan() {
