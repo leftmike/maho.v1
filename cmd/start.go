@@ -20,9 +20,7 @@ import (
 	"github.com/leftmike/maho/sql"
 	"github.com/leftmike/maho/storage"
 	"github.com/leftmike/maho/storage/basic"
-	"github.com/leftmike/maho/storage/keyval"
 	"github.com/leftmike/maho/storage/kvrows"
-	"github.com/leftmike/maho/storage/rowcols"
 )
 
 var (
@@ -143,21 +141,14 @@ func newServer(args []string) (*server.Server, error) {
 	switch store {
 	case "basic":
 		st, err = basic.NewStore(dataDir)
-	case "rowcols":
-		st, err = rowcols.NewStore(dataDir)
 	case "badger":
-		st, err = keyval.NewBadgerStore(dataDir, log.StandardLogger())
-	case "bbolt":
-		st, err = keyval.NewBBoltStore(dataDir)
-	case "kvrows":
 		st, err = kvrows.NewBadgerStore(dataDir, log.StandardLogger())
 	case "pebble":
 		st, err = kvrows.NewPebbleStore(dataDir, log.StandardLogger())
 	default:
 		return nil,
 			fmt.Errorf(
-				"maho: got %s for store; want basic, rowcols, badger, bbolt, kvrows, or pebble",
-				store)
+				"maho: got %s for store; want basic, badger, or pebble", store)
 	}
 	if err != nil {
 		return nil, fmt.Errorf("maho: %s", err)

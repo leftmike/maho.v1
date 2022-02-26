@@ -28,6 +28,8 @@ To Do:
 -- use sample databases
 -- usda.sql: foreign keys
 
+- go.mod: change to go 1.17 or 1.18
+
 - kvrows
 -- cleanup proposals
 -- consider making Rows() incremental, maybe as blocks of rows
@@ -56,6 +58,33 @@ To Do:
    guard against concurrent updates (read lock referenced rows)
 -- storage/test: test Rows, IndexRows: guard = true
 -- write lock happens as proposal; can read lock be separate for kvrows?
+
+- storage
+-- add bbolt to kvrows
+-- add btree to kvrows
+-- kvrows
+--- encode all versions (and optional proposal) of a row under a single key
+message RowData {
+    optional bytes TransactionKey = 1;
+    repeated ProposedUpdate Updates = 2;
+    repeated Rows RowValue = 3;
+}
+
+message RowValue {
+    uint64 Version = 1;
+    bytes Value = 2;
+}
+--- simplify KV interface; Update is atomic for an individual key
+type Iterator interface {
+	Item(fn func(key, val []byte) error) error
+	Close()
+}
+
+type KV interface {
+	Iterate(key []byte) (Iterator, error)
+	Update(key []byte, fn func(val []byte) ([]byte, error)) error
+}
+-- may need to remove guard tests in storage/test/guard.go
 */
 
 import (

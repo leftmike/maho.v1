@@ -7,15 +7,15 @@ import (
 	"testing"
 	"time"
 
-	_ "github.com/lib/pq"
-
 	"github.com/leftmike/sqltest/sqltestdb"
+	_ "github.com/lib/pq"
+	log "github.com/sirupsen/logrus"
 
 	"github.com/leftmike/maho/engine"
 	"github.com/leftmike/maho/flags"
 	"github.com/leftmike/maho/server"
 	"github.com/leftmike/maho/sql"
-	"github.com/leftmike/maho/storage/rowcols"
+	"github.com/leftmike/maho/storage/kvrows"
 )
 
 func TestProto3(t *testing.T) {
@@ -24,7 +24,7 @@ func TestProto3(t *testing.T) {
 	dataDir := filepath.Join("testdata", "proto3")
 	os.MkdirAll(dataDir, 0755)
 
-	st, err := rowcols.NewStore(dataDir)
+	st, err := kvrows.NewPebbleStore(dataDir, log.StandardLogger())
 	if err != nil {
 		t.Fatal(err)
 	}

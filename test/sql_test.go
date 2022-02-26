@@ -15,9 +15,7 @@ import (
 	"github.com/leftmike/maho/sql"
 	"github.com/leftmike/maho/storage"
 	"github.com/leftmike/maho/storage/basic"
-	"github.com/leftmike/maho/storage/keyval"
 	"github.com/leftmike/maho/storage/kvrows"
-	"github.com/leftmike/maho/storage/rowcols"
 	"github.com/leftmike/maho/test"
 	"github.com/leftmike/maho/testutil"
 )
@@ -84,22 +82,7 @@ var (
 			newStore: basic.NewStore,
 		},
 		{
-			name:     "rowcols",
-			newStore: rowcols.NewStore,
-		},
-		{
 			name: "badger",
-			newStore: func(dataDir string) (*storage.Store, error) {
-				return keyval.NewBadgerStore(dataDir,
-					testutil.SetupLogger(filepath.Join(dataDir, "badger_test.log")))
-			},
-		},
-		{
-			name:     "bbolt",
-			newStore: keyval.NewBBoltStore,
-		},
-		{
-			name: "kvrows",
 			newStore: func(dataDir string) (*storage.Store, error) {
 				return kvrows.NewBadgerStore(dataDir,
 					testutil.SetupLogger(filepath.Join(dataDir, "badger_test.log")))

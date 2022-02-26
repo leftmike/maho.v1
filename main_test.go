@@ -6,6 +6,8 @@ import (
 	"strings"
 	"testing"
 
+	log "github.com/sirupsen/logrus"
+
 	"github.com/leftmike/maho/engine"
 	"github.com/leftmike/maho/evaluate"
 	"github.com/leftmike/maho/flags"
@@ -14,7 +16,7 @@ import (
 	"github.com/leftmike/maho/sql"
 	"github.com/leftmike/maho/storage"
 	"github.com/leftmike/maho/storage/basic"
-	"github.com/leftmike/maho/storage/rowcols"
+	"github.com/leftmike/maho/storage/kvrows"
 	"github.com/leftmike/maho/testutil"
 )
 
@@ -155,7 +157,7 @@ func TestMain(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	st, err = rowcols.NewStore("testdata")
+	st, err = kvrows.NewBadgerStore("testdata", log.StandardLogger())
 	if err != nil {
 		t.Fatal(err)
 	}
