@@ -59,22 +59,12 @@ To Do:
 -- storage/test: test Rows, IndexRows: guard = true
 -- write lock happens as proposal; can read lock be separate for kvrows?
 
-- storage
+- storage: kvrows
 -- add bbolt to kvrows
 -- add btree to kvrows
--- kvrows
---- encode all versions (and optional proposal) of a row under a single key
-message RowData {
-    optional bytes TransactionKey = 1;
-    repeated ProposedUpdate Updates = 2;
-    repeated Rows RowValue = 3;
-}
-
-message RowValue {
-    uint64 Version = 1;
-    bytes Value = 2;
-}
---- simplify KV interface; Update is atomic for an individual key
+-- rename txdata.proto to rowdata.proto
+-- simplify KV interface; Update is atomic for an individual key
+-- maybe need batch updates
 type Iterator interface {
 	Item(fn func(key, val []byte) error) error
 	Close()

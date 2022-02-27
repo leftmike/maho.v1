@@ -2,6 +2,16 @@ syntax = "proto3";
 
 option go_package = "./kvrows";
 
+message RowData {
+    ProposalData Proposal = 1;
+    repeated RowValue Rows = 2;
+}
+
+message RowValue {
+    uint64 Version = 1;
+    bytes Value = 2;
+}
+
 message ProposalData {
     uint64 TXID = 1;
     repeated ProposedUpdate Updates = 2;

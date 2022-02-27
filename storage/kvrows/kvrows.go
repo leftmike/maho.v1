@@ -341,15 +341,16 @@ func (kvtx *transaction) NextStmt() {
 	kvtx.sid += 1
 }
 
-func (kvt *table) unmarshalProposal(key, val []byte) (*ProposalData, error) {
-	var pd ProposalData
-	err := proto.Unmarshal(val, &pd)
-	if err != nil || len(pd.Updates) == 0 {
-		return nil, fmt.Errorf("kvrows: %s: unable to unmarshal proposal at %v: %v", kvt.tn, key,
+func (kvt *table) unmarshalRowData(key, val []byte) (*RowData, error) {
+	var rd RowData
+	err := proto.Unmarshal(val, &rd)
+	if err != nil || (rd.Proposal == nil && len(rd.Rows) == 0) ||
+		(rd.Proposal != nil && len(rd.Proposal.Updates) == 0) {
+		return nil, fmt.Errorf("kvrows: %s: unable to unmarshal row data at %v: %v", kvt.tn, key,
 			val)
 	}
 
-	return &pd, nil
+	return &rd, nil
 }
 
 func (kvt *table) decodeRow(key, val []byte) ([]sql.Value, error) {
@@ -360,42 +361,6 @@ func (kvt *table) decodeRow(key, val []byte) ([]sql.Value, error) {
 	}
 
 	return row, nil
-}
-
-func (kvt *table) getProposedRow(key, val []byte) ([]sql.Value, bool, error) {
-	pd, err := kvt.unmarshalProposal(key, val)
-	if err != nil {
-		return nil, false, err
-	}
-
-	if pd.TXID == kvt.tx.txid {
-		for _, pu := range pd.Updates {
-			if pu.SID < kvt.tx.sid {
-				var row []sql.Value
-				if len(pu.Value) > 0 {
-					row, err = kvt.decodeRow(key, pu.Value)
-					if err != nil {
-						return nil, false, err
-					}
-				}
-				return row, true, nil
-			}
-		}
-	} else {
-		state, commitVer := kvt.st.getTxState(pd.TXID)
-		if state == TransactionState_Committed && commitVer <= kvt.tx.ver {
-			var row []sql.Value
-			if len(pd.Updates[0].Value) > 0 {
-				row, err = kvt.decodeRow(key, pd.Updates[0].Value)
-				if err != nil {
-					return nil, false, err
-				}
-			}
-			return row, true, nil
-		}
-	}
-
-	return nil, false, nil
 }
 
 func (kvt *table) makeKey(key []sql.ColumnKey, iid int64, row []sql.Value) []byte {
@@ -422,16 +387,12 @@ func (kvt *table) fetchRows(ctx context.Context, minKey, maxKey []byte) ([][]sql
 	defer it.Close()
 
 	var vals [][]sql.Value
-	var prevKey []byte
-	var skipping bool
 	for {
 		err = it.Item(
 			func(key, val []byte) error {
-				if len(key) < 16 {
+				if len(key) < 8 {
 					return fmt.Errorf("kvrows: %s: key too short: %v", kvt.tn, key)
 				}
-				ver := ^binary.BigEndian.Uint64(key[len(key)-8:])
-				key = key[:len(key)-8]
 
 				if maxKey == nil {
 					if !bytes.Equal(minKey[:8], key[:8]) {
@@ -441,39 +402,53 @@ func (kvt *table) fetchRows(ctx context.Context, minKey, maxKey []byte) ([][]sql
 					return io.EOF
 				}
 
-				if skipping {
-					// XXX: maybe use iterator Seek to <key> <ver:0>?
-					if !bytes.Equal(prevKey, key) {
-						skipping = false
+				rd, err := kvt.unmarshalRowData(key, val)
+				if err != nil {
+					return err
+				}
+
+				if rd.Proposal != nil {
+					if rd.Proposal.TXID == kvt.tx.txid {
+						for _, pu := range rd.Proposal.Updates {
+							if pu.SID < kvt.tx.sid {
+								if len(pu.Value) > 0 {
+									row, err := kvt.decodeRow(key, pu.Value)
+									if err != nil {
+										return err
+									}
+									vals = append(vals, row)
+								}
+								return nil
+							}
+						}
+					} else {
+						state, ver := kvt.st.getTxState(rd.Proposal.TXID)
+						if state == TransactionState_Committed && ver <= kvt.tx.ver {
+							if len(rd.Proposal.Updates[0].Value) > 0 {
+								row, err := kvt.decodeRow(key, rd.Proposal.Updates[0].Value)
+								if err != nil {
+									return err
+								}
+								vals = append(vals, row)
+							}
+							return nil
+						}
 					}
 				}
 
-				if !skipping {
-					if ver == ProposalVersion {
-						var err error
-						var row []sql.Value
-						row, skipping, err = kvt.getProposedRow(key, val)
-						if err != nil {
-							return err
-						}
-						if row != nil {
-							vals = append(vals, row)
-						}
-					} else if ver <= kvt.tx.ver {
-						if len(val) > 0 {
-							row, err := kvt.decodeRow(key, val)
+				for _, rv := range rd.Rows {
+					if rv.Version <= kvt.tx.ver {
+						if len(rv.Value) > 0 {
+							row, err := kvt.decodeRow(key, rv.Value)
 							if err != nil {
 								return err
 							}
 							vals = append(vals, row)
 						}
-						skipping = true
-					}
-
-					if skipping {
-						prevKey = append(make([]byte, 0, len(key)), key...)
+						return nil
 					}
 				}
+
 				return nil
 			})
 		if err != nil {
@@ -540,94 +515,71 @@ func (kvt *table) IndexRows(ctx context.Context, iidx int,
 	}, nil
 }
 
-func makeKeyVersion(key []byte, ver uint64) []byte {
-	buf := append(make([]byte, 0, len(key)+8), key...)
-	return util.EncodeUint64(buf, ^ver)
-}
-
-func (kvt *table) prepareUpdate(upd Updater, updateKey []byte) (*ProposalData, bool, error) {
-	var pd *ProposalData
-	err := upd.Get(makeKeyVersion(updateKey, ProposalVersion),
-		func(val []byte) error {
-			var err error
-			pd, err = kvt.unmarshalProposal(updateKey, val)
-			return err
-		})
-	if err == io.EOF {
-		return &ProposalData{TXID: kvt.tx.txid}, false, nil
-	} else if err != nil {
-		return nil, false, err
-	}
-
-	pu := pd.Updates[0]
-	if pd.TXID == kvt.tx.txid {
-		if pu.SID == kvt.tx.sid {
-			return nil, false, fmt.Errorf("kvrows: %s: multiple updates of %v", kvt.tn, updateKey)
-		}
-		return pd, len(pu.Value) != 0, nil
-	} else {
-		state, ver := kvt.st.getTxState(pd.TXID)
-		if state == TransactionState_Active {
-			return nil, false, fmt.Errorf("kvrows: %s: conflict with proposed version of %v",
-				kvt.tn, updateKey)
-		} else if state == TransactionState_Committed {
-			if ver > kvt.tx.ver {
-				return nil, false, fmt.Errorf("kvrows: %s: conflict with newer version of %v",
-					kvt.tn, updateKey)
-			}
-			err := upd.Set(makeKeyVersion(updateKey, ver), pu.Value)
-			if err != nil {
-				return nil, false, err
-			}
-			return &ProposalData{TXID: kvt.tx.txid}, len(pu.Value) != 0, nil
-		}
-
-		// Proposal was aborted; look for highest versioned value.
-	}
-
-	it, err := upd.Iterate(makeKeyVersion(updateKey, ProposalVersion-1))
-	if err != nil {
-		return nil, false, err
-	}
-	defer it.Close()
-
-	var existing bool
-	err = it.Item(
-		func(key, val []byte) error {
-			if len(key) < 16 {
-				return fmt.Errorf("kvrows: %s: key too short: %v", kvt.tn, key)
-			}
-			ver := ^binary.BigEndian.Uint64(key[len(key)-8:])
-			key = key[:len(key)-8]
-
-			if !bytes.Equal(updateKey, key) {
-				return io.EOF
-			}
-
-			if ver > kvt.tx.ver {
-				return fmt.Errorf("kvrows: %s: conflict with newer version of %v",
-					kvt.tn, updateKey)
-			}
-
-			existing = len(val) > 0
-			return nil
-		})
-	if err == io.EOF {
-		return &ProposalData{TXID: kvt.tx.txid}, false, nil
-	} else if err != nil {
-		return nil, false, err
-	}
-
-	return &ProposalData{TXID: kvt.tx.txid}, existing, nil
-}
-
 func (kvt *table) proposeUpdate(upd Updater, updateKey []byte, row []sql.Value,
 	mustExist bool) error {
 
-	pd, exists, err := kvt.prepareUpdate(upd, updateKey)
-	if err != nil {
+	var rd *RowData
+	err := upd.Get(updateKey,
+		func(val []byte) error {
+			var err error
+			rd, err = kvt.unmarshalRowData(updateKey, val)
+			return err
+		})
+	if err == io.EOF {
+		rd = &RowData{}
+	} else if err != nil {
 		return err
 	}
+
+	var exists bool
+	if rd.Proposal != nil {
+		if rd.Proposal.TXID == kvt.tx.txid {
+			if rd.Proposal.Updates[0].SID == kvt.tx.sid {
+				return fmt.Errorf("kvrows: %s: multiple updates of %v", kvt.tn, updateKey)
+			}
+			exists = (len(rd.Proposal.Updates[0].Value) != 0)
+		} else {
+			state, ver := kvt.st.getTxState(rd.Proposal.TXID)
+			if state == TransactionState_Active {
+				return fmt.Errorf("kvrows: %s: conflict with proposed version of %v", kvt.tn,
+					updateKey)
+			} else if state == TransactionState_Committed {
+				if ver > kvt.tx.ver {
+					return fmt.Errorf("kvrows: %s: conflict with newer version of %v", kvt.tn,
+						updateKey)
+				}
+
+				exists = (len(rd.Proposal.Updates[0].Value) != 0)
+				rd.Rows = append([]*RowValue{
+					&RowValue{
+						Version: ver,
+						Value:   rd.Proposal.Updates[0].Value,
+					},
+				}, rd.Rows...)
+				rd.Proposal = nil
+			} else { // state == TransactionState_Aborted
+				if len(rd.Rows) == 0 {
+					exists = false
+				} else if rd.Rows[0].Version > kvt.tx.ver {
+					return fmt.Errorf("kvrows: %s: conflict with newer version of %v", kvt.tn,
+						updateKey)
+				} else {
+					exists = (len(rd.Rows[0].Value) != 0)
+				}
+				rd.Proposal = nil
+			}
+		}
+	} else {
+		if len(rd.Rows) == 0 {
+			exists = false
+		} else if rd.Rows[0].Version > kvt.tx.ver {
+			return fmt.Errorf("kvrows: %s: conflict with newer version of %v", kvt.tn,
+				updateKey)
+		} else {
+			exists = (len(rd.Rows[0].Value) != 0)
+		}
+	}
+
 	if mustExist {
 		if !exists {
 			panic(fmt.Sprintf("kvrows: %s: row missing for update at %v", kvt.tn, updateKey))
@@ -645,18 +597,32 @@ func (kvt *table) proposeUpdate(upd Updater, updateKey []byte, row []sql.Value,
 	if len(row) > 0 {
 		rowValue = encode.EncodeRowValue(row)
 	}
-	pd.Updates = append([]*ProposedUpdate{
-		&ProposedUpdate{
-			SID:   kvt.tx.sid,
-			Value: rowValue,
-		},
-	}, pd.Updates...)
+	if rd.Proposal == nil {
+		rd.Proposal = &ProposalData{
+			TXID: kvt.tx.txid,
+			Updates: []*ProposedUpdate{
+				&ProposedUpdate{
+					SID:   kvt.tx.sid,
+					Value: rowValue,
+				},
+			},
+		}
+	} else {
+		rd.Proposal.Updates = []*ProposedUpdate{
+			&ProposedUpdate{
+				SID:   kvt.tx.sid,
+				Value: rowValue,
+			},
+			rd.Proposal.Updates[0],
+		}
+	}
 
-	val, err := proto.Marshal(pd)
+	val, err := proto.Marshal(rd)
 	if err != nil {
 		return err
 	}
-	return upd.Set(makeKeyVersion(updateKey, ProposalVersion), val)
+	return upd.Set(updateKey, val)
+
 }
 
 func (kvt *table) Insert(ctx context.Context, rows [][]sql.Value) error {
