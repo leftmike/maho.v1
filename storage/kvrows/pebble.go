@@ -68,6 +68,32 @@ func (pit pebbleIterator) Close() {
 	}
 }
 
+func (pkv *pebbleKV) Update(key []byte, fn func(val []byte) ([]byte, error)) error {
+	pkv.mutex.Lock()
+	defer pkv.mutex.Unlock()
+
+	val, closer, err := pkv.db.Get(key)
+
+	var newVal []byte
+	if err == pebble.ErrNotFound {
+		newVal, err = fn(nil)
+	} else if err != nil {
+		return err
+	} else {
+		newVal, err = fn(val)
+		closer.Close()
+	}
+
+	if err != nil {
+		return err
+	}
+
+	if len(newVal) == 0 {
+		return pkv.db.Delete(key, nil)
+	}
+	return pkv.db.Set(key, newVal, nil)
+}
+
 func (pkv *pebbleKV) Get(key []byte, fn func(val []byte) error) error {
 	val, closer, err := pkv.db.Get(key)
 	if err != nil {
@@ -81,7 +107,7 @@ func (pkv *pebbleKV) Get(key []byte, fn func(val []byte) error) error {
 	return fn(val)
 }
 
-func (pkv *pebbleKV) Update() (Updater, error) {
+func (pkv *pebbleKV) Updater() (Updater, error) {
 	pkv.mutex.Lock()
 
 	return pebbleUpdater{

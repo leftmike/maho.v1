@@ -101,9 +101,9 @@ func runKVTest(t *testing.T, kv kvrows.KV, cmds []kvCmd) {
 			}
 		case updateCmd:
 			var err error
-			updater, err = kv.Update()
+			updater, err = kv.Updater()
 			if err != nil {
-				t.Errorf("%sUpdate() failed with %s", cmd.fln, err)
+				t.Errorf("%sUpdater() failed with %s", cmd.fln, err)
 			}
 		case getCmd:
 			if updater == nil {

@@ -76,6 +76,47 @@ func (bit badgerIterator) Close() {
 	}
 }
 
+func (bkv *badgerKV) Update(key []byte, fn func(val []byte) ([]byte, error)) error {
+	bkv.mutex.Lock()
+	defer bkv.mutex.Unlock()
+
+	tx := bkv.db.NewTransaction(true)
+	item, err := tx.Get(key)
+
+	var newVal []byte
+	if err == badger.ErrKeyNotFound {
+		newVal, err = fn(nil)
+	} else if err != nil {
+		tx.Discard()
+		return err
+	} else {
+		err = item.Value(
+			func(val []byte) error {
+				var err error
+				newVal, err = fn(val)
+				return err
+			})
+	}
+
+	if err != nil {
+		tx.Discard()
+		return err
+	}
+
+	if len(newVal) == 0 {
+		err = tx.Delete(key)
+	} else {
+		err = tx.Set(key, newVal)
+	}
+
+	if err != nil {
+		tx.Discard()
+		return err
+	}
+
+	return tx.Commit()
+}
+
 func (bkv *badgerKV) Get(key []byte, fn func(val []byte) error) error {
 	tx := bkv.db.NewTransaction(false)
 	defer tx.Discard()
@@ -83,7 +124,7 @@ func (bkv *badgerKV) Get(key []byte, fn func(val []byte) error) error {
 	return get(tx, key, fn)
 }
 
-func (bkv *badgerKV) Update() (Updater, error) {
+func (bkv *badgerKV) Updater() (Updater, error) {
 	bkv.mutex.Lock()
 
 	return badgerUpdater{

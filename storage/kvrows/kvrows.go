@@ -29,8 +29,7 @@ const (
 )
 
 var (
-	errTransactionComplete = errors.New("keyval: transaction already completed")
-	versionKey             = []byte{0, 0, 0, 0, 0, 0, 0, 0, 'v', 'e', 'r', 's', 'i', 'o', 'n'}
+	errTransactionComplete = errors.New("kvrows: transaction already completed")
 	epochKey               = []byte{0, 0, 0, 0, 0, 0, 0, 0, 'e', 'p', 'o', 'c', 'h'}
 )
 
@@ -49,8 +48,11 @@ type Iterator interface {
 
 type KV interface {
 	Iterate(key []byte) (Iterator, error)
+	Update(key []byte, fn func(val []byte) ([]byte, error)) error
+
+	// XXX: remove
 	Get(key []byte, fn func(val []byte) error) error
-	Update() (Updater, error)
+	Updater() (Updater, error)
 }
 
 type kvStore struct {
@@ -121,19 +123,6 @@ func NewPebbleStore(dataDir string, logger *log.Logger) (*storage.Store, error) 
 	return storage.NewStore("kvrows", kvst, init)
 }
 
-func getUint64(kv KV, key []byte) (uint64, error) {
-	var u64 uint64
-	err := kv.Get(key,
-		func(val []byte) error {
-			if len(val) != 8 {
-				return fmt.Errorf("keyval: key %v: len(val) != 8: %d", key, len(val))
-			}
-			u64 = binary.BigEndian.Uint64(val)
-			return nil
-		})
-	return u64, err
-}
-
 func loadTransactions(kv KV) (map[uint64]*TransactionData, error) {
 	it, err := kv.Iterate(util.EncodeUint64(make([]byte, 0, 8), transactionsRID))
 	if err != nil {
@@ -175,29 +164,25 @@ func loadTransactions(kv KV) (map[uint64]*TransactionData, error) {
 	return transactions, nil
 }
 
-func setTransactionData(upd Updater, txid uint64, td *TransactionData) error {
-	val, err := proto.Marshal(td)
-	if err != nil {
-		return err
-	}
-	return upd.Set(
-		util.EncodeUint64(util.EncodeUint64(make([]byte, 0, 16), transactionsRID), txid), val)
-}
-
 func makeStore(kv KV) (*kvStore, bool, error) {
 	var init bool
-	ver, err := getUint64(kv, versionKey)
-	if err == io.EOF {
-		init = true
-	} else if err != nil {
-		return nil, false, err
-	}
+	var epoch uint64
+	err := kv.Update(epochKey,
+		func(val []byte) ([]byte, error) {
+			if len(val) == 8 {
+				epoch = binary.BigEndian.Uint64(val)
+			} else if len(val) == 0 {
+				init = true
+			} else {
+				return nil, fmt.Errorf("kvrows: key %v: len(val) != 8: %d", epochKey, len(val))
+			}
+			epoch += 1
 
-	epoch, err := getUint64(kv, epochKey)
-	if err != nil && err != io.EOF {
+			return util.EncodeUint64(make([]byte, 0, 8), epoch), nil
+		})
+	if err != nil {
 		return nil, false, err
 	}
-	epoch += 1
 
 	transactions, err := loadTransactions(kv)
 	if err != nil {
@@ -207,43 +192,29 @@ func makeStore(kv KV) (*kvStore, bool, error) {
 	kvst := &kvStore{
 		kv:           kv,
 		transactions: transactions,
-		ver:          ver,
 		epoch:        epoch,
 	}
 
-	upd, err := kvst.kv.Update()
+	err = kvst.startupStore()
 	if err != nil {
 		return nil, false, err
 	}
-	err = kvst.startupStore(upd)
-	if err != nil {
-		upd.Rollback()
-		return nil, false, err
-	}
-	err = upd.Commit(true)
-	if err != nil {
-		return nil, false, err
-	}
-
 	return kvst, init, nil
 }
 
-func (kvst *kvStore) startupStore(upd Updater) error {
-	err := upd.Set(epochKey, util.EncodeUint64(make([]byte, 0, 8), kvst.epoch))
-	if err != nil {
-		return err
-	}
-
+func (kvst *kvStore) startupStore() error {
 	for txid, td := range kvst.transactions {
 		if txid > kvst.lastTXID {
 			kvst.lastTXID = txid
 		}
 		if td.State == TransactionState_Active {
 			td.State = TransactionState_Aborted
-			err = setTransactionData(upd, txid, td)
+			err := kvst.setTransactionData(txid, td)
 			if err != nil {
 				return err
 			}
+		} else if td.State == TransactionState_Committed && td.Version >= kvst.ver {
+			kvst.ver = td.Version + 1
 		}
 	}
 
@@ -268,16 +239,12 @@ func (kvst *kvStore) Table(ctx context.Context, tx engine.Transaction, tn sql.Ta
 }
 
 func (kvst *kvStore) setTransactionData(txid uint64, td *TransactionData) error {
-	upd, err := kvst.kv.Update()
-	if err != nil {
-		return err
-	}
-	err = setTransactionData(upd, txid, td)
-	if err != nil {
-		upd.Rollback()
-		return err
-	}
-	return upd.Commit(false)
+	return kvst.kv.Update(
+		util.EncodeUint64(util.EncodeUint64(make([]byte, 0, 16), transactionsRID), txid),
+		func(val []byte) ([]byte, error) {
+			// XXX: check val
+			return proto.Marshal(td)
+		})
 }
 
 func (kvst *kvStore) Begin(sesid uint64) engine.Transaction {
@@ -326,19 +293,8 @@ func (kvst *kvStore) commit(ctx context.Context, txid uint64) error {
 		Version: ver,
 	}
 
-	upd, err := kvst.kv.Update()
+	err := kvst.setTransactionData(txid, td)
 	if err != nil {
-		return kvst.rollback(txid)
-	}
-	err = setTransactionData(upd, txid, td)
-	if err == nil {
-		err = upd.Set(versionKey, util.EncodeUint64(make([]byte, 0, 8), ver))
-		if err == nil {
-			err = upd.Commit(true)
-		}
-	}
-	if err != nil {
-		upd.Rollback()
 		return kvst.rollback(txid)
 	}
 
@@ -356,17 +312,7 @@ func (kvst *kvStore) rollback(txid uint64) error {
 	td.State = TransactionState_Aborted
 	kvst.mutex.Unlock()
 
-	upd, err := kvst.kv.Update()
-	if err == nil {
-		err = setTransactionData(upd, txid, td)
-		if err != nil {
-			upd.Rollback()
-		} else {
-			err = upd.Commit(false)
-		}
-	}
-
-	return err
+	return kvst.setTransactionData(txid, td)
 }
 
 func (kvtx *transaction) Commit(ctx context.Context) error {
@@ -714,7 +660,7 @@ func (kvt *table) proposeUpdate(upd Updater, updateKey []byte, row []sql.Value,
 }
 
 func (kvt *table) Insert(ctx context.Context, rows [][]sql.Value) error {
-	upd, err := kvt.st.kv.Update()
+	upd, err := kvt.st.kv.Updater()
 	if err != nil {
 		return err
 	}
@@ -742,7 +688,7 @@ func (kvt *table) Insert(ctx context.Context, rows [][]sql.Value) error {
 func (kvt *table) fillIndex(ctx context.Context, il storage.IndexLayout,
 	rows [][]sql.Value) error {
 
-	upd, err := kvt.st.kv.Update()
+	upd, err := kvt.st.kv.Updater()
 	if err != nil {
 		return err
 	}
@@ -812,7 +758,7 @@ func (kvr *rows) Next(ctx context.Context) ([]sql.Value, error) {
 }
 
 func (kvt *table) deleteRow(ctx context.Context, row []sql.Value) error {
-	upd, err := kvt.st.kv.Update()
+	upd, err := kvt.st.kv.Updater()
 	if err != nil {
 		return err
 	}
@@ -878,7 +824,7 @@ func (kvt *table) updateIndexes(upd Updater, updatedCols []int,
 func (kvt *table) updateRow(ctx context.Context, updatedCols []int,
 	row, updateRow []sql.Value) error {
 
-	upd, err := kvt.st.kv.Update()
+	upd, err := kvt.st.kv.Updater()
 	if err != nil {
 		return err
 	}
