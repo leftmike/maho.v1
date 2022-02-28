@@ -62,7 +62,6 @@ To Do:
 - storage: kvrows
 -- add bbolt to kvrows
 -- add btree to kvrows
--- rename txdata.proto to rowdata.proto
 -- simplify KV interface; Update is atomic for an individual key
 -- maybe need batch updates
 type Iterator interface {
