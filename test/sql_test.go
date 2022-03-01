@@ -78,14 +78,20 @@ var (
 		newStore func(dataDir string) (*storage.Store, error)
 	}{
 		{
-			name:     "basic",
-			newStore: basic.NewStore,
-		},
-		{
 			name: "badger",
 			newStore: func(dataDir string) (*storage.Store, error) {
 				return kvrows.NewBadgerStore(dataDir,
 					testutil.SetupLogger(filepath.Join(dataDir, "badger_test.log")))
+			},
+		},
+		{
+			name:     "basic",
+			newStore: basic.NewStore,
+		},
+		{
+			name: "bbolt",
+			newStore: func(dataDir string) (*storage.Store, error) {
+				return kvrows.NewBBoltStore(dataDir)
 			},
 		},
 		{

@@ -123,6 +123,20 @@ func NewPebbleStore(dataDir string, logger *log.Logger) (*storage.Store, error) 
 	return storage.NewStore("kvrows", kvst, init)
 }
 
+func NewBBoltStore(dataDir string) (*storage.Store, error) {
+	kv, err := MakeBBoltKV(dataDir)
+	if err != nil {
+		return nil, err
+	}
+
+	kvst, init, err := makeStore(kv)
+	if err != nil {
+		return nil, err
+	}
+
+	return storage.NewStore("kvrows", kvst, init)
+}
+
 func loadTransactions(kv KV) (map[uint64]*TransactionData, error) {
 	it, err := kv.Iterate(util.EncodeUint64(make([]byte, 0, 8), transactionsRID))
 	if err != nil {

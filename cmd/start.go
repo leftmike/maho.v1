@@ -139,16 +139,18 @@ func newServer(args []string) (*server.Server, error) {
 	var st *storage.Store
 	var err error
 	switch store {
-	case "basic":
-		st, err = basic.NewStore(dataDir)
 	case "badger":
 		st, err = kvrows.NewBadgerStore(dataDir, log.StandardLogger())
+	case "basic":
+		st, err = basic.NewStore(dataDir)
+	case "bbolt":
+		st, err = kvrows.NewBBoltStore(dataDir)
 	case "pebble":
 		st, err = kvrows.NewPebbleStore(dataDir, log.StandardLogger())
 	default:
 		return nil,
 			fmt.Errorf(
-				"maho: got %s for store; want basic, badger, or pebble", store)
+				"maho: got %s for store; want badger, basic, bbolt, or pebble", store)
 	}
 	if err != nil {
 		return nil, fmt.Errorf("maho: %s", err)
