@@ -89,9 +89,13 @@ var (
 			newStore: basic.NewStore,
 		},
 		{
-			name: "bbolt",
+			name:     "bbolt",
+			newStore: kvrows.NewBBoltStore,
+		},
+		{
+			name: "btree",
 			newStore: func(dataDir string) (*storage.Store, error) {
-				return kvrows.NewBBoltStore(dataDir)
+				return kvrows.NewBTreeStore()
 			},
 		},
 		{

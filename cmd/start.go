@@ -145,12 +145,14 @@ func newServer(args []string) (*server.Server, error) {
 		st, err = basic.NewStore(dataDir)
 	case "bbolt":
 		st, err = kvrows.NewBBoltStore(dataDir)
+	case "btree":
+		st, err = kvrows.NewBTreeStore()
 	case "pebble":
 		st, err = kvrows.NewPebbleStore(dataDir, log.StandardLogger())
 	default:
 		return nil,
 			fmt.Errorf(
-				"maho: got %s for store; want badger, basic, bbolt, or pebble", store)
+				"maho: got %s for store; want badger, basic, bbolt, btree, or pebble", store)
 	}
 	if err != nil {
 		return nil, fmt.Errorf("maho: %s", err)

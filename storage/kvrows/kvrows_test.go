@@ -164,3 +164,28 @@ func TestBBoltHelper(t *testing.T) {
 			return st, nil
 		})
 }
+
+func TestBTreeKVRows(t *testing.T) {
+	st, err := kvrows.NewBTreeStore()
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	test.RunDatabaseTest(t, st)
+	test.RunTableTest(t, st)
+	test.RunSchemaTest(t, st)
+	test.RunTableLifecycleTest(t, st)
+	test.RunTableRowsTest(t, st)
+
+	test.RunIndexLifecycleTest(t, st)
+	test.RunIndexOneColUniqueTest(t, st)
+	test.RunIndexTwoColUniqueTest(t, st)
+	test.RunIndexOneColTest(t, st)
+	test.RunIndexTwoColTest(t, st)
+	test.RunPrimaryMinMaxTest(t, st)
+	test.RunIndexMinMaxTest(t, st)
+
+	test.RunGuardTest(t, st)
+	test.RunStressTest(t, st)
+	test.RunParallelTest(t, st)
+}

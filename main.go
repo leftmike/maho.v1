@@ -60,7 +60,6 @@ To Do:
 -- write lock happens as proposal; can read lock be separate for kvrows?
 
 - storage: kvrows
--- add btree to kvrows
 -- think about keys as <tid><rid><key>
 -- simplify KV interface; Update is atomic for an individual key
 -- maybe need batch updates
