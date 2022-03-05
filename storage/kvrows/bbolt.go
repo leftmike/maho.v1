@@ -1,6 +1,7 @@
 package kvrows
 
 import (
+	"bytes"
 	"errors"
 	"fmt"
 	"io"
@@ -18,10 +19,10 @@ type bboltKV struct {
 }
 
 type bboltIterator struct {
-	tx   *bbolt.Tx
-	cr   *bbolt.Cursor
-	key  []byte
-	next bool
+	tx     *bbolt.Tx
+	cr     *bbolt.Cursor
+	minKey []byte
+	maxKey []byte
 }
 
 type bboltUpdater struct {
@@ -73,30 +74,30 @@ func (bkv bboltKV) begin(writable bool) (*bbolt.Tx, *bbolt.Bucket, error) {
 	return tx, bkt, nil
 }
 
-func (bkv bboltKV) Iterate(key []byte) (Iterator, error) {
+func (bkv bboltKV) Iterate(minKey, maxKey []byte) (Iterator, error) {
 	tx, bkt, err := bkv.begin(false)
 	if err != nil {
 		return nil, err
 	}
 
 	return &bboltIterator{
-		tx:  tx,
-		cr:  bkt.Cursor(),
-		key: append(make([]byte, 0, len(key)), key...),
+		tx:     tx,
+		cr:     bkt.Cursor(),
+		minKey: minKey,
+		maxKey: maxKey,
 	}, nil
 }
 
 func (bit *bboltIterator) Item(fn func(key, val []byte) error) error {
 	var key, val []byte
-	if bit.next {
+	if bit.minKey == nil {
 		key, val = bit.cr.Next()
 	} else {
-		key, val = bit.cr.Seek(bit.key)
-		bit.next = true
-		bit.key = nil
+		key, val = bit.cr.Seek(bit.minKey)
+		bit.minKey = nil
 	}
 
-	if key == nil {
+	if key == nil || bytes.Compare(bit.maxKey, key) < 0 {
 		return io.EOF
 	}
 
@@ -158,13 +159,6 @@ func (bkv bboltKV) Updater() (Updater, error) {
 	return bboltUpdater{
 		tx:  tx,
 		bkt: bkt,
-	}, nil
-}
-
-func (bu bboltUpdater) Iterate(key []byte) (Iterator, error) {
-	return &bboltIterator{
-		cr:  bu.bkt.Cursor(),
-		key: append(make([]byte, 0, len(key)), key...),
 	}, nil
 }
 

@@ -7,6 +7,7 @@ import (
 	"path/filepath"
 	"testing"
 
+	"github.com/leftmike/maho/storage/encode"
 	"github.com/leftmike/maho/storage/kvrows"
 	"github.com/leftmike/maho/testutil"
 )
@@ -47,7 +48,7 @@ func runKVTest(t *testing.T, kv kvrows.KV, cmds []kvCmd) {
 		switch cmd.cmd {
 		case iterateCmd:
 			keyVals := cmd.keyVals
-			it, err := kv.Iterate([]byte(cmd.key))
+			it, err := kv.Iterate([]byte(cmd.key), encode.MaxKey)
 			if err != nil {
 				t.Errorf("%sIterate() failed with %s", cmd.fln, err)
 				break

@@ -3,7 +3,6 @@ package kvrows
 //go:generate protoc --go_opt=paths=source_relative --go_out=. rowdata.proto
 
 import (
-	"bytes"
 	"context"
 	"encoding/binary"
 	"errors"
@@ -34,7 +33,6 @@ var (
 )
 
 type Updater interface {
-	Iterate(key []byte) (Iterator, error)
 	Get(key []byte, fn func(val []byte) error) error
 	Set(key, val []byte) error
 	Commit(sync bool) error
@@ -47,7 +45,7 @@ type Iterator interface {
 }
 
 type KV interface {
-	Iterate(key []byte) (Iterator, error)
+	Iterate(minKey, maxKey []byte) (Iterator, error)
 	Update(key []byte, fn func(val []byte) ([]byte, error)) error
 
 	// XXX: remove
@@ -152,7 +150,8 @@ func NewBTreeStore() (*storage.Store, error) {
 }
 
 func loadTransactions(kv KV) (map[uint64]*TransactionData, error) {
-	it, err := kv.Iterate(util.EncodeUint64(make([]byte, 0, 8), transactionsRID))
+	it, err := kv.Iterate(util.EncodeUint64(make([]byte, 0, 8), transactionsRID),
+		util.EncodeUint64(make([]byte, 0, 8), transactionsRID+1))
 	if err != nil {
 		return nil, err
 	}
@@ -408,7 +407,12 @@ func (kvt *table) makePrimaryKey(row []sql.Value) []byte {
 }
 
 func (kvt *table) fetchRows(ctx context.Context, minKey, maxKey []byte) ([][]sql.Value, error) {
-	it, err := kvt.st.kv.Iterate(minKey)
+	if maxKey == nil {
+		maxKey = append(make([]byte, 0, 8+len(encode.MaxKey)), minKey[:8]...)
+		maxKey = append(maxKey, encode.MaxKey...)
+	}
+
+	it, err := kvt.st.kv.Iterate(minKey, maxKey)
 	if err != nil {
 		return nil, err
 	}
@@ -420,14 +424,6 @@ func (kvt *table) fetchRows(ctx context.Context, minKey, maxKey []byte) ([][]sql
 			func(key, val []byte) error {
 				if len(key) < 8 {
 					return fmt.Errorf("kvrows: %s: key too short: %v", kvt.tn, key)
-				}
-
-				if maxKey == nil {
-					if !bytes.Equal(minKey[:8], key[:8]) {
-						return io.EOF
-					}
-				} else if bytes.Compare(maxKey, key) < 0 {
-					return io.EOF
 				}
 
 				rd, err := kvt.unmarshalRowData(key, val)

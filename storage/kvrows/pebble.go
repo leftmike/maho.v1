@@ -1,6 +1,7 @@
 package kvrows
 
 import (
+	"bytes"
 	"io"
 	"os"
 	"sync"
@@ -15,8 +16,9 @@ type pebbleKV struct {
 }
 
 type pebbleIterator struct {
-	snap *pebble.Snapshot
-	it   *pebble.Iterator
+	snap   *pebble.Snapshot
+	it     *pebble.Iterator
+	maxKey []byte
 }
 
 type pebbleUpdater struct {
@@ -36,14 +38,15 @@ func MakePebbleKV(dataDir string, logger *log.Logger) (KV, error) {
 	}, nil
 }
 
-func (pkv *pebbleKV) Iterate(key []byte) (Iterator, error) {
+func (pkv *pebbleKV) Iterate(minKey, maxKey []byte) (Iterator, error) {
 	snap := pkv.db.NewSnapshot()
 	it := snap.NewIter(nil)
-	it.SeekGE(key)
+	it.SeekGE(minKey)
 
 	return pebbleIterator{
-		snap: snap,
-		it:   it,
+		snap:   snap,
+		it:     it,
+		maxKey: maxKey,
 	}, nil
 }
 
@@ -52,7 +55,12 @@ func (pit pebbleIterator) Item(fn func(key, val []byte) error) error {
 		return io.EOF
 	}
 
-	err := fn(pit.it.Key(), pit.it.Value())
+	key := pit.it.Key()
+	if bytes.Compare(pit.maxKey, key) < 0 {
+		return io.EOF
+	}
+
+	err := fn(key, pit.it.Value())
 	if err != nil {
 		return err
 	}
@@ -113,15 +121,6 @@ func (pkv *pebbleKV) Updater() (Updater, error) {
 	return pebbleUpdater{
 		kv:    pkv,
 		batch: pkv.db.NewIndexedBatch(),
-	}, nil
-}
-
-func (pu pebbleUpdater) Iterate(key []byte) (Iterator, error) {
-	it := pu.batch.NewIter(nil)
-	it.SeekGE(key)
-
-	return pebbleIterator{
-		it: it,
 	}, nil
 }
 

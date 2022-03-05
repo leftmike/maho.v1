@@ -1,6 +1,7 @@
 package kvrows
 
 import (
+	"bytes"
 	"io"
 	"os"
 	"sync"
@@ -15,8 +16,9 @@ type badgerKV struct {
 }
 
 type badgerIterator struct {
-	tx *badger.Txn
-	it *badger.Iterator
+	tx     *badger.Txn
+	it     *badger.Iterator
+	maxKey []byte
 }
 
 type badgerUpdater struct {
@@ -40,14 +42,15 @@ func MakeBadgerKV(dataDir string, logger *log.Logger) (KV, error) {
 	}, nil
 }
 
-func (bkv *badgerKV) Iterate(key []byte) (Iterator, error) {
+func (bkv *badgerKV) Iterate(minKey, maxKey []byte) (Iterator, error) {
 	tx := bkv.db.NewTransaction(false)
 	it := tx.NewIterator(badger.DefaultIteratorOptions)
-	it.Seek(key)
+	it.Seek(minKey)
 
 	return badgerIterator{
-		tx: tx,
-		it: it,
+		tx:     tx,
+		it:     it,
+		maxKey: maxKey,
 	}, nil
 }
 
@@ -59,7 +62,11 @@ func (bit badgerIterator) Item(fn func(key, val []byte) error) error {
 	item := bit.it.Item()
 	err := item.Value(
 		func(val []byte) error {
-			return fn(item.Key(), val)
+			key := item.Key()
+			if bytes.Compare(bit.maxKey, key) < 0 {
+				return io.EOF
+			}
+			return fn(key, val)
 		})
 	if err != nil {
 		return err
@@ -130,15 +137,6 @@ func (bkv *badgerKV) Updater() (Updater, error) {
 	return badgerUpdater{
 		kv: bkv,
 		tx: bkv.db.NewTransaction(true),
-	}, nil
-}
-
-func (bu badgerUpdater) Iterate(key []byte) (Iterator, error) {
-	it := bu.tx.NewIterator(badger.DefaultIteratorOptions)
-	it.Seek(key)
-
-	return badgerIterator{
-		it: it,
 	}, nil
 }
 

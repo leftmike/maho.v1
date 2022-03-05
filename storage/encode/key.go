@@ -22,6 +22,11 @@ const (
 	Float64NaNReverseKeyTag = 144
 	StringKeyTag            = 150
 	BytesKeyTag             = 160
+	MaxKeyTag               = 255
+)
+
+var (
+	MaxKey = []byte{MaxKeyTag}
 )
 
 func encodeKeyBytes(buf []byte, bytes []byte, reverse bool) []byte {

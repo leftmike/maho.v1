@@ -60,6 +60,8 @@ To Do:
 -- write lock happens as proposal; can read lock be separate for kvrows?
 
 - storage: kvrows
+-- add short flag to skip some of the tests: testing.Short()
+-- may need to remove guard tests in storage/test/guard.go
 -- think about keys as <tid><rid><key>
 -- simplify KV interface; Update is atomic for an individual key
 -- maybe need batch updates
@@ -72,7 +74,6 @@ type KV interface {
 	Iterate(key []byte) (Iterator, error)
 	Update(key []byte, fn func(val []byte) ([]byte, error)) error
 }
--- may need to remove guard tests in storage/test/guard.go
 */
 
 import (
