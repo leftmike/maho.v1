@@ -15,10 +15,8 @@ type btreeKV struct {
 }
 
 type btreeIterator struct {
-	tree   *btree.BTree
-	idx    int
-	items  []btreeItem
-	maxKey []byte
+	idx   int
+	items []btreeItem
 }
 
 type btreeUpdater struct {
@@ -50,49 +48,25 @@ func (bkv *btreeKV) Iterate(minKey, maxKey []byte) (Iterator, error) {
 	var items []btreeItem
 	tree.AscendGreaterOrEqual(btreeItem{key: minKey},
 		func(item btree.Item) bool {
-			items = append(items, item.(btreeItem))
-			return len(items) < 8
+			bi := item.(btreeItem)
+			if bytes.Compare(maxKey, bi.key) < 0 {
+				return false
+			}
+			items = append(items, bi)
+			return true
 		})
 
 	return &btreeIterator{
-		tree:   tree,
-		items:  items,
-		maxKey: maxKey,
+		items: items,
 	}, nil
 }
 
 func (bit *btreeIterator) Item(fn func(key, val []byte) error) error {
-	if len(bit.items) == 0 {
-		return io.EOF
-	}
-
 	if bit.idx == len(bit.items) {
-		key := bit.items[len(bit.items)-1].key
-
-		bit.idx = 0
-		bit.items = bit.items[:0]
-
-		var rest bool
-		bit.tree.AscendGreaterOrEqual(btreeItem{key: key},
-			func(item btree.Item) bool {
-				if rest {
-					bit.items = append(bit.items, item.(btreeItem))
-				}
-				rest = true
-				return len(bit.items) < 8
-			})
-
-		if len(bit.items) == 0 {
-			return io.EOF
-		}
-	}
-
-	key := bit.items[bit.idx].key
-	if bytes.Compare(bit.maxKey, key) < 0 {
 		return io.EOF
 	}
 
-	err := fn(key, bit.items[bit.idx].val)
+	err := fn(bit.items[bit.idx].key, bit.items[bit.idx].val)
 	bit.idx += 1
 	return err
 }
