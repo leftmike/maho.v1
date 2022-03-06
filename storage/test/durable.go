@@ -15,17 +15,22 @@ var (
 	durableTests = []struct {
 		dbname sql.Identifier
 		tests  []interface{}
+		short  bool
 	}{
-		{sql.ID("durable_database_test"), databaseTests},
-		{sql.ID("durable_tbl_lifecycle_test"), tableLifecycleTests},
-		{sql.ID("durable_table_test"), tableTests},
-		{sql.ID("durable_schema_test"), schemaTests},
-		{sql.ID("durable_table_rows_test"), tableRowsTests},
+		{sql.ID("durable_database_test"), databaseTests, false},
+		{sql.ID("durable_tbl_lifecycle_test"), tableLifecycleTests, true},
+		{sql.ID("durable_table_test"), tableTests, false},
+		{sql.ID("durable_schema_test"), schemaTests, true},
+		{sql.ID("durable_table_rows_test"), tableRowsTests, false},
 	}
 )
 
-func DurableTests(t *testing.T, helper string) {
+func DurableTests(t *testing.T, short bool, helper string) {
 	for grp := range durableTests {
+		if durableTests[grp].short && short {
+			continue
+		}
+
 		for num := range durableTests[grp].tests {
 			cmd := exec.Command(os.Args[0], fmt.Sprintf("-test.run=%s", helper))
 			cmd.Env = append(

@@ -47,7 +47,7 @@ func TestBadgerDurability(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	test.DurableTests(t, "TestBadgerHelper")
+	test.DurableTests(t, testing.Short(), "TestBadgerHelper")
 }
 
 func TestBadgerHelper(t *testing.T) {
@@ -100,7 +100,7 @@ func TestPebbleDurability(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	test.DurableTests(t, "TestPebbleHelper")
+	test.DurableTests(t, testing.Short(), "TestPebbleHelper")
 }
 
 func TestPebbleHelper(t *testing.T) {
@@ -151,7 +151,7 @@ func TestBBoltDurability(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	test.DurableTests(t, "TestBBoltHelper")
+	test.DurableTests(t, testing.Short(), "TestBBoltHelper")
 }
 
 func TestBBoltHelper(t *testing.T) {
