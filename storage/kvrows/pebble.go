@@ -76,11 +76,17 @@ func (pit pebbleIterator) Close() {
 	}
 }
 
-func (pkv *pebbleKV) Update(key []byte, fn func(val []byte) ([]byte, error)) error {
+func (pkv *pebbleKV) Updater() (Updater, error) {
 	pkv.mutex.Lock()
-	defer pkv.mutex.Unlock()
 
-	val, closer, err := pkv.db.Get(key)
+	return pebbleUpdater{
+		kv:    pkv,
+		batch: pkv.db.NewIndexedBatch(),
+	}, nil
+}
+
+func (pu pebbleUpdater) Update(key []byte, fn func(val []byte) ([]byte, error)) error {
+	val, closer, err := pu.batch.Get(key)
 
 	var newVal []byte
 	if err == pebble.ErrNotFound {
@@ -97,48 +103,9 @@ func (pkv *pebbleKV) Update(key []byte, fn func(val []byte) ([]byte, error)) err
 	}
 
 	if len(newVal) == 0 {
-		return pkv.db.Delete(key, nil)
+		return pu.batch.Delete(key, nil)
 	}
-	return pkv.db.Set(key, newVal, nil)
-}
-
-func (pkv *pebbleKV) Get(key []byte, fn func(val []byte) error) error {
-	val, closer, err := pkv.db.Get(key)
-	if err != nil {
-		if err == pebble.ErrNotFound {
-			return io.EOF
-		}
-		return err
-	}
-	defer closer.Close()
-
-	return fn(val)
-}
-
-func (pkv *pebbleKV) Updater() (Updater, error) {
-	pkv.mutex.Lock()
-
-	return pebbleUpdater{
-		kv:    pkv,
-		batch: pkv.db.NewIndexedBatch(),
-	}, nil
-}
-
-func (pu pebbleUpdater) Get(key []byte, fn func(val []byte) error) error {
-	val, closer, err := pu.batch.Get(key)
-	if err != nil {
-		if err == pebble.ErrNotFound {
-			return io.EOF
-		}
-		return err
-	}
-	defer closer.Close()
-
-	return fn(val)
-}
-
-func (pu pebbleUpdater) Set(key, val []byte) error {
-	return pu.batch.Set(key, val, nil)
+	return pu.batch.Set(key, newVal, nil)
 }
 
 func (pu pebbleUpdater) Commit(sync bool) error {

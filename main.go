@@ -62,17 +62,6 @@ To Do:
 - storage: kvrows
 -- may need to remove guard tests in storage/test/guard.go
 -- think about keys as <tid><rid><key>
--- simplify KV interface; Update is atomic for an individual key
--- maybe need batch updates
-type Iterator interface {
-	Item(fn func(key, val []byte) error) error
-	Close()
-}
-
-type KV interface {
-	Iterate(key []byte) (Iterator, error)
-	Update(key []byte, fn func(val []byte) ([]byte, error)) error
-}
 */
 
 import (

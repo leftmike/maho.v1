@@ -110,47 +110,6 @@ func (bit *bboltIterator) Close() {
 	}
 }
 
-func (bkv bboltKV) Update(key []byte, fn func(val []byte) ([]byte, error)) error {
-	tx, bkt, err := bkv.begin(true)
-	if err != nil {
-		return err
-	}
-
-	val, err := fn(bkt.Get(key))
-	if err != nil {
-		tx.Rollback()
-		return err
-	}
-
-	if len(val) == 0 {
-		err = bkt.Delete(key)
-	} else {
-		err = bkt.Put(key, val)
-	}
-
-	if err != nil {
-		tx.Rollback()
-		return err
-	}
-
-	tx.Commit()
-	return nil
-}
-
-func (bkv bboltKV) Get(key []byte, fn func(val []byte) error) error {
-	tx, bkt, err := bkv.begin(false)
-	if err != nil {
-		return err
-	}
-	defer tx.Rollback()
-
-	val := bkt.Get(key)
-	if val == nil {
-		return io.EOF
-	}
-	return fn(val)
-}
-
 func (bkv bboltKV) Updater() (Updater, error) {
 	tx, bkt, err := bkv.begin(true)
 	if err != nil {
@@ -162,16 +121,19 @@ func (bkv bboltKV) Updater() (Updater, error) {
 	}, nil
 }
 
-func (bu bboltUpdater) Get(key []byte, fn func(val []byte) error) error {
-	val := bu.bkt.Get(key)
-	if val == nil {
-		return io.EOF
+func (bu bboltUpdater) Update(key []byte, fn func(val []byte) ([]byte, error)) error {
+	val, err := fn(bu.bkt.Get(key))
+	if err != nil {
+		return err
 	}
-	return fn(val)
-}
 
-func (bu bboltUpdater) Set(key, val []byte) error {
-	return bu.bkt.Put(key, val)
+	if len(val) == 0 {
+		err = bu.bkt.Delete(key)
+	} else {
+		err = bu.bkt.Put(key, val)
+	}
+
+	return err
 }
 
 func (bu bboltUpdater) Commit(sync bool) error {

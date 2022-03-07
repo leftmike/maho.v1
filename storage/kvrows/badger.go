@@ -83,18 +83,22 @@ func (bit badgerIterator) Close() {
 	}
 }
 
-func (bkv *badgerKV) Update(key []byte, fn func(val []byte) ([]byte, error)) error {
+func (bkv *badgerKV) Updater() (Updater, error) {
 	bkv.mutex.Lock()
-	defer bkv.mutex.Unlock()
 
-	tx := bkv.db.NewTransaction(true)
-	item, err := tx.Get(key)
+	return badgerUpdater{
+		kv: bkv,
+		tx: bkv.db.NewTransaction(true),
+	}, nil
+}
+
+func (bu badgerUpdater) Update(key []byte, fn func(val []byte) ([]byte, error)) error {
+	item, err := bu.tx.Get(key)
 
 	var newVal []byte
 	if err == badger.ErrKeyNotFound {
 		newVal, err = fn(nil)
 	} else if err != nil {
-		tx.Discard()
 		return err
 	} else {
 		err = item.Value(
@@ -106,60 +110,16 @@ func (bkv *badgerKV) Update(key []byte, fn func(val []byte) ([]byte, error)) err
 	}
 
 	if err != nil {
-		tx.Discard()
 		return err
 	}
 
 	if len(newVal) == 0 {
-		err = tx.Delete(key)
+		err = bu.tx.Delete(key)
 	} else {
-		err = tx.Set(key, newVal)
+		err = bu.tx.Set(key, newVal)
 	}
 
-	if err != nil {
-		tx.Discard()
-		return err
-	}
-
-	return tx.Commit()
-}
-
-func (bkv *badgerKV) Get(key []byte, fn func(val []byte) error) error {
-	tx := bkv.db.NewTransaction(false)
-	defer tx.Discard()
-
-	return get(tx, key, fn)
-}
-
-func (bkv *badgerKV) Updater() (Updater, error) {
-	bkv.mutex.Lock()
-
-	return badgerUpdater{
-		kv: bkv,
-		tx: bkv.db.NewTransaction(true),
-	}, nil
-}
-
-func (bu badgerUpdater) Get(key []byte, fn func(val []byte) error) error {
-	return get(bu.tx, key, fn)
-}
-
-func get(tx *badger.Txn, key []byte, fn func(val []byte) error) error {
-	item, err := tx.Get(key)
-	if err != nil {
-		if err == badger.ErrKeyNotFound {
-			return io.EOF
-		}
-		return err
-	}
-	return item.Value(
-		func(val []byte) error {
-			return fn(val)
-		})
-}
-
-func (bu badgerUpdater) Set(key, val []byte) error {
-	return bu.tx.Set(key, val)
+	return err
 }
 
 func (bu badgerUpdater) Commit(sync bool) error {

@@ -75,50 +75,6 @@ func (bit *btreeIterator) Close() {
 	// Nothing.
 }
 
-func (bkv *btreeKV) Update(key []byte, fn func(val []byte) ([]byte, error)) error {
-	bkv.updateMutex.Lock()
-	defer bkv.updateMutex.Unlock()
-
-	bkv.treeMutex.Lock()
-	tree := bkv.tree.Clone()
-	bkv.treeMutex.Unlock()
-
-	item := tree.Get(btreeItem{key: key})
-
-	var val []byte
-	if item != nil {
-		val = item.(btreeItem).val
-	}
-
-	val, err := fn(val)
-	if err != nil {
-		return err
-	}
-
-	if len(val) == 0 {
-		tree.Delete(btreeItem{key: key})
-	} else {
-		tree.ReplaceOrInsert(btreeItem{key: key, val: val})
-	}
-
-	bkv.treeMutex.Lock()
-	bkv.tree = tree
-	bkv.treeMutex.Unlock()
-	return nil
-}
-
-func (bkv *btreeKV) Get(key []byte, fn func(val []byte) error) error {
-	bkv.treeMutex.Lock()
-	tree := bkv.tree
-	bkv.treeMutex.Unlock()
-
-	item := tree.Get(btreeItem{key: key})
-	if item == nil {
-		return io.EOF
-	}
-	return fn(item.(btreeItem).val)
-}
-
 func (bkv *btreeKV) Updater() (Updater, error) {
 	bkv.updateMutex.Lock()
 
@@ -132,16 +88,24 @@ func (bkv *btreeKV) Updater() (Updater, error) {
 	}, nil
 }
 
-func (bu btreeUpdater) Get(key []byte, fn func(val []byte) error) error {
+func (bu btreeUpdater) Update(key []byte, fn func(val []byte) ([]byte, error)) error {
 	item := bu.tree.Get(btreeItem{key: key})
-	if item == nil {
-		return io.EOF
-	}
-	return fn(item.(btreeItem).val)
-}
 
-func (bu btreeUpdater) Set(key, val []byte) error {
-	bu.tree.ReplaceOrInsert(btreeItem{key: key, val: val})
+	var val []byte
+	if item != nil {
+		val = item.(btreeItem).val
+	}
+
+	val, err := fn(val)
+	if err != nil {
+		return err
+	}
+
+	if len(val) == 0 {
+		bu.tree.Delete(btreeItem{key: key})
+	} else {
+		bu.tree.ReplaceOrInsert(btreeItem{key: key, val: val})
+	}
 	return nil
 }
 
