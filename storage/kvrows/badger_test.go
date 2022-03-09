@@ -1,22 +1,21 @@
 package kvrows_test
 
 import (
+	"errors"
+	"fmt"
+	"io"
 	"path/filepath"
 	"testing"
 
+	"github.com/leftmike/maho/storage/encode"
 	"github.com/leftmike/maho/storage/kvrows"
 	"github.com/leftmike/maho/testutil"
 )
 
-/*
-XXX: fix
-
 const (
 	iterateCmd = iota
-	getKVCmd
+	updaterCmd
 	updateCmd
-	getCmd
-	setCmd
 	commitCmd
 	rollbackCmd
 )
@@ -31,7 +30,8 @@ type kvCmd struct {
 	cmd     int
 	fail    bool
 	key     string
-	val     string
+	oldVal  string
+	newVal  string
 	keyVals []keyVal
 }
 
@@ -84,57 +84,38 @@ func runKVTest(t *testing.T, kv kvrows.KV, cmds []kvCmd) {
 				t.Errorf("%sIterate() not enough key vals: %d", cmd.fln, len(keyVals))
 			}
 			it.Close()
-		case getKVCmd:
-			err := kv.Get([]byte(cmd.key),
-				func(val []byte) error {
-					if string(val) != cmd.val {
-						return fmt.Errorf("val: got %s want %s", string(val), cmd.val)
-					}
-					return nil
-				})
-			if cmd.fail {
-				if err == nil {
-					t.Errorf("%sGetAt() did not fail", cmd.fln)
-				}
-			} else if err != nil {
-				t.Errorf("%sGetAt() failed with %s", cmd.fln, err)
+
+		case updaterCmd:
+			if updater != nil {
+				panic("updater: updater is not nil")
 			}
-		case updateCmd:
+
 			var err error
 			updater, err = kv.Updater()
 			if err != nil {
 				t.Errorf("%sUpdater() failed with %s", cmd.fln, err)
 			}
-		case getCmd:
+
+		case updateCmd:
 			if updater == nil {
-				panic("get: updater is nil")
+				panic("update: updater is nil")
 			}
-			err := updater.Get([]byte(cmd.key),
-				func(val []byte) error {
-					if string(val) != cmd.val {
-						return fmt.Errorf("val: got %s want %s", string(val), cmd.val)
+
+			err := updater.Update([]byte(cmd.key),
+				func(val []byte) ([]byte, error) {
+					if string(val) != cmd.oldVal {
+						return nil, fmt.Errorf("val: got %s want %s", string(val), cmd.oldVal)
 					}
-					return nil
+					return []byte(cmd.newVal), nil
 				})
 			if cmd.fail {
 				if err == nil {
-					t.Errorf("%sGet() did not fail", cmd.fln)
+					t.Errorf("%sUpdate() did not fail", cmd.fln)
 				}
 			} else if err != nil {
-				t.Errorf("%sGet() failed with %s", cmd.fln, err)
+				t.Errorf("%sUpdate() failed with %s", cmd.fln, err)
 			}
-		case setCmd:
-			if updater == nil {
-				panic("set: updater is nil")
-			}
-			err := updater.Set([]byte(cmd.key), []byte(cmd.val))
-			if cmd.fail {
-				if err == nil {
-					t.Errorf("%sSet() did not fail", cmd.fln)
-				}
-			} else if err != nil {
-				t.Errorf("%sSet() failed with %s", cmd.fln, err)
-			}
+
 		case commitCmd:
 			if updater == nil {
 				panic("commit: updater is nil")
@@ -148,74 +129,67 @@ func runKVTest(t *testing.T, kv kvrows.KV, cmds []kvCmd) {
 				t.Errorf("%sCommit() failed with %s", cmd.fln, err)
 			}
 			updater = nil
+
 		case rollbackCmd:
 			if updater == nil {
 				panic("rollback: updater is nil")
 			}
 			updater.Rollback()
 			updater = nil
+
 		default:
 			panic(fmt.Sprintf("unexpected command: %d", cmd.cmd))
 		}
 	}
 }
-*/
 
 func testKV(t *testing.T, kv kvrows.KV) {
 	t.Helper()
-	/*
-		runKVTest(t, kv,
-			[]kvCmd{
-				{fln: fln(), cmd: iterateCmd, key: "A"},
-				{fln: fln(), cmd: getKVCmd, key: "A", fail: true},
-				{fln: fln(), cmd: updateCmd},
-				{fln: fln(), cmd: getCmd, key: "Aaaa", fail: true},
-				{fln: fln(), cmd: setCmd, key: "Aaaa", val: "aaa@2"},
-				{fln: fln(), cmd: setCmd, key: "Accc", val: "ccc@2"},
-				{fln: fln(), cmd: setCmd, key: "Abbb", val: "bbb@2"},
-				{fln: fln(), cmd: commitCmd},
 
-				{fln: fln(), cmd: iterateCmd, key: "A",
-					keyVals: []keyVal{
-						{"Aaaa", "aaa@2"},
-						{"Abbb", "bbb@2"},
-						{"Accc", "ccc@2"},
-					},
+	runKVTest(t, kv,
+		[]kvCmd{
+			{fln: fln(), cmd: iterateCmd, key: "A"},
+			{fln: fln(), cmd: updaterCmd},
+			{fln: fln(), cmd: updateCmd, key: "Aaaa", newVal: "aaa@2"},
+			{fln: fln(), cmd: updateCmd, key: "Accc", newVal: "ccc@2"},
+			{fln: fln(), cmd: updateCmd, key: "Abbb", newVal: "bbb@2"},
+			{fln: fln(), cmd: commitCmd},
+
+			{fln: fln(), cmd: iterateCmd, key: "A",
+				keyVals: []keyVal{
+					{"Aaaa", "aaa@2"},
+					{"Abbb", "bbb@2"},
+					{"Accc", "ccc@2"},
 				},
-				{fln: fln(), cmd: getKVCmd, key: "Aaaa", val: "aaa@2"},
+			},
 
-				{fln: fln(), cmd: updateCmd},
-				{fln: fln(), cmd: getCmd, key: "Abbb", val: "bbb@2"},
-				{fln: fln(), cmd: setCmd, key: "Abbb", val: "bbb@3"},
-				{fln: fln(), cmd: setCmd, key: "Addd", val: "ddd@3"},
-				{fln: fln(), cmd: commitCmd},
+			{fln: fln(), cmd: updaterCmd},
+			{fln: fln(), cmd: updateCmd, key: "Abbb", oldVal: "bbb@2", newVal: "bbb@3"},
+			{fln: fln(), cmd: updateCmd, key: "Addd", newVal: "ddd@3"},
+			{fln: fln(), cmd: commitCmd},
 
-				{fln: fln(), cmd: getKVCmd, key: "Abbb", val: "bbb@3"},
-				{fln: fln(), cmd: iterateCmd, key: "A",
-					keyVals: []keyVal{
-						{"Aaaa", "aaa@2"},
-						{"Abbb", "bbb@3"},
-						{"Accc", "ccc@2"},
-						{"Addd", "ddd@3"},
-					},
+			{fln: fln(), cmd: iterateCmd, key: "A",
+				keyVals: []keyVal{
+					{"Aaaa", "aaa@2"},
+					{"Abbb", "bbb@3"},
+					{"Accc", "ccc@2"},
+					{"Addd", "ddd@3"},
 				},
+			},
 
-				{fln: fln(), cmd: updateCmd},
-				{fln: fln(), cmd: getCmd, key: "Aaaa", val: "aaa@2"},
-				{fln: fln(), cmd: getCmd, key: "Abbb", val: "bbb@3"},
-				{fln: fln(), cmd: setCmd, key: "Abbb", val: "bbb@4"},
-				{fln: fln(), cmd: rollbackCmd},
+			{fln: fln(), cmd: updaterCmd},
+			{fln: fln(), cmd: updateCmd, key: "Abbb", oldVal: "bbb@3", newVal: "bbb@4"},
+			{fln: fln(), cmd: rollbackCmd},
 
-				{fln: fln(), cmd: iterateCmd, key: "A",
-					keyVals: []keyVal{
-						{"Aaaa", "aaa@2"},
-						{"Abbb", "bbb@3"},
-						{"Accc", "ccc@2"},
-						{"Addd", "ddd@3"},
-					},
+			{fln: fln(), cmd: iterateCmd, key: "A",
+				keyVals: []keyVal{
+					{"Aaaa", "aaa@2"},
+					{"Abbb", "bbb@3"},
+					{"Accc", "ccc@2"},
+					{"Addd", "ddd@3"},
 				},
-			})
-	*/
+			},
+		})
 }
 
 func TestBadgerKVStore(t *testing.T) {
