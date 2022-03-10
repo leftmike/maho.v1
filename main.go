@@ -52,16 +52,16 @@ To Do:
 
 - foreign key references
 -- need read lock on referenced keys
--- use SELECT ... [FOR SHARE] ???
--- engine.transaction: add guardCount; func EnterGuard(), func LeaveGuard()
--- engine.Table interface: Rows, IndexRows: add guard flag to get current snapshot _and_
+-- use SELECT ... [FOR SHARE]
+-- engine.Table interface: Rows, IndexRows: add readLock flag to get current snapshot _and_
    guard against concurrent updates (read lock referenced rows)
--- storage/test: test Rows, IndexRows: guard = true
--- write lock happens as proposal; can read lock be separate for kvrows?
+-- storage/test: test Rows, IndexRows: readLock = true
 
-- storage: kvrows
--- may need to remove guard tests in storage/test/guard.go
+- storage: distributed kvrows
 -- think about keys as <tid><rid><key>
+-- add key type as trailing byte on keys: row=1, transaction=2, metadata=3
+-- change transaction key to be the row key of the first proposal; part of one update batch
+-- change how version is tracked, maybe use an oracle
 */
 
 import (

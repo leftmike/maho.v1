@@ -36,7 +36,6 @@ func TestBadgerKVRows(t *testing.T) {
 	test.RunPrimaryMinMaxTest(t, st)
 	test.RunIndexMinMaxTest(t, st)
 
-	test.RunGuardTest(t, st)
 	test.RunStressTest(t, st)
 	test.RunParallelTest(t, st)
 }
@@ -89,7 +88,6 @@ func TestPebbleKVRows(t *testing.T) {
 	test.RunPrimaryMinMaxTest(t, st)
 	test.RunIndexMinMaxTest(t, st)
 
-	test.RunGuardTest(t, st)
 	test.RunStressTest(t, st)
 	test.RunParallelTest(t, st)
 }
@@ -140,7 +138,6 @@ func TestBBoltKVRows(t *testing.T) {
 	test.RunPrimaryMinMaxTest(t, st)
 	test.RunIndexMinMaxTest(t, st)
 
-	test.RunGuardTest(t, st)
 	test.RunStressTest(t, st)
 	test.RunParallelTest(t, st)
 }
@@ -185,7 +182,6 @@ func TestBTreeKVRows(t *testing.T) {
 	test.RunPrimaryMinMaxTest(t, st)
 	test.RunIndexMinMaxTest(t, st)
 
-	test.RunGuardTest(t, st)
 	test.RunStressTest(t, st)
 	test.RunParallelTest(t, st)
 }

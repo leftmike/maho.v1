@@ -108,7 +108,6 @@ type storeCmd struct {
 	colTypes  []sql.ColumnType
 	minRow    []sql.Value
 	maxRow    []sql.Value
-	guard     bool
 	rowsCheck func(vals [][]sql.Value) bool
 	thrd      int
 }
